@@ -763,6 +763,40 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }
     }
 
+    internal async Task OpenAppDetailsSettingsAsync()
+    {
+        if (!TryBeginOperation())
+        {
+            return;
+        }
+
+        try
+        {
+            var result = await _permissionService.OpenAppDetailsSettingsAsync();
+            StatusIsError = !result.Succeeded;
+            StatusMessage = string.IsNullOrWhiteSpace(result.Message)
+                ? "AppDetailsSettingsOpened"
+                : result.Message;
+        }
+        catch (Exception ex)
+        {
+            StatusIsError = true;
+            StatusMessage = ResolveExceptionMessage(ex, "AppDetailsSettingsFailed");
+        }
+        finally
+        {
+            try
+            {
+                await ReloadPlatformLogsAsync();
+            }
+            finally
+            {
+                EndOperation();
+                _settingsSaveCoordinator.TryStartQueued();
+            }
+        }
+    }
+
     private void ApplySnapshot(DashboardSnapshot snapshot)
     {
         _isApplyingSnapshot = true;

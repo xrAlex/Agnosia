@@ -52,6 +52,12 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
     public Task<OperationResult> RequestPermissionAsync(PermissionKind permission, CancellationToken cancellationToken = default) =>
         _permissionCoordinator.RequestPermissionAsync(permission, cancellationToken);
 
+    public Task<OperationResult> OpenAppDetailsSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        var result = _permissionCoordinator.OpenAppDetailsSettings();
+        return Task.FromResult(result);
+    }
+
     public async Task<bool> LoadOnboardingCompletedAsync(CancellationToken cancellationToken = default)
     {
         var activity = GetActivityHost().CurrentActivity;

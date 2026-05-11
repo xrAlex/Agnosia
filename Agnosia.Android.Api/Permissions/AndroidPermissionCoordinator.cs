@@ -73,7 +73,14 @@ internal sealed class AndroidPermissionCoordinator(
                 PermissionKind.Overlay,
                 "Поверх окон",
                 "Основной профиль",
-                "Необходимо для показа overlay-окна, которое позволяет запускать VPN после заморозки приложения в рабочем профиле",
+                """
+                Необходимо для показа overlay-окна, которое позволяет запускать VPN после заморозки приложения в рабочем профиле.
+
+                1. В верхней правой части экрана нажмите на ⋮.
+                2. Выберите «Разрешить доступ к настройкам».
+                3. Пролистайте вниз.
+                4. Разрешите «Поверх других приложений».
+                """,
                 AndroidPermissionApi.HasOverlayPermission(activity),
                 true,
                 "Получено",
@@ -95,7 +102,7 @@ internal sealed class AndroidPermissionCoordinator(
             PermissionKind.Notifications => AndroidPermissionApi.RequestNotificationPermission(activity),
             PermissionKind.VpnControl => await AndroidPermissionApi.RequestVpnControlAsync(commandRunner, cancellationToken),
             PermissionKind.PackageInstall => await RequestPackageInstallAccessAsync(cancellationToken),
-            PermissionKind.Overlay => AndroidPermissionApi.RequestOverlayPermission(activity),
+            PermissionKind.Overlay => AndroidPermissionApi.OpenAppDetailsSettings(activity),
             _ => OperationResult.Failure("Неизвестное разрешение.")
         };
     }
@@ -145,5 +152,12 @@ internal sealed class AndroidPermissionCoordinator(
             useWorkProfile: true,
             cancellationToken,
             "Включите установку APK из Agnosia в рабочем профиле.");
+    }
+
+    public OperationResult OpenAppDetailsSettings()
+    {
+        var activity = commandRunner.CurrentActivity;
+        AgnosiaRuntime.Initialize(activity);
+        return AndroidPermissionApi.OpenAppDetailsSettings(activity);
     }
 }

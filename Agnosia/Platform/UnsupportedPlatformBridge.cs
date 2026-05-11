@@ -28,6 +28,9 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
     public Task<OperationResult> RequestPermissionAsync(PermissionKind permission, CancellationToken cancellationToken = default) =>
         AndroidOnlyFailureTask;
 
+    public Task<OperationResult> OpenAppDetailsSettingsAsync(CancellationToken cancellationToken = default) =>
+        AndroidOnlyFailureTask;
+
     public Task<bool> LoadOnboardingCompletedAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(true);
 

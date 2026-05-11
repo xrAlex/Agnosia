@@ -13,7 +13,6 @@ internal static class AndroidPermissionApi
 {
     private const string LogTag = "AgnosiaPermissions";
     private const int NotificationPermissionRequestCode = 0x57C32;
-    private const int OverlayPermissionRequestCode = 0x57C33;
 
     public static bool HasNotificationPermission(Activity activity)
     {
@@ -107,26 +106,35 @@ internal static class AndroidPermissionApi
         }
     }
 
-    public static OperationResult RequestOverlayPermission(Activity activity)
+    public static OperationResult OpenAppDetailsSettings(Activity activity)
     {
         try
         {
-            if (Settings.CanDrawOverlays(activity))
+            var packageName = activity.PackageName;
+
+            if (string.IsNullOrWhiteSpace(packageName))
             {
-                return OperationResult.Success("Разрешение на overlay уже выдано.");
+                return OperationResult.Failure("Не удалось определить имя пакета приложения.");
             }
 
-            var intent = new Intent(
-                Settings.ActionManageOverlayPermission,
-                Uri.Parse("package:" + activity.PackageName));
-            activity.StartActivityForResult(intent, OverlayPermissionRequestCode);
-            return OperationResult.Success("Подтвердите разрешение на поверхностные окна в настройках Android.");
+            var uri = Uri.FromParts("package", packageName, null);
+            var intent = new Intent(Settings.ActionApplicationDetailsSettings);
+            
+            intent.SetData(uri);
+            activity.StartActivity(intent);
+
+            return OperationResult.Success(
+                "Пролистайте вниз и включите разрешение «Поверх других приложений» вручную.");
+        }
+        catch (ActivityNotFoundException exception)
+        {
+            Log.Warn(LogTag, $"Settings activity not found: {exception}");
+            return OperationResult.Failure("Android не нашёл страницу настроек приложения.");
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
-            Log.Warn(LogTag, $"Failed to request overlay permission: {exception}");
-            return OperationResult.Failure("Android не смог открыть запрос разрешения на поверхностные окна.");
+            Log.Warn(LogTag, $"Failed to open app details settings: {exception}");
+            return OperationResult.Failure("Android не смог открыть страницу настроек приложения.");
         }
     }
-
 }

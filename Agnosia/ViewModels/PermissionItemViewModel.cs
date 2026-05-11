@@ -31,6 +31,10 @@ public sealed partial class PermissionItemViewModel
 
     public string RequestLabel => Snapshot.IsGranted ? Snapshot.GrantedLabel : Snapshot.RequestLabel;
 
+
     [RelayCommand(CanExecute = nameof(CanRequest))]
     private Task RequestAsync() => _owner.RequestPermissionAsync(this);
+
+    [RelayCommand]
+    private Task OpenAppDetailsSettingsAsync() => _owner.OpenAppDetailsSettingsAsync();
 }
