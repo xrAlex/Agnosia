@@ -1,0 +1,227 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Agnosia.ViewModels"
+             mc:Ignorable="d"
+             x:Class="Agnosia.Views.AppsSectionView"
+             x:DataType="vm:DashboardWorkspaceViewModel">
+  <Design.DataContext>
+    <vm:DashboardWorkspaceViewModel />
+  </Design.DataContext>
+
+  <Grid Classes="content-root"
+        HorizontalAlignment="Stretch"
+        VerticalAlignment="Stretch"
+        RowDefinitions="Auto,*"
+        RowSpacing="10">
+    <StackPanel Grid.Row="0"
+                Spacing="10">
+      <TextBlock Classes="page-title"
+                 Text="Приложения" />
+
+      <StackPanel IsVisible="{Binding IsDashboardVisible}"
+                  Spacing="10">
+        <Border Classes="surface-card compact"
+                HorizontalAlignment="Stretch">
+          <Grid ColumnDefinitions="*,*"
+                ColumnSpacing="10">
+            <Button Classes="segment-chip profile-segment"
+                    Classes.selected="{Binding IsPersonalProfileSelected}"
+                    HorizontalAlignment="Stretch"
+                    Command="{Binding SelectPersonalCommand}"
+                    IsEnabled="{Binding HasSetup}">
+              <Grid ColumnDefinitions="Auto,*"
+                    ColumnSpacing="8">
+                  <PathIcon Classes="button-icon"
+                            Data="{StaticResource IconPersonalGeometry}" />
+                  <TextBlock Classes="button-label"
+                             Grid.Column="1"
+                             TextWrapping="NoWrap"
+                             Text="Личный" />
+                </Grid>
+            </Button>
+
+            <Button Grid.Column="1"
+                    Classes="segment-chip profile-segment"
+                    Classes.selected="{Binding IsWorkProfileSelected}"
+                    HorizontalAlignment="Stretch"
+                    Command="{Binding SelectWorkCommand}"
+                    IsEnabled="{Binding WorkProfileAvailable}">
+              <Grid ColumnDefinitions="Auto,*"
+                    ColumnSpacing="8">
+                  <PathIcon Classes="button-icon"
+                            Data="{StaticResource IconWorkGeometry}" />
+                  <TextBlock Classes="button-label"
+                             Grid.Column="1"
+                             TextWrapping="NoWrap"
+                             Text="Рабочий" />
+                </Grid>
+            </Button>
+          </Grid>
+        </Border>
+
+        <TextBox Watermark="Поиск по названию или имени пакета"
+                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+
+        <Border Classes="surface-card compact"
+                HorizontalAlignment="Stretch"
+                IsVisible="{Binding IsEmptyStateVisible}">
+          <TextBlock Classes="section-title compact"
+                     Text="Ничего не найдено" />
+        </Border>
+      </StackPanel>
+    </StackPanel>
+
+    <ScrollViewer Grid.Row="1"
+                  IsVisible="{Binding IsDashboardVisible}"
+                  BringIntoViewOnFocusChange="False"
+                  HorizontalScrollBarVisibility="Disabled">
+      <ItemsControl Classes="apps-list"
+                    ItemsSource="{Binding VisibleApps}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <VirtualizingStackPanel Orientation="Vertical" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:AppItemViewModel">
+            <Border HorizontalAlignment="Stretch"
+                    Classes="surface-card compact list-card"
+                    Transitions="{x:Null}">
+              <Grid RowDefinitions="Auto,Auto"
+                    RowSpacing="10">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto"
+                      ColumnSpacing="10">
+                  <Border Classes="app-icon-frame">
+                    <Grid>
+                      <Image Classes="app-icon"
+                             Source="{Binding Icon}"
+                             IsVisible="{Binding HasIcon}" />
+                      <Border Background="{StaticResource AppAccentBrush}"
+                              IsVisible="{Binding ShowMonogram}">
+                        <TextBlock HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Classes="app-monogram"
+                                   Text="{Binding Monogram}" />
+                      </Border>
+                    </Grid>
+                  </Border>
+
+                  <StackPanel Grid.Column="1"
+                              MinWidth="0"
+                              Spacing="2"
+                              VerticalAlignment="Center">
+                    <TextBlock Classes="app-title"
+                               Text="{Binding Label}" />
+                    <TextBlock Classes="package-name"
+                               Text="{Binding PackageName}" />
+                  </StackPanel>
+
+                  <Border Grid.Column="2"
+                          Classes="tag-chip dense"
+                          VerticalAlignment="Center">
+                    <TextBlock Classes="tag-label"
+                               Text="{Binding ProfileLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Profile.'}" />
+                  </Border>
+
+                  <Button Grid.Column="3"
+                          Classes="icon-action"
+                          Focusable="False"
+                          Transitions="{x:Null}">
+                    <PathIcon Classes="action-icon"
+                              Foreground="{StaticResource AppTextMutedBrush}"
+                              Data="{StaticResource IconMoreGeometry}" />
+                    <Button.Flyout>
+                      <MenuFlyout>
+                        <MenuItem Header="{Binding CloneLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}"
+                                  Command="{Binding CloneCommand}"
+                                  IsEnabled="{Binding CanClone}">
+                          <MenuItem.Icon>
+                            <PathIcon Classes="action-icon"
+                                      Data="{StaticResource IconCloneGeometry}" />
+                          </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{Binding MoveToWorkLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}"
+                                  Command="{Binding MoveToWorkCommand}"
+                                  IsVisible="{Binding CanMoveToWork}"
+                                  IsEnabled="{Binding CanMoveToWork}">
+                          <MenuItem.Icon>
+                            <PathIcon Classes="action-icon"
+                                      Data="{StaticResource IconWorkGeometry}" />
+                          </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{Binding LaunchLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}"
+                                  Command="{Binding LaunchCommand}"
+                                  IsVisible="{Binding ShowLaunch}"
+                                  IsEnabled="{Binding ShowLaunch}">
+                          <MenuItem.Icon>
+                            <PathIcon Classes="action-icon"
+                                      Data="{StaticResource IconLaunchGeometry}" />
+                          </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{Binding FreezeLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}"
+                                  Command="{Binding ToggleFrozenCommand}"
+                                  IsVisible="{Binding CanFreeze}"
+                                  IsEnabled="{Binding CanFreeze}">
+                          <MenuItem.Icon>
+                            <PathIcon Classes="action-icon"
+                                      Data="{StaticResource IconFreezeGeometry}" />
+                          </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{Binding CreateShortcutLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}"
+                                  Command="{Binding CreateShortcutCommand}"
+                                  IsVisible="{Binding ShowWorkControls}">
+                          <MenuItem.Icon>
+                            <PathIcon Classes="action-icon"
+                                      Data="{StaticResource IconLaunchGeometry}" />
+                          </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{Binding ForceFreezeLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}"
+                                  Command="{Binding ForceFreezeCommand}"
+                                  IsVisible="{Binding CanFreeze}"
+                                  IsEnabled="{Binding CanFreeze}">
+                          <MenuItem.Icon>
+                            <PathIcon Classes="action-icon"
+                                      Data="{StaticResource IconFreezeGeometry}" />
+                          </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{Binding UninstallLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}"
+                                  Command="{Binding UninstallCommand}"
+                                  IsEnabled="{Binding CanUninstall}">
+                          <MenuItem.Icon>
+                            <PathIcon Classes="action-icon"
+                                      Data="{StaticResource IconDeleteGeometry}" />
+                          </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="{Binding InteractionLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}"
+                                  Command="{Binding ToggleInteractionAccessCommand}"
+                                  IsVisible="{Binding ShowWorkControls}">
+                          <MenuItem.Icon>
+                            <PathIcon Classes="action-icon"
+                                      Data="{StaticResource IconInteractionGeometry}" />
+                          </MenuItem.Icon>
+                        </MenuItem>
+                      </MenuFlyout>
+                    </Button.Flyout>
+                  </Button>
+                </Grid>
+
+                <StackPanel Grid.Row="1"
+                            Spacing="8"
+                            IsVisible="{Binding ShowSecondaryRow}">
+                  <Border Classes="tag-chip dense"
+                          HorizontalAlignment="Left"
+                          IsVisible="{Binding HasStatusTag}">
+                    <TextBlock Classes="tag-label"
+                               Text="{Binding StatusTagLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Status.'}" />
+                  </Border>
+                </StackPanel>
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

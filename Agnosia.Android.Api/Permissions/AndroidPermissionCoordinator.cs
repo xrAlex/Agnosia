@@ -1,0 +1,149 @@
+using Agnosia.Models;
+using Android.Content;
+
+namespace Agnosia.Android.Api;
+
+internal sealed class AndroidPermissionCoordinator(
+    AndroidActivityCommandGateway commandRunner,
+    Func<CancellationToken, Task<OperationResult>> startProvisioningAsync)
+{
+    public async Task<IReadOnlyList<PermissionSnapshot>> LoadPermissionsAsync(CancellationToken cancellationToken)
+    {
+        var activity = commandRunner.CurrentActivity;
+        AgnosiaRuntime.Initialize(activity);
+
+        var hasWorkProfileTarget = AgnosiaUtilities.HasWorkProfileTarget(activity);
+        var workProfileAvailable = hasWorkProfileTarget && await commandRunner.CanReachWorkProfileAsync(cancellationToken);
+        var hasSetup = LocalStorageManager.Instance.GetBoolean(StorageKeys.HasSetup)
+            || hasWorkProfileTarget
+            || AgnosiaUtilities.HasAssociatedProfile(activity);
+        var usageAccessGranted = workProfileAvailable
+            && await AndroidProfileCommandGateway.QueryWorkUsageStatsAccessAsync(commandRunner, cancellationToken);
+        var workPackageInstallGranted = workProfileAvailable
+            && await AndroidProfileCommandGateway.QueryWorkPackageInstallAccessAsync(commandRunner, cancellationToken);
+
+        return
+        [
+            new PermissionSnapshot(
+                PermissionKind.WorkProfile,
+                "Рабочий профиль",
+                "Основной профиль",
+                "Нужен для изоляции клонированных приложений, скрытия пакетов и управления политиками рабочего пространства",
+                hasSetup && workProfileAvailable,
+                !hasSetup || !workProfileAvailable,
+                "Подключен",
+                hasSetup ? "Проверить профиль" : "Создать профиль"),
+            new PermissionSnapshot(
+                PermissionKind.UsageStats,
+                "Доступ к истории использования",
+                "Рабочий профиль",
+                "Позволяет Agnosia понять, когда вы перестали использовать приложение, и заморозить его",
+                usageAccessGranted,
+                workProfileAvailable,
+                "Получено",
+                "Открыть настройки"),
+            new PermissionSnapshot(
+                PermissionKind.Notifications,
+                "Уведомления",
+                "Основной профиль",
+                "Необходимо для отображения фоновой активности приложения",
+                AndroidPermissionApi.HasNotificationPermission(activity),
+                OperatingSystem.IsAndroidVersionAtLeast(33),
+                "Получено",
+                "Разрешить"),
+            new PermissionSnapshot(
+                PermissionKind.VpnControl,
+                "Временное управление VPN",
+                "Основной профиль",
+                "Позволяет приложению управлять VPN-соединениями",
+                AndroidPermissionApi.IsVpnPrepared(activity),
+                true,
+                "Получено",
+                "Разрешить"),
+            new PermissionSnapshot(
+                PermissionKind.PackageInstall,
+                "Установка APK",
+                "Рабочий профиль",
+                "Нужна для копирования пользовательских приложений в рабочий профиль через установщик APK",
+                workPackageInstallGranted,
+                workProfileAvailable,
+                "Получено",
+                "Открыть настройки"),
+            new PermissionSnapshot(
+                PermissionKind.Overlay,
+                "Поверх окон",
+                "Основной профиль",
+                "Необходимо для показа overlay-окна, которое позволяет запускать VPN после заморозки приложения в рабочем профиле",
+                AndroidPermissionApi.HasOverlayPermission(activity),
+                true,
+                "Получено",
+                "Разрешить")
+        ];
+    }
+
+    public async Task<OperationResult> RequestPermissionAsync(
+        PermissionKind permission,
+        CancellationToken cancellationToken)
+    {
+        var activity = commandRunner.CurrentActivity;
+        AgnosiaRuntime.Initialize(activity);
+
+        return permission switch
+        {
+            PermissionKind.WorkProfile => await startProvisioningAsync(cancellationToken),
+            PermissionKind.UsageStats => await RequestUsageStatsAccessAsync(cancellationToken),
+            PermissionKind.Notifications => AndroidPermissionApi.RequestNotificationPermission(activity),
+            PermissionKind.VpnControl => await AndroidPermissionApi.RequestVpnControlAsync(commandRunner, cancellationToken),
+            PermissionKind.PackageInstall => await RequestPackageInstallAccessAsync(cancellationToken),
+            PermissionKind.Overlay => AndroidPermissionApi.RequestOverlayPermission(activity),
+            _ => OperationResult.Failure("Неизвестное разрешение.")
+        };
+    }
+
+    public async Task EnsureUsageStatsAccessRequestedAsync(CancellationToken cancellationToken)
+    {
+        var storage = LocalStorageManager.Instance;
+        if (storage.GetBoolean(StorageKeys.UsageStatsAccessPrompted))
+        {
+            return;
+        }
+
+        if (await AndroidProfileCommandGateway.QueryWorkUsageStatsAccessAsync(commandRunner, cancellationToken))
+        {
+            storage.SetBoolean(StorageKeys.UsageStatsAccessPrompted, true);
+            return;
+        }
+
+        var requestResult = await RequestUsageStatsAccessAsync(cancellationToken);
+        if (requestResult.Succeeded)
+        {
+            storage.SetBoolean(StorageKeys.UsageStatsAccessPrompted, true);
+        }
+    }
+
+    private async Task<OperationResult> RequestUsageStatsAccessAsync(CancellationToken cancellationToken)
+    {
+        var intent = new Intent(AgnosiaActions.RequestUsageStatsAccess);
+        var result = await commandRunner.RunVoidOperationAsync(
+            intent,
+            useWorkProfile: true,
+            cancellationToken,
+            "Откройте Agnosia в списке и включите доступ к истории использования.");
+        if (result.Succeeded)
+        {
+            LocalStorageManager.Instance.SetBoolean(StorageKeys.UsageStatsAccessPrompted, true);
+        }
+
+        return result;
+    }
+
+    private Task<OperationResult> RequestPackageInstallAccessAsync(CancellationToken cancellationToken)
+    {
+        var intent = new Intent(AgnosiaActions.RequestPackageInstallAccess);
+        return commandRunner.RunVoidOperationAsync(
+            intent,
+            useWorkProfile: true,
+            cancellationToken,
+            "Включите установку APK из Agnosia в рабочем профиле.");
+    }
+}

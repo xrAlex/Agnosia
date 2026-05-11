@@ -1,0 +1,66 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Agnosia.ViewModels"
+             xmlns:views="using:Agnosia.Views"
+             mc:Ignorable="d"
+             x:Class="Agnosia.Views.PermissionsOverlayView"
+             x:DataType="vm:DashboardWorkspaceViewModel"
+             Classes="overlay-view"
+             IsVisible="{Binding IsPermissionsWindowOpen}">
+  <Design.DataContext>
+    <vm:DashboardWorkspaceViewModel />
+  </Design.DataContext>
+
+  <Border Background="{StaticResource AppOverlayScrimBrush}">
+    <Grid Classes="overlay-root">
+      <Border Classes="surface-card overlay-panel">
+        <Grid RowDefinitions="Auto,*,Auto"
+              RowSpacing="14">
+          <Grid RowDefinitions="Auto,Auto"
+                RowSpacing="10">
+            <StackPanel Spacing="4">
+              <TextBlock Classes="section-title"
+                         Text="Разрешения Android" />
+              <TextBlock Classes="page-caption"
+                         Text="{Binding PermissionSummary, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.Permission.'}" />
+            </StackPanel>
+
+            <WrapPanel Grid.Row="1"
+                       Orientation="Horizontal">
+              <Button Classes="compact-action"
+                      Margin="0,0,10,0"
+                      Command="{Binding OpenPermissionsCommand}">
+                <StackPanel Orientation="Horizontal"
+                            Spacing="8">
+                  <PathIcon Classes="action-icon"
+                            Data="{StaticResource IconRefreshGeometry}" />
+                  <TextBlock Classes="button-label"
+                             Text="Обновить" />
+                </StackPanel>
+              </Button>
+
+              <Button Classes="compact-action"
+                      Command="{Binding ClosePermissionsCommand}">
+                <TextBlock Classes="button-label"
+                           Text="Закрыть" />
+              </Button>
+            </WrapPanel>
+          </Grid>
+
+          <ScrollViewer Grid.Row="1"
+                        MinHeight="320"
+                        MaxHeight="520"
+                        HorizontalScrollBarVisibility="Disabled">
+            <views:PermissionListView Items="{Binding PermissionItems}" />
+          </ScrollViewer>
+
+          <TextBlock Grid.Row="2"
+                     Classes="page-caption"
+                     Text="После выдачи доступа вернитесь в Agnosia: статусы обновятся при возврате или по кнопке обновления." />
+        </Grid>
+      </Border>
+    </Grid>
+  </Border>
+</UserControl>

@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:Agnosia.Controls"
+             xmlns:vm="using:Agnosia.ViewModels"
+             x:Class="Agnosia.Views.AppHeaderView"
+             x:DataType="vm:DashboardWorkspaceViewModel">
+  <Grid Margin="18,10,18,0"
+        ColumnDefinitions="Auto,*"
+        ColumnSpacing="10">
+    <controls:WatcherEye Padding="1" />
+
+    <StackPanel Grid.Column="1"
+                MinWidth="0"
+                Spacing="2"
+                VerticalAlignment="Center">
+      <Button Classes="app-title-button"
+              HorizontalAlignment="Left"
+              Command="{Binding OpenLogsCommand}">
+        <TextBlock VerticalAlignment="Center"
+                   FontSize="22"
+                   FontWeight="SemiBold"
+                   Text="Agnosia" />
+      </Button>
+      <TextBlock Classes="header-status"
+                 Classes.error="{Binding StatusIsError}"
+                 Text="{Binding StatusMessage, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.Dashboard.Status.'}" />
+    </StackPanel>
+  </Grid>
+</UserControl>

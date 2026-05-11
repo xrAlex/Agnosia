@@ -1,0 +1,17 @@
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
+.idea/
+.dotnet/
+.dotnet-cli/
+.nuget-packages/
+.android_sdk/
+.android_jdk/
+_scratch/
+.agents/
+.claude/
+.buildverify/
+**/bin-scratch/
+Agnosia.UiDebug/

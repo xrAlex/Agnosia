@@ -1,0 +1,300 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Agnosia.ViewModels"
+             mc:Ignorable="d"
+             x:Class="Agnosia.Views.SettingsSectionView"
+             x:DataType="vm:DashboardWorkspaceViewModel">
+  <Design.DataContext>
+    <vm:DashboardWorkspaceViewModel />
+  </Design.DataContext>
+
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Classes="content-root">
+      <Grid ColumnDefinitions="*,Auto"
+            ColumnSpacing="10">
+        <StackPanel Spacing="4">
+          <TextBlock Classes="page-title"
+                     Text="Настройки" />
+        </StackPanel>
+
+        <Button Grid.Column="1"
+                Classes="icon-button"
+                ToolTip.Tip="Обновить"
+                Command="{Binding RefreshCommand}">
+          <PathIcon Classes="action-icon"
+                    Data="{StaticResource IconRefreshGeometry}" />
+        </Button>
+      </Grid>
+
+      <StackPanel IsVisible="{Binding IsDashboardVisible}"
+                  Spacing="12">
+          
+      <TextBlock Classes="group-title"
+                     Text="Базовые настройки" />
+      
+      <Border Classes="surface-card compact">
+          <Grid ColumnDefinitions="Auto,*,Auto"
+                ColumnSpacing="14">
+            <Border Classes="icon-tile">
+              <PathIcon Classes="section-icon centered"
+                        Data="{StaticResource IconCheckGeometry}" />
+            </Border>
+            <StackPanel Grid.Column="1"
+                        MinWidth="0"
+                        Spacing="4">
+              <TextBlock Classes="section-title compact"
+                         Text="Разрешения" />
+              <TextBlock Classes="page-caption"
+                         Text="Выдача разрешений для корректной работы приложения" />
+            </StackPanel>
+            <Button Grid.Column="2"
+                    Classes="icon-button"
+                    ToolTip.Tip="Открыть разрешения"
+                    VerticalAlignment="Center"
+                    Command="{Binding OpenPermissionsCommand}">
+              <PathIcon Classes="action-icon"
+                        Data="{StaticResource IconCheckGeometry}" />
+            </Button>
+          </Grid>
+        </Border>
+
+        <TextBlock Classes="group-title"
+                   Text="Тема" />
+
+        <Border Classes="surface-card compact">
+          <Grid ColumnDefinitions="Auto,*"
+                RowDefinitions="Auto,Auto"
+                ColumnSpacing="14"
+                RowSpacing="12">
+            <Border Classes="icon-tile">
+              <PathIcon Classes="section-icon centered"
+                        Data="{StaticResource IconSettingsGeometry}" />
+            </Border>
+            <StackPanel Grid.Row="0" Grid.Column="1"
+                        MinWidth="0"
+                        Spacing="4">
+              <TextBlock Classes="section-title compact"
+                         Text="Оформление" />
+              <TextBlock Classes="page-caption"
+                         Text="Выберите палитру интерфейса" />
+            </StackPanel>
+            <Grid Grid.Row="1"
+                  Grid.ColumnSpan="2" Grid.Column="0"
+                  ColumnDefinitions="*,*,*"
+                  ColumnSpacing="10">
+              <Button Classes="segment-chip"
+                      Classes.selected="{Binding IsAgnosiaThemeSelected}"
+                      Command="{Binding SelectAgnosiaThemeCommand}">
+                <TextBlock Classes="button-label"
+                           Text="Красная" />
+              </Button>
+              <Button Grid.Column="1"
+                      Classes="segment-chip"
+                      Classes.selected="{Binding IsDarkThemeSelected}"
+                      Command="{Binding SelectDarkThemeCommand}">
+                <TextBlock Classes="button-label"
+                           Text="Темная" />
+              </Button>
+              <Button Grid.Column="2"
+                      Classes="segment-chip"
+                      Classes.selected="{Binding IsLightThemeSelected}"
+                      Command="{Binding SelectLightThemeCommand}">
+                <TextBlock Classes="button-label"
+                           Text="Светлая" />
+              </Button>
+            </Grid>
+          </Grid>
+        </Border>
+
+        <TextBlock Classes="group-title"
+                   Text="Поведение" />
+
+        <Border Classes="surface-card compact">
+          <StackPanel Spacing="12">
+            <Grid ColumnDefinitions="Auto,*,Auto"
+                  ColumnSpacing="14">
+              <Border Classes="icon-tile">
+                <PathIcon Classes="section-icon centered"
+                          Data="{StaticResource IconAppsGeometry}" />
+              </Border>
+              <StackPanel Grid.Column="1"
+                          MinWidth="0"
+                          Spacing="4">
+                <TextBlock Classes="section-title compact"
+                           Text="Показывать все пакеты" />
+                <TextBlock Classes="page-caption"
+                           Text="Отображать в библиотеке системные и служебные приложения вместе с обычными пакетами" />
+              </StackPanel>
+              <ToggleSwitch Grid.Column="2"
+                            VerticalAlignment="Center"
+                            IsChecked="{Binding ShowAllApps}" />
+            </Grid>
+
+            <Border Classes="divider" />
+
+            <Grid ColumnDefinitions="Auto,*,Auto"
+                  ColumnSpacing="14">
+              <Border Classes="icon-tile">
+                <PathIcon Classes="section-icon centered"
+                          Data="{StaticResource IconInteractionGeometry}" />
+              </Border>
+              <StackPanel Grid.Column="1"
+                          MinWidth="0"
+                          Spacing="4">
+                <TextBlock Classes="section-title compact"
+                           Text="Контроль доступа" />
+                <TextBlock Classes="page-caption"
+                           Text="Блокировать поиск контактов и доступ к данным между личным и рабочим пространством" />
+              </StackPanel>
+              <ToggleSwitch Grid.Column="2"
+                            VerticalAlignment="Center"
+                            IsChecked="{Binding BlockContactsSearching}" />
+            </Grid>
+            <Border Classes="divider" />
+
+            <Grid ColumnDefinitions="Auto,*,Auto"
+                  ColumnSpacing="14">
+              <Border Classes="icon-tile">
+                <PathIcon Classes="section-icon centered"
+                          Data="{StaticResource IconLogGeometry}" />
+              </Border>
+              <StackPanel Grid.Column="1"
+                          MinWidth="0"
+                          Spacing="4">
+                <TextBlock Classes="section-title compact"
+                           Text="Включить логирование" />
+                <TextBlock Classes="page-caption"
+                           Text="Писать отладочные сообщения работы приложения в буфер логирования" />
+              </StackPanel>
+              <ToggleSwitch Grid.Column="2"
+                            VerticalAlignment="Center"
+                            IsChecked="{Binding LoggingEnabled}" />
+            </Grid>
+            
+            <Border Classes="divider" />
+
+            <Grid ColumnDefinitions="Auto,*,Auto"
+                  ColumnSpacing="14">
+              <Border Classes="icon-tile">
+                <PathIcon Classes="section-icon centered"
+                          Data="{StaticResource IconFreezeGeometry}" />
+              </Border>
+              <StackPanel Grid.Column="1"
+                          MinWidth="0"
+                          Spacing="4">
+                <TextBlock Classes="section-title compact"
+                           Text="Изоляция приложений" />
+                <TextBlock Classes="page-caption"
+                           Text="Приложения в рабочем профиле изолированы и не работают в фоне, активация приложения выполняется через ярлык" />
+              </StackPanel>
+              <ToggleSwitch Grid.Column="2"
+                            IsEnabled="False"
+                            VerticalAlignment="Center"
+                            IsChecked="True" />
+            </Grid>
+
+            <Border Classes="divider" />
+
+            <Grid ColumnDefinitions="Auto,*,Auto"
+                  ColumnSpacing="14">
+              <Border Classes="icon-tile">
+                <PathIcon Classes="section-icon centered"
+                          Data="{StaticResource IconVpnOffGeometry}" />
+              </Border>
+              <StackPanel Grid.Column="1"
+                          MinWidth="0"
+                          Spacing="4">
+                <TextBlock Classes="section-title compact"
+                           Text="Отключать VPN" />
+                <TextBlock Classes="page-caption"
+                           Text="Форсировать отключение VPN при запуске приложений из рабочего профиля" />
+              </StackPanel>
+              <ToggleSwitch Grid.Column="2"
+                            VerticalAlignment="Center"
+                            IsChecked="{Binding DisableVpnBeforeWorkLaunch}" />
+            </Grid>
+
+            <Border Classes="divider" />
+
+            <Grid ColumnDefinitions="Auto,*,Auto"
+                  ColumnSpacing="14">
+              <Border Classes="icon-tile">
+                <PathIcon Classes="section-icon centered"
+                          Data="{StaticResource IconVpnOffGeometry}" />
+              </Border>
+              <StackPanel Grid.Column="1"
+                          MinWidth="0"
+                          Spacing="4">
+                <TextBlock Classes="section-title compact"
+                           Text="Включать VPN после заморозки" />
+                <TextBlock Classes="page-caption"
+                           Text="Автоматически отправлять команду запуска выбранному VPN-клиенту после скрытия приложений рабочего профиля" />
+              </StackPanel>
+              <ToggleSwitch Grid.Column="2"
+                            VerticalAlignment="Center"
+                            IsChecked="{Binding EnableVpnAfterWorkFreeze}" />
+            </Grid>
+
+            <StackPanel IsVisible="{Binding IsVpnAfterFreezeClientPickerVisible}"
+                        Spacing="10">
+              <Grid ColumnDefinitions="*,*"
+                    RowDefinitions="Auto,Auto"
+                    ColumnSpacing="10"
+                    HorizontalAlignment="Center"
+                    RowSpacing="10">
+                <Button MinWidth="100" Classes="segment-chip"
+                                      Classes.selected="{Binding IsFlClashVpnAfterFreezeSelected}"
+                                      Command="{Binding SelectFlClashVpnAfterFreezeCommand}">
+                  <TextBlock Classes="button-label"
+                             Text="FlClash" />
+                </Button>
+                <Button MinWidth="100" Grid.Row="0" Grid.Column="1"
+                        Classes="segment-chip"
+                        Classes.selected="{Binding IsClashMetaVpnAfterFreezeSelected}"
+                        Command="{Binding SelectClashMetaVpnAfterFreezeCommand}">
+                  <TextBlock Classes="button-label"
+                             Text="Clash Meta" />
+                </Button>
+                <Button MinWidth="100" Grid.Row="1" Grid.Column="0"
+                        Classes="segment-chip"
+                        Classes.selected="{Binding IsHappVpnAfterFreezeSelected}"
+                        Command="{Binding SelectHappVpnAfterFreezeCommand}">
+                  <TextBlock Classes="button-label"
+                             Text="Happ" />
+                </Button>
+                <Button MinWidth="100" Grid.Row="1"
+                        Grid.Column="1"
+                        Classes="segment-chip"
+                        Classes.selected="{Binding IsTunguskaVpnAfterFreezeSelected}"
+                        Command="{Binding SelectTunguskaVpnAfterFreezeCommand}">
+                  <TextBlock Classes="button-label"
+                             Text="Tunguska" />
+                </Button>
+              </Grid>
+
+              <Border Classes="tag-chip accent"
+                      IsVisible="{Binding IsHappVpnAfterFreezeWarningVisible}">
+                <TextBlock Classes="page-caption"
+                           Text="Happ поддерживает только toggle-команду: если VPN уже включен, она может выключить подключение." />
+              </Border>
+
+              <StackPanel IsVisible="{Binding IsTunguskaAutomationTokenVisible}"
+                          Spacing="6">
+                <TextBlock Classes="page-caption"
+                           Text="Токен Tunguska Automation" />
+                <TextBox Watermark="automation_token"
+                         PasswordChar="*"
+                         Text="{Binding TunguskaAutomationToken}" />
+              </StackPanel>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <TextBlock Classes="app-version"
+                   Text="{Binding AppVersion, StringFormat='Версия {0}'}" />
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

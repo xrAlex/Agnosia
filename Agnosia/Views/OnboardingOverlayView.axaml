@@ -1,0 +1,315 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:Agnosia.Controls"
+             xmlns:vm="using:Agnosia.ViewModels"
+             xmlns:views="using:Agnosia.Views"
+             mc:Ignorable="d"
+             x:Class="Agnosia.Views.OnboardingOverlayView"
+             x:DataType="vm:DashboardWorkspaceViewModel"
+             Classes="overlay-view"
+             IsVisible="{Binding IsOnboardingVisible}">
+  <Design.DataContext>
+    <vm:DashboardWorkspaceViewModel />
+  </Design.DataContext>
+
+  <Grid Background="{StaticResource AppBackgroundBrush}"
+        RowDefinitions="Auto,*">
+    <Grid Grid.RowSpan="2"
+          IsHitTestVisible="False"
+          ClipToBounds="True">
+      <controls:PlexusBackground LineBrush="{StaticResource AppPlexusLineBrush}"
+                                 NodeBrush="{StaticResource AppPlexusNodeBrush}"
+                                 GlowBrush="{StaticResource AppPlexusGlowBrush}" />
+    </Grid>
+
+    <Grid Grid.Row="0"
+          Classes="content-root"
+          ColumnDefinitions="*">
+      <StackPanel MinWidth="0"
+                  Spacing="4">
+        <TextBlock Classes="section-title"
+                   Text="Настройка приложения" />
+      </StackPanel>
+    </Grid>
+
+    <ProgressBar Grid.Row="0"
+                 Classes="operation-progress"
+                 VerticalAlignment="Top"
+                 IsHitTestVisible="False"
+                 IsVisible="{Binding IsOperationActive}"
+                 IsIndeterminate="True" />
+
+    <ScrollViewer Grid.Row="1"
+                  HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Classes="content-root">
+        <StackPanel IsVisible="{Binding IsOnboardingWelcomeStep}"
+                    Spacing="12">
+          <Border Classes="surface-card hero">
+            <Grid ColumnDefinitions="Auto,*"
+                  ColumnSpacing="14">
+              <Border Classes="icon-tile large">
+                <PathIcon Classes="section-icon centered"
+                          Data="{StaticResource IconWorkGeometry}" />
+              </Border>
+              <StackPanel Grid.Column="1"
+                          MinWidth="0"
+                          Spacing="8">
+                <TextBlock Classes="section-title"
+                           Text="Agnosia" />
+                <TextBlock Classes="page-caption"
+                           Text="Давайте настроим приложение и рабочий профиль на устройстве, это не займет много времени" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <Grid ColumnDefinitions="*,*"
+                RowDefinitions="Auto,Auto,Auto"
+                ColumnSpacing="10"
+                RowSpacing="10">
+            <Border x:Name="InfoCardAgnosia"
+                    Classes="surface-card compact onboarding-info-card"
+                    Opacity="0">
+              <Grid>
+                <StackPanel MinWidth="0"
+                            Spacing="5">
+                  <TextBlock Classes="group-title"
+                             Text="Агнозия" />
+                  <TextBlock Classes="page-caption"
+                             Text="Агнозия — потеря распознавания знакомого. Приложения не будут знать, где они находятся" />
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <Border x:Name="InfoCardIsolation"
+                    Grid.Column="1"
+                    Classes="surface-card compact onboarding-info-card"
+                    Opacity="0">
+              <Grid>
+                <StackPanel MinWidth="0"
+                            Spacing="5">
+                  <TextBlock Classes="group-title"
+                             Text="Изоляция" />
+                  <TextBlock Classes="page-caption"
+                             Text="Банки, маркетплейсы, карты и соцсети часто видят то, что не должны. Их лучше держать отдельно" />
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <Border x:Name="InfoCardWorkProfile"
+                    Grid.Row="1"
+                    Classes="surface-card compact onboarding-info-card"
+                    Opacity="0">
+              <Grid>
+                <StackPanel MinWidth="0"
+                            Spacing="5">
+                  <TextBlock Classes="group-title"
+                             Text="Рабочий профиль" />
+                  <TextBlock Classes="page-caption"
+                             Text="Это встроенная песочница Android: отдельные приложения, настройки, по сути смартфон в смартфоне" />
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <Border x:Name="InfoCardRussianApps"
+                    Grid.Row="1"
+                    Grid.Column="1"
+                    Classes="surface-card compact onboarding-info-card"
+                    Opacity="0">
+              <Grid>
+                <StackPanel MinWidth="0"
+                            Spacing="5">
+                  <TextBlock Classes="group-title"
+                             Text="Слежка" />
+                  <TextBlock Classes="page-caption"
+                             Text="Т-Банк, Ozon, WB, VK, Яндекс, Макс и прочие РФ-сервисы, созданные для удобства, теперь стали доносчиками. Лучше их удалить или хотя бы изолировать" />
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <Border x:Name="InfoCardLessTraces"
+                    Grid.Row="2"
+                    Classes="surface-card compact onboarding-info-card"
+                    Opacity="0">
+              <Grid>
+                <StackPanel MinWidth="0"
+                            Spacing="5">
+                  <TextBlock Classes="group-title"
+                             Text="VPN" />
+                  <TextBlock Classes="page-caption"
+                             Text="Боитесь, что ваше окно в иной мир закроют? Agnosia позаботится, чтобы приложения не смогли увидеть ваш сервер" />
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <Border x:Name="InfoCardTemporaryLaunch"
+                    Grid.Row="2"
+                    Grid.Column="1"
+                    Classes="surface-card compact onboarding-info-card"
+                    Opacity="0">
+              <Grid>
+                <StackPanel MinWidth="0"
+                            Spacing="5">
+                  <TextBlock Classes="group-title"
+                             Text="Тише в фоне" />
+                  <TextBlock Classes="page-caption"
+                             Text="Чем меньше сервисов работает постоянно, тем дольше батарея вашего смартфона будет радовать вас" />
+                </StackPanel>
+              </Grid>
+            </Border>
+          </Grid>
+
+          <Button Classes="primary"
+                  HorizontalAlignment="Center"
+                  Command="{Binding StartOnboardingCommand}">
+            <TextBlock Classes="button-label"
+                       Padding="10"
+                       Text="Начать настройку" />
+          </Button>
+        </StackPanel>
+
+        <StackPanel IsVisible="{Binding IsOnboardingWorkProfileStep}"
+                    Spacing="12">
+          <TextBlock Classes="group-title"
+                     Text="Рабочий профиль" />
+
+          <Border Classes="surface-card compact">
+            <Grid ColumnDefinitions="Auto,*"
+                  ColumnSpacing="14">
+              <Border Classes="icon-tile permission-icon"
+                      Classes.granted="{Binding WorkProfileAvailable}">
+                <PathIcon Classes="section-icon centered"
+                          Data="{StaticResource IconWorkGeometry}" />
+              </Border>
+              <StackPanel Grid.Column="1"
+                          MinWidth="0"
+                          Spacing="6">
+                <TextBlock Classes="section-title compact"
+                           Text="Создание профиля" />
+                <TextBlock Classes="page-caption"
+                           Text="{Binding WorkProfileStatusText, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.Dashboard.WP.'}" />
+                <TextBlock Classes="page-caption"
+                           Text="После подключения профиля Agnosia автоматически перейдет к разрешениям." />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <Button Classes="primary"
+                  HorizontalAlignment="Left"
+                  Command="{Binding StartProvisioningCommand}"
+                  IsEnabled="{Binding CanStartProvisioning}">
+            <TextBlock Classes="button-label"
+                       Text="Создать рабочий профиль" />
+          </Button>
+        </StackPanel>
+
+        <StackPanel IsVisible="{Binding IsOnboardingPermissionsStep}"
+                    Spacing="12">
+          <Grid ColumnDefinitions="*,Auto"
+                ColumnSpacing="12">
+            <StackPanel MinWidth="0"
+                        Spacing="4">
+              <TextBlock Classes="group-title"
+                         Text="Разрешения" />
+              <TextBlock Classes="page-caption"
+                         Text="Выдайте доступы в указанных профилях" />
+            </StackPanel>
+
+            <Border Grid.Column="1"
+                    Classes="tag-chip dense"
+                    VerticalAlignment="Top">
+              <TextBlock Classes="tag-label"
+                         Text="{Binding PermissionSummary, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.Permission.'}" />
+            </Border>
+          </Grid>
+
+          <views:PermissionListView Items="{Binding PermissionItems}" />
+        </StackPanel>
+
+        <StackPanel IsVisible="{Binding IsOnboardingFinalStep}"
+                    Spacing="12">
+          <Border Classes="surface-card hero onboarding-final-hero">
+            <Grid ColumnDefinitions="Auto,*"
+                  ColumnSpacing="14">
+              <Border Classes="icon-tile large permission-icon granted">
+                <PathIcon Classes="section-icon centered"
+                          Data="{StaticResource IconCheckGeometry}" />
+              </Border>
+              <StackPanel Grid.Column="1"
+                          MinWidth="0"
+                          Spacing="8">
+                <TextBlock Classes="section-title"
+                           Text="Agnosia готова к работе" />
+                <TextBlock Classes="page-caption"
+                           Text="Ниже короткий маршрут по основным действиям. Его можно пройти позже в любом порядке." />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <Border Classes="surface-card compact tutorial-step-card">
+            <Grid ColumnDefinitions="Auto,*"
+                  ColumnSpacing="14">
+              <Border Classes="icon-tile tutorial-step-icon">
+                <PathIcon Classes="section-icon centered"
+                          Data="{StaticResource IconAppsGeometry}" />
+              </Border>
+              <StackPanel Grid.Column="1"
+                          MinWidth="0"
+                          Spacing="5">
+                <TextBlock Classes="group-title"
+                           Text="1. Изолируйте опасные приложения" />
+                <TextBlock Classes="page-caption"
+                           Text="Откройте раздел Приложения, выберите приложение из личного профиля и нажмите Копировать в рабочий или Переместить в рабочий" />
+              </StackPanel>
+            </Grid>
+          </Border>
+            
+          <Border Classes="surface-card compact tutorial-step-card">
+            <Grid ColumnDefinitions="Auto,*"
+                  ColumnSpacing="14">
+              <Border Classes="icon-tile tutorial-step-icon">
+                <PathIcon Classes="section-icon centered"
+                          Data="{StaticResource IconLaunchGeometry}" />
+              </Border>
+              <StackPanel Grid.Column="1"
+                          MinWidth="0"
+                          Spacing="5">
+                <TextBlock Classes="group-title"
+                           Text="2. Запускайте через ярлыки" />
+                <TextBlock Classes="page-caption"
+                           Text="Для скрытого приложения создайте ярлык. Agnosia временно откроет рабочее приложение, а после использования снова его заморозит" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <Border Classes="surface-card compact tutorial-step-card">
+            <Grid ColumnDefinitions="Auto,*"
+                  ColumnSpacing="14">
+              <Border Classes="icon-tile tutorial-step-icon">
+                <PathIcon Classes="section-icon centered"
+                          Data="{StaticResource IconSettingsGeometry}" />
+              </Border>
+              <StackPanel Grid.Column="1"
+                          MinWidth="0"
+                          Spacing="5">
+                <TextBlock Classes="group-title"
+                           Text="3. Настройте приложение под себя" />
+                <TextBlock Classes="page-caption"
+                           Text="В настройках можно сменить тему, включить журнал событий, управлять VPN-сценарием и ограничить обмен контактами между профилями" />
+              </StackPanel>
+            </Grid>
+          </Border>
+            
+          <Button Classes="primary"
+                  HorizontalAlignment="Stretch"
+                  Command="{Binding FinishOnboardingCommand}">
+            <TextBlock Classes="button-label"
+                       TextAlignment="Center"
+                       Text="ОК" />
+          </Button>
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

@@ -1,0 +1,111 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:Agnosia.Controls"
+             xmlns:vm="using:Agnosia.ViewModels"
+             mc:Ignorable="d"
+             x:Class="Agnosia.Views.LogOverlayView"
+             x:DataType="vm:DashboardWorkspaceViewModel"
+             Classes="overlay-view"
+             IsVisible="{Binding IsLogWindowOpen}">
+  <Design.DataContext>
+    <vm:DashboardWorkspaceViewModel />
+  </Design.DataContext>
+
+  <Grid Background="{StaticResource AppBackgroundBrush}"
+        RowDefinitions="Auto,*,Auto">
+    <Grid Grid.RowSpan="3"
+          IsHitTestVisible="False"
+          ClipToBounds="True">
+      <controls:PlexusBackground LineBrush="{StaticResource AppPlexusLineBrush}"
+                                 NodeBrush="{StaticResource AppPlexusNodeBrush}"
+                                 GlowBrush="{StaticResource AppPlexusGlowBrush}" />
+    </Grid>
+
+    <Grid Grid.Row="0"
+          Classes="content-root"
+          RowDefinitions="Auto,Auto"
+          RowSpacing="12">
+      <StackPanel MinWidth="0"
+                  Spacing="4">
+        <TextBlock Classes="page-title"
+                   Text="Журнал событий" />
+        <TextBlock Classes="header-status"
+                   Text="{Binding LogSummary}" />
+      </StackPanel>
+
+      <WrapPanel Grid.Row="1"
+                 Orientation="Horizontal"
+                 VerticalAlignment="Center">
+        <Button Classes="compact-action"
+                Margin="0,0,10,0"
+                Click="OnCopyLogsClick">
+          <StackPanel Orientation="Horizontal"
+                      Spacing="8">
+            <PathIcon Classes="button-icon"
+                      Data="{StaticResource IconCloneGeometry}" />
+            <TextBlock Classes="button-label"
+                       Text="Копировать" />
+          </StackPanel>
+        </Button>
+
+        <Button Classes="compact-action"
+                Margin="0,0,10,0"
+                Command="{Binding ClearLogsCommand}">
+          <StackPanel Orientation="Horizontal"
+                      Spacing="8">
+            <PathIcon Classes="button-icon"
+                      Data="{StaticResource IconDeleteGeometry}" />
+            <TextBlock Classes="button-label"
+                       Text="Очистить" />
+          </StackPanel>
+        </Button>
+
+        <Button Classes="icon-button"
+                ToolTip.Tip="Закрыть"
+                Command="{Binding CloseLogsCommand}">
+          <PathIcon Classes="action-icon"
+                    Data="{StaticResource IconCloseGeometry}" />
+        </Button>
+      </WrapPanel>
+    </Grid>
+
+    <Border Grid.Row="1"
+            Classes="surface-card log-panel">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                    VerticalScrollBarVisibility="Auto">
+        <ItemsControl Classes="log-list"
+                      ItemsSource="{Binding LogLines}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Vertical" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Classes="log-row">
+                <TextBlock Classes="log-entry"
+                           Text="{Binding}" />
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+
+    <Grid Grid.Row="2"
+          Classes="content-root"
+          RowDefinitions="Auto,Auto"
+          RowSpacing="10">
+      <TextBlock Classes="page-caption"
+                 Text="Показываются последние 100 сообщений. Длинные строки переносятся внутри списка." />
+
+      <Border Grid.Row="1"
+              Classes="tag-chip dense">
+        <TextBlock Classes="tag-label"
+                   Text="PER / WRK" />
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

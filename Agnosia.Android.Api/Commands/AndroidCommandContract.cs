@@ -1,0 +1,18 @@
+namespace Agnosia.Android.Api;
+
+public static class AndroidCommandContract
+{
+    public const string ResultAppsJson = "apps_json";
+    public const string ResultLogsJson = "logs_json";
+    public const string ResultInteractionPackages = "interaction_packages";
+    public const string ResultUsageStatsAccess = "usage_stats_access";
+    public const string ResultPackageInstallAccess = "package_install_access";
+    public const string ResultMessage = "message";
+    public const string ResultHideImmediately = "hide_immediately";
+    public const string ResultToggleSuccess = "toggle_success";
+    public const string ResultError = "error";
+    public const string ExtraParentFrozenCallback = "parent_frozen_callback";
+    public const string ExtraCallbackPackage = "callback_package";
+    public const string ExtraCallbackSignature = "callback_signature";
+    public const string ErrorSystemAppUnsupported = "system_app_unsupported";
+}

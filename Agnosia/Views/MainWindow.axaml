@@ -1,0 +1,22 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Agnosia.ViewModels"
+        xmlns:views="using:Agnosia.Views"
+        mc:Ignorable="d" d:DesignWidth="412" d:DesignHeight="915"
+        x:Class="Agnosia.Views.MainWindow"
+        x:DataType="vm:DashboardWorkspaceViewModel"
+        Width="412"
+        Height="915"
+        MinWidth="360"
+        MinHeight="640"
+        Background="{StaticResource AppBackgroundBrush}"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="Agnosia">
+    <Design.DataContext>
+        <vm:DashboardWorkspaceViewModel />
+    </Design.DataContext>
+
+    <views:MainView />
+</Window>

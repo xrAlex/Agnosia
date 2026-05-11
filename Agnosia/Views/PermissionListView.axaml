@@ -1,0 +1,20 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="using:Agnosia.Views"
+             xmlns:vm="using:Agnosia.ViewModels"
+             x:Class="Agnosia.Views.PermissionListView"
+             x:Name="Root"
+             x:DataType="views:PermissionListView">
+  <ItemsControl ItemsSource="{Binding Items, ElementName=Root}">
+    <ItemsControl.ItemsPanel>
+      <ItemsPanelTemplate>
+        <StackPanel Orientation="Vertical" />
+      </ItemsPanelTemplate>
+    </ItemsControl.ItemsPanel>
+    <ItemsControl.ItemTemplate>
+      <DataTemplate x:DataType="vm:PermissionItemViewModel">
+        <views:PermissionItemView />
+      </DataTemplate>
+    </ItemsControl.ItemTemplate>
+  </ItemsControl>
+</UserControl>

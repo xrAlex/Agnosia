@@ -1,0 +1,132 @@
+using Agnosia.Models;
+using Android;
+using Android.Content;
+using Android.Content.PM;
+using Android.Net;
+using Android.Provider;
+using Log = Agnosia.Android.Api.AgnosiaLog;
+using Uri = Android.Net.Uri;
+
+namespace Agnosia.Android.Api;
+
+internal static class AndroidPermissionApi
+{
+    private const string LogTag = "AgnosiaPermissions";
+    private const int NotificationPermissionRequestCode = 0x57C32;
+    private const int OverlayPermissionRequestCode = 0x57C33;
+
+    public static bool HasNotificationPermission(Activity activity)
+    {
+        try
+        {
+            return !OperatingSystem.IsAndroidVersionAtLeast(33)
+                || activity.CheckSelfPermission(Manifest.Permission.PostNotifications) == Permission.Granted;
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn(LogTag, $"Failed to check notification permission: {exception}");
+            return false;
+        }
+    }
+
+    public static OperationResult RequestNotificationPermission(Activity activity)
+    {
+        try
+        {
+            if (OperatingSystem.IsAndroidVersionAtLeast(33)
+                && activity.CheckSelfPermission(Manifest.Permission.PostNotifications) != Permission.Granted)
+            {
+                activity.RequestPermissions([Manifest.Permission.PostNotifications], NotificationPermissionRequestCode);
+            }
+
+            return OperationResult.Success("Подтвердите разрешение на уведомления в системном диалоге.");
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn(LogTag, $"Failed to request notification permission: {exception}");
+            return OperationResult.Failure("Android не смог открыть запрос разрешения на уведомления.");
+        }
+    }
+
+    public static bool IsVpnPrepared(Activity activity)
+    {
+        try
+        {
+            return VpnService.Prepare(activity) is null;
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn(LogTag, $"Failed to check VPN preparation state: {exception}");
+            return false;
+        }
+    }
+
+    public static async Task<OperationResult> RequestVpnControlAsync(
+        AndroidActivityCommandGateway activityCommands,
+        CancellationToken cancellationToken)
+    {
+        var activity = activityCommands.CurrentActivity;
+        Intent? prepareIntent;
+        try
+        {
+            prepareIntent = VpnService.Prepare(activity);
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn(LogTag, $"Failed to prepare VPN permission request: {exception}");
+            return OperationResult.Failure("Android не смог открыть запрос доступа к VPN.");
+        }
+
+        if (prepareIntent is null)
+        {
+            return OperationResult.Success("VPN-доступ уже подготовлен.");
+        }
+
+        var result = await activityCommands.StartExternalActivityForResultAsync(prepareIntent, cancellationToken);
+        var error = AndroidActivityResultApi.ExtractError(result);
+        if (!string.IsNullOrWhiteSpace(error))
+        {
+            return OperationResult.Failure(error);
+        }
+
+        return result.ResultCode == Result.Ok
+            ? OperationResult.Success("VPN-доступ подготовлен.")
+            : OperationResult.Failure("Android не выдал доступ к VPN.");
+    }
+
+    public static bool HasOverlayPermission(Context context)
+    {
+        try
+        {
+            return Settings.CanDrawOverlays(context);
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn(LogTag, $"Failed to check overlay permission: {exception}");
+            return false;
+        }
+    }
+
+    public static OperationResult RequestOverlayPermission(Activity activity)
+    {
+        try
+        {
+            if (Settings.CanDrawOverlays(activity))
+            {
+                return OperationResult.Success("Разрешение на overlay уже выдано.");
+            }
+
+            var intent = new Intent(
+                Settings.ActionManageOverlayPermission,
+                Uri.Parse("package:" + activity.PackageName));
+            activity.StartActivityForResult(intent, OverlayPermissionRequestCode);
+            return OperationResult.Success("Подтвердите разрешение на поверхностные окна в настройках Android.");
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn(LogTag, $"Failed to request overlay permission: {exception}");
+            return OperationResult.Failure("Android не смог открыть запрос разрешения на поверхностные окна.");
+        }
+    }
+
+}

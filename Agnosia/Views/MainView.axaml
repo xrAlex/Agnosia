@@ -1,0 +1,48 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:Agnosia.Controls"
+             xmlns:vm="using:Agnosia.ViewModels"
+             xmlns:views="using:Agnosia.Views"
+             mc:Ignorable="d"
+             x:Class="Agnosia.Views.MainView"
+             x:DataType="vm:DashboardWorkspaceViewModel">
+  <Design.DataContext>
+    <vm:DashboardWorkspaceViewModel />
+  </Design.DataContext>
+
+  <Grid Background="{StaticResource AppBackgroundBrush}"
+        RowDefinitions="Auto,*,Auto">
+    <Grid Grid.RowSpan="3"
+          IsHitTestVisible="False"
+          ClipToBounds="True">
+      <controls:PlexusBackground LineBrush="{StaticResource AppPlexusLineBrush}"
+                                 NodeBrush="{StaticResource AppPlexusNodeBrush}"
+                                 GlowBrush="{StaticResource AppPlexusGlowBrush}" />
+    </Grid>
+
+    <views:AppHeaderView Grid.Row="0" />
+
+    <Grid Grid.Row="1">
+      <views:OverviewSectionView IsVisible="{Binding IsOverviewSectionSelected}" />
+      <views:AppsSectionView IsVisible="{Binding IsAppsSectionSelected}" />
+      <views:SettingsSectionView IsVisible="{Binding IsSettingsSectionSelected}" />
+    </Grid>
+
+    <views:BottomNavigationView Grid.Row="2" />
+
+    <ProgressBar Grid.Row="0"
+                 Classes="operation-progress"
+                 VerticalAlignment="Top"
+                 IsHitTestVisible="False"
+                 IsVisible="{Binding IsOperationActive}"
+                 IsIndeterminate="True" />
+
+    <views:LogOverlayView Grid.Row="0" Grid.RowSpan="3" />
+
+    <views:PermissionsOverlayView Grid.Row="0" Grid.RowSpan="3" />
+
+    <views:OnboardingOverlayView Grid.Row="0" Grid.RowSpan="3" />
+  </Grid>
+</UserControl>

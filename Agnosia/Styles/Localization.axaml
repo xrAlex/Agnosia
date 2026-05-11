@@ -1,0 +1,99 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:system="clr-namespace:System;assembly=netstandard">
+    <!-- Dashboard Status -->
+    <system:String x:Key="String.Dashboard.Status.Ready">Готово к управлению приложениями между профилями.</system:String>
+    <system:String x:Key="String.Dashboard.Status.Updating">Обновляем список приложений и состояние профилей...</system:String>
+    <system:String x:Key="String.Dashboard.Status.Updated">Список приложений обновлен.</system:String>
+    <system:String x:Key="String.Dashboard.Status.NotSupported">Эта сборка предназначена для Android-устройств с поддержкой рабочего профиля.</system:String>
+    <system:String x:Key="String.Dashboard.Status.CompleteProvisioning">Сначала завершите создание рабочего профиля.</system:String>
+    <system:String x:Key="String.Dashboard.Status.ProvisioningStarted">Настройка рабочего профиля запущена. Завершите шаги Android и вернитесь в Agnosia.</system:String>
+    <system:String x:Key="String.Dashboard.Status.ProvisioningFinished">Первичная настройка завершена.</system:String>
+    <system:String x:Key="String.Dashboard.Status.CopyPersonalToWorkFinished">Копирование в рабочий профиль завершено.</system:String>
+    <system:String x:Key="String.Dashboard.Status.CopyWorkToPersonalFinished">Копирование в личный профиль завершено.</system:String>
+    <system:String x:Key="String.Dashboard.Status.MovedToWork">Приложение перемещено в рабочий профиль.</system:String>
+    <system:String x:Key="String.Dashboard.Status.MovedToWorkDeleteFailed">Приложение скопировано в рабочий профиль, но удалить его из личного профиля не удалось: {0}</system:String>
+    <system:String x:Key="String.Dashboard.Status.ManualRefreshHint">Обновите список приложений вручную, если состояние не изменилось.</system:String>
+    <system:String x:Key="String.Dashboard.Status.PermissionRequestOpened">Запрос разрешения открыт.</system:String>
+
+    <!-- Dashboard Errors -->
+    <system:String x:Key="String.Dashboard.Error.FilterUpdate">Не удалось обновить фильтр списка приложений.</system:String>
+    <system:String x:Key="String.Dashboard.Error.UpdateState">Не удалось обновить состояние приложения.</system:String>
+    <system:String x:Key="String.Dashboard.Error.CloneFailed">Android не смог скопировать приложение в рабочий профиль.</system:String>
+    <system:String x:Key="String.Dashboard.Error.DeleteFailed">Android не смог удалить приложение из личного профиля.</system:String>
+    <system:String x:Key="String.Dashboard.Error.MoveToWorkFailed">Не удалось переместить приложение в рабочий профиль.</system:String>
+    <system:String x:Key="String.Dashboard.Error.RefreshAfterOpFailed">Операция завершилась, но обновить список приложений не удалось.</system:String>
+    <system:String x:Key="String.Dashboard.Error.PermissionRequestFailed">Не удалось открыть запрос разрешения.</system:String>
+    <system:String x:Key="String.Dashboard.Error.GenericOperationFailed">Не удалось выполнить операцию.</system:String>
+    <system:String x:Key="String.Dashboard.Error.SettingsScheduleFailed">Не удалось запланировать сохранение настроек.</system:String>
+    <system:String x:Key="String.Dashboard.Error.SettingsApplyFailed">Не удалось применить настройки.</system:String>
+    <system:String x:Key="String.Dashboard.Error.SettingsSaveFailed">Не удалось сохранить настройки.</system:String>
+    <system:String x:Key="String.Dashboard.Error.SettingsQueueFailed">Не удалось обработать очередь сохранения настроек.</system:String>
+
+    <!-- Dashboard Formatter -->
+    <system:String x:Key="String.Dashboard.WP.Available">Доступен</system:String>
+    <system:String x:Key="String.Dashboard.WP.Unavailable">Недоступен</system:String>
+    <system:String x:Key="String.Dashboard.WP.NotCreated">Не создан</system:String>
+    
+    <system:String x:Key="String.Dashboard.State.Loading">Загрузка состояния профиля</system:String>
+    <system:String x:Key="String.Dashboard.State.NotSupported">Рабочие профили не поддерживаются на этом устройстве</system:String>
+    <system:String x:Key="String.Dashboard.State.NotSetup">Первичная настройка устройства не завершена</system:String>
+    <system:String x:Key="String.Dashboard.State.Syncing">Синхронизация</system:String>
+    <system:String x:Key="String.Dashboard.State.Active">Изоляция активна</system:String>
+    <system:String x:Key="String.Dashboard.State.WPUnavailable">Рабочий профиль временно недоступен</system:String>
+
+    <system:String x:Key="String.Dashboard.Health.Error">Ошибка</system:String>
+    <system:String x:Key="String.Dashboard.Health.Updating">Обновление</system:String>
+    <system:String x:Key="String.Dashboard.Health.Unstable">Нестабильно</system:String>
+    <system:String x:Key="String.Dashboard.Health.Ok">ОК</system:String>
+
+    <system:String x:Key="String.Dashboard.Detail.Error">Последняя операция завершилась ошибкой. Откройте журнал, если нужно увидеть детали.</system:String>
+    <system:String x:Key="String.Dashboard.Detail.Loading">Получаем актуальное состояние устройства.</system:String>
+    <system:String x:Key="String.Dashboard.Detail.Syncing">Идет синхронизация каталога и состояния профилей.</system:String>
+    <system:String x:Key="String.Dashboard.Detail.NotSupported">Устройство не поддерживает нужный Android-сценарий.</system:String>
+    <system:String x:Key="String.Dashboard.Detail.NotSetup">Первичная настройка еще не завершена.</system:String>
+    <system:String x:Key="String.Dashboard.Detail.WPUnavailable">Рабочий профиль создан, но сейчас недоступен.</system:String>
+    <system:String x:Key="String.Dashboard.Detail.Ok">Рабочий профиль доступен, каталог обновлен, ошибок нет.</system:String>
+
+    <!-- Permissions -->
+    <system:String x:Key="String.Permission.ActionRequired">Требуется действие</system:String>
+    <system:String x:Key="String.Permission.NotChecked">Разрешения еще не проверялись.</system:String>
+    <system:String x:Key="String.Permission.GrantedCount">Выдано: {0} / {1}</system:String>
+
+    <!-- Onboarding -->
+    <system:String x:Key="String.Onboarding.StepCounter">Шаг {0} / 3</system:String>
+
+    <!-- Refresh Info -->
+    <system:String x:Key="String.Refresh.Never">Снимок ещё не обновлялся</system:String>
+    <system:String x:Key="String.Refresh.At">Обновлено в {0:HH:mm:ss}</system:String>
+
+    <!-- App Item -->
+    <system:String x:Key="String.App.Profile.Work">Рабочий</system:String>
+    <system:String x:Key="String.App.Profile.Personal">Личный</system:String>
+    
+    <system:String x:Key="String.App.Action.Open">Открыть</system:String>
+    <system:String x:Key="String.App.Action.UnfreezeAndOpen">Разморозить и открыть</system:String>
+    <system:String x:Key="String.App.Action.CopyToWork">Копировать в рабочий</system:String>
+    <system:String x:Key="String.App.Action.CopyToPersonal">Копировать в личный</system:String>
+    <system:String x:Key="String.App.Action.MoveToWork">Переместить в рабочий</system:String>
+    <system:String x:Key="String.App.Action.Freeze">Заморозить</system:String>
+    <system:String x:Key="String.App.Action.Unfreeze">Разморозить</system:String>
+    <system:String x:Key="String.App.Action.ForceFreeze">Заморозить принудительно</system:String>
+    <system:String x:Key="String.App.Action.CreateShortcut">Создать ярлык</system:String>
+    <system:String x:Key="String.App.Action.Uninstall">Удалить</system:String>
+    <system:String x:Key="String.App.Action.AllowInteraction">Разрешить обмен</system:String>
+    <system:String x:Key="String.App.Action.DisallowInteraction">Обмен включён</system:String>
+
+    <system:String x:Key="String.App.Status.Isolated">Изолировано</system:String>
+    <system:String x:Key="String.App.Status.NotInstalled">Не установлено</system:String>
+    <system:String x:Key="String.App.Status.System">Системное</system:String>
+    <system:String x:Key="String.App.Status.Deleted">Приложение удалено.</system:String>
+    <system:String x:Key="String.App.Status.Restored">Приложение восстановлено в рабочем профиле.</system:String>
+    <system:String x:Key="String.App.Status.Hidden">Приложение скрыто в рабочем профиле.</system:String>
+    <system:String x:Key="String.App.Status.ForceHidden">Приложение скрыто.</system:String>
+    <system:String x:Key="String.App.Status.ShortcutRequested">Создание ярлыка запрошено.</system:String>
+    <system:String x:Key="String.App.Status.Launching">Открываем приложение.</system:String>
+    <system:String x:Key="String.App.Status.InteractionDisabled">Межпрофильный обмен отключен.</system:String>
+    <system:String x:Key="String.App.Status.InteractionEnabled">Межпрофильный обмен включен.</system:String>
+
+</ResourceDictionary>

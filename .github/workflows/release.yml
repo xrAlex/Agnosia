@@ -1,0 +1,117 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    name: Build Android APK
+    runs-on: windows-latest
+    environment: deploy
+
+    env:
+      DOTNET_NOLOGO: true
+      PROJECT_PATH: Agnosia.Android/Agnosia.Android.csproj
+      RELEASE_DIR: artifacts/release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+          workloads: android
+
+      - name: Restore
+        run: dotnet restore Agnosia.sln
+
+      - name: Validate signing secrets
+        shell: pwsh
+        run: |
+          $requiredSecrets = @{
+            ANDROID_KEYSTORE_BASE64 = "${{ secrets.ANDROID_KEYSTORE_BASE64 }}"
+            ANDROID_KEYSTORE_ALIAS = "${{ secrets.ANDROID_KEYSTORE_ALIAS }}"
+            ANDROID_KEYSTORE_PASSWORD = "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
+            ANDROID_KEY_PASSWORD = "${{ secrets.ANDROID_KEY_PASSWORD }}"
+          }
+
+          $missingSecrets = $requiredSecrets.GetEnumerator() |
+            Where-Object { [string]::IsNullOrWhiteSpace($_.Value) } |
+            ForEach-Object { $_.Key }
+
+          if ($missingSecrets) {
+            throw "Missing required signing secrets: $($missingSecrets -join ', ')"
+          }
+
+      - name: Decode signing keystore
+        shell: pwsh
+        run: |
+          $keystorePath = Join-Path $env:RUNNER_TEMP "agnosia-release.keystore"
+          [IO.File]::WriteAllBytes($keystorePath, [Convert]::FromBase64String("${{ secrets.ANDROID_KEYSTORE_BASE64 }}"))
+          "ANDROID_KEYSTORE_PATH=$keystorePath" >> $env:GITHUB_ENV
+
+      - name: Publish APK
+        shell: pwsh
+        env:
+          ANDROID_KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $displayVersion = $tag.TrimStart("v")
+          New-Item -ItemType Directory -Force -Path $env:RELEASE_DIR | Out-Null
+
+          dotnet publish $env:PROJECT_PATH `
+            -f net10.0-android `
+            -c Release `
+            -p:ApplicationDisplayVersion=$displayVersion `
+            -p:ApplicationVersion=$env:GITHUB_RUN_NUMBER `
+            -p:AndroidPackageFormat=apk `
+            -p:AndroidKeyStore=true `
+            -p:AndroidSigningKeyStore="$env:ANDROID_KEYSTORE_PATH" `
+            -p:AndroidSigningKeyAlias="$env:ANDROID_KEYSTORE_ALIAS" `
+            -p:AndroidSigningStorePass=env:ANDROID_KEYSTORE_PASSWORD `
+            -p:AndroidSigningKeyPass=env:ANDROID_KEY_PASSWORD
+
+          $apk = Get-ChildItem -Path Agnosia.Android/bin/Release/net10.0-android -Recurse -Filter "*.apk" |
+            Where-Object { $_.FullName -match "\\publish\\" } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+
+          if (-not $apk) {
+            throw "Published APK was not found."
+          }
+
+          $assetPath = Join-Path $env:RELEASE_DIR "Agnosia-$tag.apk"
+          Copy-Item -LiteralPath $apk.FullName -Destination $assetPath -Force
+          "APK_ASSET=$assetPath" >> $env:GITHUB_ENV
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agnosia-${{ github.ref_name }}-apk
+          path: artifacts/release/*.apk
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME $env:APK_ASSET `
+            --verify-tag `
+            --generate-notes `
+            --title "Agnosia $env:GITHUB_REF_NAME"

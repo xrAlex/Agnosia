@@ -1,0 +1,102 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Agnosia.ViewModels"
+             mc:Ignorable="d"
+             x:Class="Agnosia.Views.OverviewSectionView"
+             x:DataType="vm:DashboardWorkspaceViewModel">
+  <Design.DataContext>
+    <vm:DashboardWorkspaceViewModel />
+  </Design.DataContext>
+
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Classes="content-root">
+      <Border Classes="surface-card hero"
+              IsVisible="{Binding IsUnsupportedVisible}">
+        <StackPanel Spacing="16">
+          <Grid ColumnDefinitions="Auto,*"
+                ColumnSpacing="12">
+            <Border Classes="icon-tile large">
+              <PathIcon Classes="section-icon centered"
+                        Data="{StaticResource IconAlertGeometry}" />
+            </Border>
+            <StackPanel Grid.Column="1"
+                        Spacing="4">
+              <TextBlock Classes="section-title"
+                         Text="Требуется Android" />
+              <TextBlock Classes="page-caption"
+                         Text="Agnosia работает на Android-устройствах с поддержкой администратора устройства и рабочего профиля." />
+            </StackPanel>
+          </Grid>
+
+          <TextBlock Foreground="{StaticResource AppTextSecondaryBrush}"
+                     TextWrapping="Wrap"
+                     Text="Откройте приложение на совместимом устройстве, чтобы управлять клонированными приложениями и настройками изолированного профиля." />
+        </StackPanel>
+      </Border>
+
+      <StackPanel IsVisible="{Binding IsDashboardVisible}"
+                  Spacing="10">
+        <Border Classes="surface-card hero">
+          <StackPanel Spacing="12">
+            <WrapPanel Orientation="Horizontal">
+              <Border Classes="tag-chip dense accent"
+                      Margin="0,0,8,8">
+                <TextBlock Classes="tag-label"
+                           Text="{Binding OverallStatusText, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.Dashboard.Health.'}" />
+              </Border>
+              <Border Classes="tag-chip dense"
+                      Margin="0,0,8,8">
+                <TextBlock Classes="tag-label"
+                           Text="{Binding LastRefreshSummary, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.Refresh.'}" />
+              </Border>
+            </WrapPanel>
+
+            <TextBlock Classes="section-title hero-title"
+                       Text="{Binding OverviewHeadline, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.Dashboard.State.'}" />
+            <TextBlock Classes="page-caption"
+                       Text="{Binding OverallStatusCaption, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.Dashboard.Detail.'}" />
+          </StackPanel>
+        </Border>
+
+        <UniformGrid Classes="tile-grid"
+                     ColumnSpacing="10"
+                     RowSpacing="10">
+          <Border Classes="surface-card compact metric-card">
+            <StackPanel Spacing="6">
+              <TextBlock Classes="metric-label"
+                         Text="Всего приложений" />
+              <TextBlock Classes="metric-value"
+                         Text="{Binding TotalManagedAppsCount}" />
+              <TextBlock Classes="metric-support"
+                         Text="Личный и рабочий каталог" />
+            </StackPanel>
+          </Border>
+
+          <Border Classes="surface-card compact metric-card">
+            <StackPanel Spacing="6">
+              <TextBlock Classes="metric-label"
+                         Text="Изолированные приложения" />
+              <TextBlock Classes="metric-value"
+                         Text="{Binding HiddenWorkAppsCount}" />
+              <TextBlock Classes="metric-support"
+                         Text="Приложения которые находятся в рабочем профиле и заморожены" />
+            </StackPanel>
+          </Border>
+
+          <Border Classes="surface-card compact metric-card">
+            <StackPanel Spacing="6">
+              <TextBlock Classes="metric-label"
+                         Text="Обмен данными" />
+              <TextBlock Classes="metric-value"
+                         Text="{Binding InteractionAccessAppsCount}" />
+              <TextBlock Classes="metric-support"
+                         Text="Пакеты которые могут обмениваться данными с основным профилем" />
+            </StackPanel>
+          </Border>
+        </UniformGrid>
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
