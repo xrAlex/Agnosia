@@ -6,5 +6,8 @@ public enum VpnAutomationClientKind
     ClashMeta,
     Happ,
     Tunguska,
-    Incy
+    Incy,
+    Exclave,
+    Husi,
+    NekoBoxPlus
 }

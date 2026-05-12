@@ -240,7 +240,7 @@
             <StackPanel IsVisible="{Binding IsVpnAfterFreezeClientPickerVisible}"
                         Spacing="10">
               <Grid ColumnDefinitions="*,*"
-                    RowDefinitions="Auto,Auto,Auto"
+                    RowDefinitions="Auto,Auto,Auto,Auto"
                     ColumnSpacing="10"
                     HorizontalAlignment="Center"
                     RowSpacing="10">
@@ -273,20 +273,39 @@
                              Text="Tunguska" />
                 </Button>
                 <Button MinWidth="100" Grid.Row="2" Grid.Column="0"
-                        Grid.ColumnSpan="2"
-                        HorizontalAlignment="Center"
                         Classes="segment-chip"
                         Classes.selected="{Binding IsIncyVpnAfterFreezeSelected}"
                         Command="{Binding SelectIncyVpnAfterFreezeCommand}">
                   <TextBlock Classes="button-label"
                              Text="INCY" />
                 </Button>
+                <Button MinWidth="100" Grid.Row="2" Grid.Column="1"
+                        Classes="segment-chip"
+                        Classes.selected="{Binding IsExclaveVpnAfterFreezeSelected}"
+                        Command="{Binding SelectExclaveVpnAfterFreezeCommand}">
+                  <TextBlock Classes="button-label"
+                             Text="Exclave" />
+                </Button>
+                <Button MinWidth="100" Grid.Row="3" Grid.Column="0"
+                        Classes="segment-chip"
+                        Classes.selected="{Binding IsHusiVpnAfterFreezeSelected}"
+                        Command="{Binding SelectHusiVpnAfterFreezeCommand}">
+                  <TextBlock Classes="button-label"
+                             Text="husi" />
+                </Button>
+                <Button MinWidth="100" Grid.Row="3" Grid.Column="1"
+                        Classes="segment-chip"
+                        Classes.selected="{Binding IsNekoBoxPlusVpnAfterFreezeSelected}"
+                        Command="{Binding SelectNekoBoxPlusVpnAfterFreezeCommand}">
+                  <TextBlock Classes="button-label"
+                             Text="NekoBox+" />
+                </Button>
               </Grid>
 
               <Border Classes="tag-chip accent"
-                      IsVisible="{Binding IsHappVpnAfterFreezeWarningVisible}">
+                      IsVisible="{Binding IsToggleOnlyVpnAfterFreezeWarningVisible}">
                 <TextBlock Classes="page-caption"
-                           Text="Happ поддерживает только toggle-команду: если VPN уже включен, она может выключить подключение." />
+                           Text="Выбранный клиент поддерживает только toggle-команду: если VPN уже включен, она может выключить подключение." />
               </Border>
 
               <StackPanel IsVisible="{Binding IsTunguskaAutomationTokenVisible}"

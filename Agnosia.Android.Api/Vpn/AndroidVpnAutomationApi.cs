@@ -45,7 +45,28 @@ public static class AndroidVpnAutomationApi
             "llc.itdev.incy",
             "llc.itdev.incy.CONNECT",
             StopAction: "llc.itdev.incy.DISCONNECT",
-            ReceiverClassName: "llc.itdev.incy.receiver.VpnIntentReceiver")
+            ReceiverClassName: "llc.itdev.incy.receiver.VpnIntentReceiver"),
+        new(
+            VpnAutomationClientKind.Exclave,
+            "Exclave",
+            "com.github.dyhkwong.sagernet",
+            string.Empty,
+            ActivityClassName: "io.nekohasekai.sagernet.QuickToggleShortcut",
+            RequireExplicitActivity: true),
+        new(
+            VpnAutomationClientKind.Husi,
+            "husi",
+            "fr.husi",
+            string.Empty,
+            ActivityClassName: "fr.husi.QuickToggleShortcut",
+            RequireExplicitActivity: true),
+        new(
+            VpnAutomationClientKind.NekoBoxPlus,
+            "NekoBox+",
+            "moe.nb4a",
+            string.Empty,
+            ActivityClassName: "io.nekohasekai.sagernet.QuickToggleShortcut",
+            RequireExplicitActivity: true)
     ];
 
     public static Task<OperationResult> EnableConfiguredVpnAfterWorkFreezeAsync(Context context, string trigger)
@@ -164,8 +185,14 @@ public static class AndroidVpnAutomationApi
 
     private static Intent CreateStartActivityIntent(VpnClientDefinition definition, bool useComponent)
     {
-        var intent = new Intent(definition.StartAction);
-        intent.AddCategory(Intent.CategoryDefault);
+        var intent = string.IsNullOrWhiteSpace(definition.StartAction)
+            ? new Intent()
+            : new Intent(definition.StartAction);
+        if (!string.IsNullOrWhiteSpace(definition.StartAction))
+        {
+            intent.AddCategory(Intent.CategoryDefault);
+        }
+
         intent.SetPackage(definition.PackageName);
         intent.AddFlags(ActivityFlags.NewTask);
         if (useComponent && !string.IsNullOrWhiteSpace(definition.ActivityClassName))

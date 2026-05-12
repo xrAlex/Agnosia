@@ -133,7 +133,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsVpnAfterFreezeClientPickerVisible))]
-    [NotifyPropertyChangedFor(nameof(IsHappVpnAfterFreezeWarningVisible))]
+    [NotifyPropertyChangedFor(nameof(IsToggleOnlyVpnAfterFreezeWarningVisible))]
     [NotifyPropertyChangedFor(nameof(IsTunguskaAutomationTokenVisible))]
     private bool _enableVpnAfterWorkFreeze;
 
@@ -143,7 +143,10 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsHappVpnAfterFreezeSelected))]
     [NotifyPropertyChangedFor(nameof(IsTunguskaVpnAfterFreezeSelected))]
     [NotifyPropertyChangedFor(nameof(IsIncyVpnAfterFreezeSelected))]
-    [NotifyPropertyChangedFor(nameof(IsHappVpnAfterFreezeWarningVisible))]
+    [NotifyPropertyChangedFor(nameof(IsExclaveVpnAfterFreezeSelected))]
+    [NotifyPropertyChangedFor(nameof(IsHusiVpnAfterFreezeSelected))]
+    [NotifyPropertyChangedFor(nameof(IsNekoBoxPlusVpnAfterFreezeSelected))]
+    [NotifyPropertyChangedFor(nameof(IsToggleOnlyVpnAfterFreezeWarningVisible))]
     [NotifyPropertyChangedFor(nameof(IsTunguskaAutomationTokenVisible))]
     private VpnAutomationClientKind _vpnAfterWorkFreezeClient = VpnAutomationClientKind.FlClash;
 
@@ -300,8 +303,18 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public bool IsIncyVpnAfterFreezeSelected => VpnAfterWorkFreezeClient == VpnAutomationClientKind.Incy;
 
-    public bool IsHappVpnAfterFreezeWarningVisible =>
-        EnableVpnAfterWorkFreeze && VpnAfterWorkFreezeClient == VpnAutomationClientKind.Happ;
+    public bool IsExclaveVpnAfterFreezeSelected => VpnAfterWorkFreezeClient == VpnAutomationClientKind.Exclave;
+
+    public bool IsHusiVpnAfterFreezeSelected => VpnAfterWorkFreezeClient == VpnAutomationClientKind.Husi;
+
+    public bool IsNekoBoxPlusVpnAfterFreezeSelected => VpnAfterWorkFreezeClient == VpnAutomationClientKind.NekoBoxPlus;
+
+    public bool IsToggleOnlyVpnAfterFreezeWarningVisible =>
+        EnableVpnAfterWorkFreeze
+        && (VpnAfterWorkFreezeClient == VpnAutomationClientKind.Happ
+            || VpnAfterWorkFreezeClient == VpnAutomationClientKind.Exclave
+            || VpnAfterWorkFreezeClient == VpnAutomationClientKind.Husi
+            || VpnAfterWorkFreezeClient == VpnAutomationClientKind.NekoBoxPlus);
 
     public bool IsTunguskaAutomationTokenVisible =>
         EnableVpnAfterWorkFreeze && VpnAfterWorkFreezeClient == VpnAutomationClientKind.Tunguska;
@@ -569,6 +582,15 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     [RelayCommand]
     private void SelectIncyVpnAfterFreeze() => VpnAfterWorkFreezeClient = VpnAutomationClientKind.Incy;
+
+    [RelayCommand]
+    private void SelectExclaveVpnAfterFreeze() => VpnAfterWorkFreezeClient = VpnAutomationClientKind.Exclave;
+
+    [RelayCommand]
+    private void SelectHusiVpnAfterFreeze() => VpnAfterWorkFreezeClient = VpnAutomationClientKind.Husi;
+
+    [RelayCommand]
+    private void SelectNekoBoxPlusVpnAfterFreeze() => VpnAfterWorkFreezeClient = VpnAutomationClientKind.NekoBoxPlus;
 
     [RelayCommand]
     private void StartOnboarding()
