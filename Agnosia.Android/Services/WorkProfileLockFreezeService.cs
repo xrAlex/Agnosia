@@ -176,7 +176,7 @@ public sealed class WorkProfileLockFreezeService : Service
             }
         }
 
-        HiddenAppSessionMonitorService.RequestScreenLockCompletion(context);
+        HiddenAppSessionMonitorService.CompletePersistedSessionForScreenLock(context);
         Log.Info(LogTag, $"Screen lock freeze completed. trigger={trigger}, frozen={frozenCount}, failed={failedCount}.");
     }
 

@@ -26,12 +26,11 @@ public sealed class HiddenAppSessionMonitorService : Service
     private const string AospPermissionControllerPackage = "com.android.permissioncontroller";
     private const string GooglePlayServicesPackage = "com.google.android.gms";
     private const string ActionStart = "agnosia.action.START_HIDDEN_APP_SESSION";
-    private const string ActionCompleteForScreenLock = "agnosia.action.COMPLETE_HIDDEN_APP_SESSION_FOR_SCREEN_LOCK";
     private const string ExtraPackageName = "packageName";
     private const string ExtraDisplayName = "displayName";
     private const string ExtraTaskId = "taskId";
     private const string ExtraStartedAtUnixTimeMilliseconds = "startedAtUnixTimeMilliseconds";
-    private const string ScreenLockServiceReason = "screen_lock_service";
+    private const string ScreenLockPersistedReason = "screen_lock_persisted_session";
     private const string ScreenNonInteractiveReason = "screen_non_interactive";
     private const string SessionReplacedReason = "session_replaced";
     private const int NotificationId = 0x57C31;
@@ -76,16 +75,37 @@ public sealed class HiddenAppSessionMonitorService : Service
             $"Android не смог запустить монитор скрытого приложения {packageName}.");
     }
 
-    public static void RequestScreenLockCompletion(Context context)
+    public static void CompletePersistedSessionForScreenLock(Context context)
     {
-        Log.Info(LogTag, "Screen-lock session completion requested.");
-        var intent = new Intent(context, typeof(HiddenAppSessionMonitorService));
-        intent.SetAction(ActionCompleteForScreenLock);
-        AndroidServiceApi.TryStartService(
-            context,
-            intent,
-            LogTag,
-            "Android не смог отправить команду завершения сессии при блокировке экрана.");
+        if (!TryLoadPersistedSession(out var session))
+        {
+            Log.Info(LogTag, "No persisted hidden-app session to complete on screen lock.");
+            return;
+        }
+
+        try
+        {
+            if (AndroidSystemApi.GetDevicePolicyManager(context) is not { } policyManager)
+            {
+                Log.Warn(LogTag, $"DevicePolicyManager unavailable, could not complete persisted hidden-app session for {session.PackageName} on screen lock.");
+                return;
+            }
+
+            var admin = AgnosiaUtilities.GetAdminComponent(context, typeof(AgnosiaDeviceAdminReceiver));
+            var hiddenApplied = policyManager.SetApplicationHidden(admin, session.PackageName, true);
+            if (!hiddenApplied && !policyManager.IsApplicationHidden(admin, session.PackageName))
+            {
+                Log.Warn(LogTag, $"Android did not confirm re-hiding {session.PackageName}. reason={ScreenLockPersistedReason}");
+                return;
+            }
+
+            PersistSession(null);
+            Log.Info(LogTag, $"Persisted hidden-app session completed on screen lock for {session.PackageName}.");
+        }
+        catch (Exception exception)
+        {
+            Log.Warn(LogTag, $"Failed to complete persisted hidden-app session for {session.PackageName} on screen lock: {exception.Message}");
+        }
     }
 
     public override void OnCreate()
@@ -102,13 +122,6 @@ public sealed class HiddenAppSessionMonitorService : Service
         try
         {
             var action = intent?.Action;
-            if (string.Equals(action, ActionCompleteForScreenLock, StringComparison.Ordinal))
-            {
-                CompleteActiveSession(ScreenLockServiceReason);
-                StopSelf(startId);
-                return StartCommandResult.NotSticky;
-            }
-
             HiddenAppSessionState session;
             if (string.Equals(action, ActionStart, StringComparison.Ordinal))
             {
@@ -320,28 +333,6 @@ public sealed class HiddenAppSessionMonitorService : Service
     private bool IsDeviceInteractive() =>
         AndroidSystemApi.GetPowerManager(this)?.IsInteractive != false;
 
-    private void CompleteActiveSession(string reason)
-    {
-        HiddenAppSessionState? session;
-        lock (_sync)
-        {
-            session = _activeSession;
-            if (session is null && TryLoadPersistedSession(out var persistedSession))
-            {
-                session = persistedSession;
-                _activeSession = persistedSession;
-            }
-        }
-
-        if (session is null)
-        {
-            Log.Info(LogTag, $"No active hidden-app session to complete. reason={reason}");
-            return;
-        }
-
-        CompleteSession(session, reason);
-    }
-
     private void CompleteSession(HiddenAppSessionState session, string reason)
     {
         var shouldComplete = false;
@@ -391,8 +382,7 @@ public sealed class HiddenAppSessionMonitorService : Service
                 return;
             }
 
-            if (string.Equals(reason, ScreenLockServiceReason, StringComparison.Ordinal)
-                || string.Equals(reason, ScreenNonInteractiveReason, StringComparison.Ordinal))
+            if (string.Equals(reason, ScreenNonInteractiveReason, StringComparison.Ordinal))
             {
                 Log.Info(LogTag, $"Skipping session-level VPN enable after screen-lock freeze for {session.PackageName}; lock service handles it.");
                 return;
