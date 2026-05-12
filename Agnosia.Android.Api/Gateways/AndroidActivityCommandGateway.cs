@@ -9,7 +9,7 @@ namespace Agnosia.Android.Api;
 internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> getActivityHost)
 {
     private const string ActivityResultLogTag = "AgnosiaActivityResult";
-    private static readonly TimeSpan ProfileCommandTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan ProfileCommandTimeout = TimeSpan.FromSeconds(30);
 
     public Activity CurrentActivity => getActivityHost().CurrentActivity;
 
