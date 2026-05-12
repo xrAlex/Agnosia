@@ -28,9 +28,9 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
     private const string LogTag = "AgnosiaMainActivity";
     private static readonly Lock RequestSync = new();
     private static readonly Dictionary<int, TaskCompletionSource<AndroidActivityResult>> PendingResults = [];
+    private static readonly Queue<ActivityStartRequest> PendingActivityStarts = [];
     private static int _nextRequestCode = 4100;
     private static bool _startupMitigationsApplied;
-    private readonly Queue<Action> _pendingActivityStarts = [];
     private bool _isResumed;
 
     private static MainActivity? Current { get; set; }
@@ -122,8 +122,6 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         {
             Current = null;
             AndroidPlatformBridge.Instance.DetachActivity();
-            _pendingActivityStarts.Clear();
-            CancelPendingActivityResults();
         }
 
         base.OnDestroy();
@@ -282,48 +280,17 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         int requestCode,
         TaskCompletionSource<AndroidActivityResult> completionSource)
     {
-        void Start()
-        {
-            lock (RequestSync)
-            {
-                if (!PendingResults.ContainsKey(requestCode))
-                {
-                    return;
-                }
-            }
-
-            try
-            {
-                Log.Debug(
-                    LogTag,
-                    $"Starting activity for result. requestCode={requestCode}, action={intent.Action ?? "<none>"}.");
-                StartActivityForResult(intent, requestCode);
-            }
-            catch (Exception exception)
-            {
-                lock (RequestSync)
-                {
-                    PendingResults.Remove(requestCode);
-                }
-
-                Log.Warn(LogTag, $"Failed to start activity for result: {exception}");
-                completionSource.TrySetResult(
-                    AndroidActivityResultApi.CreateCanceledResult("Android не смог открыть нужный экран или действие."));
-            }
-        }
+        var request = new ActivityStartRequest(intent, requestCode, completionSource);
 
         void ScheduleStart()
         {
             if (!_isResumed)
             {
-                Log.Debug(
-                    LogTag,
-                    $"Queueing activity start until resume. requestCode={requestCode}, action={intent.Action ?? "<none>"}, pendingStarts={_pendingActivityStarts.Count + 1}.");
-                _pendingActivityStarts.Enqueue(Start);
+                QueueActivityStart(request);
                 return;
             }
 
-            Start();
+            StartActivityForResultRequest(request);
         }
 
         if (Looper.MainLooper?.IsCurrentThread == true)
@@ -337,26 +304,67 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
 
     private void DrainPendingActivityStarts()
     {
-        while (_isResumed && _pendingActivityStarts.Count > 0)
+        while (_isResumed)
         {
-            Log.Debug(LogTag, $"Draining queued activity start. remainingBefore={_pendingActivityStarts.Count}.");
-            _pendingActivityStarts.Dequeue().Invoke();
+            ActivityStartRequest request;
+            lock (RequestSync)
+            {
+                if (PendingActivityStarts.Count == 0)
+                {
+                    return;
+                }
+
+                Log.Debug(LogTag, $"Draining queued activity start. remainingBefore={PendingActivityStarts.Count}.");
+                request = PendingActivityStarts.Dequeue();
+            }
+
+            StartActivityForResultRequest(request);
         }
     }
 
-    private static void CancelPendingActivityResults()
+    private static void QueueActivityStart(ActivityStartRequest request)
     {
-        TaskCompletionSource<AndroidActivityResult>[] pendingResults;
         lock (RequestSync)
         {
-            pendingResults = PendingResults.Values.ToArray();
-            PendingResults.Clear();
+            if (!PendingResults.ContainsKey(request.RequestCode))
+            {
+                return;
+            }
+
+            Log.Debug(
+                LogTag,
+                $"Queueing activity start until resume. requestCode={request.RequestCode}, action={request.Intent.Action ?? "<none>"}, pendingStarts={PendingActivityStarts.Count + 1}.");
+            PendingActivityStarts.Enqueue(request);
+        }
+    }
+
+    private void StartActivityForResultRequest(ActivityStartRequest request)
+    {
+        lock (RequestSync)
+        {
+            if (!PendingResults.ContainsKey(request.RequestCode))
+            {
+                return;
+            }
         }
 
-        foreach (var completionSource in pendingResults)
+        try
         {
-            completionSource.TrySetResult(
-                AndroidActivityResultApi.CreateCanceledResult("Экран Agnosia был закрыт до завершения системного действия."));
+            Log.Debug(
+                LogTag,
+                $"Starting activity for result. requestCode={request.RequestCode}, action={request.Intent.Action ?? "<none>"}.");
+            StartActivityForResult(request.Intent, request.RequestCode);
+        }
+        catch (Exception exception)
+        {
+            lock (RequestSync)
+            {
+                PendingResults.Remove(request.RequestCode);
+            }
+
+            Log.Warn(LogTag, $"Failed to start activity for result: {exception}");
+            request.CompletionSource.TrySetResult(
+                AndroidActivityResultApi.CreateCanceledResult("Android не смог открыть нужный экран или действие."));
         }
     }
 
@@ -370,4 +378,9 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
 
     Task<AndroidActivityResult> IAndroidActivityHost.StartForResultAsync(Intent intent, CancellationToken cancellationToken) =>
         StartForResultAsync(intent, cancellationToken);
+
+    private sealed record ActivityStartRequest(
+        Intent Intent,
+        int RequestCode,
+        TaskCompletionSource<AndroidActivityResult> CompletionSource);
 }
