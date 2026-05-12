@@ -6,6 +6,7 @@ using Agnosia.Android.Services;
 using Agnosia.Infrastructure;
 using Android.Content;
 using Android.Content.PM;
+using Android.OS;
 using Android.Views;
 using Avalonia.Android;
 using Avalonia.Controls;
@@ -20,6 +21,7 @@ namespace Agnosia.Android;
     Theme = "@style/MyTheme.NoActionBar",
     Icon = "@mipmap/ic_launcher",
     MainLauncher = true,
+    Exported = true,
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode)]
 public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
 {
@@ -109,9 +111,9 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         if (ReferenceEquals(Current, this))
         {
             Current = null;
+            AndroidPlatformBridge.Instance.DetachActivity();
+            CancelPendingActivityResults();
         }
-
-        AndroidPlatformBridge.Instance.DetachActivity();
 
         base.OnDestroy();
     }
@@ -249,23 +251,66 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
 
-        try
-        {
-            StartActivityForResult(intent, requestCode);
-        }
-        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        StartActivityForResultOnUiThread(intent, requestCode, completionSource);
+
+        return completionSource.Task;
+    }
+
+    private void StartActivityForResultOnUiThread(
+        Intent intent,
+        int requestCode,
+        TaskCompletionSource<AndroidActivityResult> completionSource)
+    {
+        void Start()
         {
             lock (RequestSync)
             {
-                PendingResults.Remove(requestCode);
+                if (!PendingResults.ContainsKey(requestCode))
+                {
+                    return;
+                }
             }
 
-            Log.Warn(LogTag, $"Failed to start activity for result: {exception}");
-            completionSource.TrySetResult(
-                AndroidActivityResultApi.CreateCanceledResult("Android не смог открыть нужный экран или действие."));
+            try
+            {
+                StartActivityForResult(intent, requestCode);
+            }
+            catch (Exception exception)
+            {
+                lock (RequestSync)
+                {
+                    PendingResults.Remove(requestCode);
+                }
+
+                Log.Warn(LogTag, $"Failed to start activity for result: {exception}");
+                completionSource.TrySetResult(
+                    AndroidActivityResultApi.CreateCanceledResult("Android не смог открыть нужный экран или действие."));
+            }
         }
 
-        return completionSource.Task;
+        if (Looper.MainLooper?.IsCurrentThread == true)
+        {
+            Start();
+            return;
+        }
+
+        RunOnUiThread(Start);
+    }
+
+    private static void CancelPendingActivityResults()
+    {
+        TaskCompletionSource<AndroidActivityResult>[] pendingResults;
+        lock (RequestSync)
+        {
+            pendingResults = PendingResults.Values.ToArray();
+            PendingResults.Clear();
+        }
+
+        foreach (var completionSource in pendingResults)
+        {
+            completionSource.TrySetResult(
+                AndroidActivityResultApi.CreateCanceledResult("Экран Agnosia был закрыт до завершения системного действия."));
+        }
     }
 
     Activity IAndroidActivityHost.CurrentActivity => this;

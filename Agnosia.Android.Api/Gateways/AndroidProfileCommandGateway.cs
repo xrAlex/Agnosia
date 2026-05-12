@@ -16,19 +16,38 @@ public static class AndroidProfileCommandGateway
     private const string ExtraName = "name";
     private const string ExtraBoolean = "boolean";
     public const string ExtraTrigger = "trigger";
+    private static readonly TimeSpan ProfilePingTimeout = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan BooleanQueryCacheTtl = TimeSpan.FromSeconds(5);
     private static readonly Lock BooleanQueryCacheSync = new();
     private static readonly Dictionary<string, CachedBooleanQuery> BooleanQueryCache = [];
 
-    internal static Task<bool> CanReachWorkProfileAsync(
+    internal static async Task<bool> CanReachWorkProfileAsync(
         AndroidActivityCommandGateway commandRunner,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var activity = commandRunner.CurrentActivity;
-        return Task.FromResult(
-            !string.IsNullOrWhiteSpace(AuthenticationUtility.GetExistingKey())
-            && AgnosiaUtilities.HasWorkProfileTarget(activity));
+        if (string.IsNullOrWhiteSpace(AuthenticationUtility.GetExistingKey())
+            || !AgnosiaUtilities.HasWorkProfileTarget(activity))
+        {
+            return false;
+        }
+
+        using var pingCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        pingCancellation.CancelAfter(ProfilePingTimeout);
+        try
+        {
+            var result = await commandRunner.StartActivityForResultAsync(
+                new Intent(AgnosiaActions.ProfilePing),
+                useWorkProfile: true,
+                pingCancellation.Token);
+            return result.ResultCode == Result.Ok;
+        }
+        catch (System.OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            Log.Warn(LogTag, "Timed out waiting for work-profile ping.");
+            return false;
+        }
     }
 
     internal static async Task<ProfileAppsQueryResult?> QueryAppsAsync(

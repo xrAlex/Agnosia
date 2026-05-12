@@ -17,7 +17,7 @@ namespace Agnosia.Android.Activities;
     Theme = "@android:style/Theme.Translucent.NoTitleBar",
     Exported = true,
     ExcludeFromRecents = true,
-    LaunchMode = LaunchMode.SingleTask)]
+    LaunchMode = LaunchMode.SingleTop)]
 [IntentFilter(
 [
     AgnosiaActions.FinalizeProvision,

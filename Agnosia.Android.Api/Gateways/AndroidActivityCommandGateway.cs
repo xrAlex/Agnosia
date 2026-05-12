@@ -9,6 +9,7 @@ namespace Agnosia.Android.Api;
 internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> getActivityHost)
 {
     private const string ActivityResultLogTag = "AgnosiaActivityResult";
+    private static readonly TimeSpan ProfileCommandTimeout = TimeSpan.FromSeconds(15);
 
     public Activity CurrentActivity => getActivityHost().CurrentActivity;
 
@@ -87,7 +88,25 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
                 AuthenticationUtility.SignIntent(intent);
             }
 
-            return await host.StartForResultAsync(intent, cancellationToken);
+            if (!useWorkProfile)
+            {
+                return await host.StartForResultAsync(intent, cancellationToken);
+            }
+
+            using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCancellation.CancelAfter(ProfileCommandTimeout);
+            try
+            {
+                return await host.StartForResultAsync(intent, timeoutCancellation.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                Log.Warn(
+                    ActivityResultLogTag,
+                    $"Timed out waiting for work-profile activity result. action={intent.Action ?? "<none>"}.");
+                return AndroidActivityResultApi.CreateCanceledResult(
+                    "Рабочий профиль не ответил на системную команду вовремя.");
+            }
         }
         catch (OperationCanceledException)
         {

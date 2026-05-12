@@ -989,7 +989,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         {
             while (!cancellationToken.IsCancellationRequested && !OnboardingCompleted)
             {
-                await AdvanceOnboardingAsync(cancellationToken);
+                await InvokeOnUiThreadAsync(() => AdvanceOnboardingAsync(cancellationToken));
 
                 if (OnboardingCompleted
                     || OnboardingStep == OnboardingStep.Welcome
@@ -1016,6 +1016,31 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
                 _onboardingMonitorCancellation = null;
             }
         }
+    }
+
+    private static async Task InvokeOnUiThreadAsync(Func<Task> action)
+    {
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            await action();
+            return;
+        }
+
+        var completionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Dispatcher.UIThread.Post(async () =>
+        {
+            try
+            {
+                await action();
+                completionSource.TrySetResult();
+            }
+            catch (Exception exception)
+            {
+                completionSource.TrySetException(exception);
+            }
+        }, DispatcherPriority.Background);
+
+        await completionSource.Task;
     }
 
     private async Task AdvanceOnboardingAsync(CancellationToken cancellationToken)
