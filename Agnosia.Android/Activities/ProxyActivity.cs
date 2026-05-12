@@ -62,6 +62,9 @@ public sealed class ProxyActivity : Activity
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
     {
         base.OnActivityResult(requestCode, resultCode, data);
+        Log.Debug(
+            LogTag,
+            $"Proxy activity result received. requestCode={requestCode}, result={resultCode}, activePackage={_request?.PackageName ?? "<none>"}, hasData={data is not null}.");
 
         if (requestCode == PrepareVpnRequestCode)
         {
@@ -100,10 +103,14 @@ public sealed class ProxyActivity : Activity
 
         if (!HiddenAppShortcutManager.TryGetLaunchRequest(Intent, out var request))
         {
+            Log.Warn(LogTag, $"Proxy launch request rejected. action={Intent?.Action ?? "<none>"}.");
             Finish();
             return;
         }
 
+        Log.Info(
+            LogTag,
+            $"Proxy launch request accepted. package={request.PackageName}, targetActivity={request.TargetActivity ?? "<none>"}, displayName={request.DisplayName}.");
         _launchStarted = true;
         _request = request;
 
@@ -158,6 +165,10 @@ public sealed class ProxyActivity : Activity
                 ShowErrorAndFinish($"Не найден способ открыть {request.DisplayName}.");
                 return;
             }
+
+            Log.Info(
+                LogTag,
+                $"Resolved launch intent for {request.PackageName}. component={launchIntent.Component?.FlattenToShortString() ?? "<none>"}, flags={launchIntent.Flags}.");
 
             RunOnUiThread(() =>
             {
@@ -407,6 +418,7 @@ public sealed class ProxyActivity : Activity
 
     private void ShowErrorAndFinish(string message)
     {
+        Log.Warn(LogTag, $"Finishing proxy flow with error. package={_request?.PackageName ?? "<none>"}, message={message}");
         RunOnUiThread(() =>
         {
             Toast.MakeText(this, message, ToastLength.Long)?.Show();

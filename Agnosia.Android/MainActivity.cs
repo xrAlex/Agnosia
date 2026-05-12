@@ -139,6 +139,9 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
             PendingResults.Remove(requestCode, out completionSource);
         }
 
+        Log.Debug(
+            LogTag,
+            $"Activity result received. requestCode={requestCode}, result={resultCode}, matchedPending={completionSource is not null}, hasData={data is not null}.");
         completionSource?.TrySetResult(new AndroidActivityResult(resultCode, data));
     }
 
@@ -242,6 +245,10 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
             PendingResults[requestCode] = completionSource;
         }
 
+        Log.Debug(
+            LogTag,
+            $"Activity result request registered. requestCode={requestCode}, action={intent.Action ?? "<none>"}, isResumed={_isResumed}.");
+
         if (cancellationToken.CanBeCanceled)
         {
             cancellationRegistration = cancellationToken.Register(() =>
@@ -251,6 +258,9 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
                     PendingResults.Remove(requestCode);
                 }
 
+                Log.Debug(
+                    LogTag,
+                    $"Activity result request canceled. requestCode={requestCode}, action={intent.Action ?? "<none>"}.");
                 completionSource.TrySetCanceled(cancellationToken);
             });
         }
@@ -284,6 +294,9 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
 
             try
             {
+                Log.Debug(
+                    LogTag,
+                    $"Starting activity for result. requestCode={requestCode}, action={intent.Action ?? "<none>"}.");
                 StartActivityForResult(intent, requestCode);
             }
             catch (Exception exception)
@@ -303,6 +316,9 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         {
             if (!_isResumed)
             {
+                Log.Debug(
+                    LogTag,
+                    $"Queueing activity start until resume. requestCode={requestCode}, action={intent.Action ?? "<none>"}, pendingStarts={_pendingActivityStarts.Count + 1}.");
                 _pendingActivityStarts.Enqueue(Start);
                 return;
             }
@@ -323,6 +339,7 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
     {
         while (_isResumed && _pendingActivityStarts.Count > 0)
         {
+            Log.Debug(LogTag, $"Draining queued activity start. remainingBefore={_pendingActivityStarts.Count}.");
             _pendingActivityStarts.Dequeue().Invoke();
         }
     }

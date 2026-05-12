@@ -6,7 +6,7 @@ namespace Agnosia.Android.Api;
 
 public static class AndroidAppLogArchive
 {
-    private const int MaxEntries = 100;
+    private const int MaxEntries = 200;
 
     private static readonly Lock Sync = new();
     private static readonly JsonSerializerOptions JsonOptions = new()

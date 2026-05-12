@@ -4,7 +4,7 @@ namespace Agnosia.Services;
 
 public sealed class BoundedAppEventLogService : IAppEventLogService
 {
-    private const int DefaultCapacity = 100;
+    private const int DefaultCapacity = 200;
 
     private readonly Lock _sync = new();
     private readonly HashSet<string> _platformLogIds = new(StringComparer.Ordinal);

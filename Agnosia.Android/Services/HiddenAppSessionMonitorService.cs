@@ -638,9 +638,9 @@ public sealed class HiddenAppSessionMonitorService : Service
                 reason);
             return observation;
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            WarnUsageEventsProblemOnce($"Usage events query failed for {packageName}; no inactive evidence was produced.");
+            WarnUsageEventsProblemOnce($"Usage events query failed for {packageName}; no inactive evidence was produced. error={exception.Message}");
             return null;
         }
     }

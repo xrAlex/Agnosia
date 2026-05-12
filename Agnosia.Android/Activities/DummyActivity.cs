@@ -521,6 +521,9 @@ public sealed class DummyActivity : Activity
     {
         var intent = Intent;
         var packageName = intent?.GetStringExtra("packageName");
+        Log.Info(
+            LogTag,
+            $"Unfreeze-and-launch command received. package={packageName ?? "<none>"}, isProfileOwner={_isProfileOwner}, hasParentFrozenCallback={ReadParentFrozenCallback(intent) is not null}.");
         if (string.IsNullOrWhiteSpace(packageName))
         {
             Finish();
@@ -542,6 +545,7 @@ public sealed class DummyActivity : Activity
                 return;
             }
 
+            Log.Info(LogTag, $"Unfreeze-and-launch command forwarded to work profile. package={packageName}.");
             FinishWithResult(Result.Ok);
             return;
         }
@@ -561,10 +565,12 @@ public sealed class DummyActivity : Activity
                 $"Android не смог открыть {packageName}.",
                 out var error))
             {
+                Log.Info(LogTag, $"Proxy launch activity started. package={packageName}; finishing command activity with success.");
                 FinishWithSuccessMessage("Открываем приложение.");
                 return;
             }
 
+            Log.Warn(LogTag, $"Proxy launch activity was not started. package={packageName}, error={error ?? "<none>"}.");
             FinishWithError(error ?? $"Android не смог открыть {packageName}.");
         }
         catch (Exception exception)
@@ -744,6 +750,9 @@ public sealed class DummyActivity : Activity
 
     private void FinishWithResult(Result resultCode, Intent? data = null)
     {
+        Log.Debug(
+            LogTag,
+            $"Finishing action={Intent?.Action ?? "<none>"} with result={resultCode}, hasData={data is not null}.");
         if (data is null)
         {
             SetResult(resultCode);
