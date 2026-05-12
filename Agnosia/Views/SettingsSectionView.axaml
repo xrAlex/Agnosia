@@ -240,7 +240,7 @@
             <StackPanel IsVisible="{Binding IsVpnAfterFreezeClientPickerVisible}"
                         Spacing="10">
               <Grid ColumnDefinitions="*,*"
-                    RowDefinitions="Auto,Auto"
+                    RowDefinitions="Auto,Auto,Auto"
                     ColumnSpacing="10"
                     HorizontalAlignment="Center"
                     RowSpacing="10">
@@ -271,6 +271,15 @@
                         Command="{Binding SelectTunguskaVpnAfterFreezeCommand}">
                   <TextBlock Classes="button-label"
                              Text="Tunguska" />
+                </Button>
+                <Button MinWidth="100" Grid.Row="2" Grid.Column="0"
+                        Grid.ColumnSpan="2"
+                        HorizontalAlignment="Center"
+                        Classes="segment-chip"
+                        Classes.selected="{Binding IsIncyVpnAfterFreezeSelected}"
+                        Command="{Binding SelectIncyVpnAfterFreezeCommand}">
+                  <TextBlock Classes="button-label"
+                             Text="INCY" />
                 </Button>
               </Grid>
 

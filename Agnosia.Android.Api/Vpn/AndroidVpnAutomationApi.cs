@@ -38,7 +38,14 @@ public static class AndroidVpnAutomationApi
             "com.follow.clash.action.START",
             ActivityClassName: "com.follow.clash.TempActivity",
             RequireExplicitActivity: true,
-            IsolateActivityTask: true)
+            IsolateActivityTask: true),
+        new(
+            VpnAutomationClientKind.Incy,
+            "INCY",
+            "llc.itdev.incy",
+            "llc.itdev.incy.CONNECT",
+            StopAction: "llc.itdev.incy.DISCONNECT",
+            ReceiverClassName: "llc.itdev.incy.receiver.VpnIntentReceiver")
     ];
 
     public static Task<OperationResult> EnableConfiguredVpnAfterWorkFreezeAsync(Context context, string trigger)
@@ -80,6 +87,10 @@ public static class AndroidVpnAutomationApi
                     break;
                 case VpnAutomationClientKind.Tunguska:
                     result = StartTunguska(context, definition, storage);
+                    break;
+                case VpnAutomationClientKind.Incy:
+                    SendStartBroadcast(context, definition);
+                    result = OperationResult.Success($"Команда запуска VPN отправлена в {definition.DisplayName}.");
                     break;
                 default:
                     result = StartActivityClient(context, definition);
@@ -185,6 +196,17 @@ public static class AndroidVpnAutomationApi
         Log.Info(LogTag, $"Toggle broadcast sent. client={definition.DisplayName}, action={toggleAction}.");
     }
 
+    private static void SendStartBroadcast(Context context, VpnClientDefinition definition)
+    {
+        var receiverClassName = definition.ReceiverClassName
+            ?? throw new InvalidOperationException("VPN client definition does not provide a receiver class.");
+        var intent = new Intent(definition.StartAction);
+        intent.SetPackage(definition.PackageName);
+        intent.SetComponent(new ComponentName(definition.PackageName, receiverClassName));
+        context.SendBroadcast(intent);
+        Log.Info(LogTag, $"Start broadcast sent. client={definition.DisplayName}, action={definition.StartAction}.");
+    }
+
     private static OperationResult StartTunguska(Context context, VpnClientDefinition definition, LocalStorageManager storage)
     {
         var token = storage.GetString(StorageKeys.TunguskaAutomationToken)?.Trim();
@@ -246,6 +268,7 @@ public static class AndroidVpnAutomationApi
         string DisplayName,
         string PackageName,
         string StartAction,
+        string? StopAction = null,
         string? ToggleAction = null,
         string? ActivityClassName = null,
         string? ReceiverClassName = null,

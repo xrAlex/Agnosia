@@ -23,6 +23,7 @@
     <package android:name="com.github.metacubex.clash.meta" />
     <package android:name="com.happproxy" />
     <package android:name="io.acionyx.tunguska" />
+    <package android:name="llc.itdev.incy" />
   </queries>
 
   <application android:label="@string/app_name"

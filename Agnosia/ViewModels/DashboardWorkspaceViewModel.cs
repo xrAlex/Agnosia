@@ -142,6 +142,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsClashMetaVpnAfterFreezeSelected))]
     [NotifyPropertyChangedFor(nameof(IsHappVpnAfterFreezeSelected))]
     [NotifyPropertyChangedFor(nameof(IsTunguskaVpnAfterFreezeSelected))]
+    [NotifyPropertyChangedFor(nameof(IsIncyVpnAfterFreezeSelected))]
     [NotifyPropertyChangedFor(nameof(IsHappVpnAfterFreezeWarningVisible))]
     [NotifyPropertyChangedFor(nameof(IsTunguskaAutomationTokenVisible))]
     private VpnAutomationClientKind _vpnAfterWorkFreezeClient = VpnAutomationClientKind.FlClash;
@@ -296,6 +297,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     public bool IsHappVpnAfterFreezeSelected => VpnAfterWorkFreezeClient == VpnAutomationClientKind.Happ;
 
     public bool IsTunguskaVpnAfterFreezeSelected => VpnAfterWorkFreezeClient == VpnAutomationClientKind.Tunguska;
+
+    public bool IsIncyVpnAfterFreezeSelected => VpnAfterWorkFreezeClient == VpnAutomationClientKind.Incy;
 
     public bool IsHappVpnAfterFreezeWarningVisible =>
         EnableVpnAfterWorkFreeze && VpnAfterWorkFreezeClient == VpnAutomationClientKind.Happ;
@@ -563,6 +566,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     [RelayCommand]
     private void SelectTunguskaVpnAfterFreeze() => VpnAfterWorkFreezeClient = VpnAutomationClientKind.Tunguska;
+
+    [RelayCommand]
+    private void SelectIncyVpnAfterFreeze() => VpnAfterWorkFreezeClient = VpnAutomationClientKind.Incy;
 
     [RelayCommand]
     private void StartOnboarding()
