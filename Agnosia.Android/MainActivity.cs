@@ -30,6 +30,8 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
     private static readonly Dictionary<int, TaskCompletionSource<AndroidActivityResult>> PendingResults = [];
     private static int _nextRequestCode = 4100;
     private static bool _startupMitigationsApplied;
+    private readonly Queue<Action> _pendingActivityStarts = [];
+    private bool _isResumed;
 
     private static MainActivity? Current { get; set; }
 
@@ -85,9 +87,17 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
     protected override void OnResume()
     {
         base.OnResume();
+        _isResumed = true;
         Current = this;
         AndroidPlatformBridge.Instance.AttachActivity(this);
         ApplyPreferredDisplayMode();
+        DrainPendingActivityStarts();
+    }
+
+    protected override void OnPause()
+    {
+        _isResumed = false;
+        base.OnPause();
     }
 
     public override void OnWindowFocusChanged(bool hasFocus)
@@ -112,6 +122,7 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         {
             Current = null;
             AndroidPlatformBridge.Instance.DetachActivity();
+            _pendingActivityStarts.Clear();
             CancelPendingActivityResults();
         }
 
@@ -288,13 +299,32 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
             }
         }
 
+        void ScheduleStart()
+        {
+            if (!_isResumed)
+            {
+                _pendingActivityStarts.Enqueue(Start);
+                return;
+            }
+
+            Start();
+        }
+
         if (Looper.MainLooper?.IsCurrentThread == true)
         {
-            Start();
+            ScheduleStart();
             return;
         }
 
-        RunOnUiThread(Start);
+        RunOnUiThread(ScheduleStart);
+    }
+
+    private void DrainPendingActivityStarts()
+    {
+        while (_isResumed && _pendingActivityStarts.Count > 0)
+        {
+            _pendingActivityStarts.Dequeue().Invoke();
+        }
     }
 
     private static void CancelPendingActivityResults()
