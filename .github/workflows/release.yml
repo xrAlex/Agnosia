@@ -97,7 +97,7 @@ jobs:
             throw "Published APK was not found."
           }
 
-          $assetPath = Join-Path $env:RELEASE_DIR "Agnosia-$tag.apk"
+          $assetPath = Join-Path $env:RELEASE_DIR "Agnosia.apk"
           Copy-Item -LiteralPath $apk.FullName -Destination $assetPath -Force
           "APK_ASSET=$assetPath" >> $env:GITHUB_ENV
 
