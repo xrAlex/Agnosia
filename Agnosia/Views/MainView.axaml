@@ -44,5 +44,56 @@
     <views:PermissionsOverlayView Grid.Row="0" Grid.RowSpan="3" />
 
     <views:OnboardingOverlayView Grid.Row="0" Grid.RowSpan="3" />
+
+    <Grid Grid.Row="0"
+          Grid.RowSpan="3"
+          Background="#99000000"
+          IsVisible="{Binding IsWorkProfileRecoveryVisible}">
+      <Border Classes="surface-card"
+              MaxWidth="560"
+              Margin="18"
+              Padding="22"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center">
+        <StackPanel Spacing="18">
+          <Grid RowDefinitions="Auto,Auto,Auto"
+                RowSpacing="10">
+            <Border Classes="icon-tile large"
+                    HorizontalAlignment="Center">
+              <PathIcon Classes="section-icon centered"
+                        Data="{StaticResource IconAlertGeometry}" />
+            </Border>
+            <TextBlock Grid.Row="1"
+                       Classes="section-title"
+                       TextAlignment="Center"
+                       Text="{Binding WorkProfileRecoveryTitle}" />
+            <TextBlock Grid.Row="2"
+                       Classes="page-caption"
+                       TextAlignment="Left"
+                       Text="{Binding WorkProfileRecoveryMessage}" />
+          </Grid>
+
+          <Grid ColumnDefinitions="*,*"
+                ColumnSpacing="12">
+            <Button MinHeight="58"
+                    Command="{Binding DismissWorkProfileRecoveryCommand}">
+              <TextBlock Classes="button-label"
+                         TextAlignment="Center"
+                         HorizontalAlignment="Center"
+                         Text="Позже" />
+            </Button>
+            <Button Grid.Column="1"
+                    Classes="primary"
+                    MinHeight="58"
+                    Command="{Binding OpenWorkProfileSettingsCommand}">
+              <TextBlock Classes="button-label"
+                         TextAlignment="Center"
+                         HorizontalAlignment="Center"
+                         Text="Открыть настройки" />
+            </Button>
+          </Grid>
+        </StackPanel>
+      </Border>
+    </Grid>
   </Grid>
 </UserControl>

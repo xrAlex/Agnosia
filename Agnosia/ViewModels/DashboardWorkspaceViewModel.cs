@@ -178,6 +178,16 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private bool _onboardingCompleted = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsWorkProfileRecoveryVisible))]
+    [NotifyPropertyChangedFor(nameof(WorkProfileRecoveryTitle))]
+    [NotifyPropertyChangedFor(nameof(WorkProfileRecoveryMessage))]
+    private WorkProfileRecoveryKind _workProfileRecovery;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsWorkProfileRecoveryVisible))]
+    private bool _workProfileRecoveryDismissed;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsOnboardingWelcomeStep))]
     [NotifyPropertyChangedFor(nameof(IsOnboardingWorkProfileStep))]
     [NotifyPropertyChangedFor(nameof(IsOnboardingPermissionsStep))]
@@ -232,6 +242,25 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public bool AreOnboardingPermissionsGranted =>
         _permissionItems.Count > 0 && _permissionItems.All(item => item.IsGranted);
+
+    public bool IsWorkProfileRecoveryVisible =>
+        WorkProfileRecovery != WorkProfileRecoveryKind.None && !WorkProfileRecoveryDismissed;
+
+    public string WorkProfileRecoveryTitle => WorkProfileRecovery switch
+    {
+        WorkProfileRecoveryKind.NotManagedByAgnosia => "Рабочий профиль не управляется Agnosia",
+        WorkProfileRecoveryKind.Unavailable => "Рабочий профиль недоступен",
+        _ => "Проблема с рабочим профилем"
+    };
+
+    public string WorkProfileRecoveryMessage => WorkProfileRecovery switch
+    {
+        WorkProfileRecoveryKind.NotManagedByAgnosia =>
+            "На устройстве уже есть рабочий профиль, но Agnosia не является его владельцем. Из-за этого приложение не сможет управлять изоляцией. Удалите старый рабочий профиль в разделе Android \"Пароли, ключи доступа и аккаунты\", затем вернитесь в Agnosia и создайте профиль заново.",
+        WorkProfileRecoveryKind.Unavailable =>
+            "Agnosia не смогла связаться с рабочим профилем при запуске. Это может происходить после неудачной первой настройки или если профиль был удален. Откройте раздел Android \"Пароли, ключи доступа и аккаунты\" и удалите старый рабочий профиль, если он остался.",
+        _ => string.Empty
+    };
 
     public bool IsOnboardingVisible => !OnboardingCompleted;
 
@@ -645,6 +674,21 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         StartOnboardingMonitorIfNeeded();
     }
 
+    [RelayCommand]
+    private async Task OpenWorkProfileSettingsAsync()
+    {
+        await RunOperationAsync(
+            () => _onboardingService.OpenWorkProfileSettingsAsync(),
+            "WorkProfileSettingsOpened",
+            useBusyIndicator: true);
+    }
+
+    [RelayCommand]
+    private void DismissWorkProfileRecovery()
+    {
+        WorkProfileRecoveryDismissed = true;
+    }
+
     private async Task CompleteOnboardingAsync()
     {
         var result = await _onboardingService.CompleteOnboardingAsync();
@@ -834,7 +878,13 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             HasSetup = snapshot.HasSetup;
             IsSettingUp = snapshot.IsSettingUp;
             WorkProfileAvailable = snapshot.WorkProfileAvailable;
-            if (IsSupported && !HasSetup && OnboardingCompleted)
+            WorkProfileRecovery = snapshot.WorkProfileRecovery;
+            if (WorkProfileRecovery == WorkProfileRecoveryKind.None)
+            {
+                WorkProfileRecoveryDismissed = false;
+            }
+
+            if (IsSupported && !HasSetup && OnboardingCompleted && WorkProfileRecovery == WorkProfileRecoveryKind.None)
             {
                 OnboardingCompleted = false;
                 OnboardingStep = OnboardingStep.Welcome;

@@ -29,26 +29,49 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         var showAllApps = settings.ShowAllApps;
         var hasAssociatedProfile = AgnosiaUtilities.HasAssociatedProfile(activity);
         var hasWorkProfileTarget = AgnosiaUtilities.HasWorkProfileTarget(activity);
+        var storedHasSetup = storage.GetBoolean(StorageKeys.HasSetup);
+        var onboardingCompleted = storage.GetBoolean(StorageKeys.OnboardingCompleted);
         var isSettingUp = storage.GetBoolean(StorageKeys.IsSettingUp);
         if (isSettingUp && IsSetupStateStale(storage, hasAssociatedProfile, hasWorkProfileTarget))
         {
             Log.Warn(LogTag, "Provisioning state timed out without a reachable work profile. Clearing stale setup state.");
             AgnosiaUtilities.ClearWorkProfileConfiguredState();
             isSettingUp = false;
+            storedHasSetup = false;
+            onboardingCompleted = false;
         }
 
         var workProfileAvailable = hasWorkProfileTarget && await TryReachWorkProfileWithRetryAsync(cancellationToken);
         if (workProfileAvailable)
         {
             AgnosiaUtilities.MarkWorkProfileReady();
+            storedHasSetup = true;
+            onboardingCompleted = true;
         }
-        else if (!isSettingUp)
+        else if (!isSettingUp
+                 && !hasAssociatedProfile
+                 && !hasWorkProfileTarget
+                 && (storedHasSetup || onboardingCompleted))
         {
-            Log.Warn(LogTag, "Work profile is not reachable on startup. Clearing completed setup state.");
+            Log.Warn(LogTag, "Previously configured work profile is no longer present. Clearing setup state.");
             AgnosiaUtilities.ClearWorkProfileConfiguredState();
+            storedHasSetup = false;
+            onboardingCompleted = false;
         }
 
-        var hasSetup = storage.GetBoolean(StorageKeys.HasSetup) && workProfileAvailable;
+        var recoveryKind = GetWorkProfileRecoveryKind(
+            isSettingUp,
+            workProfileAvailable,
+            hasAssociatedProfile,
+            hasWorkProfileTarget,
+            storedHasSetup,
+            onboardingCompleted);
+        if (recoveryKind != WorkProfileRecoveryKind.None)
+        {
+            Log.Warn(LogTag, $"Work profile needs user recovery. kind={recoveryKind}.");
+        }
+
+        var hasSetup = storedHasSetup && (workProfileAvailable || recoveryKind != WorkProfileRecoveryKind.None);
         isSettingUp = storage.GetBoolean(StorageKeys.IsSettingUp) && !hasSetup;
 
         var workAppsQuery = AppQueryResult.Empty;
@@ -65,6 +88,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             HasSetup: hasSetup,
             IsSettingUp: isSettingUp,
             WorkProfileAvailable: workProfileAvailable,
+            WorkProfileRecovery: recoveryKind,
             PersonalApps: MapApps(personalAppsQuery.Apps, ProfileKind.Personal, interactionPackages),
             WorkApps: MapApps(workAppsQuery.Apps, ProfileKind.Work, interactionPackages),
             Settings: settings);
@@ -151,6 +175,34 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
 
         var startedAt = DateTimeOffset.FromUnixTimeSeconds(startedAtUnixSeconds);
         return DateTimeOffset.UtcNow - startedAt >= SetupStateTimeout;
+    }
+
+    private static WorkProfileRecoveryKind GetWorkProfileRecoveryKind(
+        bool isSettingUp,
+        bool workProfileAvailable,
+        bool hasAssociatedProfile,
+        bool hasWorkProfileTarget,
+        bool storedHasSetup,
+        bool onboardingCompleted)
+    {
+        if (isSettingUp || workProfileAvailable)
+        {
+            return WorkProfileRecoveryKind.None;
+        }
+
+        if (hasAssociatedProfile && !hasWorkProfileTarget)
+        {
+            return WorkProfileRecoveryKind.NotManagedByAgnosia;
+        }
+
+        if (hasAssociatedProfile && hasWorkProfileTarget)
+        {
+            return WorkProfileRecoveryKind.NotManagedByAgnosia;
+        }
+
+        return storedHasSetup || onboardingCompleted || hasWorkProfileTarget
+            ? WorkProfileRecoveryKind.Unavailable
+            : WorkProfileRecoveryKind.None;
     }
 
     private static AppSnapshot[] MapApps(

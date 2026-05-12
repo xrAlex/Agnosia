@@ -5,6 +5,7 @@ public sealed record DashboardSnapshot(
     bool HasSetup,
     bool IsSettingUp,
     bool WorkProfileAvailable,
+    WorkProfileRecoveryKind WorkProfileRecovery,
     IReadOnlyList<AppSnapshot> PersonalApps,
     IReadOnlyList<AppSnapshot> WorkApps,
     AppSettingsSnapshot Settings)
@@ -15,6 +16,7 @@ public sealed record DashboardSnapshot(
             HasSetup: false,
             IsSettingUp: false,
             WorkProfileAvailable: false,
+            WorkProfileRecovery: WorkProfileRecoveryKind.None,
             PersonalApps: [],
             WorkApps: [],
             Settings: AppSettingsSnapshot.Default);

@@ -156,6 +156,12 @@ public sealed class DummyActivity : Activity
             switch (action)
             {
                 case AgnosiaActions.ProfilePing:
+                    if (!_isProfileOwner)
+                    {
+                        FinishWithError("Рабочий профиль не управляется Agnosia.");
+                        break;
+                    }
+
                     if (_isProfileOwner)
                     {
                         AgnosiaUtilities.EnforceWorkProfilePolicies(

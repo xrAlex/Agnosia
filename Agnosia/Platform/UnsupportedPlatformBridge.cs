@@ -40,6 +40,9 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
     public Task<OperationResult> StartProvisioningAsync(CancellationToken cancellationToken = default) =>
         ProvisioningFailureTask;
 
+    public Task<OperationResult> OpenWorkProfileSettingsAsync(CancellationToken cancellationToken = default) =>
+        ProvisioningFailureTask;
+
     public Task<OperationResult> CloneAsync(AppSnapshot app, CancellationToken cancellationToken = default) =>
         AndroidOnlyFailureTask;
 

@@ -2,6 +2,7 @@ using Agnosia.Models;
 using Agnosia.Platform;
 using Android.App.Admin;
 using Android.Content;
+using Android.Provider;
 
 namespace Agnosia.Android.Api;
 
@@ -62,20 +63,7 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
     {
         var activity = GetActivityHost().CurrentActivity;
         AgnosiaRuntime.Initialize(activity);
-
-        if (!LocalStorageManager.Instance.GetBoolean(StorageKeys.OnboardingCompleted))
-        {
-            return false;
-        }
-
-        if (AgnosiaUtilities.HasWorkProfileTarget(activity)
-            && await _commandRunner.CanReachWorkProfileAsync(cancellationToken))
-        {
-            return true;
-        }
-
-        AgnosiaUtilities.ClearWorkProfileConfiguredState();
-        return false;
+        return await Task.FromResult(LocalStorageManager.Instance.GetBoolean(StorageKeys.OnboardingCompleted));
     }
 
     public Task<OperationResult> CompleteOnboardingAsync(CancellationToken cancellationToken = default)
@@ -135,6 +123,28 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         }
 
         return OperationResult.Success("Создание рабочего профиля запущено. Завершите шаги Android и вернитесь в Agnosia.");
+    }
+
+    public async Task<OperationResult> OpenWorkProfileSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        var activity = GetActivityHost().CurrentActivity;
+        AgnosiaRuntime.Initialize(activity);
+
+        var intent = new Intent(Settings.ActionSyncSettings);
+        var result = await _commandRunner.StartExternalActivityForResultAsync(intent, cancellationToken);
+        if (result.ResultCode == Result.Canceled
+            && !string.IsNullOrWhiteSpace(AndroidActivityResultApi.ExtractError(result)))
+        {
+            var fallbackIntent = new Intent(Settings.ActionSettings);
+            var fallbackResult = await _commandRunner.StartExternalActivityForResultAsync(fallbackIntent, cancellationToken);
+            if (fallbackResult.ResultCode == Result.Canceled
+                && !string.IsNullOrWhiteSpace(AndroidActivityResultApi.ExtractError(fallbackResult)))
+            {
+                return OperationResult.Failure("Android не смог открыть настройки устройства.");
+            }
+        }
+
+        return OperationResult.Success("Проверяем состояние рабочего профиля после возврата из настроек.");
     }
 
     public Task<OperationResult> CloneAsync(AppSnapshot app, CancellationToken cancellationToken = default) =>
