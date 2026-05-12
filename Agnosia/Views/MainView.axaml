@@ -85,6 +85,7 @@
             <Button Grid.Column="1"
                     Classes="primary"
                     MinHeight="58"
+                    HorizontalAlignment="Right"
                     Command="{Binding OpenWorkProfileSettingsCommand}">
               <TextBlock Classes="button-label"
                          TextAlignment="Center"
