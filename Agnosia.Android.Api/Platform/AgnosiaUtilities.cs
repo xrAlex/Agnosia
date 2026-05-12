@@ -166,6 +166,7 @@ public static class AgnosiaUtilities
         }
 
         AndroidPolicyApi.ApplyCrossProfileContactsPolicy(manager, admin, SettingsManager.Instance.GetBlockContactsSearchingEnabled());
+        AndroidPolicyApi.TryEnsureRequiredCrossProfilePackages(manager, admin, nameof(AgnosiaUtilities));
     }
 
     public static void EnforceUserRestrictions(Context context, Type adminReceiverType)

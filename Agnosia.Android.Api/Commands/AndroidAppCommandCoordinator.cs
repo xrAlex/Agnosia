@@ -198,6 +198,11 @@ internal sealed class AndroidAppCommandCoordinator(
         bool enabled,
         CancellationToken cancellationToken)
     {
+        if (!enabled && AndroidPackageAccessPolicy.RequiresCrossProfileInteraction(app.PackageName))
+        {
+            return OperationResult.Success("Для этого приложения контроль доступа всегда отключен политикой Agnosia.");
+        }
+
         var snapshot = await loadDashboardAsync(cancellationToken);
         var packages = snapshot.WorkApps
             .Where(item => item.InteractionAllowed)

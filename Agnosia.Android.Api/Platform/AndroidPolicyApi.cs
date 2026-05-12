@@ -24,7 +24,7 @@ public static class AndroidPolicyApi
         manager.AddUserRestriction(admin, UserManager.AllowParentProfileAppLinking);
 
     public static string[] GetCrossProfilePackages(DevicePolicyManager manager, ComponentName admin) =>
-        manager.GetCrossProfilePackages(admin).ToArray();
+        AndroidPackageAccessPolicy.ApplyRequiredCrossProfilePackages(manager.GetCrossProfilePackages(admin));
 
     public static bool TryEnableSystemApp(
         DevicePolicyManager manager,
@@ -88,12 +88,37 @@ public static class AndroidPolicyApi
     {
         try
         {
-            manager.SetCrossProfilePackages(admin, packages);
+            manager.SetCrossProfilePackages(admin, AndroidPackageAccessPolicy.ApplyRequiredCrossProfilePackages(packages));
             return true;
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
             Log.Warn(logTag, $"Failed to change cross-profile package policy: {exception}");
+            return false;
+        }
+    }
+
+    public static bool TryEnsureRequiredCrossProfilePackages(
+        DevicePolicyManager manager,
+        ComponentName admin,
+        string logTag)
+    {
+        try
+        {
+            var current = manager.GetCrossProfilePackages(admin).ToArray();
+            var required = AndroidPackageAccessPolicy.ApplyRequiredCrossProfilePackages(current);
+            if (current.Length == required.Length
+                && current.ToHashSet(StringComparer.Ordinal).SetEquals(required))
+            {
+                return true;
+            }
+
+            manager.SetCrossProfilePackages(admin, required);
+            return true;
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn(logTag, $"Failed to enforce required cross-profile package policy: {exception}");
             return false;
         }
     }
