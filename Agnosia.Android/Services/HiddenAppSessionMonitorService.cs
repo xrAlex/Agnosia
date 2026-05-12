@@ -605,6 +605,12 @@ public sealed class HiddenAppSessionMonitorService : Service
                 observation = new UsageSessionObservation(true, false, sawTargetForeground, null, latestForegroundPackage);
                 reason = "transient_system_ui_foreground";
             }
+            else if (IsUsageInactiveEvent(latestTargetEventType)
+                && string.Equals(latestForegroundPackage, packageName, StringComparison.Ordinal))
+            {
+                observation = new UsageSessionObservation(false, false, sawTargetForeground, null, latestForegroundPackage);
+                reason = "target_inactive_but_top_still_target";
+            }
             else if (IsUsageInactiveEvent(latestTargetEventType))
             {
                 observation = new UsageSessionObservation(
