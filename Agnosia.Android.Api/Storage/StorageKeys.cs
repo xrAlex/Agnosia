@@ -5,6 +5,9 @@ public static class StorageKeys
     public const string IsSettingUp = "is_setting_up";
     public const string HasSetup = "has_setup";
     public const string SetupStartedAtUtc = "setup_started_at_utc";
+    public const string ManagedProfileProvisionedAtUtc = "managed_profile_provisioned_at_utc";
+    public const string ManagedProfileUserHandle = "managed_profile_user_handle";
+    public const string ManagedProfileUserSerial = "managed_profile_user_serial";
     public const string AuthKey = "auth_key";
     public const string BlockContactsSearching = "block_contacts_searching";
     public const string ShowAllApps = "show_all_apps";

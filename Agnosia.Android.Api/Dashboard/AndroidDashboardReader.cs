@@ -32,13 +32,19 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         var storedHasSetup = storage.GetBoolean(StorageKeys.HasSetup);
         var onboardingCompleted = storage.GetBoolean(StorageKeys.OnboardingCompleted);
         var isSettingUp = storage.GetBoolean(StorageKeys.IsSettingUp);
-        if (isSettingUp && IsSetupStateStale(storage, hasAssociatedProfile, hasWorkProfileTarget))
+        var hasManagedProfileProvisionedSignal = storage.GetLong(StorageKeys.ManagedProfileProvisionedAtUtc) > 0;
+        if (isSettingUp && IsSetupStateStale(
+                storage,
+                hasAssociatedProfile,
+                hasWorkProfileTarget,
+                hasManagedProfileProvisionedSignal))
         {
             Log.Warn(LogTag, "Provisioning state timed out without a reachable work profile. Clearing stale setup state.");
             AgnosiaUtilities.ClearWorkProfileConfiguredState();
             isSettingUp = false;
             storedHasSetup = false;
             onboardingCompleted = false;
+            hasManagedProfileProvisionedSignal = false;
         }
 
         var ownerCheck = hasWorkProfileTarget
@@ -67,6 +73,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         var workProfileState = GetWorkProfileState(
             isSettingUp,
             workProfileAvailable,
+            hasManagedProfileProvisionedSignal,
             hasAssociatedProfile,
             hasWorkProfileTarget,
             storedHasSetup,
@@ -75,6 +82,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         var recoveryKind = GetWorkProfileRecoveryKind(workProfileState);
         var diagnosticReason = BuildDiagnosticReason(
             workProfileState,
+            hasManagedProfileProvisionedSignal,
             hasAssociatedProfile,
             hasWorkProfileTarget,
             storedHasSetup,
@@ -193,8 +201,14 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
     private static bool IsSetupStateStale(
         LocalStorageManager storage,
         bool hasAssociatedProfile,
-        bool hasWorkProfileTarget)
+        bool hasWorkProfileTarget,
+        bool hasManagedProfileProvisionedSignal)
     {
+        if (hasManagedProfileProvisionedSignal)
+        {
+            return false;
+        }
+
         var startedAtUnixSeconds = storage.GetLong(StorageKeys.SetupStartedAtUtc);
         if (startedAtUnixSeconds <= 0)
         {
@@ -208,6 +222,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
     private static WorkProfileStateKind GetWorkProfileState(
         bool isSettingUp,
         bool workProfileAvailable,
+        bool hasManagedProfileProvisionedSignal,
         bool hasAssociatedProfile,
         bool hasWorkProfileTarget,
         bool storedHasSetup,
@@ -219,7 +234,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             return WorkProfileStateKind.AppIsProfileOwner;
         }
 
-        if (isSettingUp)
+        if (isSettingUp && !hasManagedProfileProvisionedSignal)
         {
             return WorkProfileStateKind.ProvisioningInProgress;
         }
@@ -229,7 +244,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             return WorkProfileStateKind.AppInstalledInWorkProfileButNotOwner;
         }
 
-        if (hasAssociatedProfile)
+        if (hasManagedProfileProvisionedSignal || hasAssociatedProfile)
         {
             return WorkProfileStateKind.WorkProfileCreatedButAppNotReady;
         }
@@ -258,12 +273,14 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
 
     private static string BuildDiagnosticReason(
         WorkProfileStateKind state,
+        bool hasManagedProfileProvisionedSignal,
         bool hasAssociatedProfile,
         bool hasWorkProfileTarget,
         bool storedHasSetup,
         bool onboardingCompleted,
         WorkProfileOwnerCheckResult ownerCheck) =>
-        $"state={state}; associatedProfile={hasAssociatedProfile}; crossProfileTarget={hasWorkProfileTarget}; " +
+        $"state={state}; managedProfileProvisioned={hasManagedProfileProvisionedSignal}; " +
+        $"associatedProfile={hasAssociatedProfile}; crossProfileTarget={hasWorkProfileTarget}; " +
         $"storedSetup={storedHasSetup}; onboardingCompleted={onboardingCompleted}; " +
         $"ownerCheck={ownerCheck.Kind}; {ownerCheck.DiagnosticReason}";
 

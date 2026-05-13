@@ -30,6 +30,25 @@ public static class AndroidProvisioningApi
             adminExtras?.GetString(AuthenticationUtility.ProvisioningAuthKeyExtra));
     }
 
+    public static UserHandle? GetManagedProfileUserHandle(Intent? intent)
+    {
+        if (intent is null)
+        {
+            return null;
+        }
+
+        if (OperatingSystem.IsAndroidVersionAtLeast(33))
+        {
+            return intent.GetParcelableExtra(
+                Intent.ExtraUser,
+                Class.FromType(typeof(UserHandle))) as UserHandle;
+        }
+
+#pragma warning disable CA1422
+        return intent.GetParcelableExtra(Intent.ExtraUser) as UserHandle;
+#pragma warning restore CA1422
+    }
+
     private static PersistableBundle? GetProvisioningAdminExtras(Intent? intent)
     {
         if (intent is null)

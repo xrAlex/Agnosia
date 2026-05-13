@@ -124,6 +124,40 @@ public static class AgnosiaUtilities
         storage.SetBoolean(StorageKeys.IsSettingUp, true);
         storage.SetBoolean(StorageKeys.HasSetup, false);
         storage.SetLong(StorageKeys.SetupStartedAtUtc, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        storage.Remove(StorageKeys.ManagedProfileProvisionedAtUtc);
+        storage.Remove(StorageKeys.ManagedProfileUserHandle);
+        storage.Remove(StorageKeys.ManagedProfileUserSerial);
+    }
+
+    public static void MarkManagedProfileProvisioned(Context context, Intent? intent)
+    {
+        var storage = LocalStorageManager.Instance;
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        storage.SetBoolean(StorageKeys.IsSettingUp, true);
+        storage.SetBoolean(StorageKeys.HasSetup, false);
+        if (storage.GetLong(StorageKeys.SetupStartedAtUtc) <= 0)
+        {
+            storage.SetLong(StorageKeys.SetupStartedAtUtc, now);
+        }
+
+        storage.SetLong(StorageKeys.ManagedProfileProvisionedAtUtc, now);
+
+        var managedProfileUser = AndroidProvisioningApi.GetManagedProfileUserHandle(intent);
+        if (managedProfileUser is null)
+        {
+            return;
+        }
+
+        storage.SetString(StorageKeys.ManagedProfileUserHandle, managedProfileUser.ToString());
+        var userSerial = AndroidSystemApi.GetUserManager(context)?.GetSerialNumberForUser(managedProfileUser) ?? -1;
+        if (userSerial >= 0)
+        {
+            storage.SetLong(StorageKeys.ManagedProfileUserSerial, userSerial);
+        }
+        else
+        {
+            storage.Remove(StorageKeys.ManagedProfileUserSerial);
+        }
     }
 
     public static void ClearWorkProfileConfiguredState()
@@ -133,6 +167,9 @@ public static class AgnosiaUtilities
         storage.SetBoolean(StorageKeys.HasSetup, false);
         storage.SetBoolean(StorageKeys.OnboardingCompleted, false);
         storage.Remove(StorageKeys.SetupStartedAtUtc);
+        storage.Remove(StorageKeys.ManagedProfileProvisionedAtUtc);
+        storage.Remove(StorageKeys.ManagedProfileUserHandle);
+        storage.Remove(StorageKeys.ManagedProfileUserSerial);
     }
 
     public static void EnforceWorkProfilePolicies(Context context, Type adminReceiverType, Type mainActivityType, bool enableProfile = false)

@@ -704,7 +704,7 @@ public sealed class DummyActivity : Activity
             return;
         }
 
-        AgnosiaUtilities.MarkWorkProfileReady();
+        AndroidPlatformBridge.Instance.NotifyManagedProfileProvisioned(this, Intent);
 
         var launchIntent = string.IsNullOrWhiteSpace(PackageName)
             ? null

@@ -15,6 +15,7 @@ public static class AndroidSystemApi
     private const string DevicePolicyServiceName = "device_policy";
     private const string NotificationServiceName = "notification";
     private const string UsageStatsServiceName = "usagestats";
+    private const string UserServiceName = "user";
 
     public static ActivityManager? GetActivityManager(Context context) =>
         context.GetSystemService(ActivityServiceName) as ActivityManager;
@@ -36,6 +37,9 @@ public static class AndroidSystemApi
 
     public static PowerManager? GetPowerManager(Context context) =>
         context.GetSystemService(Context.PowerService) as PowerManager;
+
+    public static UserManager? GetUserManager(Context context) =>
+        context.GetSystemService(UserServiceName) as UserManager;
 
     public static CrossProfileApps? GetCrossProfileApps(Context context) =>
         context.GetSystemService(Context.CrossProfileAppsService) as CrossProfileApps;
