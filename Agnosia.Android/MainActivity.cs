@@ -41,22 +41,39 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         {
             global::Android.Util.Log.Error(LogTag, $"Unhandled exception: {args.ExceptionObject}");
         };
-
-        ApplyStartupMitigations();
     }
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
+        if (IsProfileOwnerStartup())
+        {
+            ServiceRegistry.SuppressPrimaryUiStartup = true;
+            base.OnCreate(savedInstanceState);
+            BootstrapWorkProfileAndFinish();
+            return;
+        }
+
         ApplyStartupMitigations();
 
+        InitializePrimaryProfileStartup();
+
+        base.OnCreate(savedInstanceState);
+
+        StartBackgroundInitialization();
+    }
+
+    private void InitializePrimaryProfileStartup()
+    {
         AgnosiaRuntime.Initialize(this);
+        ServiceRegistry.SuppressPrimaryUiStartup = false;
         ServiceRegistry.PlatformBridge = AndroidPlatformBridge.Instance;
         ServiceRegistry.InitialTheme = AndroidSettingsStore.LoadAppTheme(LocalStorageManager.Instance);
         AndroidPlatformBridge.Instance.AttachActivity(this);
         Current = this;
+    }
 
-        base.OnCreate(savedInstanceState);
-
+    private void StartBackgroundInitialization()
+    {
         _ = Task.Run(async () =>
         {
             try
@@ -71,17 +88,50 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
                     return;
                 }
 
-                AgnosiaUtilities.EnforceWorkProfilePolicies(this, typeof(AgnosiaDeviceAdminReceiver), typeof(MainActivity));
-                AgnosiaUtilities.EnforceUserRestrictions(this, typeof(AgnosiaDeviceAdminReceiver));
-
-                await Task.Delay(50);
-                RunOnUiThread(Finish);
+                RunOnUiThread(BootstrapWorkProfileAndFinish);
             }
             catch (Exception exception)
             {
                 Log.Error(LogTag, $"Background initialization failed: {exception}");
             }
         });
+    }
+
+    private bool IsProfileOwnerStartup()
+    {
+        try
+        {
+            return AgnosiaUtilities.IsProfileOwner(this);
+        }
+        catch (Exception exception)
+        {
+            global::Android.Util.Log.Warn(LogTag, $"Profile-owner startup check failed: {exception.Message}");
+            return false;
+        }
+    }
+
+    private void BootstrapWorkProfileAndFinish()
+    {
+        try
+        {
+            AgnosiaRuntime.Initialize(this);
+            AgnosiaUtilities.EnforceWorkProfilePolicies(
+                this,
+                typeof(AgnosiaDeviceAdminReceiver),
+                typeof(MainActivity),
+                enableProfile: true);
+            AgnosiaUtilities.EnforceUserRestrictions(this, typeof(AgnosiaDeviceAdminReceiver));
+            WorkProfileLockFreezeService.EnsureRunning(this);
+            Log.Info(LogTag, "Work-profile MainActivity bootstrap completed; finishing without primary UI.");
+        }
+        catch (Exception exception)
+        {
+            Log.Error(LogTag, $"Work-profile MainActivity bootstrap failed: {exception}");
+        }
+        finally
+        {
+            Finish();
+        }
     }
 
     protected override void OnResume()

@@ -172,8 +172,18 @@ public static class AgnosiaUtilities
         storage.Remove(StorageKeys.ManagedProfileUserSerial);
     }
 
+    public static void DisableMainLauncherActivity(Context context, Type mainActivityType)
+    {
+        context.PackageManager?.SetComponentEnabledSetting(
+            new ComponentName(context, Class.FromType(mainActivityType)),
+            ComponentEnabledState.Disabled,
+            ComponentEnableOption.DontKillApp);
+    }
+
     public static void EnforceWorkProfilePolicies(Context context, Type adminReceiverType, Type mainActivityType, bool enableProfile = false)
     {
+        DisableMainLauncherActivity(context, mainActivityType);
+
         if (AndroidSystemApi.GetDevicePolicyManager(context) is not { } manager)
         {
             return;
@@ -184,11 +194,6 @@ public static class AgnosiaUtilities
         {
             manager.SetProfileEnabled(admin);
         }
-
-        context.PackageManager?.SetComponentEnabledSetting(
-            new ComponentName(context, Class.FromType(mainActivityType)),
-            ComponentEnabledState.Disabled,
-            ComponentEnableOption.DontKillApp);
 
         manager.ClearCrossProfileIntentFilters(admin);
 

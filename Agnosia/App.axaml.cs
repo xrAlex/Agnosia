@@ -1,6 +1,7 @@
 using Agnosia.Infrastructure;
 using Agnosia.ViewModels;
 using Agnosia.Views;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Application = Avalonia.Application;
@@ -18,6 +19,21 @@ public class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        if (ServiceRegistry.SuppressPrimaryUiStartup)
+        {
+            if (ApplicationLifetime is IActivityApplicationLifetime activityLifetime)
+            {
+                activityLifetime.MainViewFactory = static () => new UserControl();
+            }
+            else if (ApplicationLifetime is ISingleViewApplicationLifetime singleViewPlatform)
+            {
+                singleViewPlatform.MainView = new UserControl();
+            }
+
+            base.OnFrameworkInitializationCompleted();
+            return;
+        }
+
         AppThemeManager.Apply(ServiceRegistry.InitialTheme);
         var workspaceViewModel = new DashboardWorkspaceViewModel(ServiceRegistry.PlatformBridge);
 
