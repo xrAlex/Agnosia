@@ -6,7 +6,7 @@ namespace Agnosia.Android.Api;
 
 internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway commandRunner)
 {
-    private const string LogTag = "AgnosiaTransientVpn";
+    private const string LogTag = "AgnosiaProfileDetection";
     private static readonly TimeSpan SetupStateTimeout = TimeSpan.FromMinutes(3);
 
     public async Task<DashboardSnapshot> LoadDashboardAsync(CancellationToken cancellationToken)
@@ -41,7 +41,12 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             onboardingCompleted = false;
         }
 
-        var workProfileAvailable = hasWorkProfileTarget && await TryReachWorkProfileWithRetryAsync(cancellationToken);
+        var ownerCheck = hasWorkProfileTarget
+            ? await TryCheckWorkProfileOwnerWithRetryAsync(cancellationToken)
+            : new WorkProfileOwnerCheckResult(
+                WorkProfileOwnerCheckKind.TargetUnavailable,
+                "crossProfileTarget=missing");
+        var workProfileAvailable = ownerCheck.Kind == WorkProfileOwnerCheckKind.AppIsProfileOwner;
         if (workProfileAvailable)
         {
             AgnosiaUtilities.MarkWorkProfileReady();
@@ -59,16 +64,27 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             onboardingCompleted = false;
         }
 
-        var recoveryKind = GetWorkProfileRecoveryKind(
+        var workProfileState = GetWorkProfileState(
             isSettingUp,
             workProfileAvailable,
             hasAssociatedProfile,
             hasWorkProfileTarget,
             storedHasSetup,
-            onboardingCompleted);
+            onboardingCompleted,
+            ownerCheck);
+        var recoveryKind = GetWorkProfileRecoveryKind(workProfileState);
+        var diagnosticReason = BuildDiagnosticReason(
+            workProfileState,
+            hasAssociatedProfile,
+            hasWorkProfileTarget,
+            storedHasSetup,
+            onboardingCompleted,
+            ownerCheck);
         if (recoveryKind != WorkProfileRecoveryKind.None)
         {
-            Log.Warn(LogTag, $"Work profile needs user recovery. kind={recoveryKind}.");
+            Log.Warn(
+                LogTag,
+                $"Work profile needs user attention. state={workProfileState}, recovery={recoveryKind}, reason={diagnosticReason}.");
         }
 
         var hasSetup = storedHasSetup && (workProfileAvailable || recoveryKind != WorkProfileRecoveryKind.None);
@@ -88,7 +104,9 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             HasSetup: hasSetup,
             IsSettingUp: isSettingUp,
             WorkProfileAvailable: workProfileAvailable,
+            WorkProfileState: workProfileState,
             WorkProfileRecovery: recoveryKind,
+            WorkProfileDiagnosticReason: diagnosticReason,
             PersonalApps: MapApps(personalAppsQuery.Apps, ProfileKind.Personal, interactionPackages),
             WorkApps: MapApps(workAppsQuery.Apps, ProfileKind.Work, interactionPackages),
             Settings: settings);
@@ -141,16 +159,26 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         return new AppQueryResult(payload.Apps, payload.InteractionPackages);
     }
 
-    private async Task<bool> TryReachWorkProfileWithRetryAsync(CancellationToken cancellationToken)
+    private async Task<WorkProfileOwnerCheckResult> TryCheckWorkProfileOwnerWithRetryAsync(
+        CancellationToken cancellationToken)
     {
         const int maxAttempts = 5;
         const int delayMs = 500;
 
+        var lastResult = new WorkProfileOwnerCheckResult(
+            WorkProfileOwnerCheckKind.Unreachable,
+            "profilePing=notAttempted");
         for (var attempt = 0; attempt < maxAttempts; attempt++)
         {
-            if (await commandRunner.CanReachWorkProfileAsync(cancellationToken))
+            lastResult = await AndroidProfileCommandGateway.CheckWorkProfileOwnerAsync(
+                commandRunner,
+                cancellationToken);
+            if (lastResult.Kind is WorkProfileOwnerCheckKind.AppIsProfileOwner
+                or WorkProfileOwnerCheckKind.AppInstalledButNotOwner
+                or WorkProfileOwnerCheckKind.AuthenticationKeyMissing
+                or WorkProfileOwnerCheckKind.TargetUnavailable)
             {
-                return true;
+                return lastResult;
             }
 
             if (attempt < maxAttempts - 1)
@@ -159,7 +187,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             }
         }
 
-        return false;
+        return lastResult;
     }
 
     private static bool IsSetupStateStale(
@@ -177,33 +205,67 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         return DateTimeOffset.UtcNow - startedAt >= SetupStateTimeout;
     }
 
-    private static WorkProfileRecoveryKind GetWorkProfileRecoveryKind(
+    private static WorkProfileStateKind GetWorkProfileState(
         bool isSettingUp,
         bool workProfileAvailable,
         bool hasAssociatedProfile,
         bool hasWorkProfileTarget,
         bool storedHasSetup,
-        bool onboardingCompleted)
+        bool onboardingCompleted,
+        WorkProfileOwnerCheckResult ownerCheck)
     {
-        if (isSettingUp || workProfileAvailable)
+        if (workProfileAvailable)
         {
-            return WorkProfileRecoveryKind.None;
+            return WorkProfileStateKind.AppIsProfileOwner;
         }
 
-        if (hasAssociatedProfile && !hasWorkProfileTarget)
+        if (isSettingUp)
         {
-            return WorkProfileRecoveryKind.NotManagedByAgnosia;
+            return WorkProfileStateKind.ProvisioningInProgress;
         }
 
-        if (hasAssociatedProfile && hasWorkProfileTarget)
+        if (ownerCheck.Kind == WorkProfileOwnerCheckKind.AppInstalledButNotOwner)
         {
-            return WorkProfileRecoveryKind.NotManagedByAgnosia;
+            return WorkProfileStateKind.AppInstalledInWorkProfileButNotOwner;
         }
 
-        return storedHasSetup || onboardingCompleted || hasWorkProfileTarget
-            ? WorkProfileRecoveryKind.Unavailable
-            : WorkProfileRecoveryKind.None;
+        if (hasAssociatedProfile)
+        {
+            return WorkProfileStateKind.WorkProfileCreatedButAppNotReady;
+        }
+
+        if (storedHasSetup || onboardingCompleted || hasWorkProfileTarget)
+        {
+            return WorkProfileStateKind.ErrorUnknownWithDiagnostics;
+        }
+
+        return WorkProfileStateKind.NoWorkProfile;
     }
+
+    private static WorkProfileRecoveryKind GetWorkProfileRecoveryKind(WorkProfileStateKind state) =>
+        state switch
+        {
+            WorkProfileStateKind.WorkProfileCreatedButAppNotReady =>
+                WorkProfileRecoveryKind.WorkProfileCreatedButAppNotReady,
+            WorkProfileStateKind.AppInstalledInWorkProfileButNotOwner =>
+                WorkProfileRecoveryKind.AppInstalledInWorkProfileButNotOwner,
+            WorkProfileStateKind.ForeignProfileOwner =>
+                WorkProfileRecoveryKind.ForeignProfileOwner,
+            WorkProfileStateKind.ErrorUnknownWithDiagnostics =>
+                WorkProfileRecoveryKind.ErrorUnknownWithDiagnostics,
+            _ => WorkProfileRecoveryKind.None
+        };
+
+    private static string BuildDiagnosticReason(
+        WorkProfileStateKind state,
+        bool hasAssociatedProfile,
+        bool hasWorkProfileTarget,
+        bool storedHasSetup,
+        bool onboardingCompleted,
+        WorkProfileOwnerCheckResult ownerCheck) =>
+        $"state={state}; associatedProfile={hasAssociatedProfile}; crossProfileTarget={hasWorkProfileTarget}; " +
+        $"storedSetup={storedHasSetup}; onboardingCompleted={onboardingCompleted}; " +
+        $"ownerCheck={ownerCheck.Kind}; {ownerCheck.DiagnosticReason}";
 
     private static AppSnapshot[] MapApps(
         IReadOnlyList<AppServiceModel> apps,

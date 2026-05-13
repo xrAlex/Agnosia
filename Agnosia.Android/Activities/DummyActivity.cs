@@ -156,9 +156,13 @@ public sealed class DummyActivity : Activity
             switch (action)
             {
                 case AgnosiaActions.ProfilePing:
+                    var pingResult = new Intent();
+                    pingResult.PutExtra(AndroidCommandContract.ResultProfileOwnerCheckPerformed, true);
+                    pingResult.PutExtra(AndroidCommandContract.ResultIsProfileOwner, _isProfileOwner);
                     if (!_isProfileOwner)
                     {
-                        FinishWithError("Рабочий профиль не управляется Agnosia.");
+                        pingResult.PutExtra(AndroidCommandContract.ResultError, "Рабочий профиль не управляется Agnosia.");
+                        FinishWithResult(Result.Canceled, pingResult);
                         break;
                     }
 
@@ -172,7 +176,7 @@ public sealed class DummyActivity : Activity
                         WorkProfileLockFreezeService.EnsureRunning(this);
                     }
 
-                    FinishWithResult(Result.Ok);
+                    FinishWithResult(Result.Ok, pingResult);
                     break;
                 case AgnosiaActions.QueryApps:
                     ActionQueryApps();

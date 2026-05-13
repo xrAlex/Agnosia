@@ -181,7 +181,19 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsWorkProfileRecoveryVisible))]
     [NotifyPropertyChangedFor(nameof(WorkProfileRecoveryTitle))]
     [NotifyPropertyChangedFor(nameof(WorkProfileRecoveryMessage))]
+    [NotifyPropertyChangedFor(nameof(CanStartProvisioning))]
+    [NotifyCanExecuteChangedFor(nameof(StartProvisioningCommand))]
+    private WorkProfileStateKind _workProfileState;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsWorkProfileRecoveryVisible))]
+    [NotifyPropertyChangedFor(nameof(WorkProfileRecoveryTitle))]
+    [NotifyPropertyChangedFor(nameof(WorkProfileRecoveryMessage))]
     private WorkProfileRecoveryKind _workProfileRecovery;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(WorkProfileRecoveryMessage))]
+    private string _workProfileDiagnosticReason = string.Empty;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsWorkProfileRecoveryVisible))]
@@ -248,17 +260,23 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public string WorkProfileRecoveryTitle => WorkProfileRecovery switch
     {
-        WorkProfileRecoveryKind.NotManagedByAgnosia => "Рабочий профиль не управляется Agnosia",
-        WorkProfileRecoveryKind.Unavailable => "Рабочий профиль недоступен",
+        WorkProfileRecoveryKind.WorkProfileCreatedButAppNotReady => "Рабочий профиль еще не готов",
+        WorkProfileRecoveryKind.AppInstalledInWorkProfileButNotOwner => "Agnosia не владелец профиля",
+        WorkProfileRecoveryKind.ForeignProfileOwner => "Рабочим профилем управляет другое приложение",
+        WorkProfileRecoveryKind.ErrorUnknownWithDiagnostics => "Состояние профиля неясно",
         _ => "Проблема с рабочим профилем"
     };
 
     public string WorkProfileRecoveryMessage => WorkProfileRecovery switch
     {
-        WorkProfileRecoveryKind.NotManagedByAgnosia =>
-            "На устройстве уже есть рабочий профиль, но Agnosia не является его владельцем. Из-за этого приложение не сможет управлять изоляцией. Удалите старый рабочий профиль в разделе Android \"Пароли, ключи доступа и аккаунты\", затем вернитесь в Agnosia и создайте профиль заново.",
-        WorkProfileRecoveryKind.Unavailable =>
-            "Agnosia не смогла связаться с рабочим профилем при запуске. Это может происходить после неудачной первой настройки или если профиль был удален. Откройте раздел Android \"Пароли, ключи доступа и аккаунты\" и удалите старый рабочий профиль, если он остался.",
+        WorkProfileRecoveryKind.WorkProfileCreatedButAppNotReady =>
+            WithDiagnosticReason("Android видит рабочий профиль, но Agnosia в нем пока не отвечает. Подождите, разблокируйте или включите рабочий профиль и обновите экран."),
+        WorkProfileRecoveryKind.AppInstalledInWorkProfileButNotOwner =>
+            WithDiagnosticReason("Agnosia ответила из рабочего профиля, но Android сообщил, что она не владелец профиля. Чтобы Agnosia управляла этим профилем, удалите старый рабочий профиль в настройках Android и создайте его заново."),
+        WorkProfileRecoveryKind.ForeignProfileOwner =>
+            WithDiagnosticReason("Диагностика Android указывает на другого владельца рабочего профиля. Удалите этот рабочий профиль в настройках Android, затем создайте профиль Agnosia заново."),
+        WorkProfileRecoveryKind.ErrorUnknownWithDiagnostics =>
+            WithDiagnosticReason("Agnosia не смогла надежно определить состояние рабочего профиля. Обновите экран или проверьте рабочий профиль в настройках Android."),
         _ => string.Empty
     };
 
@@ -348,7 +366,13 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     public bool IsTunguskaAutomationTokenVisible =>
         EnableVpnAfterWorkFreeze && VpnAfterWorkFreezeClient == VpnAutomationClientKind.Tunguska;
 
-    public bool CanStartProvisioning => !IsBusy && !_isOperationInProgress && IsSupported && !HasSetup && !IsSettingUp;
+    public bool CanStartProvisioning =>
+        !IsBusy
+        && !_isOperationInProgress
+        && IsSupported
+        && !HasSetup
+        && !IsSettingUp
+        && WorkProfileState == WorkProfileStateKind.NoWorkProfile;
 
     public bool IsOperationActive => IsBusy || _isOperationInProgress;
 
@@ -874,17 +898,24 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         _isApplyingSnapshot = true;
         try
         {
+            var previousRecovery = WorkProfileRecovery;
             IsSupported = snapshot.IsSupported;
             HasSetup = snapshot.HasSetup;
             IsSettingUp = snapshot.IsSettingUp;
             WorkProfileAvailable = snapshot.WorkProfileAvailable;
+            WorkProfileState = snapshot.WorkProfileState;
+            WorkProfileDiagnosticReason = snapshot.WorkProfileDiagnosticReason;
             WorkProfileRecovery = snapshot.WorkProfileRecovery;
-            if (WorkProfileRecovery == WorkProfileRecoveryKind.None)
+            if (WorkProfileRecovery == WorkProfileRecoveryKind.None
+                || WorkProfileRecovery != previousRecovery)
             {
                 WorkProfileRecoveryDismissed = false;
             }
 
-            if (IsSupported && !HasSetup && OnboardingCompleted && WorkProfileRecovery == WorkProfileRecoveryKind.None)
+            if (IsSupported
+                && !HasSetup
+                && OnboardingCompleted
+                && WorkProfileState == WorkProfileStateKind.NoWorkProfile)
             {
                 OnboardingCompleted = false;
                 OnboardingStep = OnboardingStep.Welcome;
@@ -1260,6 +1291,11 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         string.IsNullOrWhiteSpace(message) ? fallback : message;
 
     private static string ResolveExceptionMessage(Exception _, string fallback) => fallback;
+
+    private string WithDiagnosticReason(string message) =>
+        string.IsNullOrWhiteSpace(WorkProfileDiagnosticReason)
+            ? message
+            : $"{message} Причина: {WorkProfileDiagnosticReason}.";
 
     private static string GetAppVersion() =>
         typeof(DashboardWorkspaceViewModel)

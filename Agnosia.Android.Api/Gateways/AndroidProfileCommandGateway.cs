@@ -23,14 +23,28 @@ public static class AndroidProfileCommandGateway
 
     internal static async Task<bool> CanReachWorkProfileAsync(
         AndroidActivityCommandGateway commandRunner,
+        CancellationToken cancellationToken) =>
+        (await CheckWorkProfileOwnerAsync(commandRunner, cancellationToken)).Kind
+        == WorkProfileOwnerCheckKind.AppIsProfileOwner;
+
+    internal static async Task<WorkProfileOwnerCheckResult> CheckWorkProfileOwnerAsync(
+        AndroidActivityCommandGateway commandRunner,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var activity = commandRunner.CurrentActivity;
-        if (string.IsNullOrWhiteSpace(AuthenticationUtility.GetExistingKey())
-            || !AgnosiaUtilities.HasWorkProfileTarget(activity))
+        if (string.IsNullOrWhiteSpace(AuthenticationUtility.GetExistingKey()))
         {
-            return false;
+            return new WorkProfileOwnerCheckResult(
+                WorkProfileOwnerCheckKind.AuthenticationKeyMissing,
+                "authKey=missing");
+        }
+
+        if (!AgnosiaUtilities.HasWorkProfileTarget(activity))
+        {
+            return new WorkProfileOwnerCheckResult(
+                WorkProfileOwnerCheckKind.TargetUnavailable,
+                "crossProfileTarget=missing");
         }
 
         using var pingCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -41,12 +55,14 @@ public static class AndroidProfileCommandGateway
                 new Intent(AgnosiaActions.ProfilePing),
                 useWorkProfile: true,
                 pingCancellation.Token);
-            return result.ResultCode == Result.Ok;
+            return InterpretProfilePingResult(result);
         }
         catch (System.OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             Log.Warn(LogTag, "Timed out waiting for work-profile ping.");
-            return false;
+            return new WorkProfileOwnerCheckResult(
+                WorkProfileOwnerCheckKind.Unreachable,
+                $"profilePing=timeout:{ProfilePingTimeout.TotalMilliseconds:0}ms");
         }
     }
 
@@ -381,8 +397,50 @@ public static class AndroidProfileCommandGateway
     }
 
     private sealed record CachedBooleanQuery(bool Value, DateTimeOffset CachedAt);
+
+    private static WorkProfileOwnerCheckResult InterpretProfilePingResult(AndroidActivityResult result)
+    {
+        if (result.Data?.GetBooleanExtra(AndroidCommandContract.ResultProfileOwnerCheckPerformed, false) == true)
+        {
+            var isProfileOwner = result.Data.GetBooleanExtra(AndroidCommandContract.ResultIsProfileOwner, false);
+            return isProfileOwner
+                ? new WorkProfileOwnerCheckResult(
+                    WorkProfileOwnerCheckKind.AppIsProfileOwner,
+                    "inProfileOwnerCheck=true")
+                : new WorkProfileOwnerCheckResult(
+                    WorkProfileOwnerCheckKind.AppInstalledButNotOwner,
+                    "inProfileOwnerCheck=false");
+        }
+
+        if (result.ResultCode == Result.Ok)
+        {
+            return new WorkProfileOwnerCheckResult(
+                WorkProfileOwnerCheckKind.AppIsProfileOwner,
+                "legacyProfilePing=ok");
+        }
+
+        var error = AndroidActivityResultApi.ExtractError(result);
+        return new WorkProfileOwnerCheckResult(
+            WorkProfileOwnerCheckKind.Unreachable,
+            string.IsNullOrWhiteSpace(error)
+                ? $"profilePing=result:{result.ResultCode}"
+                : $"profilePing=result:{result.ResultCode}; error={error}");
+    }
 }
 
 internal sealed record ProfileAppsQueryResult(
     IReadOnlyList<AppServiceModel> Apps,
     IReadOnlyList<string> InteractionPackages);
+
+internal enum WorkProfileOwnerCheckKind
+{
+    AuthenticationKeyMissing,
+    TargetUnavailable,
+    Unreachable,
+    AppInstalledButNotOwner,
+    AppIsProfileOwner
+}
+
+internal sealed record WorkProfileOwnerCheckResult(
+    WorkProfileOwnerCheckKind Kind,
+    string DiagnosticReason);

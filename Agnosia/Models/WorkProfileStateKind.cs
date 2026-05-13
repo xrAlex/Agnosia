@@ -1,10 +1,12 @@
 namespace Agnosia.Models;
 
-public enum WorkProfileRecoveryKind
+public enum WorkProfileStateKind
 {
-    None,
+    NoWorkProfile,
+    ProvisioningInProgress,
     WorkProfileCreatedButAppNotReady,
     AppInstalledInWorkProfileButNotOwner,
+    AppIsProfileOwner,
     ForeignProfileOwner,
     ErrorUnknownWithDiagnostics
 }
