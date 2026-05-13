@@ -12,11 +12,15 @@ internal sealed class AndroidPermissionCoordinator(
         var activity = commandRunner.CurrentActivity;
         AgnosiaRuntime.Initialize(activity);
 
-        var hasWorkProfileTarget = AgnosiaUtilities.HasWorkProfileTarget(activity);
-        var workProfileAvailable = hasWorkProfileTarget && await commandRunner.CanReachWorkProfileAsync(cancellationToken);
+        var profileDiagnostics = AndroidWorkProfileDiagnosticsReader.Read(activity);
+        var hasWorkProfileTarget = profileDiagnostics.CommandTargetResolvable;
+        var workProfileAvailable = hasWorkProfileTarget
+            && profileDiagnostics.AvailableToCrossProfileApps
+            && profileDiagnostics.QuietModeEnabled != true
+            && await commandRunner.CanReachWorkProfileAsync(cancellationToken);
         var hasSetup = LocalStorageManager.Instance.GetBoolean(StorageKeys.HasSetup)
             || hasWorkProfileTarget
-            || AgnosiaUtilities.HasAssociatedProfile(activity);
+            || profileDiagnostics.ManagedProfileExists;
         var usageAccessGranted = workProfileAvailable
             && await AndroidProfileCommandGateway.QueryWorkUsageStatsAccessAsync(commandRunner, cancellationToken);
         var workPackageInstallGranted = workProfileAvailable

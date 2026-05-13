@@ -181,6 +181,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsWorkProfileRecoveryVisible))]
     [NotifyPropertyChangedFor(nameof(WorkProfileRecoveryTitle))]
     [NotifyPropertyChangedFor(nameof(WorkProfileRecoveryMessage))]
+    [NotifyPropertyChangedFor(nameof(WorkProfileStatusText))]
+    [NotifyPropertyChangedFor(nameof(OverviewHeadline))]
+    [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
     [NotifyPropertyChangedFor(nameof(CanStartProvisioning))]
     [NotifyCanExecuteChangedFor(nameof(StartProvisioningCommand))]
     private WorkProfileStateKind _workProfileState;
@@ -217,7 +220,10 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     public bool IsWorkProfileSelected => SelectedProfile == ProfileKind.Work;
 
     public string WorkProfileStatusText =>
-        DashboardStatusTextFormatter.GetWorkProfileStatus(WorkProfileAvailable, HasSetup);
+        DashboardStatusTextFormatter.GetWorkProfileStatus(
+            WorkProfileState,
+            WorkProfileAvailable,
+            HasSetup);
 
     public string OverviewHeadline =>
         DashboardStatusTextFormatter.GetOverviewHeadline(
@@ -225,7 +231,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             IsSupported,
             HasSetup,
             IsBusy,
-            WorkProfileAvailable);
+            WorkProfileAvailable,
+            WorkProfileState);
 
     public string OverallStatusText =>
         DashboardStatusTextFormatter.GetOverallStatusText(
@@ -243,7 +250,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             IsBusy,
             IsSupported,
             HasSetup,
-            WorkProfileAvailable);
+            WorkProfileAvailable,
+            WorkProfileState);
 
     public string LogSummary => _eventLogService.Summary;
 
@@ -260,6 +268,10 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public string WorkProfileRecoveryTitle => WorkProfileRecovery switch
     {
+        WorkProfileRecoveryKind.WorkProfileQuietMode => "Рабочий профиль выключен",
+        WorkProfileRecoveryKind.WorkProfileUnavailable => "Рабочий профиль недоступен",
+        WorkProfileRecoveryKind.WorkProfileCommandTargetUnavailable => "Agnosia не видна в рабочем профиле",
+        WorkProfileRecoveryKind.WorkProfileCommandChannelUnavailable => "Рабочий профиль не отвечает",
         WorkProfileRecoveryKind.WorkProfileCreatedButAppNotReady => "Рабочий профиль еще не готов",
         WorkProfileRecoveryKind.AppInstalledInWorkProfileButNotOwner => "Agnosia не владелец профиля",
         WorkProfileRecoveryKind.ForeignProfileOwner => "Рабочим профилем управляет другое приложение",
@@ -269,6 +281,14 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public string WorkProfileRecoveryMessage => WorkProfileRecovery switch
     {
+        WorkProfileRecoveryKind.WorkProfileQuietMode =>
+            WithDiagnosticReason("Android сообщает, что рабочий профиль находится в режиме паузы. Включите рабочий профиль в быстрых настройках или настройках Android, затем обновите экран."),
+        WorkProfileRecoveryKind.WorkProfileUnavailable =>
+            WithDiagnosticReason("Android видит профиль в группе пользователя, но не предоставляет его для межпрофильных операций. Включите или разблокируйте рабочий профиль в настройках Android, затем обновите экран."),
+        WorkProfileRecoveryKind.WorkProfileCommandTargetUnavailable =>
+            WithDiagnosticReason("Рабочий профиль доступен Android, но командная активность Agnosia в нем не находится. Подождите завершения установки/запуска профиля, проверьте что Agnosia установлена в рабочем профиле, затем обновите экран."),
+        WorkProfileRecoveryKind.WorkProfileCommandChannelUnavailable =>
+            WithDiagnosticReason("Командная активность Agnosia найдена в рабочем профиле, но подтвержденный ping не прошел. Разблокируйте или включите рабочий профиль и обновите экран."),
         WorkProfileRecoveryKind.WorkProfileCreatedButAppNotReady =>
             WithDiagnosticReason("Android видит рабочий профиль, но Agnosia в нем пока не отвечает. Подождите, разблокируйте или включите рабочий профиль и обновите экран."),
         WorkProfileRecoveryKind.AppInstalledInWorkProfileButNotOwner =>

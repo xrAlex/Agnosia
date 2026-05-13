@@ -27,8 +27,9 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         var storage = LocalStorageManager.Instance;
         var settings = AndroidSettingsStore.LoadSnapshot(storage);
         var showAllApps = settings.ShowAllApps;
-        var hasAssociatedProfile = AgnosiaUtilities.HasAssociatedProfile(activity);
-        var hasWorkProfileTarget = AgnosiaUtilities.HasWorkProfileTarget(activity);
+        var profileDiagnostics = AndroidWorkProfileDiagnosticsReader.Read(activity);
+        var hasAssociatedProfile = profileDiagnostics.ManagedProfileExists;
+        var hasWorkProfileTarget = profileDiagnostics.CommandTargetResolvable;
         var storedHasSetup = storage.GetBoolean(StorageKeys.HasSetup);
         var onboardingCompleted = storage.GetBoolean(StorageKeys.OnboardingCompleted);
         var isSettingUp = storage.GetBoolean(StorageKeys.IsSettingUp);
@@ -48,11 +49,16 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         }
 
         var ownerCheck = hasWorkProfileTarget
+            && profileDiagnostics.AvailableToCrossProfileApps
+            && profileDiagnostics.QuietModeEnabled != true
             ? await TryCheckWorkProfileOwnerWithRetryAsync(cancellationToken)
             : new WorkProfileOwnerCheckResult(
                 WorkProfileOwnerCheckKind.TargetUnavailable,
                 "crossProfileTarget=missing");
         var workProfileAvailable = ownerCheck.Kind == WorkProfileOwnerCheckKind.AppIsProfileOwner;
+        Log.Info(
+            LogTag,
+            $"Work profile diagnostics. {profileDiagnostics.ToLogString()}; ping={ownerCheck.Kind}; {ownerCheck.DiagnosticReason}.");
         if (workProfileAvailable)
         {
             AgnosiaUtilities.MarkWorkProfileReady();
@@ -74,8 +80,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             isSettingUp,
             workProfileAvailable,
             hasManagedProfileProvisionedSignal,
-            hasAssociatedProfile,
-            hasWorkProfileTarget,
+            profileDiagnostics,
             storedHasSetup,
             onboardingCompleted,
             ownerCheck);
@@ -83,8 +88,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         var diagnosticReason = BuildDiagnosticReason(
             workProfileState,
             hasManagedProfileProvisionedSignal,
-            hasAssociatedProfile,
-            hasWorkProfileTarget,
+            profileDiagnostics,
             storedHasSetup,
             onboardingCompleted,
             ownerCheck);
@@ -223,8 +227,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         bool isSettingUp,
         bool workProfileAvailable,
         bool hasManagedProfileProvisionedSignal,
-        bool hasAssociatedProfile,
-        bool hasWorkProfileTarget,
+        WorkProfileDiagnostics profileDiagnostics,
         bool storedHasSetup,
         bool onboardingCompleted,
         WorkProfileOwnerCheckResult ownerCheck)
@@ -244,12 +247,32 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             return WorkProfileStateKind.AppInstalledInWorkProfileButNotOwner;
         }
 
-        if (hasManagedProfileProvisionedSignal || hasAssociatedProfile)
+        if (profileDiagnostics.QuietModeEnabled == true)
+        {
+            return WorkProfileStateKind.WorkProfileQuietMode;
+        }
+
+        if (profileDiagnostics.ManagedProfileExists && !profileDiagnostics.AvailableToCrossProfileApps)
+        {
+            return WorkProfileStateKind.WorkProfileUnavailable;
+        }
+
+        if (profileDiagnostics.ManagedProfileExists && !profileDiagnostics.CommandTargetResolvable)
+        {
+            return WorkProfileStateKind.WorkProfileCommandTargetUnavailable;
+        }
+
+        if (profileDiagnostics.ManagedProfileExists && ownerCheck.Kind == WorkProfileOwnerCheckKind.Unreachable)
+        {
+            return WorkProfileStateKind.WorkProfileCommandChannelUnavailable;
+        }
+
+        if (hasManagedProfileProvisionedSignal)
         {
             return WorkProfileStateKind.WorkProfileCreatedButAppNotReady;
         }
 
-        if (storedHasSetup || onboardingCompleted || hasWorkProfileTarget)
+        if (storedHasSetup || onboardingCompleted || profileDiagnostics.CommandTargetResolvable)
         {
             return WorkProfileStateKind.ErrorUnknownWithDiagnostics;
         }
@@ -260,6 +283,14 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
     private static WorkProfileRecoveryKind GetWorkProfileRecoveryKind(WorkProfileStateKind state) =>
         state switch
         {
+            WorkProfileStateKind.WorkProfileQuietMode =>
+                WorkProfileRecoveryKind.WorkProfileQuietMode,
+            WorkProfileStateKind.WorkProfileUnavailable =>
+                WorkProfileRecoveryKind.WorkProfileUnavailable,
+            WorkProfileStateKind.WorkProfileCommandTargetUnavailable =>
+                WorkProfileRecoveryKind.WorkProfileCommandTargetUnavailable,
+            WorkProfileStateKind.WorkProfileCommandChannelUnavailable =>
+                WorkProfileRecoveryKind.WorkProfileCommandChannelUnavailable,
             WorkProfileStateKind.WorkProfileCreatedButAppNotReady =>
                 WorkProfileRecoveryKind.WorkProfileCreatedButAppNotReady,
             WorkProfileStateKind.AppInstalledInWorkProfileButNotOwner =>
@@ -274,13 +305,12 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
     private static string BuildDiagnosticReason(
         WorkProfileStateKind state,
         bool hasManagedProfileProvisionedSignal,
-        bool hasAssociatedProfile,
-        bool hasWorkProfileTarget,
+        WorkProfileDiagnostics profileDiagnostics,
         bool storedHasSetup,
         bool onboardingCompleted,
         WorkProfileOwnerCheckResult ownerCheck) =>
         $"state={state}; managedProfileProvisioned={hasManagedProfileProvisionedSignal}; " +
-        $"associatedProfile={hasAssociatedProfile}; crossProfileTarget={hasWorkProfileTarget}; " +
+        $"{profileDiagnostics.ToLogString()}; " +
         $"storedSetup={storedHasSetup}; onboardingCompleted={onboardingCompleted}; " +
         $"ownerCheck={ownerCheck.Kind}; {ownerCheck.DiagnosticReason}";
 

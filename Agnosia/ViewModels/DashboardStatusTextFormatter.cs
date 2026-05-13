@@ -1,16 +1,32 @@
+using Agnosia.Models;
+
 namespace Agnosia.ViewModels;
 
 internal static class DashboardStatusTextFormatter
 {
-    public static string GetWorkProfileStatus(bool workProfileAvailable, bool hasSetup) =>
-        workProfileAvailable ? "Available" : hasSetup ? "Unavailable" : "NotCreated";
+    public static string GetWorkProfileStatus(
+        WorkProfileStateKind workProfileState,
+        bool workProfileAvailable,
+        bool hasSetup) =>
+        workProfileAvailable
+            ? "Available"
+            : workProfileState switch
+            {
+                WorkProfileStateKind.ProvisioningInProgress => "Pending",
+                WorkProfileStateKind.WorkProfileQuietMode => "QuietMode",
+                WorkProfileStateKind.WorkProfileUnavailable => "Disabled",
+                WorkProfileStateKind.WorkProfileCommandTargetUnavailable
+                    or WorkProfileStateKind.WorkProfileCommandChannelUnavailable => "CommandIssue",
+                _ => hasSetup ? "Unavailable" : "NotCreated"
+            };
 
     public static string GetOverviewHeadline(
         bool hasLoadedSnapshot,
         bool isSupported,
         bool hasSetup,
         bool isBusy,
-        bool workProfileAvailable) =>
+        bool workProfileAvailable,
+        WorkProfileStateKind workProfileState) =>
         !hasLoadedSnapshot
             ? "Loading"
             : !isSupported
@@ -21,7 +37,7 @@ internal static class DashboardStatusTextFormatter
                         ? "Syncing"
                         : workProfileAvailable
                             ? "Active"
-                            : "WPUnavailable";
+                            : GetUnavailableHeadline(workProfileState);
 
     public static string GetOverallStatusText(
         bool statusIsError,
@@ -44,7 +60,8 @@ internal static class DashboardStatusTextFormatter
         bool isBusy,
         bool isSupported,
         bool hasSetup,
-        bool workProfileAvailable) =>
+        bool workProfileAvailable,
+        WorkProfileStateKind workProfileState) =>
         statusIsError
             ? "Error"
             : !hasLoadedSnapshot
@@ -56,6 +73,26 @@ internal static class DashboardStatusTextFormatter
                         : !hasSetup
                             ? "NotSetup"
                             : !workProfileAvailable
-                                ? "WPUnavailable"
+                                ? GetUnavailableDetail(workProfileState)
                                 : "Ok";
+
+    private static string GetUnavailableHeadline(WorkProfileStateKind workProfileState) =>
+        workProfileState switch
+        {
+            WorkProfileStateKind.WorkProfileQuietMode => "WPQuietMode",
+            WorkProfileStateKind.WorkProfileUnavailable => "WPDisabled",
+            WorkProfileStateKind.WorkProfileCommandTargetUnavailable
+                or WorkProfileStateKind.WorkProfileCommandChannelUnavailable => "WPCommandIssue",
+            _ => "WPUnavailable"
+        };
+
+    private static string GetUnavailableDetail(WorkProfileStateKind workProfileState) =>
+        workProfileState switch
+        {
+            WorkProfileStateKind.WorkProfileQuietMode => "WPQuietMode",
+            WorkProfileStateKind.WorkProfileUnavailable => "WPDisabled",
+            WorkProfileStateKind.WorkProfileCommandTargetUnavailable
+                or WorkProfileStateKind.WorkProfileCommandChannelUnavailable => "WPCommandIssue",
+            _ => "WPUnavailable"
+        };
 }
