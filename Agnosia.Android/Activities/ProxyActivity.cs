@@ -2,9 +2,11 @@ using Agnosia.Android.Api;
 using Agnosia.Android.Receivers;
 using Agnosia.Android.Services;
 using Agnosia.Android.Shortcuts;
+using Android.App.Admin;
 using Android.Content;
 using Android.Content.PM;
 using Android.Net;
+using Android.OS;
 using Java.Lang;
 using Exception = System.Exception;
 using Log = Agnosia.Android.Api.AgnosiaLog;
@@ -35,6 +37,7 @@ public sealed class ProxyActivity : Activity
     private bool _rehideStarted;
     private HiddenAppLaunchRequest? _request;
     private HiddenAppLaunchRequest? _pendingVpnDisconnectRequest;
+    private AndroidAppLaunchResult? _launchResult;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -56,6 +59,7 @@ public sealed class ProxyActivity : Activity
         _rehideStarted = false;
         _request = null;
         _pendingVpnDisconnectRequest = null;
+        _launchResult = null;
         TryStartProxyFlow();
     }
 
@@ -104,7 +108,15 @@ public sealed class ProxyActivity : Activity
         if (!HiddenAppShortcutManager.TryGetLaunchRequest(Intent, out var request))
         {
             Log.Warn(LogTag, $"Proxy launch request rejected. action={Intent?.Action ?? "<none>"}.");
-            Finish();
+            var rejectedResult = AndroidAppLaunchResult.TryRead(Intent, out var existingResult)
+                ? existingResult
+                : AndroidAppLaunchResult.CommandReceived(null, null);
+            FinishWithLaunchResult(
+                rejectedResult.Fail(
+                    AndroidAppLaunchStage.CommandReceived,
+                    AndroidAppLaunchIssueKind.InvalidRequest,
+                    "proxy_request_rejected"),
+                showToast: false);
             return;
         }
 
@@ -113,6 +125,10 @@ public sealed class ProxyActivity : Activity
             $"Proxy launch request accepted. package={request.PackageName}, targetActivity={request.TargetActivity ?? "<none>"}, displayName={request.DisplayName}.");
         _launchStarted = true;
         _request = request;
+        _launchResult = (AndroidAppLaunchResult.TryRead(Intent, out var launchResult)
+                ? launchResult
+                : AndroidAppLaunchResult.CommandReceived(request.PackageName, request.DisplayName))
+            .WithDisplayName(request.DisplayName);
 
         RunInBackground(
             () => UnhideAndLaunchAsync(request),
@@ -131,11 +147,17 @@ public sealed class ProxyActivity : Activity
 
             if (AndroidSystemApi.GetDevicePolicyManager(this) is not { } policyManager)
             {
-                ShowErrorAndFinish("Android не предоставил сервис политики устройства.");
+                FinishWithLaunchResult(
+                    GetLaunchResult(request).Fail(
+                        AndroidAppLaunchStage.CommandReceived,
+                        AndroidAppLaunchIssueKind.DevicePolicyManagerUnavailable,
+                        "devicePolicyManager=missing"),
+                    showToast: true);
                 return;
             }
 
             var admin = AgnosiaUtilities.GetAdminComponent(this, typeof(AgnosiaDeviceAdminReceiver));
+            var launchResult = GetLaunchResult(request);
             if (!AndroidPolicyApi.TrySetApplicationHidden(
                 policyManager,
                 admin,
@@ -144,7 +166,37 @@ public sealed class ProxyActivity : Activity
                 LogTag,
                 out var error))
             {
-                ShowErrorAndFinish(error ?? $"Android не смог восстановить {request.DisplayName}.");
+                FinishWithLaunchResult(
+                    launchResult.Fail(
+                        AndroidAppLaunchStage.CommandReceived,
+                        AndroidAppLaunchIssueKind.HiddenOrSuspendedPackageState,
+                        "setApplicationHidden=false failed",
+                        error),
+                    showToast: true);
+                return;
+            }
+
+            launchResult = launchResult.WithStage(AndroidAppLaunchStage.PackageUnhidden);
+            _launchResult = launchResult;
+            if (TryGetPackageLaunchBlockIssue(policyManager, admin, request.PackageName, out var blockDetail) is { } blockIssue)
+            {
+                FinishWithLaunchResult(
+                    launchResult.Fail(
+                        AndroidAppLaunchStage.PackageUnhidden,
+                        blockIssue,
+                        blockDetail),
+                    showToast: true);
+                return;
+            }
+
+            if (PackageManager is null)
+            {
+                FinishWithLaunchResult(
+                    launchResult.Fail(
+                        AndroidAppLaunchStage.PackageUnhidden,
+                        AndroidAppLaunchIssueKind.PackageManagerUnavailable,
+                        "packageManager=missing"),
+                    showToast: true);
                 return;
             }
 
@@ -162,45 +214,82 @@ public sealed class ProxyActivity : Activity
 
             if (launchIntent is null)
             {
-                ShowErrorAndFinish($"Не найден способ открыть {request.DisplayName}.");
+                var issue = TryGetPackageLaunchBlockIssue(policyManager, admin, request.PackageName, out blockDetail)
+                    ?? AndroidAppLaunchIssueKind.MissingLauncherActivity;
+                FinishWithLaunchResult(
+                    launchResult.Fail(
+                        AndroidAppLaunchStage.PackageUnhidden,
+                        issue,
+                        blockDetail ?? "launchIntent=null"),
+                    showToast: true);
                 return;
             }
 
+            launchResult = launchResult.WithStage(
+                AndroidAppLaunchStage.LaunchIntentResolved,
+                $"component={launchIntent.Component?.FlattenToShortString() ?? "<none>"}");
+            _launchResult = launchResult;
             Log.Info(
                 LogTag,
                 $"Resolved launch intent for {request.PackageName}. component={launchIntent.Component?.FlattenToShortString() ?? "<none>"}, flags={launchIntent.Flags}.");
 
+            var resultToStart = launchResult;
             RunOnUiThread(() =>
             {
                 try
                 {
+                    StartActivityForResult(launchIntent, LaunchRequestCode);
+                    var startedResult = resultToStart.WithStage(AndroidAppLaunchStage.StartActivityAttempted);
+                    if (!AndroidUsageStatsAccessApi.HasAccess(this, LogTag, fallbackWhenUnavailable: false))
+                    {
+                        startedResult = startedResult.WithIssue(
+                            AndroidAppLaunchIssueKind.UsageAccessDenied,
+                            "usageStatsAccess=denied");
+                    }
+
+                    _launchResult = startedResult;
                     Log.Info(LogTag, $"Starting hidden-session monitor for {request.PackageName}, taskId={TaskId}.");
                     HiddenAppSessionMonitorService.StartMonitoring(
                         this,
                         request.PackageName,
                         request.DisplayName,
                         TaskId,
+                        startedResult,
                         ReadParentFrozenCallback(Intent));
                     Log.Info(LogTag, $"Monitor service request sent for {request.PackageName}.");
-                    StartActivityForResult(launchIntent, LaunchRequestCode);
+                    FinishWithLaunchResult(startedResult, showToast: false);
                 }
-                catch (ActivityNotFoundException)
+                catch (ActivityNotFoundException exception)
                 {
-                    TryHideImmediately(request, "activity_not_found");
-                    ShowErrorAndFinish($"Для {request.DisplayName} не найдена активность запуска.");
+                    var failedResult = resultToStart.Fail(
+                        AndroidAppLaunchStage.StartActivityFailedWithException,
+                        AndroidAppLaunchIssueKind.MissingLauncherActivity,
+                        exception.ToString());
+                    failedResult = TryHideImmediately(request, "activity_not_found", failedResult);
+                    FinishWithLaunchResult(failedResult, showToast: true);
                 }
                 catch (Exception exception)
                 {
                     Log.Error(LogTag, $"Failed to launch {request.PackageName}: {exception}");
-                    TryHideImmediately(request, "launch_failed");
-                    ShowErrorAndFinish($"Android не смог открыть {request.DisplayName}.");
+                    var failedResult = resultToStart.Fail(
+                        AndroidAppLaunchStage.StartActivityFailedWithException,
+                        AndroidAppLaunchResult.ClassifyStartActivityException(exception),
+                        exception.ToString());
+                    failedResult = TryHideImmediately(request, "launch_failed", failedResult);
+                    FinishWithLaunchResult(failedResult, showToast: true);
                 }
             });
         }
         catch (Exception exception)
         {
             Log.Error(LogTag, $"Proxy flow failed for {request.PackageName}: {exception}");
-            ShowErrorAndFinish($"Android не смог подготовить {request.DisplayName} к запуску.");
+            FinishWithLaunchResult(
+                GetLaunchResult(request).Fail(
+                    AndroidAppLaunchStage.CommandReceived,
+                    AndroidAppLaunchResult.ClassifyStartActivityException(exception),
+                    exception.ToString(),
+                    $"Android не смог подготовить {request.DisplayName} к запуску."),
+                showToast: true);
         }
     }
 
@@ -362,14 +451,17 @@ public sealed class ProxyActivity : Activity
         Finish();
     }
 
-    private void TryHideImmediately(HiddenAppLaunchRequest request, string reason)
+    private AndroidAppLaunchResult TryHideImmediately(
+        HiddenAppLaunchRequest request,
+        string reason,
+        AndroidAppLaunchResult launchResult)
     {
         try
         {
             if (!AgnosiaUtilities.IsProfileOwner(this)
                 || AndroidSystemApi.GetDevicePolicyManager(this) is not { } policyManager)
             {
-                return;
+                return launchResult;
             }
 
             var admin = AgnosiaUtilities.GetAdminComponent(this, typeof(AgnosiaDeviceAdminReceiver));
@@ -382,6 +474,10 @@ public sealed class ProxyActivity : Activity
                 out _))
             {
                 Log.Info(LogTag, $"App {request.PackageName} hidden again directly. reason={reason}");
+                launchResult = launchResult.WithStage(
+                    AndroidAppLaunchStage.PackageRehidden,
+                    $"proxy_fallback:{reason}");
+                launchResult.Log(LogTag);
                 var result = AndroidProfileCommandGateway.NotifyParentWorkAppFrozen(
                     this,
                     $"proxy_fallback:{reason}:{request.PackageName}");
@@ -395,6 +491,8 @@ public sealed class ProxyActivity : Activity
         {
             Log.Warn(LogTag, $"Fallback re-hide for {request.PackageName} failed: {exception}");
         }
+
+        return launchResult;
     }
 
     private static PendingIntent? ReadParentFrozenCallback(Intent? intent)
@@ -424,5 +522,63 @@ public sealed class ProxyActivity : Activity
             Toast.MakeText(this, message, ToastLength.Long)?.Show();
             Finish();
         });
+    }
+
+    private AndroidAppLaunchResult GetLaunchResult(HiddenAppLaunchRequest request) =>
+        (_launchResult ?? AndroidAppLaunchResult.CommandReceived(request.PackageName, request.DisplayName))
+        .WithDisplayName(request.DisplayName);
+
+    private void FinishWithLaunchResult(AndroidAppLaunchResult result, bool showToast)
+    {
+        _launchResult = result;
+        result.Log(LogTag);
+        void FinishCore()
+        {
+            if (showToast || !result.Succeeded)
+            {
+                Toast.MakeText(this, result.Message, ToastLength.Long)?.Show();
+            }
+
+            SetResult(result.Succeeded ? Result.Ok : Result.Canceled, result.ToIntent());
+            Finish();
+        }
+
+        if (Looper.MainLooper?.IsCurrentThread == true)
+        {
+            FinishCore();
+            return;
+        }
+
+        RunOnUiThread(FinishCore);
+    }
+
+    private static AndroidAppLaunchIssueKind? TryGetPackageLaunchBlockIssue(
+        DevicePolicyManager policyManager,
+        ComponentName admin,
+        string packageName,
+        out string? detail)
+    {
+        try
+        {
+            if (policyManager.IsApplicationHidden(admin, packageName))
+            {
+                detail = "packageHidden=true";
+                return AndroidAppLaunchIssueKind.HiddenOrSuspendedPackageState;
+            }
+
+            if (policyManager.IsPackageSuspended(admin, packageName))
+            {
+                detail = "packageSuspended=true";
+                return AndroidAppLaunchIssueKind.HiddenOrSuspendedPackageState;
+            }
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            detail = $"packageState=unavailable:{exception.GetType().Name}";
+            return null;
+        }
+
+        detail = null;
+        return null;
     }
 }

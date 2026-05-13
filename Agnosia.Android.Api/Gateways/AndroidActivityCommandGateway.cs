@@ -78,6 +78,14 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
             var host = getActivityHost();
             var activity = host.CurrentActivity;
             AgnosiaRuntime.Initialize(activity);
+            var isLaunchCommand = IsLaunchCommand(intent);
+
+            if (useWorkProfile
+                && isLaunchCommand
+                && TryCreatePreflightLaunchFailure(activity, intent) is { } preflightFailure)
+            {
+                return preflightFailure;
+            }
 
             if (useWorkProfile)
             {
@@ -119,14 +127,15 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
                 Log.Warn(
                     ActivityResultLogTag,
                     $"Timed out waiting for work-profile activity result. action={intent.Action ?? "<none>"}, timeoutMs={ProfileCommandTimeout.TotalMilliseconds:0}.");
-                if (string.Equals(intent.Action, AgnosiaActions.UnfreezeAndLaunch, StringComparison.Ordinal))
+                if (isLaunchCommand)
                 {
-                    Log.Info(
-                        ActivityResultLogTag,
-                        "Treating UNFREEZE_AND_LAUNCH timeout as non-fatal because the hidden-app launch is monitored by the work-profile session service.");
-                    var data = new Intent();
-                    data.PutExtra(AndroidCommandContract.ResultMessage, "Открываем приложение.");
-                    return new AndroidActivityResult(Result.Ok, data);
+                    var launchResult = CreateLaunchResult(intent)
+                        .Fail(
+                            AndroidAppLaunchStage.CommandReceived,
+                            AndroidAppLaunchIssueKind.WorkProfileUnavailable,
+                            $"timeoutMs={ProfileCommandTimeout.TotalMilliseconds:0}");
+                    launchResult.Log(ActivityResultLogTag);
+                    return launchResult.ToActivityResult();
                 }
 
                 return AndroidActivityResultApi.CreateCanceledResult(
@@ -139,9 +148,55 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
+            if (IsLaunchCommand(intent))
+            {
+                var issue = exception is InvalidOperationException
+                    ? AndroidAppLaunchIssueKind.WorkProfileUnavailable
+                    : AndroidAppLaunchResult.ClassifyStartActivityException(exception);
+                var launchResult = CreateLaunchResult(intent)
+                    .Fail(
+                        AndroidAppLaunchStage.CommandReceived,
+                        issue,
+                        exception.ToString());
+                launchResult.Log(ActivityResultLogTag);
+                return launchResult.ToActivityResult();
+            }
+
             var error = AndroidRecoverableException.ToUserMessage(exception);
             Log.Warn(ActivityResultLogTag, $"{error} Details: {exception}");
             return AndroidActivityResultApi.CreateCanceledResult(error);
         }
+    }
+
+    private static bool IsLaunchCommand(Intent intent) =>
+        string.Equals(intent.Action, AgnosiaActions.UnfreezeAndLaunch, StringComparison.Ordinal);
+
+    private static AndroidAppLaunchResult CreateLaunchResult(Intent intent) =>
+        AndroidAppLaunchResult.CommandReceived(
+            intent.GetStringExtra("packageName"),
+            intent.GetStringExtra("displayName"));
+
+    private static AndroidActivityResult? TryCreatePreflightLaunchFailure(Activity activity, Intent intent)
+    {
+        try
+        {
+            var diagnostics = AndroidWorkProfileDiagnosticsReader.Read(activity);
+            if (diagnostics.QuietModeEnabled == true)
+            {
+                var launchResult = CreateLaunchResult(intent)
+                    .Fail(
+                        AndroidAppLaunchStage.CommandReceived,
+                        AndroidAppLaunchIssueKind.QuietMode,
+                        diagnostics.ToLogString());
+                launchResult.Log(ActivityResultLogTag);
+                return launchResult.ToActivityResult();
+            }
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn(ActivityResultLogTag, $"Could not read work-profile launch preflight diagnostics: {exception}");
+        }
+
+        return null;
     }
 }

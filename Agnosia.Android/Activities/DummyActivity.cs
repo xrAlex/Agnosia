@@ -44,6 +44,7 @@ namespace Agnosia.Android.Activities;
 public sealed class DummyActivity : Activity
 {
     private const string LogTag = "AgnosiaDummyActivity";
+    private const int ProxyLaunchRequestCode = 7201;
     private static readonly Lock PackageInstallerCallbackSync = new();
     private static DummyActivity? _activeInstance;
     private static Intent? _pendingPackageInstallerCallback;
@@ -52,6 +53,7 @@ public sealed class DummyActivity : Activity
 
     private DevicePolicyManager? _policyManager;
     private bool _isProfileOwner;
+    private AndroidAppLaunchResult? _pendingProxyLaunchResult;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -126,6 +128,34 @@ public sealed class DummyActivity : Activity
         }
 
         HandleAction();
+    }
+
+    protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+    {
+        base.OnActivityResult(requestCode, resultCode, data);
+        if (requestCode != ProxyLaunchRequestCode)
+        {
+            return;
+        }
+
+        var fallback = _pendingProxyLaunchResult
+            ?? AndroidAppLaunchResult.CommandReceived(null, null);
+        _pendingProxyLaunchResult = null;
+
+        if (AndroidAppLaunchResult.TryRead(data, out var launchResult))
+        {
+            launchResult.Log(LogTag);
+            FinishWithResult(resultCode, data);
+            return;
+        }
+
+        var failedResult = fallback.Fail(
+            AndroidAppLaunchStage.CommandReceived,
+            AndroidAppLaunchIssueKind.StartActivityException,
+            "proxy_result_missing",
+            "ProxyActivity не вернула результат попытки запуска приложения.");
+        failedResult.Log(LogTag);
+        FinishWithResult(Result.Canceled, failedResult.ToIntent());
     }
 
     private void HandleAction()
@@ -577,12 +607,20 @@ public sealed class DummyActivity : Activity
     {
         var intent = Intent;
         var packageName = intent?.GetStringExtra("packageName");
+        var displayName = intent?.GetStringExtra("displayName") ?? packageName;
+        var launchResult = AndroidAppLaunchResult.CommandReceived(packageName, displayName);
+        launchResult.Log(LogTag);
         Log.Info(
             LogTag,
             $"Unfreeze-and-launch command received. package={packageName ?? "<none>"}, isProfileOwner={_isProfileOwner}, hasParentFrozenCallback={ReadParentFrozenCallback(intent) is not null}.");
         if (string.IsNullOrWhiteSpace(packageName))
         {
-            Finish();
+            var failedResult = launchResult.Fail(
+                AndroidAppLaunchStage.CommandReceived,
+                AndroidAppLaunchIssueKind.InvalidRequest,
+                "packageName=missing");
+            failedResult.Log(LogTag);
+            FinishWithResult(Result.Canceled, failedResult.ToIntent());
             return;
         }
 
@@ -590,6 +628,11 @@ public sealed class DummyActivity : Activity
         {
             var launchRequest = new Intent(AgnosiaActions.UnfreezeAndLaunch);
             launchRequest.PutExtra("packageName", packageName);
+            if (!string.IsNullOrWhiteSpace(displayName))
+            {
+                launchRequest.PutExtra("displayName", displayName);
+            }
+
             if (!AndroidIntentApi.TryTransferToProfileAndStartActivity(
                 this,
                 launchRequest,
@@ -602,37 +645,37 @@ public sealed class DummyActivity : Activity
             }
 
             Log.Info(LogTag, $"Unfreeze-and-launch command forwarded to work profile. package={packageName}.");
-            FinishWithResult(Result.Ok);
+            var forwardedResult = launchResult.WithIssue(
+                AndroidAppLaunchIssueKind.None,
+                "forwarded_to_work_profile",
+                message: $"Команда запуска {displayName} передана в рабочий профиль.");
+            FinishWithResult(Result.Ok, forwardedResult.ToIntent());
             return;
         }
 
         try
         {
-            var proxyIntent = HiddenAppShortcutManager.CreateInternalLaunchIntent(packageName);
+            var proxyIntent = HiddenAppShortcutManager.CreateInternalLaunchIntent(packageName, label: displayName);
             if (ReadParentFrozenCallback(Intent) is { } parentFrozenCallback)
             {
                 proxyIntent.PutExtra(AndroidCommandContract.ExtraParentFrozenCallback, parentFrozenCallback);
             }
 
-            if (AndroidIntentApi.TryStartActivity(
-                this,
-                proxyIntent,
-                LogTag,
-                $"Android не смог открыть {packageName}.",
-                out var error))
-            {
-                Log.Info(LogTag, $"Proxy launch activity started. package={packageName}; finishing command activity with success.");
-                FinishWithSuccessMessage("Открываем приложение.");
-                return;
-            }
-
-            Log.Warn(LogTag, $"Proxy launch activity was not started. package={packageName}, error={error ?? "<none>"}.");
-            FinishWithError(error ?? $"Android не смог открыть {packageName}.");
+            launchResult.WriteToIntent(proxyIntent);
+            AuthenticationUtility.SignIntent(proxyIntent);
+            _pendingProxyLaunchResult = launchResult;
+            Log.Info(LogTag, $"Starting ProxyActivity for launch result. package={packageName}.");
+            StartActivityForResult(proxyIntent, ProxyLaunchRequestCode);
         }
         catch (Exception exception)
         {
             Log.Error(LogTag, $"Failed to prepare proxy launch for {packageName}: {exception}");
-            FinishWithError($"Android не смог открыть {packageName}.");
+            var failedResult = launchResult.Fail(
+                AndroidAppLaunchStage.CommandReceived,
+                AndroidAppLaunchResult.ClassifyStartActivityException(exception),
+                exception.ToString());
+            failedResult.Log(LogTag);
+            FinishWithResult(Result.Canceled, failedResult.ToIntent());
         }
     }
 

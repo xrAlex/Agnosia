@@ -11,6 +11,11 @@ public static class AndroidActivityResultApi
     public static string? ExtractError(AndroidActivityResult result) =>
         result.Data?.GetStringExtra(AndroidCommandContract.ResultError);
 
+    public static AndroidAppLaunchResult? ExtractLaunchResult(AndroidActivityResult result) =>
+        AndroidAppLaunchResult.TryRead(result.Data, out var launchResult)
+            ? launchResult
+            : null;
+
     public static AndroidActivityResult CreateCanceledResult(string error)
     {
         var data = new Intent();
@@ -39,6 +44,11 @@ public static class AndroidActivityResultApi
 
     public static OperationResult ToVoidOperationResult(AndroidActivityResult result, string successMessage)
     {
+        if (ExtractLaunchResult(result) is { } launchResult)
+        {
+            return launchResult.ToOperationResult();
+        }
+
         var message = ExtractMessage(result);
         var error = ExtractError(result);
         return result.ResultCode == Result.Canceled

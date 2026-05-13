@@ -12,6 +12,7 @@ public static class AndroidCommandContract
     public const string ResultProfileOwnerCheckPerformed = "profile_owner_check_performed";
     public const string ResultIsProfileOwner = "is_profile_owner";
     public const string ResultHideImmediately = "hide_immediately";
+    public const string ResultLaunchJson = "launch_json";
     public const string ResultToggleSuccess = "toggle_success";
     public const string ResultError = "error";
     public const string ExtraParentFrozenCallback = "parent_frozen_callback";

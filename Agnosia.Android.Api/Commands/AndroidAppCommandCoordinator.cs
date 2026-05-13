@@ -187,6 +187,7 @@ internal sealed class AndroidAppCommandCoordinator(
 
         var intent = new Intent(AgnosiaActions.UnfreezeAndLaunch);
         intent.PutExtra("packageName", app.PackageName);
+        intent.PutExtra("displayName", app.Label);
         intent.PutExtra(
             AndroidCommandContract.ExtraParentFrozenCallback,
             commandRunner.CreateWorkAppFrozenCallbackPendingIntent(app.PackageName));

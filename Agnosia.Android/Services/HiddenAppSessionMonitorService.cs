@@ -59,10 +59,11 @@ public sealed class HiddenAppSessionMonitorService : Service
         string packageName,
         string displayName,
         int taskId,
+        AndroidAppLaunchResult launchResult,
         PendingIntent? parentFrozenCallback = null)
     {
         Log.Info(LogTag, $"StartMonitoring requested for {packageName}, taskId={taskId}.");
-        var intent = CreateCommandIntent(context, ActionStart, packageName, displayName, taskId);
+        var intent = CreateCommandIntent(context, ActionStart, packageName, displayName, taskId, launchResult);
         if (parentFrozenCallback is not null)
         {
             intent.PutExtra(AndroidCommandContract.ExtraParentFrozenCallback, parentFrozenCallback);
@@ -100,6 +101,9 @@ public sealed class HiddenAppSessionMonitorService : Service
             }
 
             PersistSession(null);
+            var launchResult = GetSessionLaunchResult(session)
+                .WithStage(AndroidAppLaunchStage.PackageRehidden, ScreenLockPersistedReason);
+            launchResult.Log(LogTag);
             Log.Info(LogTag, $"Persisted hidden-app session completed on screen lock for {session.PackageName}.");
         }
         catch (Exception exception)
@@ -202,6 +206,22 @@ public sealed class HiddenAppSessionMonitorService : Service
             TryHidePackage(previousSession, SessionReplacedReason);
         }
 
+        if (!AndroidUsageStatsAccessApi.HasAccess(this, LogTag, fallbackWhenUnavailable: false, logFailure: false))
+        {
+            var updatedLaunchResult = GetSessionLaunchResult(session)
+                .WithIssue(AndroidAppLaunchIssueKind.UsageAccessDenied, "monitor_usage_access=denied");
+            updatedLaunchResult.Log(LogTag);
+            session = session with { LaunchResult = updatedLaunchResult };
+            lock (_sync)
+            {
+                if (_activeSession is not null && Matches(_activeSession, session))
+                {
+                    _activeSession = session;
+                    PersistSession(session);
+                }
+            }
+        }
+
         StartForegroundServiceNotification(session);
         Log.Info(
             LogTag,
@@ -250,6 +270,11 @@ public sealed class HiddenAppSessionMonitorService : Service
                 if (!hasSeenTarget)
                 {
                     Log.Debug(LogTag, $"Target foreground evidence observed. package={session.PackageName}, now={now:O}, top={observation.TopPackage ?? "<none>"}.");
+                    session = UpdateLaunchResult(
+                        session,
+                        result => result.WithStage(
+                            AndroidAppLaunchStage.TargetBecameForeground,
+                            $"top={observation.TopPackage ?? "<none>"}"));
                 }
 
                 hasSeenTarget = true;
@@ -375,6 +400,9 @@ public sealed class HiddenAppSessionMonitorService : Service
                 return;
             }
 
+            var launchResult = GetSessionLaunchResult(session)
+                .WithStage(AndroidAppLaunchStage.PackageRehidden, reason);
+            launchResult.Log(LogTag);
             Log.Info(LogTag, $"App {session.PackageName} hidden again. reason={reason}");
             if (string.Equals(reason, SessionReplacedReason, StringComparison.Ordinal))
             {
@@ -445,7 +473,13 @@ public sealed class HiddenAppSessionMonitorService : Service
         }
     }
 
-    private static Intent CreateCommandIntent(Context context, string action, string packageName, string displayName, int taskId)
+    private static Intent CreateCommandIntent(
+        Context context,
+        string action,
+        string packageName,
+        string displayName,
+        int taskId,
+        AndroidAppLaunchResult launchResult)
     {
         var intent = new Intent(context, typeof(HiddenAppSessionMonitorService));
         intent.SetAction(action);
@@ -453,6 +487,7 @@ public sealed class HiddenAppSessionMonitorService : Service
         intent.PutExtra(ExtraDisplayName, displayName);
         intent.PutExtra(ExtraTaskId, taskId);
         intent.PutExtra(ExtraStartedAtUnixTimeMilliseconds, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        launchResult.WriteToIntent(intent);
         return intent;
     }
 
@@ -469,11 +504,15 @@ public sealed class HiddenAppSessionMonitorService : Service
             return false;
         }
 
+        var launchResult = AndroidAppLaunchResult.TryRead(intent, out var restoredLaunchResult)
+            ? restoredLaunchResult.WithDisplayName(displayName)
+            : AndroidAppLaunchResult.CommandReceived(packageName, displayName);
         session = new HiddenAppSessionState(
             packageName,
             displayName,
             taskId,
-            startedAt > 0 ? startedAt : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+            startedAt > 0 ? startedAt : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            launchResult)
         {
             ParentFrozenCallback = ReadParentFrozenCallback(intent)
         };
@@ -513,6 +552,12 @@ public sealed class HiddenAppSessionMonitorService : Service
         DateTimeOffset startedAt,
         DateTimeOffset now)
     {
+        if (!AndroidUsageStatsAccessApi.HasAccess(this, LogTag, fallbackWhenUnavailable: false, logFailure: false))
+        {
+            WarnUsageEventsProblemOnce("Usage stats access is not granted in the work profile; no foreground evidence can be produced.");
+            return null;
+        }
+
         if (AndroidSystemApi.GetUsageStatsManager(this) is not { } usageStatsManager)
         {
             WarnUsageEventsProblemOnce("UsageStatsManager unavailable; no inactive evidence was produced.");
@@ -818,11 +863,34 @@ public sealed class HiddenAppSessionMonitorService : Service
         StartForeground(NotificationId, notification);
     }
 
+    private HiddenAppSessionState UpdateLaunchResult(
+        HiddenAppSessionState session,
+        Func<AndroidAppLaunchResult, AndroidAppLaunchResult> update)
+    {
+        var updatedResult = update(GetSessionLaunchResult(session));
+        updatedResult.Log(LogTag);
+        var updatedSession = session with { LaunchResult = updatedResult };
+        lock (_sync)
+        {
+            if (_activeSession is not null && Matches(_activeSession, session))
+            {
+                _activeSession = updatedSession;
+                PersistSession(updatedSession);
+            }
+        }
+
+        return updatedSession;
+    }
+
+    private static AndroidAppLaunchResult GetSessionLaunchResult(HiddenAppSessionState session) =>
+        session.LaunchResult ?? AndroidAppLaunchResult.CommandReceived(session.PackageName, session.DisplayName);
+
     private sealed record HiddenAppSessionState(
         string PackageName,
         string DisplayName,
         int TaskId,
-        long StartedAtUnixTimeMilliseconds = 0)
+        long StartedAtUnixTimeMilliseconds = 0,
+        AndroidAppLaunchResult? LaunchResult = null)
     {
         public static HiddenAppSessionState Empty { get; } = new(string.Empty, string.Empty, -1);
 
