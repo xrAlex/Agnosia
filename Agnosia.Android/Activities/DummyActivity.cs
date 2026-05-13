@@ -162,6 +162,7 @@ public sealed class DummyActivity : Activity
                     if (!_isProfileOwner)
                     {
                         pingResult.PutExtra(AndroidCommandContract.ResultError, "Рабочий профиль не управляется Agnosia.");
+                        AuthenticationUtility.SignIntent(pingResult);
                         FinishWithResult(Result.Canceled, pingResult);
                         break;
                     }
@@ -176,6 +177,7 @@ public sealed class DummyActivity : Activity
                         WorkProfileLockFreezeService.EnsureRunning(this);
                     }
 
+                    AuthenticationUtility.SignIntent(pingResult);
                     FinishWithResult(Result.Ok, pingResult);
                     break;
                 case AgnosiaActions.QueryApps:

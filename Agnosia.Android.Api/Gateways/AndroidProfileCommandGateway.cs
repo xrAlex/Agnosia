@@ -402,6 +402,13 @@ public static class AndroidProfileCommandGateway
     {
         if (result.Data?.GetBooleanExtra(AndroidCommandContract.ResultProfileOwnerCheckPerformed, false) == true)
         {
+            if (!AuthenticationUtility.CheckIntent(result.Data))
+            {
+                return new WorkProfileOwnerCheckResult(
+                    WorkProfileOwnerCheckKind.Unreachable,
+                    "profilePing=unsignedOwnerCheck");
+            }
+
             var isProfileOwner = result.Data.GetBooleanExtra(AndroidCommandContract.ResultIsProfileOwner, false);
             return isProfileOwner
                 ? new WorkProfileOwnerCheckResult(
@@ -410,13 +417,6 @@ public static class AndroidProfileCommandGateway
                 : new WorkProfileOwnerCheckResult(
                     WorkProfileOwnerCheckKind.AppInstalledButNotOwner,
                     "inProfileOwnerCheck=false");
-        }
-
-        if (result.ResultCode == Result.Ok)
-        {
-            return new WorkProfileOwnerCheckResult(
-                WorkProfileOwnerCheckKind.AppIsProfileOwner,
-                "legacyProfilePing=ok");
         }
 
         var error = AndroidActivityResultApi.ExtractError(result);
