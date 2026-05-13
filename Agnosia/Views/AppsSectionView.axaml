@@ -66,6 +66,20 @@
 
         <Border Classes="surface-card compact"
                 HorizontalAlignment="Stretch"
+                IsVisible="{Binding IsAppInventoryProgressVisible}">
+          <Grid ColumnDefinitions="*,Auto"
+                ColumnSpacing="12">
+            <TextBlock Classes="section-title compact"
+                       Text="Загружаем приложения" />
+            <ProgressBar Grid.Column="1"
+                         Width="92"
+                         VerticalAlignment="Center"
+                         IsIndeterminate="True" />
+          </Grid>
+        </Border>
+
+        <Border Classes="surface-card compact"
+                HorizontalAlignment="Stretch"
                 IsVisible="{Binding IsEmptyStateVisible}">
           <TextBlock Classes="section-title compact"
                      Text="Ничего не найдено" />

@@ -74,7 +74,8 @@ public static class AndroidProfileCommandGateway
     {
         if (profile == ProfileKind.Personal)
         {
-            return QueryLocalApps(commandRunner.CurrentActivity, showAll);
+            return await QueryLocalAppsAsync(commandRunner.CurrentActivity, showAll, cancellationToken)
+                .ConfigureAwait(false);
         }
 
         var intent = new Intent(AgnosiaActions.QueryApps);
@@ -82,7 +83,7 @@ public static class AndroidProfileCommandGateway
         var result = await commandRunner.StartActivityForResultAsync(
             intent,
             useWorkProfile: true,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
         if (result.ResultCode != Result.Ok || result.Data is null)
         {
             Log.Warn(LogTag, "Failed to query work apps through the profile activity command.");
@@ -94,6 +95,37 @@ public static class AndroidProfileCommandGateway
             "work apps") ?? [];
         var interactionPackages = result.Data.GetStringArrayExtra(AndroidCommandContract.ResultInteractionPackages) ?? [];
         return new ProfileAppsQueryResult(apps, interactionPackages);
+    }
+
+    internal static async Task<byte[]?> LoadAppIconAsync(
+        AndroidActivityCommandGateway commandRunner,
+        AppSnapshot app,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (app.Profile == ProfileKind.Personal)
+        {
+            return await LoadLocalAppIconAsync(
+                    commandRunner.CurrentActivity,
+                    app.PackageName,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        var intent = new Intent(AgnosiaActions.QueryAppIcon);
+        intent.PutExtra(ExtraPackage, app.PackageName);
+        var result = await commandRunner.StartActivityForResultAsync(
+                intent,
+                useWorkProfile: true,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (result.ResultCode != Result.Ok || result.Data is null)
+        {
+            Log.Warn(LogTag, $"Failed to query work app icon for {app.PackageName}.");
+            return null;
+        }
+
+        return result.Data.GetByteArrayExtra(AndroidCommandContract.ResultIconPng);
     }
 
     internal static async Task<IReadOnlyList<AppLogEntry>> QueryWorkLogsAsync(
@@ -269,22 +301,40 @@ public static class AndroidProfileCommandGateway
         return AndroidActivityResultApi.ToPackageOperationResult(result, successMessage);
     }
 
-    private static ProfileAppsQueryResult? QueryLocalApps(Context context, bool showAll)
-    {
-        if (context.PackageManager is not { } packageManager)
+    private static Task<ProfileAppsQueryResult?> QueryLocalAppsAsync(
+        Context context,
+        bool showAll,
+        CancellationToken cancellationToken) =>
+        Task.Run(() =>
         {
-            Log.Warn(LogTag, "PackageManager unavailable; could not query local apps.");
-            return null;
-        }
+            cancellationToken.ThrowIfCancellationRequested();
+            if (context.PackageManager is not { } packageManager)
+            {
+                Log.Warn(LogTag, "PackageManager unavailable; could not query local apps.");
+                return null;
+            }
 
-        var apps = AndroidAppInventoryApi.QueryInstalledApps(
-            context,
-            packageManager,
-            AndroidSystemApi.GetDevicePolicyManager(context),
-            admin: null,
-            showAll);
-        return new ProfileAppsQueryResult(apps, []);
-    }
+            var apps = AndroidAppInventoryApi.QueryInstalledApps(
+                context,
+                packageManager,
+                AndroidSystemApi.GetDevicePolicyManager(context),
+                admin: null,
+                showAll,
+                cancellationToken);
+            return new ProfileAppsQueryResult(apps, []);
+        }, cancellationToken);
+
+    private static Task<byte[]?> LoadLocalAppIconAsync(
+        Context context,
+        string packageName,
+        CancellationToken cancellationToken) =>
+        Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return context.PackageManager is { } packageManager
+                ? AndroidAppInventoryApi.LoadAppIconPng(context, packageManager, packageName, cancellationToken)
+                : null;
+        }, cancellationToken);
 
     private static Intent CreateSystemPackageIntent(string action, string packageName)
     {

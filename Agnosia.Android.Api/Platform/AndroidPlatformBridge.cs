@@ -50,6 +50,19 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
     public Task<DashboardSnapshot> LoadDashboardAsync(CancellationToken cancellationToken = default) =>
         _dashboardReader.LoadDashboardAsync(cancellationToken);
 
+    public Task<DashboardSnapshot> LoadDashboardProfileAsync(CancellationToken cancellationToken = default) =>
+        _dashboardReader.LoadDashboardProfileAsync(cancellationToken);
+
+    public Task<DashboardAppInventorySnapshot> LoadAppInventoryAsync(
+        DashboardSnapshot profileSnapshot,
+        CancellationToken cancellationToken = default) =>
+        _dashboardReader.LoadAppInventoryAsync(profileSnapshot, cancellationToken);
+
+    public Task<byte[]?> LoadAppIconAsync(
+        AppSnapshot app,
+        CancellationToken cancellationToken = default) =>
+        _dashboardReader.LoadAppIconAsync(app, cancellationToken);
+
     public Task<IReadOnlyList<AppLogEntry>> LoadRecentLogsAsync(CancellationToken cancellationToken = default) =>
         _dashboardReader.LoadRecentLogsAsync(cancellationToken);
 

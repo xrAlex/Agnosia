@@ -23,6 +23,7 @@ namespace Agnosia.Android.Activities;
     AgnosiaActions.FinalizeProvision,
     AgnosiaActions.ProfilePing,
     AgnosiaActions.QueryApps,
+    AgnosiaActions.QueryAppIcon,
     AgnosiaActions.QueryLogs,
     AgnosiaActions.QueryUsageStatsAccess,
     AgnosiaActions.RequestUsageStatsAccess,
@@ -181,7 +182,10 @@ public sealed class DummyActivity : Activity
                     FinishWithResult(Result.Ok, pingResult);
                     break;
                 case AgnosiaActions.QueryApps:
-                    ActionQueryApps();
+                    _ = ActionQueryAppsAsync();
+                    break;
+                case AgnosiaActions.QueryAppIcon:
+                    _ = ActionQueryAppIconAsync();
                     break;
                 case AgnosiaActions.QueryLogs:
                     ActionQueryLogs();
@@ -243,7 +247,7 @@ public sealed class DummyActivity : Activity
         }
     }
 
-    private void ActionQueryApps()
+    private async Task ActionQueryAppsAsync()
     {
         var intent = Intent;
         var packageManager = PackageManager;
@@ -253,21 +257,67 @@ public sealed class DummyActivity : Activity
             return;
         }
 
-        var showAll = intent.GetBooleanExtra("show_all", false);
-        var admin = _isProfileOwner && _policyManager is not null
-            ? AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType)
-            : null;
-        var models = AndroidAppInventoryApi.QueryInstalledApps(this, packageManager, _policyManager, admin, showAll);
-
-        var result = new Intent();
-        result.PutExtra(AndroidCommandContract.ResultAppsJson, JsonSerializer.Serialize(models));
-
-        if (admin is not null && _policyManager is not null)
+        try
         {
-            result.PutExtra(AndroidCommandContract.ResultInteractionPackages, AndroidPolicyApi.GetCrossProfilePackages(_policyManager, admin));
+            var showAll = intent.GetBooleanExtra("show_all", false);
+            var policyManager = _policyManager;
+            var admin = _isProfileOwner && policyManager is not null
+                ? AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType)
+                : null;
+            var models = await Task.Run(() => AndroidAppInventoryApi.QueryInstalledApps(
+                this,
+                packageManager,
+                policyManager,
+                admin,
+                showAll));
+
+            var result = new Intent();
+            result.PutExtra(AndroidCommandContract.ResultAppsJson, JsonSerializer.Serialize(models));
+
+            if (admin is not null && policyManager is not null)
+            {
+                result.PutExtra(AndroidCommandContract.ResultInteractionPackages, AndroidPolicyApi.GetCrossProfilePackages(policyManager, admin));
+            }
+
+            FinishWithResult(Result.Ok, result);
+        }
+        catch (Exception exception)
+        {
+            Log.Warn(LogTag, $"Failed to query apps: {exception}");
+            FinishWithResult(Result.Canceled);
+        }
+    }
+
+    private async Task ActionQueryAppIconAsync()
+    {
+        var intent = Intent;
+        var packageManager = PackageManager;
+        var packageName = intent?.GetStringExtra("package");
+        if (string.IsNullOrWhiteSpace(packageName) || packageManager is null)
+        {
+            FinishWithResult(Result.Canceled);
+            return;
         }
 
-        FinishWithResult(Result.Ok, result);
+        try
+        {
+            var iconPng = await Task.Run(() => AndroidAppInventoryApi.LoadAppIconPng(
+                this,
+                packageManager,
+                packageName));
+            var result = new Intent();
+            if (iconPng is { Length: > 0 })
+            {
+                result.PutExtra(AndroidCommandContract.ResultIconPng, iconPng);
+            }
+
+            FinishWithResult(Result.Ok, result);
+        }
+        catch (Exception exception)
+        {
+            Log.Warn(LogTag, $"Failed to query app icon for {packageName}: {exception}");
+            FinishWithResult(Result.Canceled);
+        }
     }
 
     private void ActionQueryLogs()

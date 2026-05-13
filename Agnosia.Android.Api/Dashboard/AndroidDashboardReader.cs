@@ -11,6 +11,17 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
 
     public async Task<DashboardSnapshot> LoadDashboardAsync(CancellationToken cancellationToken)
     {
+        var profileSnapshot = await LoadDashboardProfileAsync(cancellationToken).ConfigureAwait(false);
+        var inventory = await LoadAppInventoryAsync(profileSnapshot, cancellationToken).ConfigureAwait(false);
+        return profileSnapshot with
+        {
+            PersonalApps = inventory.PersonalApps,
+            WorkApps = inventory.WorkApps
+        };
+    }
+
+    public async Task<DashboardSnapshot> LoadDashboardProfileAsync(CancellationToken cancellationToken)
+    {
         var activity = commandRunner.CurrentActivity;
         AgnosiaRuntime.Initialize(activity);
 
@@ -51,7 +62,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         var ownerCheck = hasWorkProfileTarget
             && profileDiagnostics.AvailableToCrossProfileApps
             && profileDiagnostics.QuietModeEnabled != true
-            ? await TryCheckWorkProfileOwnerWithRetryAsync(cancellationToken)
+            ? await TryCheckWorkProfileOwnerWithRetryAsync(cancellationToken).ConfigureAwait(false)
             : new WorkProfileOwnerCheckResult(
                 WorkProfileOwnerCheckKind.TargetUnavailable,
                 "crossProfileTarget=missing");
@@ -102,15 +113,6 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         var hasSetup = storedHasSetup && (workProfileAvailable || recoveryKind != WorkProfileRecoveryKind.None);
         isSettingUp = storage.GetBoolean(StorageKeys.IsSettingUp) && !hasSetup;
 
-        var workAppsQuery = AppQueryResult.Empty;
-        if (workProfileAvailable)
-        {
-            workAppsQuery = await QueryAppsAsync(ProfileKind.Work, showAllApps, cancellationToken);
-        }
-
-        var personalAppsQuery = await QueryAppsAsync(ProfileKind.Personal, showAllApps, cancellationToken);
-        var interactionPackages = workAppsQuery.InteractionPackages.ToHashSet(StringComparer.Ordinal);
-
         return new DashboardSnapshot(
             IsSupported: true,
             HasSetup: hasSetup,
@@ -119,10 +121,40 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             WorkProfileState: workProfileState,
             WorkProfileRecovery: recoveryKind,
             WorkProfileDiagnosticReason: diagnosticReason,
-            PersonalApps: MapApps(personalAppsQuery.Apps, ProfileKind.Personal, interactionPackages),
-            WorkApps: MapApps(workAppsQuery.Apps, ProfileKind.Work, interactionPackages),
+            PersonalApps: [],
+            WorkApps: [],
             Settings: settings);
     }
+
+    public async Task<DashboardAppInventorySnapshot> LoadAppInventoryAsync(
+        DashboardSnapshot profileSnapshot,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!profileSnapshot.IsSupported || !profileSnapshot.HasSetup)
+        {
+            return DashboardAppInventorySnapshot.Empty;
+        }
+
+        var showAllApps = profileSnapshot.Settings.ShowAllApps;
+        var personalAppsTask = QueryAppsAsync(ProfileKind.Personal, showAllApps, cancellationToken);
+        var workAppsTask = profileSnapshot.WorkProfileAvailable
+            ? QueryAppsAsync(ProfileKind.Work, showAllApps, cancellationToken)
+            : Task.FromResult(AppQueryResult.Empty);
+
+        await Task.WhenAll(personalAppsTask, workAppsTask).ConfigureAwait(false);
+
+        var personalAppsQuery = await personalAppsTask.ConfigureAwait(false);
+        var workAppsQuery = await workAppsTask.ConfigureAwait(false);
+        var interactionPackages = workAppsQuery.InteractionPackages.ToHashSet(StringComparer.Ordinal);
+
+        return new DashboardAppInventorySnapshot(
+            MapApps(personalAppsQuery.Apps, ProfileKind.Personal, interactionPackages),
+            MapApps(workAppsQuery.Apps, ProfileKind.Work, interactionPackages));
+    }
+
+    public Task<byte[]?> LoadAppIconAsync(AppSnapshot app, CancellationToken cancellationToken) =>
+        AndroidProfileCommandGateway.LoadAppIconAsync(commandRunner, app, cancellationToken);
 
     public async Task<IReadOnlyList<AppLogEntry>> LoadRecentLogsAsync(CancellationToken cancellationToken)
     {
@@ -164,7 +196,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             commandRunner,
             profile,
             showAll,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
         if (payload is null)
             return AppQueryResult.Empty;
 
@@ -184,7 +216,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         {
             lastResult = await AndroidProfileCommandGateway.CheckWorkProfileOwnerAsync(
                 commandRunner,
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
             if (lastResult.Kind is WorkProfileOwnerCheckKind.AppIsProfileOwner
                 or WorkProfileOwnerCheckKind.AppInstalledButNotOwner
                 or WorkProfileOwnerCheckKind.AuthenticationKeyMissing
@@ -195,7 +227,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
 
             if (attempt < maxAttempts - 1)
             {
-                await Task.Delay(delayMs, cancellationToken);
+                await Task.Delay(delayMs, cancellationToken).ConfigureAwait(false);
             }
         }
 

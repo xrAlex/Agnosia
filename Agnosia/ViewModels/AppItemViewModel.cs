@@ -12,6 +12,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
     private bool _iconLoadRequested;
     private bool _disposed;
     private Bitmap? _icon;
+    private CancellationTokenSource? _iconLoadCancellation;
 
     public AppItemViewModel(DashboardWorkspaceViewModel owner, AppSnapshot snapshot)
     {
@@ -144,27 +145,43 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         }
 
         _disposed = true;
+        _iconLoadCancellation?.Cancel();
+        _iconLoadCancellation = null;
         _icon?.Dispose();
         _icon = null;
     }
 
-    private void RequestIconLoad()
+    public void RequestIconLoad()
     {
-        if (_disposed || _iconLoadRequested || Snapshot.IconPng is not { Length: > 0 } iconPng)
+        if (_disposed || _iconLoadRequested)
         {
             return;
         }
 
         _iconLoadRequested = true;
-        _ = LoadIconAsync(iconPng);
+        _iconLoadCancellation = new CancellationTokenSource();
+        _ = LoadIconAsync(_iconLoadCancellation);
     }
 
-    private async Task LoadIconAsync(byte[] iconPng)
+    private async Task LoadIconAsync(CancellationTokenSource iconLoadCancellation)
     {
         Bitmap? decodedIcon = null;
         try
         {
-            decodedIcon = await Task.Run(() => DecodeIcon(iconPng));
+            var iconPng = Snapshot.IconPng is { Length: > 0 } existingIcon
+                ? existingIcon
+                : await _owner
+                    .LoadAppIconPngAsync(Snapshot, iconLoadCancellation.Token)
+                    .ConfigureAwait(false);
+            if (iconPng is not { Length: > 0 })
+            {
+                return;
+            }
+
+            decodedIcon = await Task.Run(
+                    () => DecodeIcon(iconPng),
+                    iconLoadCancellation.Token)
+                .ConfigureAwait(false);
             if (decodedIcon is null)
             {
                 return;
@@ -172,7 +189,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                if (_disposed)
+                if (_disposed || iconLoadCancellation.IsCancellationRequested)
                 {
                     decodedIcon.Dispose();
                     decodedIcon = null;
@@ -185,9 +202,20 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
                 OnPropertyChanged(nameof(ShowMonogram));
             }, DispatcherPriority.Background);
         }
+        catch (OperationCanceledException) when (iconLoadCancellation.IsCancellationRequested)
+        {
+        }
         catch (Exception)
         {
             decodedIcon?.Dispose();
+        }
+        finally
+        {
+            iconLoadCancellation.Dispose();
+            if (ReferenceEquals(_iconLoadCancellation, iconLoadCancellation))
+            {
+                _iconLoadCancellation = null;
+            }
         }
     }
 

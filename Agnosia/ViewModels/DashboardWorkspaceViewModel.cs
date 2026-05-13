@@ -15,6 +15,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private const int SearchRefreshDelayMs = 150;
     private const int SettingsSaveDelayMs = 350;
     private const int OnboardingMonitorDelayMs = 1500;
+    private const int VisibleIconPrefetchCount = 18;
     private readonly IDashboardPlatformService _dashboardService;
     private readonly IPlatformEventLogReader _platformEventLogReader;
     private readonly IPermissionPlatformService _permissionService;
@@ -23,6 +24,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private readonly IAppEventLogService _eventLogService;
     private readonly DebouncedAsyncAction _searchRefreshDebouncer;
     private readonly DashboardSettingsSaveCoordinator _settingsSaveCoordinator;
+    private readonly SemaphoreSlim _iconLoadGate = new(1, 1);
     private readonly ObservableCollection<PermissionItemViewModel> _permissionItems = [];
     private AppItemViewModel[] _visibleApps = [];
     private AppItemViewModel[] _personalApps = [];
@@ -30,6 +32,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private bool _initialized;
     private bool _isApplyingSnapshot;
     private bool _isOperationInProgress;
+    private int _inventoryLoadGeneration;
+    private CancellationTokenSource? _inventoryLoadCancellation;
     private CancellationTokenSource? _onboardingMonitorCancellation;
 
     public IReadOnlyList<AppItemViewModel> VisibleApps => _visibleApps;
@@ -42,6 +46,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsUnsupportedVisible))]
     [NotifyPropertyChangedFor(nameof(IsDashboardVisible))]
     [NotifyPropertyChangedFor(nameof(IsEmptyStateVisible))]
+    [NotifyPropertyChangedFor(nameof(IsAppInventoryProgressVisible))]
     [NotifyPropertyChangedFor(nameof(CanOpenAppsSection))]
     [NotifyPropertyChangedFor(nameof(CanOpenSettingsSection))]
     [NotifyPropertyChangedFor(nameof(OverviewHeadline))]
@@ -57,10 +62,12 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEmptyStateVisible))]
+    [NotifyPropertyChangedFor(nameof(IsAppInventoryProgressVisible))]
     [NotifyPropertyChangedFor(nameof(CanStartProvisioning))]
     [NotifyPropertyChangedFor(nameof(OverviewHeadline))]
     [NotifyPropertyChangedFor(nameof(OverallStatusText))]
     [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
+    [NotifyPropertyChangedFor(nameof(IsOperationActive))]
     [NotifyCanExecuteChangedFor(nameof(StartProvisioningCommand))]
     private bool _isBusy;
 
@@ -68,6 +75,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsUnsupportedVisible))]
     [NotifyPropertyChangedFor(nameof(IsDashboardVisible))]
     [NotifyPropertyChangedFor(nameof(IsEmptyStateVisible))]
+    [NotifyPropertyChangedFor(nameof(IsAppInventoryProgressVisible))]
     [NotifyPropertyChangedFor(nameof(CanStartProvisioning))]
     [NotifyPropertyChangedFor(nameof(CanOpenAppsSection))]
     [NotifyPropertyChangedFor(nameof(CanOpenSettingsSection))]
@@ -80,6 +88,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsDashboardVisible))]
     [NotifyPropertyChangedFor(nameof(IsEmptyStateVisible))]
+    [NotifyPropertyChangedFor(nameof(IsAppInventoryProgressVisible))]
     [NotifyPropertyChangedFor(nameof(CanStartProvisioning))]
     [NotifyPropertyChangedFor(nameof(CanOpenAppsSection))]
     [NotifyPropertyChangedFor(nameof(CanOpenSettingsSection))]
@@ -113,6 +122,20 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEmptyStateVisible))]
     private string _searchText = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEmptyStateVisible))]
+    [NotifyPropertyChangedFor(nameof(IsAppInventoryProgressVisible))]
+    private bool _hasLoadedInventory;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEmptyStateVisible))]
+    [NotifyPropertyChangedFor(nameof(IsAppInventoryProgressVisible))]
+    [NotifyPropertyChangedFor(nameof(OverviewHeadline))]
+    [NotifyPropertyChangedFor(nameof(OverallStatusText))]
+    [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
+    [NotifyPropertyChangedFor(nameof(IsOperationActive))]
+    private bool _isInventoryLoading;
 
     [ObservableProperty]
     private string _statusMessage = "Ready";
@@ -230,7 +253,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             HasLoadedSnapshot,
             IsSupported,
             HasSetup,
-            IsBusy,
+            IsOperationActive,
             WorkProfileAvailable,
             WorkProfileState);
 
@@ -238,7 +261,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         DashboardStatusTextFormatter.GetOverallStatusText(
             StatusIsError,
             HasLoadedSnapshot,
-            IsBusy,
+            IsOperationActive,
             IsSupported,
             HasSetup,
             WorkProfileAvailable);
@@ -247,7 +270,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         DashboardStatusTextFormatter.GetOverallStatusCaption(
             StatusIsError,
             HasLoadedSnapshot,
-            IsBusy,
+            IsOperationActive,
             IsSupported,
             HasSetup,
             WorkProfileAvailable,
@@ -350,7 +373,10 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public bool CanOpenSettingsSection => IsDashboardVisible;
 
-    public bool IsEmptyStateVisible => IsDashboardVisible && _visibleApps.Length == 0;
+    public bool IsEmptyStateVisible =>
+        IsDashboardVisible && HasLoadedInventory && !IsInventoryLoading && _visibleApps.Length == 0;
+
+    public bool IsAppInventoryProgressVisible => IsDashboardVisible && IsInventoryLoading;
 
     public bool IsAgnosiaThemeSelected => SelectedTheme == AppThemeKind.Agnosia;
 
@@ -394,7 +420,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         && !IsSettingUp
         && WorkProfileState == WorkProfileStateKind.NoWorkProfile;
 
-    public bool IsOperationActive => IsBusy || _isOperationInProgress;
+    public bool IsOperationActive => IsBusy || _isOperationInProgress || IsInventoryLoading;
 
     partial void OnSelectedSectionChanged(DashboardSection value)
     {
@@ -522,7 +548,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
         _initialized = true;
         OnboardingCompleted = await _onboardingService.LoadOnboardingCompletedAsync();
-        await RefreshAsync();
+        await RefreshDashboardAsync(allowDuringOperation: false);
         if (!OnboardingCompleted)
         {
             await AdvanceOnboardingAsync(CancellationToken.None);
@@ -531,28 +557,44 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task RefreshAsync()
+    private Task RefreshAsync() => RefreshDashboardAsync(allowDuringOperation: false);
+
+    private async Task RefreshDashboardAsync(bool allowDuringOperation)
     {
-        if (IsBusy || _isOperationInProgress)
+        if (!allowDuringOperation && (IsBusy || _isOperationInProgress))
             return;
-        
+
+        CancelInventoryLoad(updateProgressState: true);
         IsBusy = true;
         StatusIsError = false;
         StatusMessage = "Updating";
 
         try
         {
-            ApplySnapshot(await _dashboardService.LoadDashboardAsync());
+            var profileSnapshot = await _dashboardService.LoadDashboardProfileAsync();
+            ApplyProfileSnapshot(profileSnapshot);
             HasLoadedSnapshot = true;
             StatusMessage = IsSupported
                 ? "Updated"
                 : "NotSupported";
+
+            if (IsDashboardVisible)
+            {
+                StartInventoryLoad(profileSnapshot);
+            }
+            else
+            {
+                ApplyInventorySnapshot(DashboardAppInventorySnapshot.Empty);
+                HasLoadedInventory = true;
+            }
         }
         catch (Exception ex)
         {
             HasLoadedSnapshot = true;
+            HasLoadedInventory = true;
             StatusIsError = true;
             StatusMessage = ResolveExceptionMessage(ex, "UpdateState");
+            IsInventoryLoading = false;
         }
         finally
         {
@@ -567,6 +609,99 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             }
         }
     }
+
+    private void StartInventoryLoad(DashboardSnapshot profileSnapshot)
+    {
+        var generation = BeginInventoryLoad(out var inventoryCancellation);
+        HasLoadedInventory = false;
+        IsInventoryLoading = true;
+        StatusIsError = false;
+        StatusMessage = "LoadingApps";
+        _ = LoadInventoryForGenerationAsync(profileSnapshot, generation, inventoryCancellation);
+    }
+
+    private int BeginInventoryLoad(out CancellationTokenSource inventoryCancellation)
+    {
+        CancelInventoryLoad(updateProgressState: false);
+        inventoryCancellation = new CancellationTokenSource();
+        _inventoryLoadCancellation = inventoryCancellation;
+        return ++_inventoryLoadGeneration;
+    }
+
+    private void CancelInventoryLoad(bool updateProgressState)
+    {
+        if (_inventoryLoadCancellation is not null)
+        {
+            _inventoryLoadCancellation.Cancel();
+            _inventoryLoadCancellation = null;
+        }
+
+        ++_inventoryLoadGeneration;
+        if (updateProgressState)
+        {
+            IsInventoryLoading = false;
+        }
+    }
+
+    private async Task LoadInventoryForGenerationAsync(
+        DashboardSnapshot profileSnapshot,
+        int generation,
+        CancellationTokenSource inventoryCancellation)
+    {
+        try
+        {
+            var inventory = await _dashboardService
+                .LoadAppInventoryAsync(profileSnapshot, inventoryCancellation.Token)
+                .ConfigureAwait(false);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (!IsCurrentInventoryLoad(generation, inventoryCancellation))
+                {
+                    return;
+                }
+
+                ApplyInventorySnapshot(inventory);
+                HasLoadedInventory = true;
+                IsInventoryLoading = false;
+                StatusMessage = IsSupported ? "Updated" : "NotSupported";
+            }, DispatcherPriority.Background);
+        }
+        catch (OperationCanceledException) when (inventoryCancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (!IsCurrentInventoryLoad(generation, inventoryCancellation))
+                {
+                    return;
+                }
+
+                HasLoadedInventory = true;
+                IsInventoryLoading = false;
+                StatusIsError = true;
+                StatusMessage = ResolveExceptionMessage(ex, "LoadAppsFailed");
+            }, DispatcherPriority.Background);
+        }
+        finally
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (ReferenceEquals(_inventoryLoadCancellation, inventoryCancellation))
+                {
+                    _inventoryLoadCancellation = null;
+                }
+            }, DispatcherPriority.Background);
+            inventoryCancellation.Dispose();
+        }
+    }
+
+    private bool IsCurrentInventoryLoad(int generation, CancellationTokenSource inventoryCancellation) =>
+        generation == _inventoryLoadGeneration
+        && ReferenceEquals(_inventoryLoadCancellation, inventoryCancellation)
+        && !inventoryCancellation.IsCancellationRequested;
 
     [RelayCommand]
     private void SelectPersonal() => SelectedProfile = ProfileKind.Personal;
@@ -793,7 +928,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             {
                 try
                 {
-                    ApplySnapshot(await _dashboardService.LoadDashboardAsync());
+                    await RefreshDashboardAsync(allowDuringOperation: true);
                 }
                 catch (Exception ex) when (!StatusIsError)
                 {
@@ -841,6 +976,19 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             app,
             snapshot => _appCommandService.SetInteractionAccessAsync(snapshot, !snapshot.InteractionAllowed),
             app.InteractionAllowed ? "InteractionDisabled" : "InteractionEnabled");
+
+    internal async Task<byte[]?> LoadAppIconPngAsync(AppSnapshot snapshot, CancellationToken cancellationToken)
+    {
+        await _iconLoadGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await _dashboardService.LoadAppIconAsync(snapshot, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _iconLoadGate.Release();
+        }
+    }
 
     internal async Task RequestPermissionAsync(PermissionItemViewModel permission)
     {
@@ -915,6 +1063,14 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private void ApplySnapshot(DashboardSnapshot snapshot)
     {
+        ApplyProfileSnapshot(snapshot);
+        ApplyInventorySnapshot(new DashboardAppInventorySnapshot(snapshot.PersonalApps, snapshot.WorkApps));
+        HasLoadedSnapshot = true;
+        HasLoadedInventory = true;
+    }
+
+    private void ApplyProfileSnapshot(DashboardSnapshot snapshot)
+    {
         _isApplyingSnapshot = true;
         try
         {
@@ -953,10 +1109,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             SelectedTheme = snapshot.Settings.Theme;
             _settingsSaveCoordinator.SetLoadedShowAllApps(snapshot.Settings.ShowAllApps);
 
-            var previousPersonalApps = _personalApps;
-            var previousWorkApps = _workApps;
-            _personalApps = snapshot.PersonalApps.Select(app => new AppItemViewModel(this, app)).ToArray();
-            _workApps = snapshot.WorkApps.Select(app => new AppItemViewModel(this, app)).ToArray();
             LastRefreshedAt = DateTimeOffset.Now;
 
             if (!WorkProfileAvailable && SelectedProfile == ProfileKind.Work)
@@ -964,19 +1116,32 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
                 SelectedProfile = ProfileKind.Personal;
             }
 
-            OnPropertyChanged(nameof(PersonalAppsCount));
-            OnPropertyChanged(nameof(WorkAppsCount));
+            OnPropertyChanged(nameof(CanOpenAppsSection));
+            OnPropertyChanged(nameof(CanOpenSettingsSection));
             NotifyOverviewMetricsChanged();
 
             EnsureSelectedSectionIsAvailable();
-            RefreshVisibleApps();
-            DisposeAppItems(previousPersonalApps);
-            DisposeAppItems(previousWorkApps);
         }
         finally
         {
             _isApplyingSnapshot = false;
         }
+    }
+
+    private void ApplyInventorySnapshot(DashboardAppInventorySnapshot snapshot)
+    {
+        var previousPersonalApps = _personalApps;
+        var previousWorkApps = _workApps;
+        _personalApps = snapshot.PersonalApps.Select(app => new AppItemViewModel(this, app)).ToArray();
+        _workApps = snapshot.WorkApps.Select(app => new AppItemViewModel(this, app)).ToArray();
+
+        OnPropertyChanged(nameof(PersonalAppsCount));
+        OnPropertyChanged(nameof(WorkAppsCount));
+        NotifyOverviewMetricsChanged();
+
+        RefreshVisibleApps();
+        DisposeAppItems(previousPersonalApps);
+        DisposeAppItems(previousWorkApps);
     }
 
     private void RefreshVisibleApps()
@@ -1017,6 +1182,11 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         _visibleApps = visibleApps;
         OnPropertyChanged(nameof(VisibleApps));
         OnPropertyChanged(nameof(IsEmptyStateVisible));
+
+        foreach (var app in visibleApps.Take(VisibleIconPrefetchCount))
+        {
+            app.RequestIconLoad();
+        }
     }
 
     private void CancelPendingSearchRefresh()
@@ -1061,7 +1231,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
             if (result.Succeeded)
             {
-                ApplySnapshot(await _dashboardService.LoadDashboardAsync());
+                await RefreshDashboardAsync(allowDuringOperation: true);
             }
         }
         catch (Exception ex)

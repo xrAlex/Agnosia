@@ -25,13 +25,15 @@ public static class AndroidAppInventoryApi
         PackageManager packageManager,
         DevicePolicyManager? policyManager,
         ComponentName? admin,
-        bool showAll)
+        bool showAll,
+        CancellationToken cancellationToken = default)
     {
         var apps = packageManager.GetInstalledApplications(AndroidSystemApi.GetInstalledApplicationFlags());
         var models = new List<AppServiceModel>(apps.Count);
         var installedPackageNames = new HashSet<string>(StringComparer.Ordinal);
         foreach (var app in apps)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!string.IsNullOrWhiteSpace(app.PackageName))
             {
                 installedPackageNames.Add(app.PackageName);
@@ -43,9 +45,36 @@ public static class AndroidAppInventoryApi
             }
         }
 
-        PruneIconCache(context, installedPackageNames);
+        PruneMemoryIconCache(installedPackageNames);
         models.Sort(static (left, right) => StringComparer.CurrentCultureIgnoreCase.Compare(left.Label, right.Label));
         return models;
+    }
+
+    public static byte[]? LoadAppIconPng(
+        Context context,
+        PackageManager packageManager,
+        string packageName,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(packageName)
+            || string.Equals(packageName, context.PackageName, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        try
+        {
+            var app = packageManager.GetApplicationInfo(packageName, PackageInfoFlags.MatchDisabledComponents);
+            cancellationToken.ThrowIfCancellationRequested();
+            return ResolveAppIconPng(context, packageManager, app, packageName, cancellationToken);
+        }
+        catch (Exception exception) when (exception is PackageManager.NameNotFoundException
+            or InvalidOperationException
+            || AndroidRecoverableException.IsMatch(exception))
+        {
+            return null;
+        }
     }
 
     private static AppServiceModel? TryCreateModel(
@@ -76,7 +105,6 @@ public static class AndroidAppInventoryApi
             Label = packageManager.GetApplicationLabel(app),
             SourceDirectory = app.SourceDir,
             SplitApks = app.SplitSourceDirs?.ToArray() ?? [],
-            IconPng = ResolveAppIconPng(context, packageManager, app, packageName),
             IsSystem = isSystem,
             IsHidden = admin is not null && policyManager?.IsApplicationHidden(admin, packageName) == true,
             CanLaunch = packageManager.GetLaunchIntentForPackage(packageName) is not null,
@@ -88,7 +116,8 @@ public static class AndroidAppInventoryApi
         Context context,
         PackageManager packageManager,
         ApplicationInfo app,
-        string packageName)
+        string packageName,
+        CancellationToken cancellationToken)
     {
         var hasIdentity = TryGetPackageIdentity(packageManager, packageName, out var identity);
         if (hasIdentity && TryGetCachedIcon(context, packageName, identity, out var cachedIcon))
@@ -96,9 +125,11 @@ public static class AndroidAppInventoryApi
             return cachedIcon;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         var iconPng = TryRenderAppIcon(context, packageManager, app, packageName);
         if (hasIdentity)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             CacheIcon(context, packageName, identity, iconPng);
         }
 
@@ -267,7 +298,7 @@ public static class AndroidAppInventoryApi
         }
     }
 
-    private static void PruneIconCache(Context context, HashSet<string> installedPackageNames)
+    private static void PruneMemoryIconCache(HashSet<string> installedPackageNames)
     {
         lock (IconCacheSync)
         {
@@ -281,8 +312,6 @@ public static class AndroidAppInventoryApi
                 IconCache.Remove(packageName);
             }
         }
-
-        PruneDiskIconCache(context);
     }
 
     private static void PruneDiskIconCache(Context context)

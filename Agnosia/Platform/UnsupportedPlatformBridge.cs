@@ -7,6 +7,8 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
     private const string AndroidOnlyMessage = "Agnosia работает только на Android.";
     private const string ProvisioningMessage = "Agnosia требует Android с поддержкой рабочего профиля.";
     private static readonly Task<DashboardSnapshot> UnsupportedDashboardTask = Task.FromResult(DashboardSnapshot.Unsupported);
+    private static readonly Task<DashboardAppInventorySnapshot> EmptyInventoryTask =
+        Task.FromResult(DashboardAppInventorySnapshot.Empty);
     private static readonly Task<IReadOnlyList<AppLogEntry>> EmptyLogsTask = Task.FromResult<IReadOnlyList<AppLogEntry>>([]);
     private static readonly Task<IReadOnlyList<PermissionSnapshot>> EmptyPermissionsTask = Task.FromResult<IReadOnlyList<PermissionSnapshot>>([]);
     private static readonly Task<OperationResult> AndroidOnlyFailureTask = Task.FromResult(OperationResult.Failure(AndroidOnlyMessage));
@@ -18,6 +20,19 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
 
     public Task<DashboardSnapshot> LoadDashboardAsync(CancellationToken cancellationToken = default) =>
         UnsupportedDashboardTask;
+
+    public Task<DashboardSnapshot> LoadDashboardProfileAsync(CancellationToken cancellationToken = default) =>
+        UnsupportedDashboardTask;
+
+    public Task<DashboardAppInventorySnapshot> LoadAppInventoryAsync(
+        DashboardSnapshot profileSnapshot,
+        CancellationToken cancellationToken = default) =>
+        EmptyInventoryTask;
+
+    public Task<byte[]?> LoadAppIconAsync(
+        AppSnapshot app,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<byte[]?>(null);
 
     public Task<IReadOnlyList<AppLogEntry>> LoadRecentLogsAsync(CancellationToken cancellationToken = default) =>
         EmptyLogsTask;
