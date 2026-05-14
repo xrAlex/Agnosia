@@ -56,11 +56,22 @@ public static class AndroidPolicyApi
     {
         try
         {
+            bool? hiddenBefore = null;
+            try
+            {
+                hiddenBefore = manager.IsApplicationHidden(admin, packageName);
+            }
+            catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+            {
+                Log.Warn(logTag, $"Could not read hidden state before SetApplicationHidden. package={packageName}, requestedHidden={hidden}, exception={exception.GetType().FullName}: {exception.Message}");
+            }
+
             var hiddenApplied = manager.SetApplicationHidden(admin, packageName, hidden);
             var currentHidden = manager.IsApplicationHidden(admin, packageName);
-            Log.Info(logTag, $"SetApplicationHidden result. package={packageName}, requestedHidden={hidden}, returned={hiddenApplied}, currentHidden={currentHidden}.");
+            Log.Info(logTag, $"SetApplicationHidden result. package={packageName}, requestedHidden={hidden}, returned={hiddenApplied}, hiddenBefore={hiddenBefore?.ToString() ?? "<unknown>"}, currentHidden={currentHidden}, adminPackage={admin.PackageName}.");
             if (!hiddenApplied && currentHidden != hidden)
             {
+                Log.Warn(logTag, $"SetApplicationHidden rejected. package={packageName}, requestedHidden={hidden}, returned={hiddenApplied}, hiddenBefore={hiddenBefore?.ToString() ?? "<unknown>"}, currentHidden={currentHidden}, adminPackage={admin.PackageName}.");
                 error = hidden
                     ? $"Android не смог скрыть {packageName}."
                     : $"Android не смог восстановить {packageName}.";
@@ -72,7 +83,7 @@ public static class AndroidPolicyApi
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
-            Log.Warn(logTag, $"Failed to change hidden state for {packageName}: {exception}");
+            Log.Warn(logTag, $"Failed to change hidden state. package={packageName}, requestedHidden={hidden}, adminPackage={admin.PackageName}, exception={exception.GetType().FullName}: {exception}");
             error = hidden
                 ? $"Android не смог скрыть {packageName}."
                 : $"Android не смог восстановить {packageName}.";

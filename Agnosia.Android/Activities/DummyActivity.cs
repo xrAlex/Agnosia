@@ -45,8 +45,8 @@ public sealed class DummyActivity : Activity
 {
     private const string LogTag = "AgnosiaDummyActivity";
     private const int ProxyLaunchRequestCode = 7201;
-    private static readonly TimeSpan PackageAvailabilityWaitTimeout = TimeSpan.FromSeconds(10);
-    private static readonly TimeSpan PackageAvailabilityRetryDelay = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan PackageAvailabilityWaitTimeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan PackageAvailabilityRetryDelay = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan HideAfterInstallRetryTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan HideAfterInstallRetryDelay = TimeSpan.FromMilliseconds(500);
     private static readonly Lock PackageInstallerCallbackSync = new();
@@ -439,7 +439,9 @@ public sealed class DummyActivity : Activity
         var callbackPendingIntent = AndroidPendingIntentApi.CreatePackageInstallerCallbackPendingIntent(
             this,
             typeof(PackageInstallerCallbackReceiver),
-            AgnosiaActions.PackageInstallerCallback);
+            AgnosiaActions.PackageInstallerCallback,
+            packageName,
+            AndroidCommandContract.PackageInstallerOperationInstall);
         if (!AndroidPackageApi.TryStartInstall(
             this,
             packageName,
@@ -492,7 +494,9 @@ public sealed class DummyActivity : Activity
         var pendingIntent = AndroidPendingIntentApi.CreatePackageInstallerCallbackPendingIntent(
             this,
             typeof(PackageInstallerCallbackReceiver),
-            AgnosiaActions.PackageInstallerCallback);
+            AgnosiaActions.PackageInstallerCallback,
+            packageName,
+            AndroidCommandContract.PackageInstallerOperationUninstall);
         if (!AndroidPackageApi.TryStartUninstall(this, packageName, pendingIntent))
         {
             FinishWithResult(Result.Canceled);
@@ -607,7 +611,7 @@ public sealed class DummyActivity : Activity
 
             if (DateTimeOffset.UtcNow >= deadline)
             {
-                Log.Warn(LogTag, $"Timed out waiting for package {packageName} to become available after install.");
+                Log.Warn(LogTag, $"Timed out waiting for package {packageName} to become available after install. timeoutMs={PackageAvailabilityWaitTimeout.TotalMilliseconds:0}, pollMs={PackageAvailabilityRetryDelay.TotalMilliseconds:0}.");
                 return false;
             }
 
@@ -620,17 +624,25 @@ public sealed class DummyActivity : Activity
     {
         try
         {
-            var applicationInfo = PackageManager?.GetApplicationInfo(packageName, PackageInfoFlags.MatchDisabledComponents);
-            return applicationInfo is not null
+            var packageInfo = PackageManager?.GetPackageInfo(packageName, PackageInfoFlags.MatchDisabledComponents);
+            var applicationInfo = packageInfo?.ApplicationInfo;
+            var isInstalled = applicationInfo is not null
                 && (applicationInfo.Flags & ApplicationInfoFlags.Installed) != 0;
+            if (!isInstalled)
+            {
+                Log.Debug(LogTag, $"Package is not installed yet. package={packageName}, hasPackageInfo={packageInfo is not null}, hasApplicationInfo={applicationInfo is not null}.");
+            }
+
+            return isInstalled;
         }
         catch (PackageManager.NameNotFoundException)
         {
+            Log.Debug(LogTag, $"Package is not visible yet. package={packageName}, reason=NameNotFound.");
             return false;
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
-            Log.Warn(LogTag, $"Failed to query package availability for {packageName}: {exception}");
+            Log.Warn(LogTag, $"Failed to query package availability. package={packageName}, exception={exception.GetType().FullName}: {exception}");
             return false;
         }
     }
@@ -647,6 +659,7 @@ public sealed class DummyActivity : Activity
         string? hideError = null;
         while (true)
         {
+            LogTechnicalHidePreflight(admin, packageName, attempt);
             if (AndroidPolicyApi.TrySetApplicationHidden(_policyManager, admin, packageName, hidden: true, LogTag, out hideError))
             {
                 if (attempt > 1)
@@ -665,6 +678,31 @@ public sealed class DummyActivity : Activity
 
             await Task.Delay(HideAfterInstallRetryDelay);
             attempt++;
+        }
+    }
+
+    private void LogTechnicalHidePreflight(ComponentName admin, string packageName, int attempt)
+    {
+        try
+        {
+            var isInstalled = IsPackageAvailable(packageName);
+            bool? isHiddenBefore = null;
+            try
+            {
+                isHiddenBefore = _policyManager?.IsApplicationHidden(admin, packageName);
+            }
+            catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+            {
+                Log.Warn(LogTag, $"PREPARE_HIDDEN_SHORTCUT hidden-state preflight failed. package={packageName}, attempt={attempt}, exception={exception.GetType().FullName}: {exception.Message}");
+            }
+
+            Log.Info(
+                LogTag,
+                $"PREPARE_HIDDEN_SHORTCUT hide preflight. package={packageName}, operation=hidePackage, attempt={attempt}, isInstalled={isInstalled}, isHiddenBefore={isHiddenBefore?.ToString() ?? "<unknown>"}, isProfileOwner={_isProfileOwner}.");
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn(LogTag, $"PREPARE_HIDDEN_SHORTCUT hide preflight failed. package={packageName}, attempt={attempt}, exception={exception.GetType().FullName}: {exception}");
         }
     }
 
@@ -952,11 +990,15 @@ public sealed class DummyActivity : Activity
         Finish();
     }
 
-    private void HandlePackageInstallerCallback(Intent? intent)
+    private async void HandlePackageInstallerCallback(Intent? intent)
     {
         var status = (PackageInstallStatus)(intent?.Extras?.GetInt(PackageInstaller.ExtraStatus) ?? (int)PackageInstallStatus.Failure);
+        var callbackPackage = intent?.GetStringExtra(AndroidCommandContract.ExtraCallbackPackage)
+            ?? intent?.GetStringExtra(PackageInstaller.ExtraPackageName);
+        var operation = intent?.GetStringExtra(AndroidCommandContract.ExtraPackageInstallerOperation);
+        var statusMessage = intent?.GetStringExtra(PackageInstaller.ExtraStatusMessage);
 
-        Log.Info(LogTag, $"PackageInstaller callback status={status}.");
+        Log.Info(LogTag, $"PackageInstaller callback status={status}, operation={operation ?? "<unknown>"}, package={callbackPackage ?? "<unknown>"}, statusMessage={statusMessage ?? "<none>"}.");
 
         if (status == PackageInstallStatus.PendingUserAction)
         {
@@ -982,11 +1024,21 @@ public sealed class DummyActivity : Activity
 
         if (status == PackageInstallStatus.Success)
         {
+            if (string.Equals(operation, AndroidCommandContract.PackageInstallerOperationInstall, StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(callbackPackage)
+                && !await WaitForPackageAvailableAsync(callbackPackage))
+            {
+                FinishWithError($"Android установил {callbackPackage}, но пакет еще не доступен в рабочем профиле.");
+                return;
+            }
+
             FinishWithResult(Result.Ok);
             return;
         }
 
-        FinishWithError("Android отклонил установку пакета.");
+        FinishWithError(string.IsNullOrWhiteSpace(statusMessage)
+            ? "Android отклонил установку пакета."
+            : $"Android отклонил установку пакета: {statusMessage}");
     }
 
     private void DeliverPendingPackageInstallerCallback()

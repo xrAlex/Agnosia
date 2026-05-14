@@ -28,10 +28,28 @@ public static class AndroidPendingIntentApi
             ?? throw new InvalidOperationException("Android could not create a PendingIntent for the work-app frozen callback.");
     }
 
-    public static PendingIntent CreatePackageInstallerCallbackPendingIntent(Context context, Type receiverType, string action, int requestCode = 0)
+    public static PendingIntent CreatePackageInstallerCallbackPendingIntent(
+        Context context,
+        Type receiverType,
+        string action,
+        string? packageName = null,
+        string? operation = null)
     {
         var intent = new Intent(context, receiverType);
         intent.SetAction(action);
+        if (!string.IsNullOrWhiteSpace(packageName))
+        {
+            intent.PutExtra(AndroidCommandContract.ExtraCallbackPackage, packageName);
+        }
+
+        if (!string.IsNullOrWhiteSpace(operation))
+        {
+            intent.PutExtra(AndroidCommandContract.ExtraPackageInstallerOperation, operation);
+        }
+
+        var requestCode = string.IsNullOrWhiteSpace(packageName) && string.IsNullOrWhiteSpace(operation)
+            ? 0
+            : GetStableRequestCode(action, $"{operation}:{packageName}");
 
         return PendingIntent.GetBroadcast(
             context,
