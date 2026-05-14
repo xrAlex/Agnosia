@@ -59,7 +59,6 @@ public sealed class HiddenAppSessionMonitorService : Service
     private static readonly TimeSpan InitialLaunchGracePeriod = TimeSpan.FromSeconds(45);
     private static readonly TimeSpan InitialFastPollingWindow = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan PostLaunchTransientUiGracePeriod = TimeSpan.FromSeconds(45);
-    private static readonly TimeSpan NoSuccessorForegroundFallbackDelay = TimeSpan.FromMinutes(3);
     private static readonly TimeSpan UserBackgroundHideDelay = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan UsageEventsLookback = TimeSpan.FromMinutes(10);
 
@@ -255,7 +254,7 @@ public sealed class HiddenAppSessionMonitorService : Service
         StartForegroundServiceNotification(session);
         Log.Info(
             LogTag,
-            $"Started hidden-session monitor for {session.PackageName}, taskId={session.TaskId}, startedAt={GetSessionStartedAt(session):O}, fastPollMs={FastPollInterval.TotalMilliseconds}, steadyPollMs={SteadyPollInterval.TotalMilliseconds}, hideDelayMs={UserBackgroundHideDelay.TotalMilliseconds}, noSuccessorForegroundFallbackMs={NoSuccessorForegroundFallbackDelay.TotalMilliseconds}.");
+            $"Started hidden-session monitor for {session.PackageName}, taskId={session.TaskId}, startedAt={GetSessionStartedAt(session):O}, fastPollMs={FastPollInterval.TotalMilliseconds}, steadyPollMs={SteadyPollInterval.TotalMilliseconds}, hideDelayMs={UserBackgroundHideDelay.TotalMilliseconds}.");
     }
 
     private async Task MonitorSessionSafelyAsync(HiddenAppSessionState session, CancellationToken cancellationToken)
@@ -817,23 +816,13 @@ public sealed class HiddenAppSessionMonitorService : Service
                 var inactiveSince = latestTargetEventAt > 0
                     ? DateTimeOffset.FromUnixTimeMilliseconds(latestTargetEventAt)
                     : (DateTimeOffset?)null;
-                var inactiveWithoutSuccessorFor = inactiveSince is not null
-                    ? now - inactiveSince.Value
-                    : TimeSpan.Zero;
-                var isTransientTargetActivity = IsTransientTargetActivity(latestTargetClassName);
-                var confirmedInactive = !isTransientTargetActivity
-                                        || inactiveWithoutSuccessorFor >= NoSuccessorForegroundFallbackDelay;
                 observation = new UsageSessionObservation(
                     false,
-                    confirmedInactive,
+                    true,
                     sawTargetForeground,
                     inactiveSince,
                     latestForegroundPackage);
-                reason = confirmedInactive
-                    ? isTransientTargetActivity
-                        ? "target_transient_activity_inactive_without_successor_foreground_fallback_elapsed"
-                        : "target_activity_inactive_without_successor_foreground"
-                    : "target_transient_activity_inactive_without_successor_foreground";
+                reason = "target_activity_inactive_without_successor_foreground";
             }
             else
             {
@@ -912,17 +901,6 @@ public sealed class HiddenAppSessionMonitorService : Service
                 TopPackage = latestForegroundPackage
             };
             reason = "target_inactive_then_successor_foreground";
-            return true;
-        }
-
-        if (now - previousObservation.InactiveSince.Value >= NoSuccessorForegroundFallbackDelay)
-        {
-            observation = previousObservation with
-            {
-                ConfirmedInactive = true,
-                TopPackage = latestForegroundPackage ?? previousObservation.TopPackage
-            };
-            reason = "target_transient_activity_inactive_without_successor_foreground_fallback_elapsed";
             return true;
         }
 
@@ -1005,8 +983,7 @@ public sealed class HiddenAppSessionMonitorService : Service
 
     private static bool IsUsageInactiveEvent(int eventType)
     {
-        return eventType is UsageEventMoveToBackgroundOrActivityPaused or UsageEventActivityStopped
-            or UsageEventActivityDestroyed;
+        return eventType == UsageEventMoveToBackgroundOrActivityPaused;
     }
 
     private static string GetUsageEventName(int eventType)
@@ -1046,17 +1023,6 @@ public sealed class HiddenAppSessionMonitorService : Service
                    || className.Contains("Permission", StringComparison.Ordinal)
                    || className.Contains("PackageInstaller", StringComparison.Ordinal)
                    || className.Contains("DocumentsActivity", StringComparison.Ordinal));
-    }
-
-    private static bool IsTransientTargetActivity(string? className)
-    {
-        if (string.IsNullOrWhiteSpace(className)) return false;
-        
-        return className.Contains("passport", StringComparison.OrdinalIgnoreCase)
-               || className.Contains("router", StringComparison.OrdinalIgnoreCase)
-               || className.Contains("bouncer", StringComparison.OrdinalIgnoreCase)
-               || className.Contains("auth", StringComparison.OrdinalIgnoreCase)
-               || className.Contains("login", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string FormatTime(DateTimeOffset? value)
