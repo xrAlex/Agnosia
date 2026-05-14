@@ -12,6 +12,8 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
     private const string LogTag = "AgnosiaPlatformBridge";
     private const int ProvisioningWarmupAttempts = 20;
     private const int ProvisioningWarmupDelayMilliseconds = 300;
+    private const int ProvisioningBackgroundReadinessAttempts = 45;
+    private const int ProvisioningBackgroundReadinessDelayMilliseconds = 2000;
 
     private readonly AndroidActivityCommandGateway _commandRunner;
     private readonly AndroidDashboardReader _dashboardReader;
@@ -205,19 +207,22 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         TryStartPendingProvisioningReadinessPolling("managed_profile_provisioned_broadcast");
     }
 
-    private async Task<bool> WaitForWorkProfileAvailabilityAsync(CancellationToken cancellationToken)
+    private async Task<bool> WaitForWorkProfileAvailabilityAsync(
+        CancellationToken cancellationToken,
+        int attempts = ProvisioningWarmupAttempts,
+        int delayMilliseconds = ProvisioningWarmupDelayMilliseconds)
     {
         var activity = GetActivityHost().CurrentActivity;
-        for (var attempt = 0; attempt < ProvisioningWarmupAttempts; attempt++)
+        for (var attempt = 0; attempt < attempts; attempt++)
         {
             if (AgnosiaUtilities.HasWorkProfileTarget(activity) && await _commandRunner.CanReachWorkProfileAsync(cancellationToken))
             {
                 return true;
             }
 
-            if (attempt < ProvisioningWarmupAttempts - 1)
+            if (attempt < attempts - 1)
             {
-                await Task.Delay(ProvisioningWarmupDelayMilliseconds, cancellationToken);
+                await Task.Delay(delayMilliseconds, cancellationToken);
             }
         }
 
@@ -267,7 +272,10 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         try
         {
             Log.Info(LogTag, $"Polling work-profile readiness. trigger={trigger}.");
-            if (await WaitForWorkProfileAvailabilityAsync(pollingCancellation.Token))
+            if (await WaitForWorkProfileAvailabilityAsync(
+                    pollingCancellation.Token,
+                    ProvisioningBackgroundReadinessAttempts,
+                    ProvisioningBackgroundReadinessDelayMilliseconds))
             {
                 AgnosiaUtilities.MarkWorkProfileReady();
                 Log.Info(LogTag, "Work-profile Agnosia confirmed profile-owner readiness.");

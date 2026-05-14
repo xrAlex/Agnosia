@@ -8,6 +8,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
 {
     private const string LogTag = "AgnosiaProfileDetection";
     private static readonly TimeSpan SetupStateTimeout = TimeSpan.FromMinutes(3);
+    private static readonly TimeSpan ProvisionedSetupStateTimeout = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan WorkProfileOwnerCacheTtl = TimeSpan.FromSeconds(5);
     private readonly Lock _workProfileOwnerCacheSync = new();
     private CachedWorkProfileOwnerCheck? _cachedWorkProfileOwnerCheck;
@@ -282,19 +283,30 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         bool hasWorkProfileTarget,
         bool hasManagedProfileProvisionedSignal)
     {
-        if (hasManagedProfileProvisionedSignal)
+        var startedAtUnixSeconds = storage.GetLong(StorageKeys.SetupStartedAtUtc);
+        if (hasManagedProfileProvisionedSignal
+            && !IsSetupStartedBefore(ProvisionedSetupStateTimeout, startedAtUnixSeconds))
         {
             return false;
         }
 
-        var startedAtUnixSeconds = storage.GetLong(StorageKeys.SetupStartedAtUtc);
         if (startedAtUnixSeconds <= 0)
         {
             return !hasAssociatedProfile && !hasWorkProfileTarget;
         }
 
+        return IsSetupStartedBefore(SetupStateTimeout, startedAtUnixSeconds);
+    }
+
+    private static bool IsSetupStartedBefore(TimeSpan timeout, long startedAtUnixSeconds)
+    {
+        if (startedAtUnixSeconds <= 0)
+        {
+            return false;
+        }
+
         var startedAt = DateTimeOffset.FromUnixTimeSeconds(startedAtUnixSeconds);
-        return DateTimeOffset.UtcNow - startedAt >= SetupStateTimeout;
+        return DateTimeOffset.UtcNow - startedAt >= timeout;
     }
 
     private static WorkProfileStateKind GetWorkProfileState(
@@ -311,14 +323,14 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             return WorkProfileStateKind.AppIsProfileOwner;
         }
 
-        if (isSettingUp && !hasManagedProfileProvisionedSignal)
-        {
-            return WorkProfileStateKind.ProvisioningInProgress;
-        }
-
         if (ownerCheck.Kind == WorkProfileOwnerCheckKind.AppInstalledButNotOwner)
         {
             return WorkProfileStateKind.AppInstalledInWorkProfileButNotOwner;
+        }
+
+        if (isSettingUp)
+        {
+            return WorkProfileStateKind.ProvisioningInProgress;
         }
 
         if (profileDiagnostics.QuietModeEnabled == true)
