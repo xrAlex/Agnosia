@@ -5,9 +5,16 @@ namespace Agnosia.Infrastructure;
 
 public static class ServiceRegistry
 {
+    public static event Action? PrimaryActivityResumed;
+
     public static IPlatformBridge PlatformBridge { get; set; } = UnsupportedPlatformBridge.Instance;
 
     public static AppThemeKind InitialTheme { get; set; } = AppThemeKind.Agnosia;
 
     public static bool SuppressPrimaryUiStartup { get; set; }
+
+    public static void NotifyPrimaryActivityResumed()
+    {
+        PrimaryActivityResumed?.Invoke();
+    }
 }

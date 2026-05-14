@@ -29,6 +29,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private readonly DashboardSettingsSaveCoordinator _settingsSaveCoordinator;
     private readonly SemaphoreSlim _iconLoadGate = new(1, 1);
     private readonly Lock _iconBatchSync = new();
+    private readonly Lock _permissionReloadSync = new();
     private readonly List<PendingIconLoad> _pendingIconLoads = [];
     private readonly Dictionary<AppItemKey, AppItemViewModel> _appItemCache = [];
     private readonly ObservableCollection<PermissionItemViewModel> _permissionItems = [];
@@ -37,9 +38,11 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private AppItemViewModel[] _workApps = [];
     private DashboardSnapshot? _lastProfileSnapshot;
     private Task? _iconBatchProcessor;
+    private Task? _permissionReloadTask;
     private bool _initialized;
     private bool _isApplyingSnapshot;
     private bool _isOperationInProgress;
+    private bool _refreshPermissionsOnResume;
     private int _inventoryLoadGeneration;
     private CancellationTokenSource? _inventoryLoadCancellation;
     private CancellationTokenSource? _onboardingMonitorCancellation;
@@ -292,7 +295,10 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             : $"GrantedCount|{_permissionItems.Count(item => item.IsGranted)}|{_permissionItems.Count}";
 
     public bool AreOnboardingPermissionsGranted =>
-        _permissionItems.Count > 0 && _permissionItems.All(item => item.IsGranted);
+        _permissionItems.Count > 0
+        && _permissionItems
+            .Where(item => IsRequiredOnboardingPermission(item.Kind))
+            .All(item => item.IsGranted);
 
     public bool IsWorkProfileRecoveryVisible =>
         WorkProfileRecovery != WorkProfileRecoveryKind.None && !WorkProfileRecoveryDismissed;
@@ -570,6 +576,17 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             await AdvanceOnboardingAsync(CancellationToken.None);
             StartOnboardingMonitorIfNeeded();
         }
+    }
+
+    public void HandlePrimaryActivityResumed()
+    {
+        if (!_refreshPermissionsOnResume)
+        {
+            return;
+        }
+
+        _refreshPermissionsOnResume = false;
+        _ = RefreshPermissionsAfterResumeAsync();
     }
 
     [RelayCommand]
@@ -1133,14 +1150,33 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
         try
         {
+            var refreshOnResume = ShouldRefreshPermissionOnResume(permission.Kind);
+            if (refreshOnResume)
+            {
+                _refreshPermissionsOnResume = true;
+            }
+
             var result = await _permissionService.RequestPermissionAsync(permission.Kind);
             StatusIsError = !result.Succeeded;
             StatusMessage = string.IsNullOrWhiteSpace(result.Message)
                 ? "PermissionRequestOpened"
                 : result.Message;
-            await ReloadPermissionsAsync();
-            await CompleteOnboardingIfReadyAsync();
-            StartOnboardingMonitorIfNeeded();
+
+            if (!refreshOnResume || !result.Succeeded)
+            {
+                if (!result.Succeeded)
+                {
+                    _refreshPermissionsOnResume = false;
+                }
+
+                await ReloadPermissionsAsync();
+                await CompleteOnboardingIfReadyAsync();
+            }
+
+            if (permission.Kind == PermissionKind.WorkProfile)
+            {
+                StartOnboardingMonitorIfNeeded();
+            }
         }
         catch (Exception ex)
         {
@@ -1407,10 +1443,22 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private static bool IsStaleInstallSourceMessage(string? message) =>
         message?.Contains(StaleApkMessageMarker, StringComparison.Ordinal) == true;
 
+    private static bool IsRequiredOnboardingPermission(PermissionKind kind) =>
+        kind is PermissionKind.WorkProfile
+            or PermissionKind.UsageStats
+            or PermissionKind.Notifications
+            or PermissionKind.PackageInstall;
+
+    private static bool ShouldRefreshPermissionOnResume(PermissionKind kind) =>
+        kind is PermissionKind.UsageStats
+            or PermissionKind.PackageInstall
+            or PermissionKind.Overlay;
+
     private void StartOnboardingMonitorIfNeeded()
     {
         if (OnboardingCompleted
             || OnboardingStep == OnboardingStep.Welcome
+            || OnboardingStep == OnboardingStep.Permissions
             || OnboardingStep == OnboardingStep.Final
             || _onboardingMonitorCancellation is not null)
         {
@@ -1441,6 +1489,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
                 if (OnboardingCompleted
                     || OnboardingStep == OnboardingStep.Welcome
+                    || OnboardingStep == OnboardingStep.Permissions
                     || OnboardingStep == OnboardingStep.Final)
                 {
                     return;
@@ -1598,17 +1647,54 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         TracePerf("ReloadPlatformLogs", startedAt, $"count={logs.Count}");
     }
 
-    private async Task ReloadPermissionsAsync()
+    private Task ReloadPermissionsAsync()
+    {
+        lock (_permissionReloadSync)
+        {
+            if (_permissionReloadTask is { IsCompleted: false })
+            {
+                return _permissionReloadTask;
+            }
+
+            _permissionReloadTask = ReloadPermissionsCoreAsync();
+            return _permissionReloadTask;
+        }
+    }
+
+    private async Task ReloadPermissionsCoreAsync()
     {
         var snapshots = await _permissionService.LoadPermissionsAsync();
-        _permissionItems.Clear();
-        foreach (var snapshot in snapshots)
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
         {
-            _permissionItems.Add(new PermissionItemViewModel(this, snapshot));
+            _permissionItems.Clear();
+            foreach (var snapshot in snapshots)
+            {
+                _permissionItems.Add(new PermissionItemViewModel(this, snapshot));
+            }
+
+            OnPropertyChanged(nameof(PermissionSummary));
+            OnPropertyChanged(nameof(AreOnboardingPermissionsGranted));
+        }, DispatcherPriority.Background);
+    }
+
+    private async Task RefreshPermissionsAfterResumeAsync()
+    {
+        if (!_initialized
+            || (!IsPermissionsWindowOpen && !IsOnboardingPermissionsStep))
+        {
+            return;
         }
 
-        OnPropertyChanged(nameof(PermissionSummary));
-        OnPropertyChanged(nameof(AreOnboardingPermissionsGranted));
+        try
+        {
+            await ReloadPermissionsAsync();
+            await CompleteOnboardingIfReadyAsync();
+        }
+        catch (Exception ex)
+        {
+            await ReportErrorOnUiThreadAsync(ex, "PermissionRequestFailed");
+        }
     }
 
     private void ImportPlatformLogs(IEnumerable<AppLogEntry> logs)

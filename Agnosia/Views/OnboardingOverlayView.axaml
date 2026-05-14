@@ -215,6 +215,8 @@
                          Text="Разрешения" />
               <TextBlock Classes="page-caption"
                          Text="Выдайте доступы в указанных профилях" />
+              <TextBlock Classes="page-caption"
+                         Text="VPN и доступ поверх окон можно включить позже в настройках приложения." />
             </StackPanel>
 
             <Border Grid.Column="1"

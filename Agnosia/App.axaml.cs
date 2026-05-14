@@ -36,6 +36,7 @@ public class App : Application
 
         AppThemeManager.Apply(ServiceRegistry.InitialTheme);
         var workspaceViewModel = new DashboardWorkspaceViewModel(ServiceRegistry.PlatformBridge);
+        ServiceRegistry.PrimaryActivityResumed += workspaceViewModel.HandlePrimaryActivityResumed;
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {

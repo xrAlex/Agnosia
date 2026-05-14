@@ -145,6 +145,7 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         _isResumed = true;
         Current = this;
         AndroidPlatformBridge.Instance.AttachActivity(this);
+        ServiceRegistry.NotifyPrimaryActivityResumed();
         ApplyPreferredDisplayMode();
         DrainPendingActivityStarts();
     }
