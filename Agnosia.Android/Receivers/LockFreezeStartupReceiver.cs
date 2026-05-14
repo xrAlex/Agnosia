@@ -11,7 +11,9 @@ namespace Agnosia.Android.Receivers;
 [IntentFilter(
 [
     Intent.ActionBootCompleted,
-    Intent.ActionMyPackageReplaced
+    Intent.ActionMyPackageReplaced,
+    "android.intent.action.MANAGED_PROFILE_AVAILABLE",
+    "android.intent.action.MANAGED_PROFILE_UNLOCKED"
 ])]
 public sealed class LockFreezeStartupReceiver : BroadcastReceiver
 {

@@ -9,31 +9,8 @@ namespace Agnosia.Android.Api;
 
 public static class AgnosiaUtilities
 {
-    private static readonly string[] ParentToManagedActions =
-    [
-        AgnosiaActions.ProfilePing,
-        AgnosiaActions.QueryApps,
-        AgnosiaActions.QueryLogs,
-        AgnosiaActions.QueryUsageStatsAccess,
-        AgnosiaActions.RequestUsageStatsAccess,
-        AgnosiaActions.QueryPackageInstallAccess,
-        AgnosiaActions.RequestPackageInstallAccess,
-        AgnosiaActions.InstallPackage,
-        AgnosiaActions.UninstallPackage,
-        AgnosiaActions.FreezePackage,
-        AgnosiaActions.UnfreezePackage,
-        AgnosiaActions.UnfreezeAndLaunch,
-        AgnosiaActions.PrepareHiddenShortcut,
-        AgnosiaActions.LaunchAppProxy,
-        AgnosiaActions.SetCrossProfileInteraction,
-        AgnosiaActions.SynchronizePreference
-    ];
-
-    private static readonly string[] ManagedToParentActions =
-    [
-        AgnosiaActions.WorkAppFrozen,
-        AgnosiaActions.FinalizeProvision
-    ];
+    private static readonly string[] ParentToManagedActions = AgnosiaActions.ParentToManagedCommandActions;
+    private static readonly string[] ManagedToParentActions = AgnosiaActions.ManagedToParentCommandActions;
 
     public static ComponentName GetAdminComponent(Context context, Type adminReceiverType) =>
         new(context, Class.FromType(adminReceiverType));
@@ -183,6 +160,7 @@ public static class AgnosiaUtilities
     public static void EnforceWorkProfilePolicies(Context context, Type adminReceiverType, Type mainActivityType, bool enableProfile = false)
     {
         DisableMainLauncherActivity(context, mainActivityType);
+        EnsureCrossProfileCommandActionsRegistered();
 
         if (AndroidSystemApi.GetDevicePolicyManager(context) is not { } manager)
         {
@@ -236,6 +214,69 @@ public static class AgnosiaUtilities
 
     private static void AddManagedToParentCrossProfileIntent(DevicePolicyManager manager, ComponentName admin, string action) =>
         AddCrossProfileIntent(manager, admin, action, DevicePolicyManagerFlags.ParentCanAccessManaged);
+
+    private static void EnsureCrossProfileCommandActionsRegistered()
+    {
+        var duplicateActions = ParentToManagedActions
+            .Concat(ManagedToParentActions)
+            .GroupBy(action => action, StringComparer.Ordinal)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToArray();
+        if (duplicateActions.Length > 0)
+        {
+            throw new InvalidOperationException(
+                "Duplicate cross-profile command action registration: " + string.Join(", ", duplicateActions));
+        }
+
+        EnsureActionsRegistered(
+            AgnosiaActions.ParentToManagedCommandActions,
+            ParentToManagedActions,
+            "parent-to-managed");
+        EnsureActionsRegistered(
+            AgnosiaActions.ManagedToParentCommandActions,
+            ManagedToParentActions,
+            "managed-to-parent");
+        EnsureTargetProfileActivityActionsRegistered();
+    }
+
+    private static void EnsureActionsRegistered(
+        IEnumerable<string> declaredActions,
+        IEnumerable<string> registeredActions,
+        string direction)
+    {
+        var registered = registeredActions.ToHashSet(StringComparer.Ordinal);
+        var missingActions = declaredActions
+            .Where(action => !registered.Contains(action))
+            .ToArray();
+        if (missingActions.Length == 0)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Missing {direction} cross-profile command action registration: {string.Join(", ", missingActions)}");
+    }
+
+    private static void EnsureTargetProfileActivityActionsRegistered()
+    {
+        var crossProfileActions = ParentToManagedActions
+            .Concat(ManagedToParentActions)
+            .ToHashSet(StringComparer.Ordinal);
+        var localOnlyActions = AgnosiaActions.LocalOnlyTargetProfileActivityActions.ToHashSet(StringComparer.Ordinal);
+        var missingActions = AgnosiaActions.TargetProfileActivityActions
+            .Where(action => !localOnlyActions.Contains(action))
+            .Where(action => !crossProfileActions.Contains(action))
+            .ToArray();
+        if (missingActions.Length == 0)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            "Target-profile activity command actions are missing cross-profile filters: " +
+            string.Join(", ", missingActions));
+    }
 
     private static ResolveInfo? ResolveProfileTargetActivity(Context context, Intent intent)
     {

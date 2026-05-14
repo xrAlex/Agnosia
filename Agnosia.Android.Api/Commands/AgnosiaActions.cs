@@ -25,4 +25,62 @@ public static class AgnosiaActions
     public const string SynchronizePreference = "agnosia.action.SYNCHRONIZE_PREFERENCE";
     public const string WorkAppFrozen = "agnosia.action.WORK_APP_FROZEN";
     public const string PackageInstallerCallback = "agnosia.action.PACKAGEINSTALLER_CALLBACK";
+
+    public static readonly string[] ParentToManagedCommandActions =
+    [
+        ProfilePing,
+        QueryApps,
+        QueryAppIcon,
+        QueryLogs,
+        QueryUsageStatsAccess,
+        RequestUsageStatsAccess,
+        QueryPackageInstallAccess,
+        RequestPackageInstallAccess,
+        InstallPackage,
+        UninstallPackage,
+        FreezePackage,
+        UnfreezePackage,
+        UnfreezeAndLaunch,
+        PrepareHiddenShortcut,
+        CreateHiddenShortcut,
+        LaunchAppProxy,
+        SetCrossProfileInteraction,
+        SynchronizePreference
+    ];
+
+    public static readonly string[] ManagedToParentCommandActions =
+    [
+        WorkAppFrozen,
+        FinalizeProvision
+    ];
+
+    public static readonly string[] TargetProfileActivityActions =
+    [
+        FinalizeProvision,
+        ProfilePing,
+        QueryApps,
+        QueryAppIcon,
+        QueryLogs,
+        QueryUsageStatsAccess,
+        RequestUsageStatsAccess,
+        QueryPackageInstallAccess,
+        RequestPackageInstallAccess,
+        InstallPackage,
+        UninstallPackage,
+        FreezePackage,
+        UnfreezePackage,
+        PrepareHiddenShortcut,
+        CreateHiddenShortcut,
+        UnfreezeAndLaunch,
+        LaunchAppProxy,
+        SetCrossProfileInteraction,
+        SynchronizePreference,
+        WorkAppFrozen,
+        PackageInstallerCallback
+    ];
+
+    public static readonly string[] LocalOnlyTargetProfileActivityActions =
+    [
+        PackageInstallerCallback
+    ];
 }
