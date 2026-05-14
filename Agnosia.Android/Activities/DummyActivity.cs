@@ -675,10 +675,16 @@ public sealed class DummyActivity : Activity
             HiddenAppShortcutBuildResult metadataResult;
             try
             {
-                metadataResult = await HiddenAppShortcutManager.BuildMetadataAsync(
-                    this,
-                    packageName,
+                metadataResult = await Task.Run(
+                    () => HiddenAppShortcutManager.BuildMetadataAsync(
+                        this,
+                        packageName,
+                        cancellationToken),
                     cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exception)
             {
@@ -694,7 +700,9 @@ public sealed class DummyActivity : Activity
             }
 
             var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
-            var hideError = await TryHidePackageAfterInstallAsync(admin, packageName, cancellationToken);
+            var hideError = await Task.Run(
+                () => TryHidePackageAfterInstallAsync(admin, packageName, cancellationToken),
+                cancellationToken);
             if (hideError is not null)
             {
                 FinishWithError(hideError);

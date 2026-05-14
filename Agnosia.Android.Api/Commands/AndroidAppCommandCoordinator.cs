@@ -11,6 +11,7 @@ internal sealed class AndroidAppCommandCoordinator(
 {
     private const string LogTag = "AgnosiaTransientVpn";
     private const string ActivityResultLogTag = "AgnosiaActivityResult";
+    private static readonly TimeSpan ClonedPackageSettleDelay = TimeSpan.FromSeconds(2);
 
     public async Task<OperationResult> CloneAsync(AppSnapshot app, CancellationToken cancellationToken)
     {
@@ -121,6 +122,10 @@ internal sealed class AndroidAppCommandCoordinator(
         CancellationToken cancellationToken)
     {
         await permissionCoordinator.EnsureUsageStatsAccessRequestedAsync(cancellationToken);
+        Log.Info(
+            ActivityResultLogTag,
+            $"Waiting for cloned work package to settle before hidden-shortcut preparation. package={app.PackageName}, delayMs={ClonedPackageSettleDelay.TotalMilliseconds:0}.");
+        await Task.Delay(ClonedPackageSettleDelay, cancellationToken);
 
         var shortcutResult = await PreparePinnedShortcutInParentAsync(app.PackageName, cancellationToken);
         if (!shortcutResult.Succeeded)
