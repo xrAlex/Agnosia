@@ -13,6 +13,7 @@ using Exception = System.Exception;
 using Log = Agnosia.Android.Api.AgnosiaLog;
 using Math = System.Math;
 using OperationCanceledException = System.OperationCanceledException;
+using Stopwatch = System.Diagnostics.Stopwatch;
 using StringBuilder = System.Text.StringBuilder;
 
 namespace Agnosia.Android.Services;
@@ -45,8 +46,11 @@ public sealed class HiddenAppSessionMonitorService : Service
     private const int UsageEventMoveToBackgroundOrActivityPaused = 2;
     private const int UsageEventActivityStopped = 23;
     private const int UsageEventActivityDestroyed = 24;
-    private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan FastPollInterval = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan SteadyPollInterval = TimeSpan.FromMilliseconds(1500);
+    private static readonly TimeSpan IdlePollInterval = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan InitialLaunchGracePeriod = TimeSpan.FromSeconds(45);
+    private static readonly TimeSpan InitialFastPollingWindow = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan PostLaunchTransientUiGracePeriod = TimeSpan.FromSeconds(45);
     private static readonly TimeSpan UserBackgroundHideDelay = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan UsageEventsLookback = TimeSpan.FromMinutes(10);
@@ -56,7 +60,9 @@ public sealed class HiddenAppSessionMonitorService : Service
     private HiddenAppSessionState? _activeSession;
     private ComponentName? _adminComponent;
     private UsageObservationSnapshot? _lastUsageObservationSnapshot;
+    private UsageSessionObservation? _lastUsageSessionObservation;
     private TaskObservationSnapshot? _lastTaskObservationSnapshot;
+    private long _nextUsageEventsQueryBeginUnixTimeMilliseconds;
     private bool _usageEventsProblemWarningLogged;
 
     public static void StartMonitoring(
@@ -81,12 +87,12 @@ public sealed class HiddenAppSessionMonitorService : Service
             $"Android не смог запустить монитор скрытого приложения {packageName}.");
     }
 
-    public static void CompletePersistedSessionForScreenLock(Context context)
+    public static bool CompletePersistedSessionForScreenLock(Context context)
     {
         if (!TryLoadPersistedSession(out var session))
         {
             Log.Info(LogTag, "No persisted hidden-app session to complete on screen lock.");
-            return;
+            return false;
         }
 
         try
@@ -94,7 +100,7 @@ public sealed class HiddenAppSessionMonitorService : Service
             if (AndroidSystemApi.GetDevicePolicyManager(context) is not { } policyManager)
             {
                 Log.Warn(LogTag, $"DevicePolicyManager unavailable, could not complete persisted hidden-app session for {session.PackageName} on screen lock.");
-                return;
+                return false;
             }
 
             var admin = AgnosiaUtilities.GetAdminComponent(context, typeof(AgnosiaDeviceAdminReceiver));
@@ -102,7 +108,7 @@ public sealed class HiddenAppSessionMonitorService : Service
             if (!hiddenApplied && !policyManager.IsApplicationHidden(admin, session.PackageName))
             {
                 Log.Warn(LogTag, $"Android did not confirm re-hiding {session.PackageName}. reason={ScreenLockPersistedReason}");
-                return;
+                return false;
             }
 
             PersistSession(null);
@@ -110,10 +116,12 @@ public sealed class HiddenAppSessionMonitorService : Service
                 .WithStage(AndroidAppLaunchStage.PackageRehidden, ScreenLockPersistedReason);
             launchResult.Log(LogTag);
             Log.Info(LogTag, $"Persisted hidden-app session completed on screen lock for {session.PackageName}.");
+            return true;
         }
         catch (Exception exception)
         {
             Log.Warn(LogTag, $"Failed to complete persisted hidden-app session for {session.PackageName} on screen lock: {exception.Message}");
+            return false;
         }
     }
 
@@ -200,7 +208,11 @@ public sealed class HiddenAppSessionMonitorService : Service
         }
 
         _lastUsageObservationSnapshot = null;
+        _lastUsageSessionObservation = null;
         _lastTaskObservationSnapshot = null;
+        _nextUsageEventsQueryBeginUnixTimeMilliseconds = GetSessionStartedAt(session)
+            .AddSeconds(-2)
+            .ToUnixTimeMilliseconds();
         _usageEventsProblemWarningLogged = false;
 
         if (previousSession is not null
@@ -231,7 +243,7 @@ public sealed class HiddenAppSessionMonitorService : Service
         StartForegroundServiceNotification(session);
         Log.Info(
             LogTag,
-            $"Started hidden-session monitor for {session.PackageName}, taskId={session.TaskId}, startedAt={GetSessionStartedAt(session):O}, pollMs={PollInterval.TotalMilliseconds}, hideDelayMs={UserBackgroundHideDelay.TotalMilliseconds}.");
+            $"Started hidden-session monitor for {session.PackageName}, taskId={session.TaskId}, startedAt={GetSessionStartedAt(session):O}, fastPollMs={FastPollInterval.TotalMilliseconds}, steadyPollMs={SteadyPollInterval.TotalMilliseconds}, hideDelayMs={UserBackgroundHideDelay.TotalMilliseconds}.");
     }
 
     private async Task MonitorSessionSafelyAsync(HiddenAppSessionState session, CancellationToken cancellationToken)
@@ -270,7 +282,12 @@ public sealed class HiddenAppSessionMonitorService : Service
                 return;
             }
 
+            var pollStartedAt = Stopwatch.GetTimestamp();
             var observation = ObserveSession(session, startedAt, now);
+            var pollElapsedMs = Stopwatch.GetElapsedTime(pollStartedAt).TotalMilliseconds;
+            Log.Debug(
+                LogTag,
+                $"UsagePoll elapsedMs={pollElapsedMs:0.0}; package={session.PackageName}; foreground={observation.IsForeground}; inactive={observation.ConfirmedInactive}; delegated={observation.IsSystemDelegatedFlow}.");
             if (observation.SawTargetForeground)
             {
                 if (!hasSeenTarget)
@@ -350,7 +367,9 @@ public sealed class HiddenAppSessionMonitorService : Service
 
             try
             {
-                await Task.Delay(PollInterval, cancellationToken);
+                await Task.Delay(
+                    GetNextPollDelay(startedAt, now, hasSeenTarget, inactiveSince, observation),
+                    cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -383,6 +402,31 @@ public sealed class HiddenAppSessionMonitorService : Service
             usageObservation?.SawTargetForeground == true,
             false);
         return observation;
+    }
+
+    private static TimeSpan GetNextPollDelay(
+        DateTimeOffset startedAt,
+        DateTimeOffset now,
+        bool hasSeenTarget,
+        DateTimeOffset? inactiveSince,
+        SessionObservation observation)
+    {
+        if (inactiveSince is not null)
+        {
+            return FastPollInterval;
+        }
+
+        if (!hasSeenTarget && now - startedAt <= InitialFastPollingWindow)
+        {
+            return FastPollInterval;
+        }
+
+        if (observation.IsSystemDelegatedFlow || observation.IsForeground)
+        {
+            return SteadyPollInterval;
+        }
+
+        return hasSeenTarget ? SteadyPollInterval : IdlePollInterval;
     }
 
     private bool IsDeviceInteractive() =>
@@ -652,8 +696,10 @@ public sealed class HiddenAppSessionMonitorService : Service
         try
         {
             var begin = Math.Max(
-                startedAt.AddSeconds(-2).ToUnixTimeMilliseconds(),
-                now.Subtract(UsageEventsLookback).ToUnixTimeMilliseconds());
+                Math.Max(
+                    startedAt.AddSeconds(-2).ToUnixTimeMilliseconds(),
+                    now.Subtract(UsageEventsLookback).ToUnixTimeMilliseconds()),
+                _nextUsageEventsQueryBeginUnixTimeMilliseconds);
             var events = usageStatsManager.QueryEvents(begin, now.ToUnixTimeMilliseconds());
             if (events is null)
             {
@@ -672,6 +718,7 @@ public sealed class HiddenAppSessionMonitorService : Service
             string? latestTargetEventName = null;
             string? latestForegroundEventName = null;
             var latestForegroundAt = 0L;
+            var latestScannedEventAt = 0L;
             var targetUsageEvents = new StringBuilder();
 
             while (events.HasNextEvent)
@@ -684,6 +731,7 @@ public sealed class HiddenAppSessionMonitorService : Service
                 scannedEvents++;
                 var eventType = (int)usageEvent.EventType;
                 var eventPackage = usageEvent.PackageName;
+                latestScannedEventAt = Math.Max(latestScannedEventAt, usageEvent.TimeStamp);
                 if (IsUsageForegroundEvent(eventType))
                 {
                     foregroundEvents++;
@@ -716,7 +764,13 @@ public sealed class HiddenAppSessionMonitorService : Service
             string reason;
             if (latestTargetEventType < 0)
             {
-                observation = new UsageSessionObservation(false, false, sawTargetForeground, null, latestForegroundPackage);
+                observation = _lastUsageSessionObservation is { } previousObservation
+                    ? previousObservation with
+                    {
+                        SawTargetForeground = previousObservation.SawTargetForeground || sawTargetForeground,
+                        TopPackage = latestForegroundPackage ?? previousObservation.TopPackage
+                    }
+                    : new UsageSessionObservation(false, false, sawTargetForeground, null, latestForegroundPackage);
                 reason = "no_target_lifecycle_event";
             }
             else if (IsUsageForegroundEvent(latestTargetEventType))
@@ -772,6 +826,12 @@ public sealed class HiddenAppSessionMonitorService : Service
                 targetUsageEvents.ToString(),
                 observation,
                 reason);
+            _lastUsageSessionObservation = observation;
+            _nextUsageEventsQueryBeginUnixTimeMilliseconds = Math.Max(
+                begin,
+                latestScannedEventAt > 0
+                    ? latestScannedEventAt - 1
+                    : now.AddSeconds(-1).ToUnixTimeMilliseconds());
             return observation;
         }
         catch (Exception exception)

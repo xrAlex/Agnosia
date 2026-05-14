@@ -108,7 +108,8 @@ public static class AndroidAppInventoryApi
             IsSystem = isSystem,
             IsHidden = admin is not null && policyManager?.IsApplicationHidden(admin, packageName) == true,
             CanLaunch = packageManager.GetLaunchIntentForPackage(packageName) is not null,
-            IsInstalled = isInstalled
+            IsInstalled = isInstalled,
+            IconPng = TryGetMemoryCachedIcon(packageManager, packageName, out var cachedIcon) ? cachedIcon : null
         };
     }
 
@@ -225,6 +226,29 @@ public static class AndroidAppInventoryApi
             }
 
             return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryGetMemoryCachedIcon(
+        PackageManager packageManager,
+        string packageName,
+        out byte[]? iconPng)
+    {
+        iconPng = null;
+        if (!TryGetPackageIdentity(packageManager, packageName, out var identity))
+        {
+            return false;
+        }
+
+        lock (IconCacheSync)
+        {
+            if (IconCache.TryGetValue(packageName, out var entry) && entry.Identity == identity)
+            {
+                iconPng = entry.IconPng;
+                return true;
+            }
         }
 
         return false;

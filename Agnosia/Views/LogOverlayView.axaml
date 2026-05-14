@@ -20,7 +20,8 @@
           ClipToBounds="True">
       <controls:PlexusBackground LineBrush="{StaticResource AppPlexusLineBrush}"
                                  NodeBrush="{StaticResource AppPlexusNodeBrush}"
-                                 GlowBrush="{StaticResource AppPlexusGlowBrush}" />
+                                 GlowBrush="{StaticResource AppPlexusGlowBrush}"
+                                 IsVisible="{Binding IsLogWindowOpen}" />
     </Grid>
 
     <Grid Grid.Row="0"

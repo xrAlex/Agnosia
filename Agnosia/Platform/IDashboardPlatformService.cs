@@ -15,4 +15,8 @@ public interface IDashboardPlatformService
     Task<byte[]?> LoadAppIconAsync(
         AppSnapshot app,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyDictionary<string, byte[]?>> LoadAppIconsAsync(
+        IReadOnlyList<AppSnapshot> apps,
+        CancellationToken cancellationToken = default);
 }

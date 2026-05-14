@@ -34,6 +34,15 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
         CancellationToken cancellationToken = default) =>
         Task.FromResult<byte[]?>(null);
 
+    public Task<IReadOnlyDictionary<string, byte[]?>> LoadAppIconsAsync(
+        IReadOnlyList<AppSnapshot> apps,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyDictionary<string, byte[]?>>(
+            apps
+                .Select(app => app.PackageName)
+                .Distinct(StringComparer.Ordinal)
+                .ToDictionary(packageName => packageName, _ => (byte[]?)null, StringComparer.Ordinal));
+
     public Task<IReadOnlyList<AppLogEntry>> LoadRecentLogsAsync(CancellationToken cancellationToken = default) =>
         EmptyLogsTask;
 

@@ -8,6 +8,9 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
 {
     private const string LogTag = "AgnosiaProfileDetection";
     private static readonly TimeSpan SetupStateTimeout = TimeSpan.FromMinutes(3);
+    private static readonly TimeSpan WorkProfileOwnerCacheTtl = TimeSpan.FromSeconds(5);
+    private readonly Lock _workProfileOwnerCacheSync = new();
+    private CachedWorkProfileOwnerCheck? _cachedWorkProfileOwnerCheck;
 
     public async Task<DashboardSnapshot> LoadDashboardAsync(CancellationToken cancellationToken)
     {
@@ -156,6 +159,11 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
     public Task<byte[]?> LoadAppIconAsync(AppSnapshot app, CancellationToken cancellationToken) =>
         AndroidProfileCommandGateway.LoadAppIconAsync(commandRunner, app, cancellationToken);
 
+    public Task<IReadOnlyDictionary<string, byte[]?>> LoadAppIconsAsync(
+        IReadOnlyList<AppSnapshot> apps,
+        CancellationToken cancellationToken) =>
+        AndroidProfileCommandGateway.LoadAppIconsAsync(commandRunner, apps, cancellationToken);
+
     public async Task<IReadOnlyList<AppLogEntry>> LoadRecentLogsAsync(CancellationToken cancellationToken)
     {
         var activity = commandRunner.CurrentActivity;
@@ -168,7 +176,8 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
 
         var logs = AndroidAppLogArchive.Load(activity).ToList();
         if (AgnosiaUtilities.HasWorkProfileTarget(activity)
-            && await commandRunner.CanReachWorkProfileAsync(cancellationToken))
+            && (await TryCheckWorkProfileOwnerWithRetryAsync(cancellationToken).ConfigureAwait(false)).Kind
+            == WorkProfileOwnerCheckKind.AppIsProfileOwner)
         {
             logs.AddRange(await AndroidProfileCommandGateway.QueryWorkLogsAsync(commandRunner, cancellationToken));
         }
@@ -206,6 +215,11 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
     private async Task<WorkProfileOwnerCheckResult> TryCheckWorkProfileOwnerWithRetryAsync(
         CancellationToken cancellationToken)
     {
+        if (TryGetCachedWorkProfileOwnerCheck(out var cachedResult))
+        {
+            return cachedResult;
+        }
+
         const int maxAttempts = 5;
         const int delayMs = 500;
 
@@ -222,6 +236,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
                 or WorkProfileOwnerCheckKind.AuthenticationKeyMissing
                 or WorkProfileOwnerCheckKind.TargetUnavailable)
             {
+                SetCachedWorkProfileOwnerCheck(lastResult);
                 return lastResult;
             }
 
@@ -231,7 +246,34 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             }
         }
 
+        SetCachedWorkProfileOwnerCheck(lastResult);
         return lastResult;
+    }
+
+    private bool TryGetCachedWorkProfileOwnerCheck(out WorkProfileOwnerCheckResult result)
+    {
+        lock (_workProfileOwnerCacheSync)
+        {
+            if (_cachedWorkProfileOwnerCheck is { } cached
+                && DateTimeOffset.UtcNow - cached.CachedAt <= WorkProfileOwnerCacheTtl)
+            {
+                result = cached.Result;
+                return true;
+            }
+        }
+
+        result = new WorkProfileOwnerCheckResult(
+            WorkProfileOwnerCheckKind.Unreachable,
+            "profilePing=cacheMiss");
+        return false;
+    }
+
+    private void SetCachedWorkProfileOwnerCheck(WorkProfileOwnerCheckResult result)
+    {
+        lock (_workProfileOwnerCacheSync)
+        {
+            _cachedWorkProfileOwnerCheck = new CachedWorkProfileOwnerCheck(result, DateTimeOffset.UtcNow);
+        }
     }
 
     private static bool IsSetupStateStale(
@@ -378,4 +420,8 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
     {
         public static AppQueryResult Empty { get; } = new([], []);
     }
+
+    private sealed record CachedWorkProfileOwnerCheck(
+        WorkProfileOwnerCheckResult Result,
+        DateTimeOffset CachedAt);
 }

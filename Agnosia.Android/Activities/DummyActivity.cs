@@ -24,7 +24,9 @@ namespace Agnosia.Android.Activities;
     AgnosiaActions.ProfilePing,
     AgnosiaActions.QueryApps,
     AgnosiaActions.QueryAppIcon,
+    AgnosiaActions.QueryAppIcons,
     AgnosiaActions.QueryLogs,
+    AgnosiaActions.QueryCrossProfilePackages,
     AgnosiaActions.QueryUsageStatsAccess,
     AgnosiaActions.RequestUsageStatsAccess,
     AgnosiaActions.QueryPackageInstallAccess,
@@ -56,7 +58,9 @@ public sealed class DummyActivity : Activity
     private static readonly Type MainActivityType = typeof(MainActivity);
 
     private DevicePolicyManager? _policyManager;
+    private readonly CancellationTokenSource _destroyCancellation = new();
     private bool _isProfileOwner;
+    private bool _finishRequested;
     private AndroidAppLaunchResult? _pendingProxyLaunchResult;
 
     protected override void OnCreate(Bundle? savedInstanceState)
@@ -107,6 +111,7 @@ public sealed class DummyActivity : Activity
 
     protected override void OnDestroy()
     {
+        _destroyCancellation.Cancel();
         lock (PackageInstallerCallbackSync)
         {
             if (ReferenceEquals(_activeInstance, this))
@@ -115,6 +120,7 @@ public sealed class DummyActivity : Activity
             }
         }
 
+        _destroyCancellation.Dispose();
         base.OnDestroy();
     }
 
@@ -216,13 +222,19 @@ public sealed class DummyActivity : Activity
                     FinishWithResult(Result.Ok, pingResult);
                     break;
                 case AgnosiaActions.QueryApps:
-                    _ = ActionQueryAppsAsync();
+                    RunAction(ActionQueryAppsAsync, "Android не смог получить список приложений.");
                     break;
                 case AgnosiaActions.QueryAppIcon:
-                    _ = ActionQueryAppIconAsync();
+                    RunAction(ActionQueryAppIconAsync, "Android не смог получить иконку приложения.");
+                    break;
+                case AgnosiaActions.QueryAppIcons:
+                    RunAction(ActionQueryAppIconsAsync, "Android не смог получить иконки приложений.");
                     break;
                 case AgnosiaActions.QueryLogs:
                     ActionQueryLogs();
+                    break;
+                case AgnosiaActions.QueryCrossProfilePackages:
+                    ActionQueryCrossProfilePackages();
                     break;
                 case AgnosiaActions.QueryUsageStatsAccess:
                     ActionQueryUsageStatsAccess();
@@ -243,7 +255,7 @@ public sealed class DummyActivity : Activity
                     ActionUninstallPackage();
                     break;
                 case AgnosiaActions.PrepareHiddenShortcut:
-                    ActionPrepareHiddenShortcut();
+                    RunAction(ActionPrepareHiddenShortcutAsync, "Android не смог подготовить ярлык скрытого приложения.");
                     break;
                 case AgnosiaActions.CreateHiddenShortcut:
                     ActionCreateHiddenShortcut();
@@ -264,7 +276,7 @@ public sealed class DummyActivity : Activity
                     ActionSynchronizePreference();
                     break;
                 case AgnosiaActions.WorkAppFrozen:
-                    ActionWorkAppFrozen();
+                    RunAction(ActionWorkAppFrozenAsync, "Android не смог обработать событие заморозки приложения.");
                     break;
                 case AgnosiaActions.FinalizeProvision:
                     ActionFinalizeProvision();
@@ -281,7 +293,34 @@ public sealed class DummyActivity : Activity
         }
     }
 
-    private async Task ActionQueryAppsAsync()
+    private void RunAction(
+        Func<CancellationToken, Task> action,
+        string fallbackErrorMessage)
+    {
+        var cancellationToken = _destroyCancellation.Token;
+        _ = RunActionAsync(action, fallbackErrorMessage, cancellationToken);
+    }
+
+    private async Task RunActionAsync(
+        Func<CancellationToken, Task> action,
+        string fallbackErrorMessage,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await action(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            Log.Error(LogTag, $"{fallbackErrorMessage} Details: {exception}");
+            FinishWithError(fallbackErrorMessage);
+        }
+    }
+
+    private async Task ActionQueryAppsAsync(CancellationToken cancellationToken)
     {
         var intent = Intent;
         var packageManager = PackageManager;
@@ -303,7 +342,8 @@ public sealed class DummyActivity : Activity
                 packageManager,
                 policyManager,
                 admin,
-                showAll));
+                showAll,
+                cancellationToken), cancellationToken);
 
             var result = new Intent();
             result.PutExtra(AndroidCommandContract.ResultAppsJson, JsonSerializer.Serialize(models));
@@ -315,6 +355,10 @@ public sealed class DummyActivity : Activity
 
             FinishWithResult(Result.Ok, result);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception exception)
         {
             Log.Warn(LogTag, $"Failed to query apps: {exception}");
@@ -322,7 +366,7 @@ public sealed class DummyActivity : Activity
         }
     }
 
-    private async Task ActionQueryAppIconAsync()
+    private async Task ActionQueryAppIconAsync(CancellationToken cancellationToken)
     {
         var intent = Intent;
         var packageManager = PackageManager;
@@ -338,7 +382,8 @@ public sealed class DummyActivity : Activity
             var iconPng = await Task.Run(() => AndroidAppInventoryApi.LoadAppIconPng(
                 this,
                 packageManager,
-                packageName));
+                packageName,
+                cancellationToken), cancellationToken);
             var result = new Intent();
             if (iconPng is { Length: > 0 })
             {
@@ -347,9 +392,65 @@ public sealed class DummyActivity : Activity
 
             FinishWithResult(Result.Ok, result);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception exception)
         {
             Log.Warn(LogTag, $"Failed to query app icon for {packageName}: {exception}");
+            FinishWithResult(Result.Canceled);
+        }
+    }
+
+    private async Task ActionQueryAppIconsAsync(CancellationToken cancellationToken)
+    {
+        var packageManager = PackageManager;
+        var packageNames = Intent?.GetStringArrayExtra("packages") ?? [];
+        if (packageNames.Length == 0 || packageManager is null)
+        {
+            FinishWithResult(Result.Canceled);
+            return;
+        }
+
+        try
+        {
+            var icons = await Task.Run(() =>
+            {
+                var loadedIcons = new Dictionary<string, byte[]?>(StringComparer.Ordinal);
+                foreach (var packageName in packageNames.Distinct(StringComparer.Ordinal))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    loadedIcons[packageName] = AndroidAppInventoryApi.LoadAppIconPng(
+                        this,
+                        packageManager,
+                        packageName,
+                        cancellationToken);
+                }
+
+                return loadedIcons;
+            }, cancellationToken);
+
+            var result = new Intent();
+            var bundle = new Bundle();
+            foreach (var (packageName, iconPng) in icons)
+            {
+                if (iconPng is { Length: > 0 })
+                {
+                    bundle.PutByteArray(packageName, iconPng);
+                }
+            }
+
+            result.PutExtra(AndroidCommandContract.ResultIconsBundle, bundle);
+            FinishWithResult(Result.Ok, result);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            Log.Warn(LogTag, $"Failed to query app icons: {exception}");
             FinishWithResult(Result.Canceled);
         }
     }
@@ -360,6 +461,23 @@ public sealed class DummyActivity : Activity
         result.PutExtra(
             AndroidCommandContract.ResultLogsJson,
             JsonSerializer.Serialize(AndroidAppLogArchive.Load(this)));
+        FinishWithResult(Result.Ok, result);
+    }
+
+    private void ActionQueryCrossProfilePackages()
+    {
+        if (!_isProfileOwner || _policyManager is null)
+        {
+            FinishWithResult(Result.Canceled);
+            return;
+        }
+
+        var result = new Intent();
+        result.PutExtra(
+            AndroidCommandContract.ResultInteractionPackages,
+            AndroidPolicyApi.GetCrossProfilePackages(
+                _policyManager,
+                AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType)));
         FinishWithResult(Result.Ok, result);
     }
 
@@ -529,7 +647,7 @@ public sealed class DummyActivity : Activity
             : "Приложение снова доступно в рабочем профиле.");
     }
 
-    private async void ActionPrepareHiddenShortcut()
+    private async Task ActionPrepareHiddenShortcutAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -548,7 +666,7 @@ public sealed class DummyActivity : Activity
 
             Log.Info(LogTag, $"Starting hidden shortcut preparation for {packageName}.");
 
-            if (!await WaitForPackageAvailableAsync(packageName))
+            if (!await WaitForPackageAvailableAsync(packageName, cancellationToken))
             {
                 FinishWithError($"Android не успел подготовить {packageName} после установки. Повторите действие через несколько секунд.");
                 return;
@@ -557,7 +675,10 @@ public sealed class DummyActivity : Activity
             HiddenAppShortcutBuildResult metadataResult;
             try
             {
-                metadataResult = await HiddenAppShortcutManager.BuildMetadataAsync(this, packageName);
+                metadataResult = await HiddenAppShortcutManager.BuildMetadataAsync(
+                    this,
+                    packageName,
+                    cancellationToken);
             }
             catch (Exception exception)
             {
@@ -573,7 +694,7 @@ public sealed class DummyActivity : Activity
             }
 
             var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
-            var hideError = await TryHidePackageAfterInstallAsync(admin, packageName);
+            var hideError = await TryHidePackageAfterInstallAsync(admin, packageName, cancellationToken);
             if (hideError is not null)
             {
                 FinishWithError(hideError);
@@ -586,6 +707,10 @@ public sealed class DummyActivity : Activity
             HiddenAppShortcutManager.WriteMetadataToIntent(result, metadataResult.Metadata);
             FinishWithResult(Result.Ok, result);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             Log.Error(LogTag, $"ActionPrepareHiddenShortcut failed: {ex}");
@@ -593,7 +718,9 @@ public sealed class DummyActivity : Activity
         }
     }
 
-    private async Task<bool> WaitForPackageAvailableAsync(string packageName)
+    private async Task<bool> WaitForPackageAvailableAsync(
+        string packageName,
+        CancellationToken cancellationToken)
     {
         var deadline = DateTimeOffset.UtcNow + PackageAvailabilityWaitTimeout;
         var attempt = 1;
@@ -615,7 +742,7 @@ public sealed class DummyActivity : Activity
                 return false;
             }
 
-            await Task.Delay(PackageAvailabilityRetryDelay);
+            await Task.Delay(PackageAvailabilityRetryDelay, cancellationToken);
             attempt++;
         }
     }
@@ -647,7 +774,10 @@ public sealed class DummyActivity : Activity
         }
     }
 
-    private async Task<string?> TryHidePackageAfterInstallAsync(ComponentName admin, string packageName)
+    private async Task<string?> TryHidePackageAfterInstallAsync(
+        ComponentName admin,
+        string packageName,
+        CancellationToken cancellationToken)
     {
         if (_policyManager is null)
         {
@@ -676,7 +806,7 @@ public sealed class DummyActivity : Activity
                 return hideError ?? $"Android не смог скрыть {packageName} после установки.";
             }
 
-            await Task.Delay(HideAfterInstallRetryDelay);
+            await Task.Delay(HideAfterInstallRetryDelay, cancellationToken);
             attempt++;
         }
     }
@@ -872,7 +1002,7 @@ public sealed class DummyActivity : Activity
         FinishWithResult(Result.Ok);
     }
 
-    private async void ActionWorkAppFrozen()
+    private async Task ActionWorkAppFrozenAsync(CancellationToken cancellationToken)
     {
         if (_isProfileOwner)
         {
@@ -882,12 +1012,14 @@ public sealed class DummyActivity : Activity
 
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var trigger = Intent?.GetStringExtra(AndroidProfileCommandGateway.ExtraTrigger) ?? "work_app_frozen";
             Log.Info(LogTag, $"Work-app frozen event received in parent profile. trigger={trigger}");
 
             // The overlay is already visible from the work-app launch; VPN TempActivity
             // will start without BAL_BLOCK because Android sees a visible non-app window.
             var result = await AndroidVpnAutomationApi.EnableConfiguredVpnAfterWorkFreezeAsync(this, trigger);
+            cancellationToken.ThrowIfCancellationRequested();
             if (result.Succeeded)
             {
                 Log.Info(LogTag, $"Work-app frozen event handled successfully. trigger={trigger}, message={result.Message}");
@@ -897,6 +1029,10 @@ public sealed class DummyActivity : Activity
 
             Log.Warn(LogTag, $"Work-app frozen event handling failed. trigger={trigger}, message={result.Message}");
             FinishWithError(result.Message);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
@@ -975,6 +1111,12 @@ public sealed class DummyActivity : Activity
 
     private void FinishWithResult(Result resultCode, Intent? data = null)
     {
+        if (_finishRequested || _destroyCancellation.IsCancellationRequested)
+        {
+            return;
+        }
+
+        _finishRequested = true;
         Log.Debug(
             LogTag,
             $"Finishing action={Intent?.Action ?? "<none>"} with result={resultCode}, hasData={data is not null}.");
@@ -990,7 +1132,14 @@ public sealed class DummyActivity : Activity
         Finish();
     }
 
-    private async void HandlePackageInstallerCallback(Intent? intent)
+    private void HandlePackageInstallerCallback(Intent? intent) =>
+        RunAction(
+            cancellationToken => HandlePackageInstallerCallbackAsync(intent, cancellationToken),
+            "Android не смог обработать результат установки пакета.");
+
+    private async Task HandlePackageInstallerCallbackAsync(
+        Intent? intent,
+        CancellationToken cancellationToken)
     {
         var status = (PackageInstallStatus)(intent?.Extras?.GetInt(PackageInstaller.ExtraStatus) ?? (int)PackageInstallStatus.Failure);
         var callbackPackage = intent?.GetStringExtra(AndroidCommandContract.ExtraCallbackPackage)
@@ -1026,7 +1175,7 @@ public sealed class DummyActivity : Activity
         {
             if (string.Equals(operation, AndroidCommandContract.PackageInstallerOperationInstall, StringComparison.Ordinal)
                 && !string.IsNullOrWhiteSpace(callbackPackage)
-                && !await WaitForPackageAvailableAsync(callbackPackage))
+                && !await WaitForPackageAvailableAsync(callbackPackage, cancellationToken))
             {
                 FinishWithError($"Android установил {callbackPackage}, но пакет еще не доступен в рабочем профиле.");
                 return;

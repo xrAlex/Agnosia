@@ -4,6 +4,7 @@ public static class AndroidCommandContract
 {
     public const string ResultAppsJson = "apps_json";
     public const string ResultIconPng = "icon_png";
+    public const string ResultIconsBundle = "icons_bundle";
     public const string ResultLogsJson = "logs_json";
     public const string ResultInteractionPackages = "interaction_packages";
     public const string ResultUsageStatsAccess = "usage_stats_access";

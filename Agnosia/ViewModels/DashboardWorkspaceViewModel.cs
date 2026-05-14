@@ -7,6 +7,8 @@ using Agnosia.Services;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Stopwatch = System.Diagnostics.Stopwatch;
+using Trace = System.Diagnostics.Trace;
 
 namespace Agnosia.ViewModels;
 
@@ -15,7 +17,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private const int SearchRefreshDelayMs = 150;
     private const int SettingsSaveDelayMs = 350;
     private const int OnboardingMonitorDelayMs = 1500;
-    private const int VisibleIconPrefetchCount = 18;
+    private const int IconBatchDelayMs = 60;
     private const string StaleApkMessageMarker = "APK изменился";
     private readonly IDashboardPlatformService _dashboardService;
     private readonly IPlatformEventLogReader _platformEventLogReader;
@@ -26,10 +28,15 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private readonly DebouncedAsyncAction _searchRefreshDebouncer;
     private readonly DashboardSettingsSaveCoordinator _settingsSaveCoordinator;
     private readonly SemaphoreSlim _iconLoadGate = new(1, 1);
+    private readonly Lock _iconBatchSync = new();
+    private readonly List<PendingIconLoad> _pendingIconLoads = [];
+    private readonly Dictionary<AppItemKey, AppItemViewModel> _appItemCache = [];
     private readonly ObservableCollection<PermissionItemViewModel> _permissionItems = [];
     private AppItemViewModel[] _visibleApps = [];
     private AppItemViewModel[] _personalApps = [];
     private AppItemViewModel[] _workApps = [];
+    private DashboardSnapshot? _lastProfileSnapshot;
+    private Task? _iconBatchProcessor;
     private bool _initialized;
     private bool _isApplyingSnapshot;
     private bool _isOperationInProgress;
@@ -428,6 +435,14 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         if (value == DashboardSection.Apps)
         {
             _settingsSaveCoordinator.TryStartPendingCatalogRefresh();
+            StartInventoryLoadIfNeeded();
+            return;
+        }
+
+        CancelVisibleIconLoads();
+        if (IsInventoryLoading)
+        {
+            CancelInventoryLoad(updateProgressState: true);
         }
     }
 
@@ -565,6 +580,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         if (!allowDuringOperation && (IsBusy || _isOperationInProgress))
             return;
 
+        var refreshStartedAt = Stopwatch.GetTimestamp();
         CancelInventoryLoad(updateProgressState: true);
         IsBusy = true;
         StatusIsError = false;
@@ -572,16 +588,25 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
         try
         {
+            var profileStartedAt = Stopwatch.GetTimestamp();
             var profileSnapshot = await _dashboardService.LoadDashboardProfileAsync();
+            TracePerf("RefreshProfile", profileStartedAt);
+            _lastProfileSnapshot = profileSnapshot;
             ApplyProfileSnapshot(profileSnapshot);
             HasLoadedSnapshot = true;
             StatusMessage = IsSupported
                 ? "Updated"
                 : "NotSupported";
 
-            if (IsDashboardVisible)
+            if (IsDashboardVisible && SelectedSection == DashboardSection.Apps)
             {
                 StartInventoryLoad(profileSnapshot);
+            }
+            else if (IsDashboardVisible)
+            {
+                HasLoadedInventory = false;
+                IsInventoryLoading = false;
+                CancelVisibleIconLoads();
             }
             else
             {
@@ -607,6 +632,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             {
                 IsBusy = false;
                 _settingsSaveCoordinator.TryStartQueued();
+                TracePerf("RefreshDashboard", refreshStartedAt);
             }
         }
     }
@@ -619,6 +645,19 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         StatusIsError = false;
         StatusMessage = "LoadingApps";
         _ = LoadInventoryForGenerationAsync(profileSnapshot, generation, inventoryCancellation);
+    }
+
+    private void StartInventoryLoadIfNeeded()
+    {
+        if (!IsDashboardVisible
+            || HasLoadedInventory
+            || IsInventoryLoading
+            || _lastProfileSnapshot is null)
+        {
+            return;
+        }
+
+        StartInventoryLoad(_lastProfileSnapshot);
     }
 
     private int BeginInventoryLoad(out CancellationTokenSource inventoryCancellation)
@@ -651,9 +690,14 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     {
         try
         {
+            var loadStartedAt = Stopwatch.GetTimestamp();
             var inventory = await _dashboardService
                 .LoadAppInventoryAsync(profileSnapshot, inventoryCancellation.Token)
                 .ConfigureAwait(false);
+            TracePerf(
+                "LoadInventory",
+                loadStartedAt,
+                $"personal={inventory.PersonalApps.Count}; work={inventory.WorkApps.Count}");
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -744,7 +788,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         if (!LoggingEnabled)
             return;
         
-        await ReloadPlatformLogsAsync();
+        await ReloadPlatformLogsAsync(force: true);
         IsLogWindowOpen = true;
     }
 
@@ -985,14 +1029,98 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     internal async Task<byte[]?> LoadAppIconPngAsync(AppSnapshot snapshot, CancellationToken cancellationToken)
     {
-        await _iconLoadGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        if (snapshot.IconPng is { Length: > 0 } existingIcon)
+        {
+            return existingIcon;
+        }
+
+        return await QueueIconLoadAsync(snapshot, cancellationToken).ConfigureAwait(false);
+    }
+
+    private Task<byte[]?> QueueIconLoadAsync(AppSnapshot snapshot, CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Task.FromCanceled<byte[]?>(cancellationToken);
+        }
+
+        var pendingIconLoad = new PendingIconLoad(snapshot, cancellationToken);
+        lock (_iconBatchSync)
+        {
+            _pendingIconLoads.Add(pendingIconLoad);
+            _iconBatchProcessor ??= ProcessIconLoadBatchesAsync();
+        }
+
+        return pendingIconLoad.Task;
+    }
+
+    private async Task ProcessIconLoadBatchesAsync()
+    {
+        while (true)
+        {
+            await Task.Delay(IconBatchDelayMs).ConfigureAwait(false);
+            PendingIconLoad[] batch;
+            lock (_iconBatchSync)
+            {
+                if (_pendingIconLoads.Count == 0)
+                {
+                    _iconBatchProcessor = null;
+                    return;
+                }
+
+                batch = _pendingIconLoads.ToArray();
+                _pendingIconLoads.Clear();
+            }
+
+            foreach (var completedRequest in batch.Where(request => request.IsCompleted))
+            {
+                completedRequest.Dispose();
+            }
+
+            batch = batch.Where(request => !request.IsCompleted).ToArray();
+            if (batch.Length == 0)
+            {
+                continue;
+            }
+
+            await LoadIconBatchAsync(batch).ConfigureAwait(false);
+        }
+    }
+
+    private async Task LoadIconBatchAsync(PendingIconLoad[] batch)
+    {
+        var snapshots = batch
+            .Select(request => request.Snapshot)
+            .GroupBy(snapshot => (snapshot.Profile, snapshot.PackageName))
+            .Select(group => group.First())
+            .ToArray();
+        var startedAt = Stopwatch.GetTimestamp();
+
+        IReadOnlyDictionary<string, byte[]?> icons;
+        await _iconLoadGate.WaitAsync().ConfigureAwait(false);
         try
         {
-            return await _dashboardService.LoadAppIconAsync(snapshot, cancellationToken).ConfigureAwait(false);
+            icons = await _dashboardService.LoadAppIconsAsync(snapshots).ConfigureAwait(false);
+            TracePerf("IconBatchLoad", startedAt, $"requested={snapshots.Length}; completed={icons.Count}");
+        }
+        catch (Exception exception)
+        {
+            foreach (var request in batch)
+            {
+                request.TrySetException(exception);
+            }
+
+            return;
         }
         finally
         {
             _iconLoadGate.Release();
+        }
+
+        foreach (var request in batch)
+        {
+            icons.TryGetValue(request.Snapshot.PackageName, out var iconPng);
+            request.TrySetResult(iconPng);
         }
     }
 
@@ -1069,6 +1197,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private void ApplySnapshot(DashboardSnapshot snapshot)
     {
+        _lastProfileSnapshot = snapshot;
         ApplyProfileSnapshot(snapshot);
         ApplyInventorySnapshot(new DashboardAppInventorySnapshot(snapshot.PersonalApps, snapshot.WorkApps));
         HasLoadedSnapshot = true;
@@ -1136,18 +1265,21 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private void ApplyInventorySnapshot(DashboardAppInventorySnapshot snapshot)
     {
-        var previousPersonalApps = _personalApps;
-        var previousWorkApps = _workApps;
-        _personalApps = snapshot.PersonalApps.Select(app => new AppItemViewModel(this, app)).ToArray();
-        _workApps = snapshot.WorkApps.Select(app => new AppItemViewModel(this, app)).ToArray();
+        var startedAt = Stopwatch.GetTimestamp();
+        var retainedKeys = new HashSet<AppItemKey>();
+        _personalApps = UpdateAppItems(snapshot.PersonalApps, retainedKeys);
+        _workApps = UpdateAppItems(snapshot.WorkApps, retainedKeys);
+        DisposeStaleAppItems(retainedKeys);
 
         OnPropertyChanged(nameof(PersonalAppsCount));
         OnPropertyChanged(nameof(WorkAppsCount));
         NotifyOverviewMetricsChanged();
 
         RefreshVisibleApps();
-        DisposeAppItems(previousPersonalApps);
-        DisposeAppItems(previousWorkApps);
+        TracePerf(
+            "ApplyInventory",
+            startedAt,
+            $"personal={_personalApps.Length}; work={_workApps.Length}; cached={_appItemCache.Count}");
     }
 
     private void RefreshVisibleApps()
@@ -1185,14 +1317,11 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private void SetVisibleApps(AppItemViewModel[] visibleApps)
     {
+        var startedAt = Stopwatch.GetTimestamp();
         _visibleApps = visibleApps;
         OnPropertyChanged(nameof(VisibleApps));
         OnPropertyChanged(nameof(IsEmptyStateVisible));
-
-        foreach (var app in visibleApps.Take(VisibleIconPrefetchCount))
-        {
-            app.RequestIconLoad();
-        }
+        TracePerf("SetVisibleApps", startedAt, $"count={visibleApps.Length}; profile={SelectedProfile}");
     }
 
     private void CancelPendingSearchRefresh()
@@ -1456,15 +1585,17 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(LogLines));
     }
 
-    private async Task ReloadPlatformLogsAsync()
+    private async Task ReloadPlatformLogsAsync(bool force = false)
     {
-        if (!LoggingEnabled)
+        if (!LoggingEnabled || (!force && !IsLogWindowOpen))
         {
             return;
         }
 
+        var startedAt = Stopwatch.GetTimestamp();
         var logs = await _platformEventLogReader.LoadRecentLogsAsync();
         ImportPlatformLogs(logs);
+        TracePerf("ReloadPlatformLogs", startedAt, $"count={logs.Count}");
     }
 
     private async Task ReloadPermissionsAsync()
@@ -1514,11 +1645,46 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             ?.InformationalVersion
             .Split('+')[0] ?? "0.9";
 
-    private static void DisposeAppItems(IEnumerable<AppItemViewModel> apps)
+    private AppItemViewModel[] UpdateAppItems(
+        IReadOnlyList<AppSnapshot> snapshots,
+        HashSet<AppItemKey> retainedKeys)
     {
-        foreach (var app in apps)
+        var result = new AppItemViewModel[snapshots.Count];
+        for (var index = 0; index < snapshots.Count; index++)
         {
-            app.Dispose();
+            var snapshot = snapshots[index];
+            var key = new AppItemKey(snapshot.Profile, snapshot.PackageName);
+            retainedKeys.Add(key);
+            if (_appItemCache.TryGetValue(key, out var app))
+            {
+                app.ApplySnapshot(snapshot);
+            }
+            else
+            {
+                app = new AppItemViewModel(this, snapshot);
+                _appItemCache[key] = app;
+            }
+
+            result[index] = app;
+        }
+
+        return result;
+    }
+
+    private void DisposeStaleAppItems(HashSet<AppItemKey> retainedKeys)
+    {
+        foreach (var staleKey in _appItemCache.Keys.Where(key => !retainedKeys.Contains(key)).ToArray())
+        {
+            _appItemCache[staleKey].Dispose();
+            _appItemCache.Remove(staleKey);
+        }
+    }
+
+    private void CancelVisibleIconLoads()
+    {
+        foreach (var app in _visibleApps)
+        {
+            app.CancelIconLoad();
         }
     }
 
@@ -1529,4 +1695,55 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(HiddenWorkAppsCount));
         OnPropertyChanged(nameof(InteractionAccessAppsCount));
     }
+
+    private static void TracePerf(string operation, long startedAt, string? detail = null)
+    {
+        var elapsedMs = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
+        var suffix = string.IsNullOrWhiteSpace(detail) ? string.Empty : $"; {detail}";
+        Trace.WriteLine($"AgnosiaPerf {operation} elapsedMs={elapsedMs:0.0}{suffix}");
+    }
+
+    private sealed class PendingIconLoad : IDisposable
+    {
+        private readonly TaskCompletionSource<byte[]?> _completion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly CancellationToken _cancellationToken;
+        private readonly CancellationTokenRegistration _cancellationRegistration;
+
+        public PendingIconLoad(AppSnapshot snapshot, CancellationToken cancellationToken)
+        {
+            Snapshot = snapshot;
+            _cancellationToken = cancellationToken;
+            _cancellationRegistration = cancellationToken.CanBeCanceled
+                ? cancellationToken.Register(static state =>
+                    ((PendingIconLoad)state!)._completion.TrySetCanceled(
+                        ((PendingIconLoad)state)._cancellationToken), this)
+                : default;
+        }
+
+        public AppSnapshot Snapshot { get; }
+
+        public Task<byte[]?> Task => _completion.Task;
+
+        public bool IsCompleted => _completion.Task.IsCompleted;
+
+        public void TrySetResult(byte[]? iconPng)
+        {
+            _completion.TrySetResult(iconPng);
+            Dispose();
+        }
+
+        public void TrySetException(Exception exception)
+        {
+            _completion.TrySetException(exception);
+            Dispose();
+        }
+
+        public void Dispose()
+        {
+            _cancellationRegistration.Dispose();
+        }
+    }
+
+    private readonly record struct AppItemKey(ProfileKind Profile, string PackageName);
 }

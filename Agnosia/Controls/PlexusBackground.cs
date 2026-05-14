@@ -49,8 +49,13 @@ public sealed class PlexusBackground : Control
     private readonly DispatcherTimer _animationTimer;
     private readonly List<PlexusNode> _nodes = [];
     private readonly Random _random = new();
+    private RenderBrushCacheKey? _renderBrushCacheKey;
+    private Pen? _linePen;
+    private IBrush? _glowRenderBrush;
+    private IBrush? _nodeRenderBrush;
     private DateTime _lastFrameUtc;
     private Size _surfaceSize;
+    private bool _isAttached;
 
     static PlexusBackground()
     {
@@ -77,12 +82,17 @@ public sealed class PlexusBackground : Control
 
         AttachedToVisualTree += (_, _) =>
         {
+            _isAttached = true;
             _lastFrameUtc = DateTime.UtcNow;
             EnsureNodes(forceReset: _nodes.Count == 0);
-            _animationTimer.Start();
+            UpdateTimerState();
         };
 
-        DetachedFromVisualTree += (_, _) => _animationTimer.Stop();
+        DetachedFromVisualTree += (_, _) =>
+        {
+            _isAttached = false;
+            _animationTimer.Stop();
+        };
     }
 
     public IBrush? LineBrush
@@ -143,9 +153,24 @@ public sealed class PlexusBackground : Control
             return;
         }
 
+        if (change.Property == IsVisibleProperty)
+        {
+            UpdateTimerState();
+            return;
+        }
+
         if (change.Property == ParticleCountProperty)
         {
             EnsureNodes(forceReset: true);
+        }
+
+        if (change.Property == LineBrushProperty
+            || change.Property == NodeBrushProperty
+            || change.Property == GlowBrushProperty
+            || change.Property == LineBrightnessProperty
+            || change.Property == NodeBrightnessProperty)
+        {
+            _renderBrushCacheKey = null;
         }
     }
 
@@ -165,12 +190,17 @@ public sealed class PlexusBackground : Control
         var nodeRadius = Math.Max(0.8, NodeRadius);
         var lineBrightness = Math.Clamp(LineBrightness, 0, 4);
         var nodeBrightness = Math.Clamp(NodeBrightness, 0, 4);
+        EnsureRenderBrushes(lineColor, nodeColor, glowColor, lineBrightness, nodeBrightness);
         var bounds = Bounds.Size;
         var nodeCount = _nodes.Count;
         var connectionDistanceSquared = connectionDistance * connectionDistance;
-        var linePen = new Pen(new SolidColorBrush(ScaleColorBrightness(lineColor, lineBrightness)), 1.15);
-        var glowBrush = new SolidColorBrush(ScaleColorBrightness(glowColor, nodeBrightness));
-        var nodeBrush = new SolidColorBrush(ScaleColorBrightness(nodeColor, nodeBrightness));
+        var linePen = _linePen;
+        var glowBrush = _glowRenderBrush;
+        var nodeBrush = _nodeRenderBrush;
+        if (linePen is null || glowBrush is null || nodeBrush is null)
+        {
+            return;
+        }
 
         for (var index = 0; index < nodeCount; index++)
         {
@@ -231,6 +261,12 @@ public sealed class PlexusBackground : Control
 
     private void OnAnimationFrame(object? sender, EventArgs e)
     {
+        if (!IsVisible)
+        {
+            _animationTimer.Stop();
+            return;
+        }
+
         EnsureNodes();
 
         if (_nodes.Count == 0 || Bounds.Width <= 1 || Bounds.Height <= 1)
@@ -266,6 +302,40 @@ public sealed class PlexusBackground : Control
         }
 
         InvalidateVisual();
+    }
+
+    private void UpdateTimerState()
+    {
+        if (!_isAttached || !IsVisible)
+        {
+            _animationTimer.Stop();
+            return;
+        }
+
+        if (!_animationTimer.IsEnabled)
+        {
+            _lastFrameUtc = DateTime.UtcNow;
+            _animationTimer.Start();
+        }
+    }
+
+    private void EnsureRenderBrushes(
+        Color lineColor,
+        Color nodeColor,
+        Color glowColor,
+        double lineBrightness,
+        double nodeBrightness)
+    {
+        var cacheKey = new RenderBrushCacheKey(lineColor, nodeColor, glowColor, lineBrightness, nodeBrightness);
+        if (_renderBrushCacheKey == cacheKey)
+        {
+            return;
+        }
+
+        _renderBrushCacheKey = cacheKey;
+        _linePen = new Pen(new SolidColorBrush(ScaleColorBrightness(lineColor, lineBrightness)), 1.15);
+        _glowRenderBrush = new SolidColorBrush(ScaleColorBrightness(glowColor, nodeBrightness));
+        _nodeRenderBrush = new SolidColorBrush(ScaleColorBrightness(nodeColor, nodeBrightness));
     }
 
     private void EnsureNodes(bool forceReset = false)
@@ -381,4 +451,11 @@ public sealed class PlexusBackground : Control
 
         public double PulseSpeed { get; set; }
     }
+
+    private readonly record struct RenderBrushCacheKey(
+        Color LineColor,
+        Color NodeColor,
+        Color GlowColor,
+        double LineBrightness,
+        double NodeBrightness);
 }

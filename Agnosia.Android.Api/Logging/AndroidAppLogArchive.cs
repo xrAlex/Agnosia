@@ -7,12 +7,17 @@ namespace Agnosia.Android.Api;
 public static class AndroidAppLogArchive
 {
     private const int MaxEntries = 200;
+    private const string PerfLogTag = "AgnosiaPerf";
 
     private static readonly Lock Sync = new();
+    private static readonly TimeSpan FlushDelay = TimeSpan.FromSeconds(1);
+    private static readonly List<AppLogEntry> PendingEntries = [];
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
+    private static Context? FlushContext;
+    private static bool FlushScheduled;
 
     public static void Append(Context context, AppLogLevel level, string tag, string message)
     {
@@ -22,6 +27,7 @@ public static class AndroidAppLogArchive
         }
 
         AgnosiaRuntime.Initialize(context);
+        var appContext = context.ApplicationContext ?? context;
         lock (Sync)
         {
             if (!LocalStorageManager.Instance.GetBoolean(StorageKeys.LoggingEnabled, true))
@@ -29,17 +35,16 @@ public static class AndroidAppLogArchive
                 return;
             }
 
-            var entries = LoadCore();
-            entries.Add(new AppLogEntry(
+            PendingEntries.Add(new AppLogEntry(
                 Guid.NewGuid().ToString("N"),
                 DateTimeOffset.Now,
-                ResolveProfile(context),
+                ResolveProfile(appContext),
                 level,
                 tag,
                 message));
 
-            Trim(entries);
-            SaveCore(entries);
+            Trim(PendingEntries);
+            EnsureFlushScheduledLocked(appContext);
         }
     }
 
@@ -48,6 +53,7 @@ public static class AndroidAppLogArchive
         AgnosiaRuntime.Initialize(context);
         lock (Sync)
         {
+            FlushPendingLocked(context.ApplicationContext ?? context);
             return LoadCore();
         }
     }
@@ -57,8 +63,70 @@ public static class AndroidAppLogArchive
         AgnosiaRuntime.Initialize(context);
         lock (Sync)
         {
+            PendingEntries.Clear();
             LocalStorageManager.Instance.Remove(StorageKeys.LogEntries);
         }
+    }
+
+    private static void EnsureFlushScheduledLocked(Context context)
+    {
+        FlushContext = context;
+        if (FlushScheduled)
+        {
+            return;
+        }
+
+        FlushScheduled = true;
+        _ = FlushAfterDelayAsync();
+    }
+
+    private static async Task FlushAfterDelayAsync()
+    {
+        try
+        {
+            await Task.Delay(FlushDelay).ConfigureAwait(false);
+            lock (Sync)
+            {
+                FlushPendingLocked(FlushContext);
+                FlushScheduled = false;
+            }
+        }
+        catch (Exception exception)
+        {
+            global::Android.Util.Log.Warn(PerfLogTag, $"LogAppend flush failed: {exception.Message}");
+            lock (Sync)
+            {
+                FlushScheduled = false;
+            }
+        }
+    }
+
+    private static void FlushPendingLocked(Context? context)
+    {
+        if (context is not null)
+        {
+            AgnosiaRuntime.Initialize(context);
+        }
+
+        if (PendingEntries.Count == 0)
+        {
+            return;
+        }
+
+        if (!LocalStorageManager.Instance.GetBoolean(StorageKeys.LoggingEnabled, true))
+        {
+            PendingEntries.Clear();
+            return;
+        }
+
+        var startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+        var entries = LoadCore();
+        entries.AddRange(PendingEntries);
+        PendingEntries.Clear();
+        Trim(entries);
+        SaveCore(entries);
+        var elapsedMs = System.Diagnostics.Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
+        global::Android.Util.Log.Debug(PerfLogTag, $"LogAppend flush elapsedMs={elapsedMs:0.0}; count={entries.Count}");
     }
 
     private static List<AppLogEntry> LoadCore()

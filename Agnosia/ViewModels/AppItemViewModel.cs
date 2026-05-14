@@ -3,6 +3,8 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Stopwatch = System.Diagnostics.Stopwatch;
+using Trace = System.Diagnostics.Trace;
 
 namespace Agnosia.ViewModels;
 
@@ -20,7 +22,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         Snapshot = snapshot;
     }
 
-    public AppSnapshot Snapshot { get; }
+    public AppSnapshot Snapshot { get; private set; }
 
     public string PackageName => Snapshot.PackageName;
 
@@ -151,6 +153,66 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         _icon = null;
     }
 
+    public void ApplySnapshot(AppSnapshot snapshot)
+    {
+        if (!string.Equals(Snapshot.PackageName, snapshot.PackageName, StringComparison.Ordinal)
+            || Snapshot.Profile != snapshot.Profile)
+        {
+            throw new InvalidOperationException("App item identity cannot be changed.");
+        }
+
+        var previous = Snapshot;
+        Snapshot = snapshot;
+
+        if (!ByteArraysEqual(previous.IconPng, snapshot.IconPng))
+        {
+            ResetIcon();
+        }
+
+        if (!string.Equals(previous.Label, snapshot.Label, StringComparison.Ordinal))
+        {
+            OnPropertyChanged(nameof(Label));
+            OnPropertyChanged(nameof(Monogram));
+        }
+
+        if (previous.IsHidden != snapshot.IsHidden)
+        {
+            OnPropertyChanged(nameof(IsHidden));
+            OnPropertyChanged(nameof(StatusTagLabel));
+            OnPropertyChanged(nameof(HasStatusTag));
+            OnPropertyChanged(nameof(ShowSecondaryRow));
+            OnPropertyChanged(nameof(LaunchLabel));
+            OnPropertyChanged(nameof(FreezeLabel));
+        }
+
+        if (previous.InteractionAllowed != snapshot.InteractionAllowed)
+        {
+            OnPropertyChanged(nameof(InteractionAllowed));
+            OnPropertyChanged(nameof(InteractionLabel));
+        }
+
+        if (previous.IsSystem != snapshot.IsSystem)
+        {
+            OnPropertyChanged(nameof(CanClone));
+            OnPropertyChanged(nameof(CanMoveToWork));
+            OnPropertyChanged(nameof(CanUninstall));
+        }
+
+        if (previous.CanLaunch != snapshot.CanLaunch)
+        {
+            OnPropertyChanged(nameof(ShowLaunch));
+        }
+
+        if (previous.IsInstalled != snapshot.IsInstalled)
+        {
+            OnPropertyChanged(nameof(StatusTagLabel));
+            OnPropertyChanged(nameof(HasStatusTag));
+            OnPropertyChanged(nameof(ShowSecondaryRow));
+        }
+
+        NotifyCommandStateChanged();
+    }
+
     public void RequestIconLoad()
     {
         if (_disposed || _iconLoadRequested)
@@ -163,8 +225,21 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         _ = LoadIconAsync(_iconLoadCancellation);
     }
 
+    public void CancelIconLoad()
+    {
+        if (_icon is not null)
+        {
+            return;
+        }
+
+        _iconLoadCancellation?.Cancel();
+        _iconLoadCancellation = null;
+        _iconLoadRequested = false;
+    }
+
     private async Task LoadIconAsync(CancellationTokenSource iconLoadCancellation)
     {
+        var startedAt = Stopwatch.GetTimestamp();
         Bitmap? decodedIcon = null;
         try
         {
@@ -211,12 +286,56 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         }
         finally
         {
+            TracePerf("IconLoad", startedAt, $"profile={Snapshot.Profile}; package={Snapshot.PackageName}");
             iconLoadCancellation.Dispose();
             if (ReferenceEquals(_iconLoadCancellation, iconLoadCancellation))
             {
                 _iconLoadCancellation = null;
             }
         }
+    }
+
+    private void ResetIcon()
+    {
+        _iconLoadCancellation?.Cancel();
+        _iconLoadCancellation = null;
+        _iconLoadRequested = false;
+        Icon = null;
+        OnPropertyChanged(nameof(HasIcon));
+        OnPropertyChanged(nameof(ShowMonogram));
+    }
+
+    private void NotifyCommandStateChanged()
+    {
+        CloneCommand.NotifyCanExecuteChanged();
+        MoveToWorkCommand.NotifyCanExecuteChanged();
+        UninstallCommand.NotifyCanExecuteChanged();
+        ToggleFrozenCommand.NotifyCanExecuteChanged();
+        ForceFreezeCommand.NotifyCanExecuteChanged();
+        CreateShortcutCommand.NotifyCanExecuteChanged();
+        LaunchCommand.NotifyCanExecuteChanged();
+        ToggleInteractionAccessCommand.NotifyCanExecuteChanged();
+    }
+
+    private static void TracePerf(string operation, long startedAt, string detail)
+    {
+        var elapsedMs = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
+        Trace.WriteLine($"AgnosiaPerf {operation} elapsedMs={elapsedMs:0.0}; {detail}");
+    }
+
+    private static bool ByteArraysEqual(byte[]? left, byte[]? right)
+    {
+        if (ReferenceEquals(left, right))
+        {
+            return true;
+        }
+
+        if (left is null || right is null || left.Length != right.Length)
+        {
+            return false;
+        }
+
+        return left.AsSpan().SequenceEqual(right);
     }
 
     private static string ResolveStatusTagLabel(AppSnapshot snapshot)

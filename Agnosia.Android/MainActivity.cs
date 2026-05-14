@@ -26,12 +26,17 @@ namespace Agnosia.Android;
 public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
 {
     private const string LogTag = "AgnosiaMainActivity";
+    private const int MaxPendingActivityStarts = 8;
+    private const int MaxActivityStartsPerDrain = 2;
+    private const long PendingDrainDelayMilliseconds = 150;
     private static readonly Lock RequestSync = new();
     private static readonly Dictionary<int, TaskCompletionSource<AndroidActivityResult>> PendingResults = [];
     private static readonly Queue<ActivityStartRequest> PendingActivityStarts = [];
     private static int _nextRequestCode = 4100;
     private static bool _startupMitigationsApplied;
     private bool _isResumed;
+    private bool _pendingDrainScheduled;
+    private long _lastPublishedMoveAtMilliseconds;
 
     private static MainActivity? Current { get; set; }
 
@@ -162,7 +167,7 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
 
     public override bool DispatchTouchEvent(MotionEvent? ev)
     {
-        PublishTouchEvent(ev, Content);
+        PublishTouchEvent(ev);
         return base.DispatchTouchEvent(ev);
     }
 
@@ -222,14 +227,25 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         Window.Attributes = attributes;
     }
 
-    private static void PublishTouchEvent(MotionEvent? ev, object? content)
+    private void PublishTouchEvent(MotionEvent? ev)
     {
         if (ev is null)
         {
             return;
         }
 
-        var scaling = content is Control mainView
+        if (ev.ActionMasked == MotionEventActions.Move)
+        {
+            var now = System.Environment.TickCount64;
+            if (now - _lastPublishedMoveAtMilliseconds < 32)
+            {
+                return;
+            }
+
+            _lastPublishedMoveAtMilliseconds = now;
+        }
+
+        var scaling = Content is Control mainView
             ? TopLevel.GetTopLevel(mainView)?.RenderScaling ?? 1
             : 1;
 
@@ -354,7 +370,9 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
 
     private void DrainPendingActivityStarts()
     {
-        while (_isResumed)
+        _pendingDrainScheduled = false;
+        var drained = 0;
+        while (_isResumed && drained < MaxActivityStartsPerDrain)
         {
             ActivityStartRequest request;
             lock (RequestSync)
@@ -369,10 +387,16 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
             }
 
             StartActivityForResultRequest(request);
+            drained++;
+        }
+
+        if (_isResumed && HasPendingActivityStarts())
+        {
+            SchedulePendingActivityDrain();
         }
     }
 
-    private static void QueueActivityStart(ActivityStartRequest request)
+    private void QueueActivityStart(ActivityStartRequest request)
     {
         lock (RequestSync)
         {
@@ -381,10 +405,25 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
                 return;
             }
 
+            if (IsIconCommand(request.Intent))
+            {
+                DropQueuedIconRequestsLocked("coalesced_icon_request");
+            }
+
+            while (PendingActivityStarts.Count >= MaxPendingActivityStarts)
+            {
+                DropOldestPendingActivityStartLocked("pending_start_queue_limit");
+            }
+
             Log.Debug(
                 LogTag,
                 $"Queueing activity start until resume. requestCode={request.RequestCode}, action={request.Intent.Action ?? "<none>"}, pendingStarts={PendingActivityStarts.Count + 1}.");
             PendingActivityStarts.Enqueue(request);
+        }
+
+        if (_isResumed)
+        {
+            SchedulePendingActivityDrain();
         }
     }
 
@@ -417,6 +456,77 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
                 AndroidActivityResultApi.CreateCanceledResult("Android не смог открыть нужный экран или действие."));
         }
     }
+
+    private bool HasPendingActivityStarts()
+    {
+        lock (RequestSync)
+        {
+            return PendingActivityStarts.Count > 0;
+        }
+    }
+
+    private void SchedulePendingActivityDrain()
+    {
+        if (_pendingDrainScheduled)
+        {
+            return;
+        }
+
+        _pendingDrainScheduled = true;
+        var handler = new Handler(Looper.MainLooper ?? throw new InvalidOperationException("Android main looper is unavailable."));
+        handler.PostDelayed(DrainPendingActivityStarts, PendingDrainDelayMilliseconds);
+    }
+
+    private static void DropQueuedIconRequestsLocked(string reason)
+    {
+        if (PendingActivityStarts.Count == 0)
+        {
+            return;
+        }
+
+        var retained = new Queue<ActivityStartRequest>();
+        while (PendingActivityStarts.Count > 0)
+        {
+            var queued = PendingActivityStarts.Dequeue();
+            if (IsIconCommand(queued.Intent))
+            {
+                CancelQueuedActivityStartLocked(queued, reason);
+                continue;
+            }
+
+            retained.Enqueue(queued);
+        }
+
+        while (retained.Count > 0)
+        {
+            PendingActivityStarts.Enqueue(retained.Dequeue());
+        }
+    }
+
+    private static void DropOldestPendingActivityStartLocked(string reason)
+    {
+        if (PendingActivityStarts.Count == 0)
+        {
+            return;
+        }
+
+        var request = PendingActivityStarts.Dequeue();
+        CancelQueuedActivityStartLocked(request, reason);
+    }
+
+    private static void CancelQueuedActivityStartLocked(ActivityStartRequest request, string reason)
+    {
+        PendingResults.Remove(request.RequestCode);
+        Log.Debug(
+            LogTag,
+            $"Dropping queued activity start. requestCode={request.RequestCode}, action={request.Intent.Action ?? "<none>"}, reason={reason}.");
+        request.CompletionSource.TrySetResult(
+            AndroidActivityResultApi.CreateCanceledResult("Android отменил устаревшую фоновую команду."));
+    }
+
+    private static bool IsIconCommand(Intent intent) =>
+        string.Equals(intent.Action, AgnosiaActions.QueryAppIcon, StringComparison.Ordinal)
+        || string.Equals(intent.Action, AgnosiaActions.QueryAppIcons, StringComparison.Ordinal);
 
     Activity IAndroidActivityHost.CurrentActivity => this;
 

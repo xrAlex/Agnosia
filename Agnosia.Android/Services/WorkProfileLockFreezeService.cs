@@ -127,57 +127,13 @@ public sealed class WorkProfileLockFreezeService : Service
             return;
         }
 
-        if (AndroidSystemApi.GetDevicePolicyManager(context) is not { } policyManager)
+        if (HiddenAppSessionMonitorService.CompletePersistedSessionForScreenLock(context))
         {
-            Log.Warn(LogTag, "DevicePolicyManager unavailable; could not freeze work profile apps on screen lock.");
+            Log.Info(LogTag, $"Screen lock freeze completed from active hidden session. trigger={trigger}.");
             return;
         }
 
-        if (context.PackageManager is not { } packageManager)
-        {
-            Log.Warn(LogTag, "PackageManager unavailable; could not enumerate work profile apps on screen lock.");
-            return;
-        }
-
-        var admin = AgnosiaUtilities.GetAdminComponent(context, typeof(AgnosiaDeviceAdminReceiver));
-        var frozenCount = 0;
-        var failedCount = 0;
-        var apps = packageManager.GetInstalledApplications(AndroidSystemApi.GetInstalledApplicationFlags());
-        foreach (var app in apps)
-        {
-            var packageName = app.PackageName;
-            if (!AndroidWorkProfilePackageClassifier.IsUserAppFreezeCandidate(
-                    context,
-                    packageManager,
-                    policyManager,
-                    app,
-                    packageName))
-            {
-                continue;
-            }
-
-            try
-            {
-                var hiddenApplied = policyManager.SetApplicationHidden(admin, packageName, true);
-                if (hiddenApplied || policyManager.IsApplicationHidden(admin, packageName))
-                {
-                    frozenCount++;
-                }
-                else
-                {
-                    failedCount++;
-                    Log.Warn(LogTag, $"Android did not confirm hiding {packageName} on screen lock.");
-                }
-            }
-            catch (Exception exception)
-            {
-                failedCount++;
-                Log.Warn(LogTag, $"Failed to hide {packageName} on screen lock: {exception.Message}");
-            }
-        }
-
-        HiddenAppSessionMonitorService.CompletePersistedSessionForScreenLock(context);
-        Log.Info(LogTag, $"Screen lock freeze completed. trigger={trigger}, frozen={frozenCount}, failed={failedCount}.");
+        Log.Debug(LogTag, $"Screen lock has no active hidden session; skipping full package scan. trigger={trigger}.");
     }
 
     private static void EnableParentVpnAfterScreenLockAsync(Context context, string trigger)

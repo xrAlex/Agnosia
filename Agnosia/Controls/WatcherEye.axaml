@@ -44,13 +44,23 @@
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"
                    Fill="{StaticResource AppAccentBrush}"
-                   Opacity="0.9" />
+                   Opacity="0.9"
+                   RenderTransformOrigin="0.5,0.5">
+            <Ellipse.RenderTransform>
+              <ScaleTransform />
+            </Ellipse.RenderTransform>
+          </Ellipse>
           <Ellipse x:Name="PupilCore"
                    Width="6"
                    Height="6"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"
-                   Fill="{StaticResource AppBackgroundBrush}" />
+                   Fill="{StaticResource AppBackgroundBrush}"
+                   RenderTransformOrigin="0.5,0.5">
+            <Ellipse.RenderTransform>
+              <ScaleTransform />
+            </Ellipse.RenderTransform>
+          </Ellipse>
           <Ellipse x:Name="PupilHighlight"
                    Width="2"
                    Height="2"

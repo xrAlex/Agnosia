@@ -128,6 +128,85 @@ public static class AndroidProfileCommandGateway
         return result.Data.GetByteArrayExtra(AndroidCommandContract.ResultIconPng);
     }
 
+    internal static async Task<IReadOnlyDictionary<string, byte[]?>> LoadAppIconsAsync(
+        AndroidActivityCommandGateway commandRunner,
+        IReadOnlyList<AppSnapshot> apps,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (apps.Count == 0)
+        {
+            return new Dictionary<string, byte[]?>(StringComparer.Ordinal);
+        }
+
+        var icons = new Dictionary<string, byte[]?>(StringComparer.Ordinal);
+        var personalApps = apps.Where(app => app.Profile == ProfileKind.Personal).ToArray();
+        var workApps = apps.Where(app => app.Profile == ProfileKind.Work).ToArray();
+
+        if (personalApps.Length > 0)
+        {
+            var personalIcons = await LoadLocalAppIconsAsync(
+                    commandRunner.CurrentActivity,
+                    personalApps.Select(app => app.PackageName).Distinct(StringComparer.Ordinal).ToArray(),
+                    cancellationToken)
+                .ConfigureAwait(false);
+            foreach (var (packageName, iconPng) in personalIcons)
+            {
+                icons[packageName] = iconPng;
+            }
+        }
+
+        if (workApps.Length > 0)
+        {
+            var packageNames = workApps
+                .Select(app => app.PackageName)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            var intent = new Intent(AgnosiaActions.QueryAppIcons);
+            intent.PutExtra(ExtraPackages, packageNames);
+            var result = await commandRunner.StartActivityForResultAsync(
+                    intent,
+                    useWorkProfile: true,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (result.ResultCode != Result.Ok || result.Data is null)
+            {
+                Log.Warn(LogTag, $"Failed to query {packageNames.Length} work app icons.");
+                foreach (var packageName in packageNames)
+                {
+                    icons.TryAdd(packageName, null);
+                }
+            }
+            else
+            {
+                var bundle = result.Data.GetBundleExtra(AndroidCommandContract.ResultIconsBundle);
+                foreach (var packageName in packageNames)
+                {
+                    icons[packageName] = bundle?.GetByteArray(packageName);
+                }
+            }
+        }
+
+        return icons;
+    }
+
+    internal static async Task<IReadOnlyList<string>> QueryWorkCrossProfilePackagesAsync(
+        AndroidActivityCommandGateway commandRunner,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandRunner.StartActivityForResultAsync(
+            new Intent(AgnosiaActions.QueryCrossProfilePackages),
+            useWorkProfile: true,
+            cancellationToken);
+        if (result.ResultCode != Result.Ok || result.Data is null)
+        {
+            Log.Warn(LogTag, "Failed to query work cross-profile packages through the profile activity command.");
+            return [];
+        }
+
+        return result.Data.GetStringArrayExtra(AndroidCommandContract.ResultInteractionPackages) ?? [];
+    }
+
     internal static async Task<IReadOnlyList<AppLogEntry>> QueryWorkLogsAsync(
         AndroidActivityCommandGateway commandRunner,
         CancellationToken cancellationToken)
@@ -336,6 +415,37 @@ public static class AndroidProfileCommandGateway
                 : null;
         }, cancellationToken);
 
+    private static Task<IReadOnlyDictionary<string, byte[]?>> LoadLocalAppIconsAsync(
+        Context context,
+        IReadOnlyList<string> packageNames,
+        CancellationToken cancellationToken) =>
+        Task.Run<IReadOnlyDictionary<string, byte[]?>>(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var icons = new Dictionary<string, byte[]?>(StringComparer.Ordinal);
+            if (context.PackageManager is not { } packageManager)
+            {
+                foreach (var packageName in packageNames)
+                {
+                    icons[packageName] = null;
+                }
+
+                return icons;
+            }
+
+            foreach (var packageName in packageNames)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                icons[packageName] = AndroidAppInventoryApi.LoadAppIconPng(
+                    context,
+                    packageManager,
+                    packageName,
+                    cancellationToken);
+            }
+
+            return icons;
+        }, cancellationToken);
+
     private static Intent CreateSystemPackageIntent(string action, string packageName)
     {
         var intent = new Intent(action);
@@ -377,8 +487,6 @@ public static class AndroidProfileCommandGateway
             return;
         }
 
-        Exception? startException = null;
-        using var completed = new ManualResetEventSlim();
         var mainLooper = Looper.MainLooper
             ?? throw new InvalidOperationException("Android main looper is unavailable.");
         new Handler(mainLooper).Post(() =>
@@ -389,19 +497,11 @@ public static class AndroidProfileCommandGateway
             }
             catch (Exception exception)
             {
-                startException = exception;
-            }
-            finally
-            {
-                completed.Set();
+                Log.Warn(
+                    LogTag,
+                    $"Failed to start other-profile activity on main thread. action={intent.Action ?? "<none>"}; error={exception.Message}");
             }
         });
-
-        completed.Wait(TimeSpan.FromSeconds(2));
-        if (startException is not null)
-        {
-            throw startException;
-        }
     }
 
     private static T? DeserializeResult<T>(string? raw, string description)

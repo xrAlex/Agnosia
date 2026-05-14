@@ -6,7 +6,9 @@ public static class AgnosiaActions
     public const string ProfilePing = "agnosia.action.TRY_START_SERVICE";
     public const string QueryApps = "agnosia.action.QUERY_APPS";
     public const string QueryAppIcon = "agnosia.action.QUERY_APP_ICON";
+    public const string QueryAppIcons = "agnosia.action.QUERY_APP_ICONS";
     public const string QueryLogs = "agnosia.action.QUERY_LOGS";
+    public const string QueryCrossProfilePackages = "agnosia.action.QUERY_CROSS_PROFILE_PACKAGES";
     public const string QueryUsageStatsAccess = "agnosia.action.QUERY_USAGE_STATS_ACCESS";
     public const string RequestUsageStatsAccess = "agnosia.action.REQUEST_USAGE_STATS_ACCESS";
     public const string QueryPackageInstallAccess = "agnosia.action.QUERY_PACKAGE_INSTALL_ACCESS";
@@ -31,7 +33,9 @@ public static class AgnosiaActions
         ProfilePing,
         QueryApps,
         QueryAppIcon,
+        QueryAppIcons,
         QueryLogs,
+        QueryCrossProfilePackages,
         QueryUsageStatsAccess,
         RequestUsageStatsAccess,
         QueryPackageInstallAccess,
@@ -60,7 +64,9 @@ public static class AgnosiaActions
         ProfilePing,
         QueryApps,
         QueryAppIcon,
+        QueryAppIcons,
         QueryLogs,
+        QueryCrossProfilePackages,
         QueryUsageStatsAccess,
         RequestUsageStatsAccess,
         QueryPackageInstallAccess,

@@ -27,6 +27,11 @@ public static class AgnosiaLog
     {
         androidLogWriter(tag, message);
 
+        if (level == AppLogLevel.Debug)
+        {
+            return;
+        }
+
         try
         {
             var context = Application.Context;

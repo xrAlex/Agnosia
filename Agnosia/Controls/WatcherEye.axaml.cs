@@ -15,11 +15,8 @@ public partial class WatcherEye : UserControl
     private const double GazeVerticalWeight = 0.58;
     private const double FullGazeDistance = 300;
     private const double PupilFollowStep = 0.2;
-    private const double IrisBaseSize = 14;
     private const double IrisHorizontalSqueeze = 0.24;
     private const double IrisVerticalSqueeze = 0.12;
-    private const double PupilBaseWidth = 6;
-    private const double PupilBaseHeight = 6;
     private const double PupilHorizontalSqueeze = 0.4;
     private const double PupilVerticalSqueeze = 0.15;
     private const double HighlightMaxOffsetX = 0.3;
@@ -35,6 +32,8 @@ public partial class WatcherEye : UserControl
     private readonly DispatcherTimer _returnToUserTimer;
     private readonly TranslateTransform _pupilTransform;
     private readonly TranslateTransform _pupilHighlightTransform;
+    private readonly ScaleTransform _irisDiscScaleTransform;
+    private readonly ScaleTransform _pupilCoreScaleTransform;
     private TopLevel? _pointerSource;
     private bool _isTrackingPointer;
     private bool _isAttachedToPointerEvents;
@@ -49,6 +48,10 @@ public partial class WatcherEye : UserControl
             ?? throw new InvalidOperationException("Watcher pupil transform was not found.");
         _pupilHighlightTransform = PupilHighlight.RenderTransform as TranslateTransform
             ?? throw new InvalidOperationException("Watcher pupil highlight transform was not found.");
+        _irisDiscScaleTransform = IrisDisc.RenderTransform as ScaleTransform
+            ?? throw new InvalidOperationException("Watcher iris scale transform was not found.");
+        _pupilCoreScaleTransform = PupilCore.RenderTransform as ScaleTransform
+            ?? throw new InvalidOperationException("Watcher pupil scale transform was not found.");
 
         _pupilMotionTimer = new DispatcherTimer
         {
@@ -306,19 +309,19 @@ public partial class WatcherEye : UserControl
 
         if (intensity <= 0.01)
         {
-            IrisDisc.Width = IrisBaseSize;
-            IrisDisc.Height = IrisBaseSize;
-            PupilCore.Width = PupilBaseWidth;
-            PupilCore.Height = PupilBaseHeight;
+            _irisDiscScaleTransform.ScaleX = 1;
+            _irisDiscScaleTransform.ScaleY = 1;
+            _pupilCoreScaleTransform.ScaleX = 1;
+            _pupilCoreScaleTransform.ScaleY = 1;
             _pupilHighlightTransform.X = 0;
             _pupilHighlightTransform.Y = 0;
             return;
         }
 
-        IrisDisc.Width = IrisBaseSize * (1 - Math.Abs(gazeX) * IrisHorizontalSqueeze);
-        IrisDisc.Height = IrisBaseSize * (1 - Math.Abs(gazeY) * IrisVerticalSqueeze);
-        PupilCore.Width = PupilBaseWidth * (1 - Math.Abs(gazeX) * PupilHorizontalSqueeze);
-        PupilCore.Height = PupilBaseHeight * (1 - Math.Abs(gazeY) * PupilVerticalSqueeze);
+        _irisDiscScaleTransform.ScaleX = 1 - Math.Abs(gazeX) * IrisHorizontalSqueeze;
+        _irisDiscScaleTransform.ScaleY = 1 - Math.Abs(gazeY) * IrisVerticalSqueeze;
+        _pupilCoreScaleTransform.ScaleX = 1 - Math.Abs(gazeX) * PupilHorizontalSqueeze;
+        _pupilCoreScaleTransform.ScaleY = 1 - Math.Abs(gazeY) * PupilVerticalSqueeze;
         _pupilHighlightTransform.X = -gazeX * HighlightMaxOffsetX;
         _pupilHighlightTransform.Y = -gazeY * HighlightMaxOffsetY;
     }

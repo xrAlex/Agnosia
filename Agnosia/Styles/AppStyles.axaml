@@ -439,8 +439,21 @@
     <Setter Property="SelectionBrush" Value="{StaticResource AppAccentBrush}" />
     <Setter Property="MinHeight" Value="42" />
   </Style>
-  <Style Selector="ItemsControl.apps-list">
+  <Style Selector="ListBox.apps-list">
     <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Margin" Value="0" />
+  </Style>
+  <Style Selector="ListBox.apps-list ListBoxItem">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Margin" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="Transitions">
+      <Transitions />
+    </Setter>
   </Style>
   <Style Selector="ToggleSwitch">
     <Setter Property="Foreground" Value="{StaticResource AppTextPrimaryBrush}" />

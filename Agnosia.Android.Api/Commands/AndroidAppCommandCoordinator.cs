@@ -217,10 +217,9 @@ internal sealed class AndroidAppCommandCoordinator(
             return OperationResult.Success("Для этого приложения контроль доступа всегда отключен политикой Agnosia.");
         }
 
-        var snapshot = await loadDashboardAsync(cancellationToken);
-        var packages = snapshot.WorkApps
-            .Where(item => item.InteractionAllowed)
-            .Select(item => item.PackageName)
+        var packages = (await AndroidProfileCommandGateway
+                .QueryWorkCrossProfilePackagesAsync(commandRunner, cancellationToken)
+                .ConfigureAwait(false))
             .ToHashSet(StringComparer.Ordinal);
 
         if (enabled)

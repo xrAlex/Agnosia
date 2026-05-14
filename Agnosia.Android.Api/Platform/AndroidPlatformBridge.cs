@@ -63,6 +63,11 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         CancellationToken cancellationToken = default) =>
         _dashboardReader.LoadAppIconAsync(app, cancellationToken);
 
+    public Task<IReadOnlyDictionary<string, byte[]?>> LoadAppIconsAsync(
+        IReadOnlyList<AppSnapshot> apps,
+        CancellationToken cancellationToken = default) =>
+        _dashboardReader.LoadAppIconsAsync(apps, cancellationToken);
+
     public Task<IReadOnlyList<AppLogEntry>> LoadRecentLogsAsync(CancellationToken cancellationToken = default) =>
         _dashboardReader.LoadRecentLogsAsync(cancellationToken);
 

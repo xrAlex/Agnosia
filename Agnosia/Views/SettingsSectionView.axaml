@@ -312,7 +312,7 @@
                           Spacing="6">
                 <TextBlock Classes="page-caption"
                            Text="Токен Tunguska Automation" />
-                <TextBox Watermark="automation_token"
+                <TextBox PlaceholderText="automation_token"
                          PasswordChar="*"
                          Text="{Binding TunguskaAutomationToken}" />
               </StackPanel>
