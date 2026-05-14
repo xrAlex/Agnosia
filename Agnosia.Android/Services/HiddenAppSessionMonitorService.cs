@@ -331,6 +331,21 @@ public sealed class HiddenAppSessionMonitorService : Service
                 var inactiveFor = now - inactiveSince.Value;
                 if (inactiveFor >= UserBackgroundHideDelay)
                 {
+                    var finalTaskObservation = ObserveTask(session);
+                    if (finalTaskObservation is not null
+                        && TaskBelongsToTarget(finalTaskObservation, session.PackageName))
+                    {
+                        Log.Info(
+                            LogTag,
+                            $"FreezeCandidate package={session.PackageName}, latestTop={observation.TopPackage ?? "<none>"}, inactiveSince={inactiveSince:O}, inactiveForMs={inactiveFor.TotalMilliseconds:0}, hideDelayMs={UserBackgroundHideDelay.TotalMilliseconds:0}, taskExists=True, taskId={finalTaskObservation.TaskId}, taskBase={finalTaskObservation.BaseActivity ?? "<none>"}, taskTop={finalTaskObservation.TopActivity ?? "<none>"}, decision=keep_alive, reason=target_task_still_present.");
+                        inactiveSince = null;
+                        lastForegroundAt = now;
+                        continue;
+                    }
+
+                    Log.Info(
+                        LogTag,
+                        $"FreezeCandidate package={session.PackageName}, latestTop={observation.TopPackage ?? "<none>"}, inactiveSince={inactiveSince:O}, inactiveForMs={inactiveFor.TotalMilliseconds:0}, hideDelayMs={UserBackgroundHideDelay.TotalMilliseconds:0}, taskExists=False, decision=freeze, reason=confirmed_inactivity_without_target_task.");
                     Log.Info(
                         LogTag,
                         $"Freeze decision: freeze after confirmed inactivity. package={session.PackageName}, top={observation.TopPackage ?? "<none>"}, inactiveSince={inactiveSince:O}, inactiveForMs={inactiveFor.TotalMilliseconds:0}, hideDelayMs={UserBackgroundHideDelay.TotalMilliseconds:0}.");
@@ -394,6 +409,18 @@ public sealed class HiddenAppSessionMonitorService : Service
                 true);
         }
 
+        if (taskObservation is not null
+            && TaskBelongsToTarget(taskObservation, session.PackageName))
+        {
+            return new SessionObservation(
+                true,
+                taskObservation.TopPackage ?? taskObservation.BasePackage,
+                false,
+                null,
+                true,
+                false);
+        }
+
         var observation = new SessionObservation(
             usageObservation?.IsForeground == true,
             usageObservation?.TopPackage,
@@ -403,6 +430,11 @@ public sealed class HiddenAppSessionMonitorService : Service
             false);
         return observation;
     }
+
+    private static bool TaskBelongsToTarget(TaskSessionObservation? observation, string packageName) =>
+        observation is not null
+        && (string.Equals(observation.BasePackage, packageName, StringComparison.Ordinal)
+            || string.Equals(observation.TopPackage, packageName, StringComparison.Ordinal));
 
     private static TimeSpan GetNextPollDelay(
         DateTimeOffset startedAt,
