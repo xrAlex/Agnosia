@@ -24,6 +24,10 @@ public sealed class HiddenAppSessionMonitorService : Service
     private const string LogTag = "AgnosiaHiddenSession";
     private const string PermissionControllerPackage = "com.google.android.permissioncontroller";
     private const string AospPermissionControllerPackage = "com.android.permissioncontroller";
+    private const string SettingsPackage = "com.android.settings";
+    private const string PackageInstallerPackage = "com.android.packageinstaller";
+    private const string GoogleDocumentsUiPackage = "com.google.android.documentsui";
+    private const string AospDocumentsUiPackage = "com.android.documentsui";
     private const string GooglePlayServicesPackage = "com.google.android.gms";
     private const string ActionStart = "agnosia.action.START_HIDDEN_APP_SESSION";
     private const string ExtraPackageName = "packageName";
@@ -52,6 +56,7 @@ public sealed class HiddenAppSessionMonitorService : Service
     private HiddenAppSessionState? _activeSession;
     private ComponentName? _adminComponent;
     private UsageObservationSnapshot? _lastUsageObservationSnapshot;
+    private TaskObservationSnapshot? _lastTaskObservationSnapshot;
     private bool _usageEventsProblemWarningLogged;
 
     public static void StartMonitoring(
@@ -195,6 +200,7 @@ public sealed class HiddenAppSessionMonitorService : Service
         }
 
         _lastUsageObservationSnapshot = null;
+        _lastTaskObservationSnapshot = null;
         _usageEventsProblemWarningLogged = false;
 
         if (previousSession is not null
@@ -280,7 +286,18 @@ public sealed class HiddenAppSessionMonitorService : Service
                 hasSeenTarget = true;
             }
 
-            if (observation.IsForeground)
+            if (observation.IsSystemDelegatedFlow)
+            {
+                if (inactiveSince is not null)
+                {
+                    Log.Debug(LogTag, $"Inactive timer reset because a system delegated flow is active. package={session.PackageName}, previousInactiveSince={inactiveSince:O}, now={now:O}, top={observation.TopPackage ?? "<none>"}.");
+                }
+
+                hasSeenTarget = true;
+                lastForegroundAt = now;
+                inactiveSince = null;
+            }
+            else if (observation.IsForeground)
             {
                 if (inactiveSince is not null)
                 {
@@ -345,18 +362,86 @@ public sealed class HiddenAppSessionMonitorService : Service
     private SessionObservation ObserveSession(HiddenAppSessionState session, DateTimeOffset startedAt, DateTimeOffset now)
     {
         var usageObservation = ObserveUsageEvents(session.PackageName, startedAt, now);
+        var taskObservation = ObserveTask(session);
+
+        if (taskObservation?.IsSystemDelegatedFlow == true)
+        {
+            return new SessionObservation(
+                false,
+                taskObservation.TopPackage,
+                false,
+                null,
+                true,
+                true);
+        }
 
         var observation = new SessionObservation(
             usageObservation?.IsForeground == true,
             usageObservation?.TopPackage,
             usageObservation?.IsForeground == false && usageObservation.ConfirmedInactive,
             usageObservation?.InactiveSince,
-            usageObservation?.SawTargetForeground == true);
+            usageObservation?.SawTargetForeground == true,
+            false);
         return observation;
     }
 
     private bool IsDeviceInteractive() =>
         AndroidSystemApi.GetPowerManager(this)?.IsInteractive != false;
+
+    private TaskSessionObservation? ObserveTask(HiddenAppSessionState session)
+    {
+        if (AndroidSystemApi.GetActivityManager(this) is not { } activityManager)
+        {
+            return null;
+        }
+
+        try
+        {
+            var appTasks = activityManager.AppTasks;
+            if (appTasks is null)
+            {
+                return null;
+            }
+
+            foreach (var appTask in appTasks)
+            {
+#pragma warning disable CA1422
+                if (appTask?.TaskInfo is not { } taskInfo || taskInfo.Id != session.TaskId)
+#pragma warning restore CA1422
+                {
+                    continue;
+                }
+
+                var baseActivity = taskInfo.BaseActivity;
+                var topActivity = taskInfo.TopActivity;
+                var basePackage = baseActivity?.PackageName;
+                var topPackage = topActivity?.PackageName;
+                var topClass = topActivity?.ClassName;
+                var isSystemDelegatedFlow = string.Equals(basePackage, session.PackageName, StringComparison.Ordinal)
+                    && IsSystemDelegatedFlow(topPackage, topClass);
+                var observation = new TaskSessionObservation(
+                    session.TaskId,
+                    basePackage,
+                    baseActivity?.FlattenToShortString(),
+                    topPackage,
+                    topActivity?.FlattenToShortString(),
+                    isSystemDelegatedFlow);
+
+                LogTaskObservationIfChanged(session.PackageName, observation);
+                return observation;
+            }
+
+            LogTaskObservationIfChanged(
+                session.PackageName,
+                new TaskSessionObservation(session.TaskId, null, null, null, null, false));
+            return null;
+        }
+        catch (Exception exception)
+        {
+            Log.Debug(LogTag, $"Task observation unavailable for {session.PackageName}, taskId={session.TaskId}: {exception.Message}");
+            return null;
+        }
+    }
 
     private void CompleteSession(HiddenAppSessionState session, string reason)
     {
@@ -750,6 +835,34 @@ public sealed class HiddenAppSessionMonitorService : Service
             $"Usage observation changed. package={packageName}, reason={reason}, queryBegin={DateTimeOffset.FromUnixTimeMilliseconds(queryBegin):O}, queryEnd={queryEnd:O}, scanned={scannedEvents}, targetEvents={targetEvents}, foregroundEvents={foregroundEvents}, targetUsageEvents=[{FormatTrace(targetUsageEvents)}], latestTarget={latestTargetEventName ?? "<none>"}@{FormatUnixTime(latestTargetEventAt)}, latestForeground={latestForegroundPackage ?? "<none>"}:{latestForegroundEventName ?? "<none>"}@{FormatUnixTime(latestForegroundAt)}, resultForeground={observation.IsForeground}, resultInactive={observation.ConfirmedInactive}, sawTargetForeground={observation.SawTargetForeground}, inactiveSince={FormatTime(observation.InactiveSince)}, top={observation.TopPackage ?? "<none>"}.");
     }
 
+    private void LogTaskObservationIfChanged(string packageName, TaskSessionObservation observation)
+    {
+        var snapshot = new TaskObservationSnapshot(
+            observation.TaskId,
+            observation.BasePackage,
+            observation.BaseActivity,
+            observation.TopPackage,
+            observation.TopActivity,
+            observation.IsSystemDelegatedFlow);
+        if (snapshot.Equals(_lastTaskObservationSnapshot))
+        {
+            return;
+        }
+
+        _lastTaskObservationSnapshot = snapshot;
+        if (observation.IsSystemDelegatedFlow)
+        {
+            Log.Info(
+                LogTag,
+                $"System delegated flow detected, freeze postponed. package={packageName}, taskId={observation.TaskId}, base={observation.BaseActivity ?? "<none>"}, top={observation.TopActivity ?? "<none>"}, decision=keep_alive.");
+            return;
+        }
+
+        Log.Debug(
+            LogTag,
+            $"Task observation changed. package={packageName}, taskId={observation.TaskId}, base={observation.BaseActivity ?? "<none>"}, top={observation.TopActivity ?? "<none>"}, systemDelegatedFlow={observation.IsSystemDelegatedFlow}.");
+    }
+
     private static bool IsUsageForegroundEvent(int eventType) =>
         eventType == UsageEventMoveToForegroundOrActivityResumed;
 
@@ -770,6 +883,22 @@ public sealed class HiddenAppSessionMonitorService : Service
         string.Equals(packageName, PermissionControllerPackage, StringComparison.Ordinal)
         || string.Equals(packageName, AospPermissionControllerPackage, StringComparison.Ordinal)
         || string.Equals(packageName, GooglePlayServicesPackage, StringComparison.Ordinal);
+
+    private static bool IsSystemDelegatedFlow(string? packageName, string? className) =>
+        string.Equals(packageName, SettingsPackage, StringComparison.Ordinal)
+        || string.Equals(packageName, PermissionControllerPackage, StringComparison.Ordinal)
+        || string.Equals(packageName, AospPermissionControllerPackage, StringComparison.Ordinal)
+        || string.Equals(packageName, PackageInstallerPackage, StringComparison.Ordinal)
+        || string.Equals(packageName, GoogleDocumentsUiPackage, StringComparison.Ordinal)
+        || string.Equals(packageName, AospDocumentsUiPackage, StringComparison.Ordinal)
+        || IsKnownSystemDelegatedActivity(className);
+
+    private static bool IsKnownSystemDelegatedActivity(string? className) =>
+        !string.IsNullOrWhiteSpace(className)
+        && (className.Contains("AppNotificationSettingsActivity", StringComparison.Ordinal)
+            || className.Contains("Permission", StringComparison.Ordinal)
+            || className.Contains("PackageInstaller", StringComparison.Ordinal)
+            || className.Contains("DocumentsActivity", StringComparison.Ordinal));
 
     private static string FormatTime(DateTimeOffset? value) =>
         value is null ? "<none>" : value.Value.ToString("O");
@@ -903,7 +1032,8 @@ public sealed class HiddenAppSessionMonitorService : Service
         string? TopPackage,
         bool ConfirmedInactive,
         DateTimeOffset? InactiveSince,
-        bool SawTargetForeground);
+        bool SawTargetForeground,
+        bool IsSystemDelegatedFlow);
 
     private sealed record UsageSessionObservation(
         bool IsForeground,
@@ -911,6 +1041,14 @@ public sealed class HiddenAppSessionMonitorService : Service
         bool SawTargetForeground,
         DateTimeOffset? InactiveSince,
         string? TopPackage);
+
+    private sealed record TaskSessionObservation(
+        int TaskId,
+        string? BasePackage,
+        string? BaseActivity,
+        string? TopPackage,
+        string? TopActivity,
+        bool IsSystemDelegatedFlow);
 
     private sealed record UsageObservationSnapshot(
         bool IsForeground,
@@ -928,4 +1066,12 @@ public sealed class HiddenAppSessionMonitorService : Service
         int TargetEvents,
         int ForegroundEvents,
         string Reason);
+
+    private sealed record TaskObservationSnapshot(
+        int TaskId,
+        string? BasePackage,
+        string? BaseActivity,
+        string? TopPackage,
+        string? TopActivity,
+        bool IsSystemDelegatedFlow);
 }
