@@ -43,7 +43,7 @@ public sealed class HiddenAppSessionMonitorService : Service
     private const string ExtraTaskId = "taskId";
     private const string ExtraStartedAtUnixTimeMilliseconds = "startedAtUnixTimeMilliseconds";
     private const string ScreenLockPersistedReason = "screen_lock_persisted_session";
-    private const string ScreenNonInteractiveReason = "screen_non_interactive";
+    internal const string ScreenNonInteractiveReason = "screen_non_interactive";
     private const string SessionReplacedReason = "session_replaced";
     private const int NotificationId = 0x57C31;
     private const string NotificationChannelId = "agnosia.hidden-app-session";
@@ -59,7 +59,7 @@ public sealed class HiddenAppSessionMonitorService : Service
     private static readonly TimeSpan InitialLaunchGracePeriod = TimeSpan.FromSeconds(45);
     private static readonly TimeSpan InitialFastPollingWindow = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan PostLaunchTransientUiGracePeriod = TimeSpan.FromSeconds(45);
-    private static readonly TimeSpan UserBackgroundHideDelay = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan UserBackgroundHideDelay = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan UsageEventsLookback = TimeSpan.FromMinutes(10);
 
     private readonly Lock _sync = new();
@@ -275,10 +275,15 @@ public sealed class HiddenAppSessionMonitorService : Service
     private async Task MonitorSessionAsync(HiddenAppSessionState session, CancellationToken cancellationToken)
     {
         var startedAt = GetSessionStartedAt(session);
-        var lastForegroundAt = startedAt;
-        DateTimeOffset? inactiveSince = null;
-        var hasSeenTarget = false;
-        var launchObservationWarningLogged = false;
+        var stateMachine = new HiddenAppSessionMonitorStateMachine(
+            startedAt,
+            InitialLaunchGracePeriod,
+            PostLaunchTransientUiGracePeriod,
+            UserBackgroundHideDelay,
+            InitialFastPollingWindow,
+            FastPollInterval,
+            SteadyPollInterval,
+            IdlePollInterval);
         Log.Debug(
             LogTag,
             $"Monitor loop initialized. package={session.PackageName}, taskId={session.TaskId}, startedAt={startedAt:O}.");
@@ -286,121 +291,90 @@ public sealed class HiddenAppSessionMonitorService : Service
         while (!cancellationToken.IsCancellationRequested)
         {
             var now = DateTimeOffset.UtcNow;
-            if (!IsDeviceInteractive())
-            {
-                Log.Info(LogTag,
-                    $"Freeze decision: freeze immediately because device is non-interactive. package={session.PackageName}, now={now:O}.");
-                CompleteSession(session, ScreenNonInteractiveReason);
-                return;
-            }
-
             var pollStartedAt = Stopwatch.GetTimestamp();
             var observation = ObserveSession(session, startedAt, now);
             var pollElapsedMs = Stopwatch.GetElapsedTime(pollStartedAt).TotalMilliseconds;
+            var transition = stateMachine.MoveNext(now, IsDeviceInteractive(), observation);
             Log.Debug(
                 LogTag,
-                $"UsagePoll elapsedMs={pollElapsedMs:0.0}; package={session.PackageName}; foreground={observation.IsForeground}; inactive={observation.ConfirmedInactive}; delegated={observation.IsSystemDelegatedFlow}.");
-            if (observation.SawTargetForeground)
+                $"UsagePoll elapsedMs={pollElapsedMs:0.0}; package={session.PackageName}; foreground={observation.IsForeground}; inactive={observation.ConfirmedInactive}; delegated={observation.IsSystemDelegatedFlow}; statePhase={transition.Phase}; stateDecision={transition.DecisionReason}; stateAction={transition.Action}.");
+            if (transition.TargetForegroundFirstSeen)
             {
-                if (!hasSeenTarget)
+                Log.Debug(LogTag,
+                    $"Target foreground evidence observed. package={session.PackageName}, now={now:O}, top={observation.TopPackage ?? "<none>"}.");
+                session = UpdateLaunchResult(
+                    session,
+                    result => result.WithStage(
+                        AndroidAppLaunchStage.TargetBecameForeground,
+                        $"top={observation.TopPackage ?? "<none>"}"));
+            }
+
+            if (transition.ResetInactiveSince is not null)
+            {
+                Log.Debug(LogTag,
+                    $"Inactive timer reset. package={session.PackageName}, previousInactiveSince={transition.ResetInactiveSince:O}, now={now:O}, top={observation.TopPackage ?? "<none>"}, reason={transition.DecisionReason}.");
+            }
+
+            if (transition.ShouldRaiseLaunchObservationWarning)
+            {
+                Log.Warn(
+                    LogTag,
+                    $"Session {session.PackageName} has not produced foreground evidence yet; keeping it visible instead of hiding on an unconfirmed timeout.");
+            }
+
+            if (transition.ShouldRaiseTransientUiWarning)
+            {
+                Log.Warn(
+                    LogTag,
+                    $"Session {session.PackageName} has no current foreground evidence, but inactivity is not confirmed; keeping it visible.");
+            }
+
+            if (transition.Action == HiddenAppSessionTransitionAction.Complete)
+            {
+                if (transition.CompletionKind == HiddenAppSessionCompletionKind.AfterTargetTaskRecheck
+                    && HasTargetTaskAtCompletion(session, observation, transition, now))
                 {
-                    Log.Debug(LogTag,
-                        $"Target foreground evidence observed. package={session.PackageName}, now={now:O}, top={observation.TopPackage ?? "<none>"}.");
-                    session = UpdateLaunchResult(
-                        session,
-                        result => result.WithStage(
-                            AndroidAppLaunchStage.TargetBecameForeground,
-                            $"top={observation.TopPackage ?? "<none>"}"));
+                    stateMachine.PostponeCompletionBecauseTargetTaskStillPresent(now);
+                    continue;
                 }
 
-                hasSeenTarget = true;
-            }
-
-            if (observation.IsSystemDelegatedFlow)
-            {
-                if (inactiveSince is not null)
-                    Log.Debug(LogTag,
-                        $"Inactive timer reset because a system delegated flow is active. package={session.PackageName}, previousInactiveSince={inactiveSince:O}, now={now:O}, top={observation.TopPackage ?? "<none>"}.");
-
-                hasSeenTarget = true;
-                lastForegroundAt = now;
-                inactiveSince = null;
-            }
-            else if (observation.IsForeground)
-            {
-                if (inactiveSince is not null)
-                    Log.Debug(LogTag,
-                        $"Inactive timer reset because target is foreground again. package={session.PackageName}, previousInactiveSince={inactiveSince:O}, now={now:O}.");
-
-                hasSeenTarget = true;
-                lastForegroundAt = now;
-                inactiveSince = null;
-            }
-            else if (hasSeenTarget && observation.ConfirmedInactive)
-            {
-                inactiveSince ??= observation.InactiveSince ?? now;
-                var inactiveFor = now - inactiveSince.Value;
-                if (inactiveFor >= UserBackgroundHideDelay)
-                {
-                    var finalTaskObservation = ObserveTask(session);
-                    if (finalTaskObservation is not null
-                        && TaskBelongsToTarget(finalTaskObservation, session.PackageName))
-                    {
-                        Log.Info(
-                            LogTag,
-                            $"FreezeCandidate package={session.PackageName}, latestTop={observation.TopPackage ?? "<none>"}, inactiveSince={inactiveSince:O}, inactiveForMs={inactiveFor.TotalMilliseconds:0}, hideDelayMs={UserBackgroundHideDelay.TotalMilliseconds:0}, taskExists=True, taskId={finalTaskObservation.TaskId}, taskBase={finalTaskObservation.BaseActivity ?? "<none>"}, taskTop={finalTaskObservation.TopActivity ?? "<none>"}, decision=keep_alive, reason=target_task_still_present.");
-                        inactiveSince = null;
-                        lastForegroundAt = now;
-                        continue;
-                    }
-
-                    Log.Info(
-                        LogTag,
-                        $"FreezeCandidate package={session.PackageName}, latestTop={observation.TopPackage ?? "<none>"}, inactiveSince={inactiveSince:O}, inactiveForMs={inactiveFor.TotalMilliseconds:0}, hideDelayMs={UserBackgroundHideDelay.TotalMilliseconds:0}, taskExists=False, decision=freeze, reason=confirmed_inactivity_without_target_task.");
-                    Log.Info(
-                        LogTag,
-                        $"Freeze decision: freeze after confirmed inactivity. package={session.PackageName}, top={observation.TopPackage ?? "<none>"}, inactiveSince={inactiveSince:O}, inactiveForMs={inactiveFor.TotalMilliseconds:0}, hideDelayMs={UserBackgroundHideDelay.TotalMilliseconds:0}.");
-                    CompleteSession(session, "user_backgrounded_or_closed");
-                    return;
-                }
-            }
-            else if (!hasSeenTarget)
-            {
-                if (!launchObservationWarningLogged && now - startedAt >= InitialLaunchGracePeriod)
-                {
-                    launchObservationWarningLogged = true;
-                    Log.Warn(
-                        LogTag,
-                        $"Session {session.PackageName} has not produced foreground evidence yet; keeping it visible instead of hiding on an unconfirmed timeout.");
-                }
-            }
-            else
-            {
-                if (inactiveSince is not null)
-                    Log.Debug(LogTag,
-                        $"Inactive timer reset because inactivity is not confirmed. package={session.PackageName}, previousInactiveSince={inactiveSince:O}, now={now:O}, top={observation.TopPackage ?? "<none>"}.");
-
-                inactiveSince = null;
-                if (now - lastForegroundAt >= PostLaunchTransientUiGracePeriod)
-                {
-                    Log.Warn(
-                        LogTag,
-                        $"Session {session.PackageName} has no current foreground evidence, but inactivity is not confirmed; keeping it visible.");
-                    lastForegroundAt = now;
-                }
+                Log.Info(
+                    LogTag,
+                    $"Freeze decision: freeze. package={session.PackageName}, top={observation.TopPackage ?? "<none>"}, inactiveSince={FormatTime(transition.InactiveSince)}, inactiveForMs={transition.InactiveFor?.TotalMilliseconds ?? 0:0}, reason={transition.CompletionReason ?? "<none>"}, decisionReason={transition.DecisionReason}.");
+                CompleteSession(session, transition.CompletionReason ?? "state_machine_completed");
+                return;
             }
 
             try
             {
-                await Task.Delay(
-                    GetNextPollDelay(startedAt, now, hasSeenTarget, inactiveSince, observation),
-                    cancellationToken);
+                await Task.Delay(transition.PollDelay, cancellationToken);
             }
             catch (OperationCanceledException)
             {
                 return;
             }
         }
+    }
+
+    private bool HasTargetTaskAtCompletion(
+        HiddenAppSessionState session,
+        SessionObservation observation,
+        HiddenAppSessionTransition transition,
+        DateTimeOffset now)
+    {
+        var finalTaskObservation = ObserveTask(session);
+        if (finalTaskObservation is null || !TaskBelongsToTarget(finalTaskObservation, session.PackageName))
+        {
+            Log.Info(
+                LogTag,
+                $"FreezeCandidate package={session.PackageName}, latestTop={observation.TopPackage ?? "<none>"}, inactiveSince={FormatTime(transition.InactiveSince)}, inactiveForMs={transition.InactiveFor?.TotalMilliseconds ?? 0:0}, hideDelayMs={UserBackgroundHideDelay.TotalMilliseconds:0}, taskExists=False, decision=freeze, reason=confirmed_inactivity_without_target_task.");
+            return false;
+        }
+
+        Log.Info(
+            LogTag,
+            $"FreezeCandidate package={session.PackageName}, latestTop={observation.TopPackage ?? "<none>"}, inactiveSince={FormatTime(transition.InactiveSince)}, inactiveForMs={transition.InactiveFor?.TotalMilliseconds ?? 0:0}, hideDelayMs={UserBackgroundHideDelay.TotalMilliseconds:0}, taskExists=True, taskId={finalTaskObservation.TaskId}, taskBase={finalTaskObservation.BaseActivity ?? "<none>"}, taskTop={finalTaskObservation.TopActivity ?? "<none>"}, decision=keep_alive, reason=target_task_still_present.");
+        return true;
     }
 
     private SessionObservation ObserveSession(HiddenAppSessionState session, DateTimeOffset startedAt,
@@ -443,20 +417,6 @@ public sealed class HiddenAppSessionMonitorService : Service
         return observation is not null
                && (string.Equals(observation.BasePackage, packageName, StringComparison.Ordinal)
                    || string.Equals(observation.TopPackage, packageName, StringComparison.Ordinal));
-    }
-
-    private static TimeSpan GetNextPollDelay(
-        DateTimeOffset startedAt,
-        DateTimeOffset now,
-        bool hasSeenTarget,
-        DateTimeOffset? inactiveSince,
-        SessionObservation observation)
-    {
-        if (inactiveSince is not null || !hasSeenTarget && now - startedAt <= InitialFastPollingWindow) return FastPollInterval;
-
-        if (observation.IsSystemDelegatedFlow || observation.IsForeground) return SteadyPollInterval;
-
-        return hasSeenTarget ? SteadyPollInterval : IdlePollInterval;
     }
 
     private bool IsDeviceInteractive()
@@ -1067,7 +1027,7 @@ public sealed class HiddenAppSessionMonitorService : Service
             NotificationChannelName,
             NotificationChannelDescription,
             $"Открыто: {session.DisplayName}",
-            "Приложение снова скроется через 30 секунд после сворачивания или закрытия.",
+            $"Приложение снова скроется через {UserBackgroundHideDelay.TotalSeconds:0} секунд после сворачивания или закрытия.",
             ResourceConstant.Drawable.icon);
 
         if (OperatingSystem.IsAndroidVersionAtLeast(34))
@@ -1114,14 +1074,6 @@ public sealed class HiddenAppSessionMonitorService : Service
 
         [JsonIgnore] public PendingIntent? ParentFrozenCallback { get; init; }
     }
-
-    private sealed record SessionObservation(
-        bool IsForeground,
-        string? TopPackage,
-        bool ConfirmedInactive,
-        DateTimeOffset? InactiveSince,
-        bool SawTargetForeground,
-        bool IsSystemDelegatedFlow);
 
     private sealed record UsageSessionObservation(
         bool IsForeground,
