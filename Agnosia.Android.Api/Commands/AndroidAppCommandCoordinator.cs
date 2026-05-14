@@ -1,8 +1,14 @@
+using Agnosia.Android.Api.Gateways;
+using Agnosia.Android.Api.Packages;
+using Agnosia.Android.Api.Permissions;
+using Agnosia.Android.Api.Platform;
+using Agnosia.Android.Api.Storage;
+using Agnosia.Android.Api.Vpn;
 using Agnosia.Models;
 using Android.Content;
-using Log = Agnosia.Android.Api.AgnosiaLog;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Commands;
 
 internal sealed class AndroidAppCommandCoordinator(
     AndroidActivityCommandGateway commandRunner,
@@ -42,7 +48,8 @@ internal sealed class AndroidAppCommandCoordinator(
                         out splitApks))
                 {
                     _ = await loadDashboardAsync(cancellationToken);
-                    return OperationResult.Failure("APK изменился или приложение было обновлено. Обновите список и повторите.");
+                    return OperationResult.Failure(
+                        "APK изменился или приложение было обновлено. Обновите список и повторите.");
                 }
 
                 intent.PutExtra("apk", sourceDirectory);
@@ -50,14 +57,13 @@ internal sealed class AndroidAppCommandCoordinator(
             }
 
             result = await (app.Profile == ProfileKind.Personal
-                ? commandRunner.RunPackageOperationAsync(intent, useWorkProfile: true, cancellationToken, "Приложение скопировано в рабочий профиль.")
-                : commandRunner.RunPackageOperationAsync(intent, useWorkProfile: false, cancellationToken, "Приложение скопировано в личный профиль."));
+                ? commandRunner.RunPackageOperationAsync(intent, true, cancellationToken,
+                    "Приложение скопировано в рабочий профиль.")
+                : commandRunner.RunPackageOperationAsync(intent, false, cancellationToken,
+                    "Приложение скопировано в личный профиль."));
         }
 
-        if (!result.Succeeded || app.Profile != ProfileKind.Personal)
-        {
-            return result;
-        }
+        if (!result.Succeeded || app.Profile != ProfileKind.Personal) return result;
 
         var freezeResult = await HideClonedWorkAppAsync(
             app with
@@ -77,21 +83,21 @@ internal sealed class AndroidAppCommandCoordinator(
     public Task<OperationResult> UninstallAsync(AppSnapshot app, CancellationToken cancellationToken)
     {
         if (app.IsSystem && app.Profile == ProfileKind.Work)
-        {
             return AndroidProfileCommandGateway.HideSystemAppInWorkProfileAsync(
                 commandRunner,
                 app.PackageName,
                 "Приложение удалено из рабочего профиля.",
                 cancellationToken);
-        }
 
         var intent = new Intent(AgnosiaActions.UninstallPackage);
         intent.PutExtra("package", app.PackageName);
         intent.PutExtra("is_system", app.IsSystem);
 
         return app.Profile == ProfileKind.Work
-            ? commandRunner.RunPackageOperationAsync(intent, useWorkProfile: true, cancellationToken, "Приложение удалено из рабочего профиля.")
-            : commandRunner.RunPackageOperationAsync(intent, useWorkProfile: false, cancellationToken, "Приложение удалено из личного профиля.");
+            ? commandRunner.RunPackageOperationAsync(intent, true, cancellationToken,
+                "Приложение удалено из рабочего профиля.")
+            : commandRunner.RunPackageOperationAsync(intent, false, cancellationToken,
+                "Приложение удалено из личного профиля.");
     }
 
     public async Task<OperationResult> SetFrozenAsync(
@@ -104,9 +110,7 @@ internal sealed class AndroidAppCommandCoordinator(
             await permissionCoordinator.EnsureUsageStatsAccessRequestedAsync(cancellationToken);
             var shortcutResult = await PreparePinnedShortcutInParentAsync(app.PackageName, cancellationToken);
             if (!shortcutResult.Succeeded || !shortcutResult.HideImmediately)
-            {
                 return new OperationResult(shortcutResult.Succeeded, shortcutResult.Message);
-            }
         }
 
         return await AndroidProfileCommandGateway.SetPackageHiddenInWorkProfileAsync(
@@ -128,15 +132,12 @@ internal sealed class AndroidAppCommandCoordinator(
         await Task.Delay(ClonedPackageSettleDelay, cancellationToken);
 
         var shortcutResult = await PreparePinnedShortcutInParentAsync(app.PackageName, cancellationToken);
-        if (!shortcutResult.Succeeded)
-        {
-            return new OperationResult(false, shortcutResult.Message);
-        }
+        if (!shortcutResult.Succeeded) return new OperationResult(false, shortcutResult.Message);
 
         return await AndroidProfileCommandGateway.SetPackageHiddenInWorkProfileAsync(
             commandRunner,
             app.PackageName,
-            hidden: true,
+            true,
             "Приложение скрыто.",
             cancellationToken);
     }
@@ -144,14 +145,13 @@ internal sealed class AndroidAppCommandCoordinator(
     public Task<OperationResult> ForceFreezeAsync(AppSnapshot app, CancellationToken cancellationToken)
     {
         if (app.Profile != ProfileKind.Work)
-        {
-            return Task.FromResult(OperationResult.Failure("Политика устройства может скрывать только приложения рабочего профиля."));
-        }
+            return Task.FromResult(
+                OperationResult.Failure("Политика устройства может скрывать только приложения рабочего профиля."));
 
         return AndroidProfileCommandGateway.SetPackageHiddenInWorkProfileAsync(
             commandRunner,
             app.PackageName,
-            hidden: true,
+            true,
             "Приложение скрыто.",
             cancellationToken);
     }
@@ -161,9 +161,7 @@ internal sealed class AndroidAppCommandCoordinator(
         CancellationToken cancellationToken)
     {
         if (app.Profile != ProfileKind.Work)
-        {
             return OperationResult.Failure("Ярлыки доступны только для приложений рабочего профиля.");
-        }
 
         var shortcutResult = await PreparePinnedShortcutInParentAsync(app.PackageName, cancellationToken);
         return shortcutResult.Succeeded
@@ -180,28 +178,21 @@ internal sealed class AndroidAppCommandCoordinator(
         {
             var launchIntent = activity.PackageManager?.GetLaunchIntentForPackage(app.PackageName);
             if (launchIntent is null)
-            {
                 return OperationResult.Failure("Android не смог определить, как открыть это приложение.");
-            }
 
             if (AndroidIntentApi.TryStartActivity(
-                activity,
-                launchIntent,
-                ActivityResultLogTag,
-                "Android не смог открыть это приложение.",
-                out var error))
-            {
+                    activity,
+                    launchIntent,
+                    ActivityResultLogTag,
+                    "Android не смог открыть это приложение.",
+                    out var error))
                 return OperationResult.Success("Открываем приложение.");
-            }
 
             return OperationResult.Failure(error ?? "Android не смог открыть это приложение.");
         }
 
         var vpnPreparationResult = await EnsurePersonalVpnDisabledBeforeWorkLaunchAsync(cancellationToken);
-        if (!vpnPreparationResult.Succeeded)
-        {
-            return vpnPreparationResult;
-        }
+        if (!vpnPreparationResult.Succeeded) return vpnPreparationResult;
 
         var intent = new Intent(AgnosiaActions.UnfreezeAndLaunch);
         intent.PutExtra("packageName", app.PackageName);
@@ -209,7 +200,7 @@ internal sealed class AndroidAppCommandCoordinator(
         intent.PutExtra(
             AndroidCommandContract.ExtraParentFrozenCallback,
             commandRunner.CreateWorkAppFrozenCallbackPendingIntent(app.PackageName));
-        return await commandRunner.RunVoidOperationAsync(intent, useWorkProfile: true, cancellationToken, "Открываем приложение.");
+        return await commandRunner.RunVoidOperationAsync(intent, true, cancellationToken, "Открываем приложение.");
     }
 
     public async Task<OperationResult> SetInteractionAccessAsync(
@@ -218,9 +209,7 @@ internal sealed class AndroidAppCommandCoordinator(
         CancellationToken cancellationToken)
     {
         if (!enabled && AndroidPackageAccessPolicy.RequiresCrossProfileInteraction(app.PackageName))
-        {
             return OperationResult.Success("Для этого приложения контроль доступа всегда отключен политикой Agnosia.");
-        }
 
         var packages = (await AndroidProfileCommandGateway
                 .QueryWorkCrossProfilePackagesAsync(commandRunner, cancellationToken)
@@ -228,13 +217,9 @@ internal sealed class AndroidAppCommandCoordinator(
             .ToHashSet(StringComparer.Ordinal);
 
         if (enabled)
-        {
             packages.Add(app.PackageName);
-        }
         else
-        {
             packages.Remove(app.PackageName);
-        }
 
         return await AndroidProfileCommandGateway.SetCrossProfileInteractionAsync(
             commandRunner,
@@ -243,7 +228,8 @@ internal sealed class AndroidAppCommandCoordinator(
             cancellationToken);
     }
 
-    private async Task<OperationResult> EnsurePersonalVpnDisabledBeforeWorkLaunchAsync(CancellationToken cancellationToken)
+    private async Task<OperationResult> EnsurePersonalVpnDisabledBeforeWorkLaunchAsync(
+        CancellationToken cancellationToken)
     {
         var activity = commandRunner.CurrentActivity;
         var storage = LocalStorageManager.Instance;
@@ -274,9 +260,8 @@ internal sealed class AndroidAppCommandCoordinator(
 
         activity = commandRunner.CurrentActivity;
         if (AndroidVpnApi.IsVpnActive(activity))
-        {
-            return OperationResult.Failure("VPN все еще активен в личном профиле. Сторонний клиент мог сразу подключиться снова.");
-        }
+            return OperationResult.Failure(
+                "VPN все еще активен в личном профиле. Сторонний клиент мог сразу подключиться снова.");
 
         storage.SetBoolean(StorageKeys.HaveActiveVpnSession, true);
         return OperationResult.Success("VPN отключен.");
@@ -289,7 +274,7 @@ internal sealed class AndroidAppCommandCoordinator(
         var prepareIntent = new Intent(AgnosiaActions.PrepareHiddenShortcut);
         prepareIntent.PutExtra("package", packageName);
 
-        var prepareResult = await commandRunner.StartActivityForResultAsync(prepareIntent, useWorkProfile: true, cancellationToken);
+        var prepareResult = await commandRunner.StartActivityForResultAsync(prepareIntent, true, cancellationToken);
         if (prepareResult.ResultCode != Result.Ok || prepareResult.Data is null)
         {
             var error = prepareResult.Data?.GetStringExtra(AndroidCommandContract.ResultError);
@@ -305,7 +290,7 @@ internal sealed class AndroidAppCommandCoordinator(
         CopyExtraIfPresent(prepareResult.Data, createIntent, "iconBase64");
         CopyExtraIfPresent(prepareResult.Data, createIntent, "shortcutToken");
 
-        var createResult = await commandRunner.StartActivityForResultAsync(createIntent, useWorkProfile: false, cancellationToken);
+        var createResult = await commandRunner.StartActivityForResultAsync(createIntent, false, cancellationToken);
         if (createResult.ResultCode != Result.Ok)
         {
             var error = createResult.Data?.GetStringExtra(AndroidCommandContract.ResultError);
@@ -315,19 +300,16 @@ internal sealed class AndroidAppCommandCoordinator(
         }
 
         return new ShortcutPreparationResult(
-            Succeeded: true,
-            HideImmediately: createResult.Data?.GetBooleanExtra(AndroidCommandContract.ResultHideImmediately, false) == true,
-            Message: createResult.Data?.GetStringExtra(AndroidCommandContract.ResultMessage)
-                ?? "Подготовка ярлыка завершена.");
+            true,
+            createResult.Data?.GetBooleanExtra(AndroidCommandContract.ResultHideImmediately, false) == true,
+            createResult.Data?.GetStringExtra(AndroidCommandContract.ResultMessage)
+            ?? "Подготовка ярлыка завершена.");
     }
 
     private static void CopyExtraIfPresent(Intent source, Intent target, string extraName)
     {
         var value = source.GetStringExtra(extraName);
-        if (!string.IsNullOrWhiteSpace(value))
-        {
-            target.PutExtra(extraName, value);
-        }
+        if (!string.IsNullOrWhiteSpace(value)) target.PutExtra(extraName, value);
     }
 
     private sealed record ShortcutPreparationResult(
@@ -335,6 +317,9 @@ internal sealed class AndroidAppCommandCoordinator(
         bool HideImmediately,
         string Message)
     {
-        public static ShortcutPreparationResult Failure(string message) => new(false, false, message);
+        public static ShortcutPreparationResult Failure(string message)
+        {
+            return new ShortcutPreparationResult(false, false, message);
+        }
     }
 }

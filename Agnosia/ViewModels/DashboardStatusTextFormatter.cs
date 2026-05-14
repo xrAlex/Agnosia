@@ -7,8 +7,9 @@ internal static class DashboardStatusTextFormatter
     public static string GetWorkProfileStatus(
         WorkProfileStateKind workProfileState,
         bool workProfileAvailable,
-        bool hasSetup) =>
-        workProfileAvailable
+        bool hasSetup)
+    {
+        return workProfileAvailable
             ? "Available"
             : workProfileState switch
             {
@@ -19,6 +20,7 @@ internal static class DashboardStatusTextFormatter
                     or WorkProfileStateKind.WorkProfileCommandChannelUnavailable => "CommandIssue",
                 _ => hasSetup ? "Unavailable" : "NotCreated"
             };
+    }
 
     public static string GetOverviewHeadline(
         bool hasLoadedSnapshot,
@@ -26,8 +28,9 @@ internal static class DashboardStatusTextFormatter
         bool hasSetup,
         bool isBusy,
         bool workProfileAvailable,
-        WorkProfileStateKind workProfileState) =>
-        !hasLoadedSnapshot
+        WorkProfileStateKind workProfileState)
+    {
+        return !hasLoadedSnapshot
             ? "Loading"
             : !isSupported
                 ? "NotSupported"
@@ -38,6 +41,7 @@ internal static class DashboardStatusTextFormatter
                         : workProfileAvailable
                             ? "Active"
                             : GetUnavailableHeadline(workProfileState);
+    }
 
     public static string GetOverallStatusText(
         bool statusIsError,
@@ -45,14 +49,16 @@ internal static class DashboardStatusTextFormatter
         bool isBusy,
         bool isSupported,
         bool hasSetup,
-        bool workProfileAvailable) =>
-        statusIsError
+        bool workProfileAvailable)
+    {
+        return statusIsError
             ? "Error"
             : !hasLoadedSnapshot || isBusy
                 ? "Updating"
                 : !isSupported || !hasSetup || !workProfileAvailable
                     ? "Unstable"
                     : "Ok";
+    }
 
     public static string GetOverallStatusCaption(
         bool statusIsError,
@@ -61,8 +67,9 @@ internal static class DashboardStatusTextFormatter
         bool isSupported,
         bool hasSetup,
         bool workProfileAvailable,
-        WorkProfileStateKind workProfileState) =>
-        statusIsError
+        WorkProfileStateKind workProfileState)
+    {
+        return statusIsError
             ? "Error"
             : !hasLoadedSnapshot
                 ? "Loading"
@@ -75,9 +82,11 @@ internal static class DashboardStatusTextFormatter
                             : !workProfileAvailable
                                 ? GetUnavailableDetail(workProfileState)
                                 : "Ok";
+    }
 
-    private static string GetUnavailableHeadline(WorkProfileStateKind workProfileState) =>
-        workProfileState switch
+    private static string GetUnavailableHeadline(WorkProfileStateKind workProfileState)
+    {
+        return workProfileState switch
         {
             WorkProfileStateKind.WorkProfileQuietMode => "WPQuietMode",
             WorkProfileStateKind.WorkProfileUnavailable => "WPDisabled",
@@ -85,9 +94,11 @@ internal static class DashboardStatusTextFormatter
                 or WorkProfileStateKind.WorkProfileCommandChannelUnavailable => "WPCommandIssue",
             _ => "WPUnavailable"
         };
+    }
 
-    private static string GetUnavailableDetail(WorkProfileStateKind workProfileState) =>
-        workProfileState switch
+    private static string GetUnavailableDetail(WorkProfileStateKind workProfileState)
+    {
+        return workProfileState switch
         {
             WorkProfileStateKind.WorkProfileQuietMode => "WPQuietMode",
             WorkProfileStateKind.WorkProfileUnavailable => "WPDisabled",
@@ -95,4 +106,5 @@ internal static class DashboardStatusTextFormatter
                 or WorkProfileStateKind.WorkProfileCommandChannelUnavailable => "WPCommandIssue",
             _ => "WPUnavailable"
         };
+    }
 }

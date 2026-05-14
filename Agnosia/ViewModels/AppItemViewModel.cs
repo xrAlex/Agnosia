@@ -48,16 +48,10 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
         private set
         {
-            if (ReferenceEquals(_icon, value))
-            {
-                return;
-            }
+            if (ReferenceEquals(_icon, value)) return;
 
             var previousIcon = _icon;
-            if (SetProperty(ref _icon, value))
-            {
-                previousIcon?.Dispose();
-            }
+            if (SetProperty(ref _icon, value)) previousIcon?.Dispose();
         }
     }
 
@@ -103,48 +97,69 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     public string CloneLabel => Profile == ProfileKind.Work ? "CopyToPersonal" : "CopyToWork";
 
-    public string MoveToWorkLabel => "MoveToWork";
+    public static string MoveToWorkLabel => "MoveToWork";
 
     public string FreezeLabel => IsHidden ? "Unfreeze" : "Freeze";
 
-    public string ForceFreezeLabel => "ForceFreeze";
+    public static string ForceFreezeLabel => "ForceFreeze";
 
-    public string CreateShortcutLabel => "CreateShortcut";
+    public static string CreateShortcutLabel => "CreateShortcut";
 
-    public string UninstallLabel => "Uninstall";
+    public static string UninstallLabel => "Uninstall";
 
     public string InteractionLabel => InteractionAllowed ? "DisallowInteraction" : "AllowInteraction";
 
     [RelayCommand(CanExecute = nameof(CanClone))]
-    private Task CloneAsync() => _owner.CloneAsync(this);
+    private Task CloneAsync()
+    {
+        return _owner.CloneAsync(this);
+    }
 
     [RelayCommand(CanExecute = nameof(CanMoveToWork))]
-    private Task MoveToWorkAsync() => _owner.MoveToWorkAsync(this);
+    private Task MoveToWorkAsync()
+    {
+        return _owner.MoveToWorkAsync(this);
+    }
 
     [RelayCommand(CanExecute = nameof(CanUninstall))]
-    private Task UninstallAsync() => _owner.UninstallAsync(this);
+    private Task UninstallAsync()
+    {
+        return _owner.UninstallAsync(this);
+    }
 
     [RelayCommand(CanExecute = nameof(CanFreeze))]
-    private Task ToggleFrozenAsync() => _owner.ToggleFrozenAsync(this);
+    private Task ToggleFrozenAsync()
+    {
+        return _owner.ToggleFrozenAsync(this);
+    }
 
     [RelayCommand(CanExecute = nameof(CanFreeze))]
-    private Task ForceFreezeAsync() => _owner.ForceFreezeAsync(this);
+    private Task ForceFreezeAsync()
+    {
+        return _owner.ForceFreezeAsync(this);
+    }
 
     [RelayCommand(CanExecute = nameof(ShowWorkControls))]
-    private Task CreateShortcutAsync() => _owner.CreateShortcutAsync(this);
+    private Task CreateShortcutAsync()
+    {
+        return _owner.CreateShortcutAsync(this);
+    }
 
     [RelayCommand(CanExecute = nameof(ShowLaunch))]
-    private Task LaunchAsync() => _owner.LaunchAsync(this);
+    private Task LaunchAsync()
+    {
+        return _owner.LaunchAsync(this);
+    }
 
     [RelayCommand(CanExecute = nameof(ShowWorkControls))]
-    private Task ToggleInteractionAccessAsync() => _owner.ToggleInteractionAccessAsync(this);
+    private Task ToggleInteractionAccessAsync()
+    {
+        return _owner.ToggleInteractionAccessAsync(this);
+    }
 
     public void Dispose()
     {
-        if (_disposed)
-        {
-            return;
-        }
+        if (_disposed) return;
 
         _disposed = true;
         _iconLoadCancellation?.Cancel();
@@ -157,17 +172,12 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
     {
         if (!string.Equals(Snapshot.PackageName, snapshot.PackageName, StringComparison.Ordinal)
             || Snapshot.Profile != snapshot.Profile)
-        {
             throw new InvalidOperationException("App item identity cannot be changed.");
-        }
 
         var previous = Snapshot;
         Snapshot = snapshot;
 
-        if (!ByteArraysEqual(previous.IconPng, snapshot.IconPng))
-        {
-            ResetIcon();
-        }
+        if (!ByteArraysEqual(previous.IconPng, snapshot.IconPng)) ResetIcon();
 
         if (!string.Equals(previous.Label, snapshot.Label, StringComparison.Ordinal))
         {
@@ -198,10 +208,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(CanUninstall));
         }
 
-        if (previous.CanLaunch != snapshot.CanLaunch)
-        {
-            OnPropertyChanged(nameof(ShowLaunch));
-        }
+        if (previous.CanLaunch != snapshot.CanLaunch) OnPropertyChanged(nameof(ShowLaunch));
 
         if (previous.IsInstalled != snapshot.IsInstalled)
         {
@@ -215,10 +222,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     public void RequestIconLoad()
     {
-        if (_disposed || _iconLoadRequested)
-        {
-            return;
-        }
+        if (_disposed || _iconLoadRequested) return;
 
         _iconLoadRequested = true;
         _iconLoadCancellation = new CancellationTokenSource();
@@ -227,10 +231,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     public void CancelIconLoad()
     {
-        if (_icon is not null)
-        {
-            return;
-        }
+        if (_icon is not null) return;
 
         _iconLoadCancellation?.Cancel();
         _iconLoadCancellation = null;
@@ -249,19 +250,13 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
                 : await _owner
                     .LoadAppIconPngAsync(Snapshot, iconLoadCancellation.Token)
                     .ConfigureAwait(false);
-            if (iconPng is not { Length: > 0 })
-            {
-                return;
-            }
+            if (iconPng is not { Length: > 0 }) return;
 
             decodedIcon = await Task.Run(
                     () => DecodeIcon(iconPng),
                     iconLoadCancellation.Token)
                 .ConfigureAwait(false);
-            if (decodedIcon is null)
-            {
-                return;
-            }
+            if (decodedIcon is null) return;
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
@@ -290,21 +285,14 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         {
             TracePerf("IconLoad", startedAt, $"profile={Snapshot.Profile}; package={Snapshot.PackageName}");
             if (!iconLoaded && !iconLoadCancellation.IsCancellationRequested)
-            {
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     if (!_disposed && ReferenceEquals(_iconLoadCancellation, iconLoadCancellation))
-                    {
                         _iconLoadRequested = false;
-                    }
                 }, DispatcherPriority.Background);
-            }
 
             iconLoadCancellation.Dispose();
-            if (ReferenceEquals(_iconLoadCancellation, iconLoadCancellation))
-            {
-                _iconLoadCancellation = null;
-            }
+            if (ReferenceEquals(_iconLoadCancellation, iconLoadCancellation)) _iconLoadCancellation = null;
         }
     }
 
@@ -338,45 +326,27 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     private static bool ByteArraysEqual(byte[]? left, byte[]? right)
     {
-        if (ReferenceEquals(left, right))
-        {
-            return true;
-        }
+        if (ReferenceEquals(left, right)) return true;
 
-        if (left is null || right is null || left.Length != right.Length)
-        {
-            return false;
-        }
+        if (left is null || right is null || left.Length != right.Length) return false;
 
         return left.AsSpan().SequenceEqual(right);
     }
 
     private static string ResolveStatusTagLabel(AppSnapshot snapshot)
     {
-        if (snapshot.Profile == ProfileKind.Work && snapshot.IsHidden)
-        {
-            return "Isolated";
-        }
+        if (snapshot.Profile == ProfileKind.Work && snapshot.IsHidden) return "Isolated";
 
-        if (!snapshot.IsInstalled)
-        {
-            return "NotInstalled";
-        }
+        if (!snapshot.IsInstalled) return "NotInstalled";
 
-        if (snapshot.IsSystem)
-        {
-            return "System";
-        }
+        if (snapshot.IsSystem) return "System";
 
         return string.Empty;
     }
 
     private static Bitmap? DecodeIcon(byte[]? iconPng)
     {
-        if (iconPng is not { Length: > 0 })
-        {
-            return null;
-        }
+        if (iconPng is not { Length: > 0 }) return null;
 
         try
         {

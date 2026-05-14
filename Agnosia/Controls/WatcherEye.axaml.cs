@@ -45,13 +45,15 @@ public partial class WatcherEye : UserControl
         InitializeComponent();
 
         _pupilTransform = Pupil.RenderTransform as TranslateTransform
-            ?? throw new InvalidOperationException("Watcher pupil transform was not found.");
+                          ?? throw new InvalidOperationException("Watcher pupil transform was not found.");
         _pupilHighlightTransform = PupilHighlight.RenderTransform as TranslateTransform
-            ?? throw new InvalidOperationException("Watcher pupil highlight transform was not found.");
+                                   ?? throw new InvalidOperationException(
+                                       "Watcher pupil highlight transform was not found.");
         _irisDiscScaleTransform = IrisDisc.RenderTransform as ScaleTransform
-            ?? throw new InvalidOperationException("Watcher iris scale transform was not found.");
+                                  ?? throw new InvalidOperationException("Watcher iris scale transform was not found.");
         _pupilCoreScaleTransform = PupilCore.RenderTransform as ScaleTransform
-            ?? throw new InvalidOperationException("Watcher pupil scale transform was not found.");
+                                   ?? throw new InvalidOperationException(
+                                       "Watcher pupil scale transform was not found.");
 
         _pupilMotionTimer = new DispatcherTimer
         {
@@ -91,10 +93,7 @@ public partial class WatcherEye : UserControl
     {
         DetachPointerSource();
         _pointerSource = TopLevel.GetTopLevel(this);
-        if (_pointerSource is null)
-        {
-            return;
-        }
+        if (_pointerSource is null) return;
 
         _pointerSource.AddHandler(PointerPressedEvent, OnPointerPressed, PointerRoutingStrategies, true);
         _pointerSource.AddHandler(PointerMovedEvent, OnPointerMoved, PointerRoutingStrategies, true);
@@ -138,10 +137,7 @@ public partial class WatcherEye : UserControl
             pointerPoint.Properties.IsLeftButtonPressed ||
             e.Pointer.Type is PointerType.Touch or PointerType.Pen;
 
-        if (!shouldTrack)
-        {
-            return;
-        }
+        if (!shouldTrack) return;
 
         BeginOrMoveTracking(pointerPoint.Position);
     }
@@ -153,10 +149,7 @@ public partial class WatcherEye : UserControl
 
     private void OnPointerExited(object? sender, PointerEventArgs e)
     {
-        if (IsInsidePointerSource(e))
-        {
-            return;
-        }
+        if (IsInsidePointerSource(e)) return;
 
         EndTracking();
     }
@@ -187,10 +180,7 @@ public partial class WatcherEye : UserControl
     {
         var source = _pointerSource;
         var localPosition = source?.TranslatePoint(rootPosition, this);
-        if (localPosition is null)
-        {
-            return;
-        }
+        if (localPosition is null) return;
 
         BeginOrMoveTracking(localPosition.Value);
     }
@@ -205,10 +195,7 @@ public partial class WatcherEye : UserControl
 
     private void EndTracking()
     {
-        if (!_isTrackingPointer)
-        {
-            return;
-        }
+        if (!_isTrackingPointer) return;
 
         _pointerIdleTimer.Stop();
         _isTrackingPointer = false;
@@ -232,10 +219,7 @@ public partial class WatcherEye : UserControl
 
     private void ScheduleIdleReturn()
     {
-        if (!_isTrackingPointer)
-        {
-            return;
-        }
+        if (!_isTrackingPointer) return;
 
         _pointerIdleTimer.Stop();
         _pointerIdleTimer.Start();
@@ -276,10 +260,7 @@ public partial class WatcherEye : UserControl
         _targetPupilX = x;
         _targetPupilY = y;
 
-        if (!_pupilMotionTimer.IsEnabled)
-        {
-            _pupilMotionTimer.Start();
-        }
+        if (!_pupilMotionTimer.IsEnabled) _pupilMotionTimer.Start();
     }
 
     private void UpdatePupilPosition()

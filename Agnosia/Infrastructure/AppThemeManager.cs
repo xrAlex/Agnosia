@@ -11,15 +11,9 @@ public static class AppThemeManager
 
     public static void Apply(AppThemeKind theme)
     {
-        if (_appliedTheme == theme)
-        {
-            return;
-        }
+        if (_appliedTheme == theme) return;
 
-        if (Application.Current is not { } application)
-        {
-            return;
-        }
+        if (Application.Current is not { } application) return;
 
         _appliedTheme = theme;
         var palette = ResolvePalette(theme);
@@ -54,98 +48,94 @@ public static class AppThemeManager
         SetBrush(application, "AppPlexusNodeBrush", palette.PlexusNode);
         SetBrush(application, "AppPlexusGlowBrush", palette.PlexusGlow);
 
-        if (shouldUpdateThemeVariant)
-        {
-            application.RequestedThemeVariant = palette.ThemeVariant;
-        }
+        if (shouldUpdateThemeVariant) application.RequestedThemeVariant = palette.ThemeVariant;
     }
 
-    private static AppThemePalette ResolvePalette(AppThemeKind theme) =>
-        theme switch
+    private static AppThemePalette ResolvePalette(AppThemeKind theme)
+    {
+        return theme switch
         {
             AppThemeKind.Dark => new AppThemePalette(
                 ThemeVariant.Dark,
-                Background: Color.Parse("#101114"),
-                Chrome: Color.Parse("#17191D"),
-                Surface: Color.Parse("#1D2025"),
-                SurfaceAlt: Color.Parse("#262A31"),
-                Border: Color.Parse("#3B4656"),
-                BorderSoft: Color.Parse("#2C333D"),
-                Accent: Color.Parse("#4DA3FF"),
-                AccentHover: Color.Parse("#6CB4FF"),
-                AccentPressed: Color.Parse("#2F7FD1"),
-                AccentMuted: Color.Parse("#183B5F"),
-                AccentSoft: Color.Parse("#9BCBFF"),
-                ButtonSecondary: Color.Parse("#20242A"),
-                ButtonSecondaryHover: Color.Parse("#2B3038"),
-                Input: Color.Parse("#15181D"),
-                TextPrimary: Color.Parse("#F4F7FA"),
-                TextSecondary: Color.Parse("#C8D0DA"),
-                TextMuted: Color.Parse("#91A0AF"),
-                OnAccent: Color.Parse("#07111D"),
-                OverlayScrim: Color.Parse("#AA05070A"),
-                PlexusLine: Color.Parse("#665FA8FF"),
-                PlexusNode: Color.Parse("#CC7DB8FF"),
-                PlexusGlow: Color.Parse("#245FA8FF")),
+                Color.Parse("#101114"),
+                Color.Parse("#17191D"),
+                Color.Parse("#1D2025"),
+                Color.Parse("#262A31"),
+                Color.Parse("#3B4656"),
+                Color.Parse("#2C333D"),
+                Color.Parse("#4DA3FF"),
+                Color.Parse("#6CB4FF"),
+                Color.Parse("#2F7FD1"),
+                Color.Parse("#183B5F"),
+                Color.Parse("#9BCBFF"),
+                Color.Parse("#20242A"),
+                Color.Parse("#2B3038"),
+                Color.Parse("#15181D"),
+                Color.Parse("#F4F7FA"),
+                Color.Parse("#C8D0DA"),
+                Color.Parse("#91A0AF"),
+                Color.Parse("#07111D"),
+                Color.Parse("#AA05070A"),
+                Color.Parse("#665FA8FF"),
+                Color.Parse("#CC7DB8FF"),
+                Color.Parse("#245FA8FF")),
             AppThemeKind.Light => new AppThemePalette(
                 ThemeVariant.Light,
-                Background: Color.Parse("#F6F7F9"),
-                Chrome: Color.Parse("#FFFFFF"),
-                Surface: Color.Parse("#FFFFFF"),
-                SurfaceAlt: Color.Parse("#EEF2F6"),
-                Border: Color.Parse("#C8D3DF"),
-                BorderSoft: Color.Parse("#DEE5EC"),
-                Accent: Color.Parse("#176BCA"),
-                AccentHover: Color.Parse("#2E7FDB"),
-                AccentPressed: Color.Parse("#0F559F"),
-                AccentMuted: Color.Parse("#DCEBFA"),
-                AccentSoft: Color.Parse("#8ABBF0"),
-                ButtonSecondary: Color.Parse("#F3F6FA"),
-                ButtonSecondaryHover: Color.Parse("#E8EEF5"),
-                Input: Color.Parse("#FFFFFF"),
-                TextPrimary: Color.Parse("#18202A"),
-                TextSecondary: Color.Parse("#4D5C6C"),
-                TextMuted: Color.Parse("#718194"),
-                OnAccent: Color.Parse("#FFFFFF"),
-                OverlayScrim: Color.Parse("#88F6F7F9"),
-                PlexusLine: Color.Parse("#554D8DDA"),
-                PlexusNode: Color.Parse("#AA176BCA"),
-                PlexusGlow: Color.Parse("#204D8DDA")),
+                Color.Parse("#F6F7F9"),
+                Color.Parse("#FFFFFF"),
+                Color.Parse("#FFFFFF"),
+                Color.Parse("#EEF2F6"),
+                Color.Parse("#C8D3DF"),
+                Color.Parse("#DEE5EC"),
+                Color.Parse("#176BCA"),
+                Color.Parse("#2E7FDB"),
+                Color.Parse("#0F559F"),
+                Color.Parse("#DCEBFA"),
+                Color.Parse("#8ABBF0"),
+                Color.Parse("#F3F6FA"),
+                Color.Parse("#E8EEF5"),
+                Color.Parse("#FFFFFF"),
+                Color.Parse("#18202A"),
+                Color.Parse("#4D5C6C"),
+                Color.Parse("#718194"),
+                Color.Parse("#FFFFFF"),
+                Color.Parse("#88F6F7F9"),
+                Color.Parse("#554D8DDA"),
+                Color.Parse("#AA176BCA"),
+                Color.Parse("#204D8DDA")),
             _ => new AppThemePalette(
                 ThemeVariant.Dark,
-                Background: Color.Parse("#08090B"),
-                Chrome: Color.Parse("#101216"),
-                Surface: Color.Parse("#16191E"),
-                SurfaceAlt: Color.Parse("#20242B"),
-                Border: Color.Parse("#37404A"),
-                BorderSoft: Color.Parse("#242A32"),
-                Accent: Color.Parse("#FF253A"),
-                AccentHover: Color.Parse("#FF4355"),
-                AccentPressed: Color.Parse("#C9001D"),
-                AccentMuted: Color.Parse("#361821"),
-                AccentSoft: Color.Parse("#FF6F7B"),
-                ButtonSecondary: Color.Parse("#1B1F25"),
-                ButtonSecondaryHover: Color.Parse("#252B34"),
-                Input: Color.Parse("#11141A"),
-                TextPrimary: Color.Parse("#F7F8FA"),
-                TextSecondary: Color.Parse("#C9D0D8"),
-                TextMuted: Color.Parse("#98A2B0"),
-                OnAccent: Color.Parse("#08090B"),
-                OverlayScrim: Color.Parse("#AA05070A"),
-                PlexusLine: Color.Parse("#7AFF253A"),
-                PlexusNode: Color.Parse("#E6FF5663"),
-                PlexusGlow: Color.Parse("#30FF253A"))
+                Color.Parse("#08090B"),
+                Color.Parse("#101216"),
+                Color.Parse("#16191E"),
+                Color.Parse("#20242B"),
+                Color.Parse("#37404A"),
+                Color.Parse("#242A32"),
+                Color.Parse("#FF253A"),
+                Color.Parse("#FF4355"),
+                Color.Parse("#C9001D"),
+                Color.Parse("#361821"),
+                Color.Parse("#FF6F7B"),
+                Color.Parse("#1B1F25"),
+                Color.Parse("#252B34"),
+                Color.Parse("#11141A"),
+                Color.Parse("#F7F8FA"),
+                Color.Parse("#C9D0D8"),
+                Color.Parse("#98A2B0"),
+                Color.Parse("#08090B"),
+                Color.Parse("#AA05070A"),
+                Color.Parse("#7AFF253A"),
+                Color.Parse("#E6FF5663"),
+                Color.Parse("#30FF253A"))
         };
+    }
 
     private static void SetBrush(Application application, string key, Color color)
     {
         if (application.Resources.TryGetResource(key, application.ActualThemeVariant, out var resource)
             && resource is SolidColorBrush brush)
         {
-            if (brush.Color == color)
-            {
-                return;
-            }
+            if (brush.Color == color) return;
 
             brush.Color = color;
             return;
@@ -159,9 +149,7 @@ public static class AppThemeManager
         if (application.Resources.TryGetResource(key, application.ActualThemeVariant, out var resource)
             && resource is Color existingColor
             && existingColor == color)
-        {
             return;
-        }
 
         application.Resources[key] = color;
     }

@@ -13,15 +13,13 @@ public sealed class BoundedAppEventLogService : IAppEventLogService
     public BoundedAppEventLogService(int capacity = DefaultCapacity)
     {
         if (capacity <= 0)
-        {
             throw new ArgumentOutOfRangeException(nameof(capacity), capacity, "Event log capacity must be positive.");
-        }
 
         Capacity = capacity;
         _entries = new Queue<string>(capacity);
     }
 
-    public int Count
+    private int Count
     {
         get
         {
@@ -32,7 +30,7 @@ public sealed class BoundedAppEventLogService : IAppEventLogService
         }
     }
 
-    public int Capacity { get; }
+    private int Capacity { get; }
 
     public string Summary => $"Сообщений: {Count} / {Capacity}";
 
@@ -73,19 +71,13 @@ public sealed class BoundedAppEventLogService : IAppEventLogService
                          .OrderBy(log => log.Timestamp)
                          .ThenBy(log => log.Id, StringComparer.Ordinal))
             {
-                if (!_platformLogIds.Add(entry.Id))
-                {
-                    continue;
-                }
+                if (!_platformLogIds.Add(entry.Id)) continue;
 
                 _entries.Enqueue(FormatPlatformLogEntry(entry));
                 hasChanges = true;
             }
 
-            if (hasChanges)
-            {
-                Trim();
-            }
+            if (hasChanges) Trim();
 
             return hasChanges;
         }
@@ -102,10 +94,7 @@ public sealed class BoundedAppEventLogService : IAppEventLogService
 
     private void Trim()
     {
-        while (_entries.Count > Capacity)
-        {
-            _entries.Dequeue();
-        }
+        while (_entries.Count > Capacity) _entries.Dequeue();
     }
 
     private static string FormatPlatformLogEntry(AppLogEntry entry)

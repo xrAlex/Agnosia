@@ -16,10 +16,7 @@ public partial class OnboardingOverlayView : UserControl
         DetachedFromVisualTree += (_, _) => CancelCardReveal();
         PropertyChanged += (_, args) =>
         {
-            if (args.Property == IsVisibleProperty)
-            {
-                StartCardReveal();
-            }
+            if (args.Property == IsVisibleProperty) StartCardReveal();
         };
     }
 
@@ -28,10 +25,7 @@ public partial class OnboardingOverlayView : UserControl
         CancelCardReveal();
         HideInfoCards();
 
-        if (!IsVisible)
-        {
-            return;
-        }
+        if (!IsVisible) return;
 
         _cardRevealCancellation = new CancellationTokenSource();
         _ = RevealInfoCardsAsync(_cardRevealCancellation.Token);
@@ -52,10 +46,7 @@ public partial class OnboardingOverlayView : UserControl
             foreach (var card in cards)
             {
                 await Task.Delay(CardRevealDelayMs, cancellationToken);
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    return;
-                }
+                if (cancellationToken.IsCancellationRequested) return;
 
                 await Dispatcher.UIThread.InvokeAsync(() => card.Opacity = 1, DispatcherPriority.Background);
             }
@@ -67,19 +58,19 @@ public partial class OnboardingOverlayView : UserControl
 
     private void HideInfoCards()
     {
-        foreach (var card in GetInfoCards())
-        {
-            card.Opacity = 0;
-        }
+        foreach (var card in GetInfoCards()) card.Opacity = 0;
     }
 
-    private Border[] GetInfoCards() =>
-    [
-        InfoCardAgnosia,
-        InfoCardIsolation,
-        InfoCardWorkProfile,
-        InfoCardRussianApps,
-        InfoCardLessTraces,
-        InfoCardTemporaryLaunch
-    ];
+    private Border[] GetInfoCards()
+    {
+        return
+        [
+            InfoCardAgnosia,
+            InfoCardIsolation,
+            InfoCardWorkProfile,
+            InfoCardRussianApps,
+            InfoCardLessTraces,
+            InfoCardTemporaryLaunch
+        ];
+    }
 }

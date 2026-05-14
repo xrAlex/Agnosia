@@ -16,5 +16,6 @@ public interface IAppCommandService
 
     Task<OperationResult> LaunchAsync(AppSnapshot app, CancellationToken cancellationToken = default);
 
-    Task<OperationResult> SetInteractionAccessAsync(AppSnapshot app, bool enabled, CancellationToken cancellationToken = default);
+    Task<OperationResult> SetInteractionAccessAsync(AppSnapshot app, bool enabled,
+        CancellationToken cancellationToken = default);
 }

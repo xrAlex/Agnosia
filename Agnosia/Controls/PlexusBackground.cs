@@ -84,7 +84,7 @@ public sealed class PlexusBackground : Control
         {
             _isAttached = true;
             _lastFrameUtc = DateTime.UtcNow;
-            EnsureNodes(forceReset: _nodes.Count == 0);
+            EnsureNodes(_nodes.Count == 0);
             UpdateTimerState();
         };
 
@@ -159,29 +159,21 @@ public sealed class PlexusBackground : Control
             return;
         }
 
-        if (change.Property == ParticleCountProperty)
-        {
-            EnsureNodes(forceReset: true);
-        }
+        if (change.Property == ParticleCountProperty) EnsureNodes(true);
 
         if (change.Property == LineBrushProperty
             || change.Property == NodeBrushProperty
             || change.Property == GlowBrushProperty
             || change.Property == LineBrightnessProperty
             || change.Property == NodeBrightnessProperty)
-        {
             _renderBrushCacheKey = null;
-        }
     }
 
     public override void Render(DrawingContext context)
     {
         base.Render(context);
 
-        if (_nodes.Count == 0 || Bounds.Width <= 1 || Bounds.Height <= 1)
-        {
-            return;
-        }
+        if (_nodes.Count == 0 || Bounds.Width <= 1 || Bounds.Height <= 1) return;
 
         var lineColor = ResolveColor(LineBrush, DefaultLineColor);
         var nodeColor = ResolveColor(NodeBrush, DefaultNodeColor);
@@ -197,10 +189,7 @@ public sealed class PlexusBackground : Control
         var linePen = _linePen;
         var glowBrush = _glowRenderBrush;
         var nodeBrush = _nodeRenderBrush;
-        if (linePen is null || glowBrush is null || nodeBrush is null)
-        {
-            return;
-        }
+        if (linePen is null || glowBrush is null || nodeBrush is null) return;
 
         for (var index = 0; index < nodeCount; index++)
         {
@@ -212,13 +201,10 @@ public sealed class PlexusBackground : Control
                 var deltaX = source.Position.X - target.Position.X;
                 var deltaY = source.Position.Y - target.Position.Y;
                 var distanceSquared = deltaX * deltaX + deltaY * deltaY;
-                if (distanceSquared > connectionDistanceSquared)
-                {
-                    continue;
-                }
+                if (distanceSquared > connectionDistanceSquared) continue;
 
                 var distance = Math.Sqrt(distanceSquared);
-                var distanceFactor = 1 - (distance / connectionDistance);
+                var distanceFactor = 1 - distance / connectionDistance;
                 var edgeFactor = GetEdgeFactor((source.Position.Y + target.Position.Y) * 0.5, bounds.Height);
                 var opacity = Math.Clamp(Math.Pow(distanceFactor, 1.35) * edgeFactor * 0.9, 0, 1);
                 using (context.PushOpacity(opacity))
@@ -269,10 +255,7 @@ public sealed class PlexusBackground : Control
 
         EnsureNodes();
 
-        if (_nodes.Count == 0 || Bounds.Width <= 1 || Bounds.Height <= 1)
-        {
-            return;
-        }
+        if (_nodes.Count == 0 || Bounds.Width <= 1 || Bounds.Height <= 1) return;
 
         var currentFrameUtc = DateTime.UtcNow;
         var elapsedSeconds = Math.Clamp((currentFrameUtc - _lastFrameUtc).TotalSeconds, 0.01, 0.05);
@@ -283,7 +266,7 @@ public sealed class PlexusBackground : Control
         for (var index = 0; index < _nodes.Count; index++)
         {
             var node = _nodes[index];
-            var nextPosition = node.Position + (node.Velocity * elapsedSeconds);
+            var nextPosition = node.Position + node.Velocity * elapsedSeconds;
 
             if (nextPosition.X <= 0 || nextPosition.X >= width)
             {
@@ -327,10 +310,7 @@ public sealed class PlexusBackground : Control
         double nodeBrightness)
     {
         var cacheKey = new RenderBrushCacheKey(lineColor, nodeColor, glowColor, lineBrightness, nodeBrightness);
-        if (_renderBrushCacheKey == cacheKey)
-        {
-            return;
-        }
+        if (_renderBrushCacheKey == cacheKey) return;
 
         _renderBrushCacheKey = cacheKey;
         _linePen = new Pen(new SolidColorBrush(ScaleColorBrightness(lineColor, lineBrightness)), 1.15);
@@ -340,16 +320,10 @@ public sealed class PlexusBackground : Control
 
     private void EnsureNodes(bool forceReset = false)
     {
-        if (Bounds.Width <= 1 || Bounds.Height <= 1)
-        {
-            return;
-        }
+        if (Bounds.Width <= 1 || Bounds.Height <= 1) return;
 
         var particleCount = GetParticleCount();
-        if (!forceReset && _nodes.Count == particleCount)
-        {
-            return;
-        }
+        if (!forceReset && _nodes.Count == particleCount) return;
 
         _nodes.Clear();
         _surfaceSize = Bounds.Size;
@@ -357,13 +331,13 @@ public sealed class PlexusBackground : Control
         for (var index = 0; index < particleCount; index++)
         {
             var angle = _random.NextDouble() * Math.Tau;
-            var speed = MinimumParticleSpeed + (_random.NextDouble() * (MaximumParticleSpeed - MinimumParticleSpeed));
+            var speed = MinimumParticleSpeed + _random.NextDouble() * (MaximumParticleSpeed - MinimumParticleSpeed);
             _nodes.Add(new PlexusNode
             {
                 Position = new Point(_random.NextDouble() * Bounds.Width, _random.NextDouble() * Bounds.Height),
                 Velocity = new Vector(Math.Cos(angle) * speed, Math.Sin(angle) * speed),
                 Phase = _random.NextDouble() * Math.Tau,
-                PulseSpeed = 0.7 + (_random.NextDouble() * 0.9)
+                PulseSpeed = 0.7 + _random.NextDouble() * 0.9
             });
         }
 
@@ -373,15 +347,12 @@ public sealed class PlexusBackground : Control
 
     private void ResizeNodes(Size newSize)
     {
-        if (newSize.Width <= 1 || newSize.Height <= 1)
-        {
-            return;
-        }
+        if (newSize.Width <= 1 || newSize.Height <= 1) return;
 
         if (_nodes.Count != GetParticleCount() || _surfaceSize.Width <= 1 || _surfaceSize.Height <= 1)
         {
             _surfaceSize = newSize;
-            EnsureNodes(forceReset: true);
+            EnsureNodes(true);
             return;
         }
 
@@ -393,10 +364,7 @@ public sealed class PlexusBackground : Control
             return;
         }
 
-        foreach (var node in _nodes)
-        {
-            node.Position = new Point(node.Position.X * scaleX, node.Position.Y * scaleY);
-        }
+        foreach (var node in _nodes) node.Position = new Point(node.Position.X * scaleX, node.Position.Y * scaleY);
 
         _surfaceSize = newSize;
         InvalidateVisual();
@@ -409,22 +377,16 @@ public sealed class PlexusBackground : Control
 
     private static double GetEdgeFactor(double y, double height)
     {
-        if (height <= 1)
-        {
-            return 1;
-        }
+        if (height <= 1) return 1;
 
         var normalized = y / height;
         var centerDistance = Math.Abs((normalized - 0.5) * 2);
-        return EdgeOpacityFloor + ((1 - EdgeOpacityFloor) * centerDistance);
+        return EdgeOpacityFloor + (1 - EdgeOpacityFloor) * centerDistance;
     }
 
     private static Color ResolveColor(IBrush? brush, Color fallback)
     {
-        if (brush is not ISolidColorBrush solidColorBrush)
-        {
-            return fallback;
-        }
+        if (brush is not ISolidColorBrush solidColorBrush) return fallback;
 
         return ApplyOpacity(solidColorBrush.Color, solidColorBrush.Opacity);
     }

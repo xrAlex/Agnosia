@@ -63,13 +63,13 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(OverviewHeadline))]
     [NotifyPropertyChangedFor(nameof(OverallStatusText))]
     [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
-    private bool _hasLoadedSnapshot;
+    private partial bool HasLoadedSnapshot { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsOverviewSectionSelected))]
     [NotifyPropertyChangedFor(nameof(IsAppsSectionSelected))]
     [NotifyPropertyChangedFor(nameof(IsSettingsSectionSelected))]
-    private DashboardSection _selectedSection = DashboardSection.Overview;
+    private partial DashboardSection SelectedSection { get; set; } = DashboardSection.Overview;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEmptyStateVisible))]
@@ -80,7 +80,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
     [NotifyPropertyChangedFor(nameof(IsOperationActive))]
     [NotifyCanExecuteChangedFor(nameof(StartProvisioningCommand))]
-    private bool _isBusy;
+    private partial bool IsBusy { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsUnsupportedVisible))]
@@ -94,7 +94,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(OverallStatusText))]
     [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
     [NotifyCanExecuteChangedFor(nameof(StartProvisioningCommand))]
-    private bool _isSupported = true;
+    private partial bool IsSupported { get; set; } = true;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsDashboardVisible))]
@@ -108,13 +108,13 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(OverallStatusText))]
     [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
     [NotifyCanExecuteChangedFor(nameof(StartProvisioningCommand))]
-    private bool _hasSetup;
+    public partial bool HasSetup { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanStartProvisioning))]
     [NotifyPropertyChangedFor(nameof(OverviewHeadline))]
     [NotifyCanExecuteChangedFor(nameof(StartProvisioningCommand))]
-    private bool _isSettingUp;
+    private partial bool IsSettingUp { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(WorkProfileStatusText))]
@@ -122,22 +122,22 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(CanContinueOnboardingFromWorkProfile))]
     [NotifyPropertyChangedFor(nameof(OverallStatusText))]
     [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
-    private bool _workProfileAvailable;
+    public partial bool WorkProfileAvailable { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEmptyStateVisible))]
     [NotifyPropertyChangedFor(nameof(IsPersonalProfileSelected))]
     [NotifyPropertyChangedFor(nameof(IsWorkProfileSelected))]
-    private ProfileKind _selectedProfile;
+    private partial ProfileKind SelectedProfile { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEmptyStateVisible))]
-    private string _searchText = string.Empty;
+    public partial string SearchText { get; set; } = string.Empty;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEmptyStateVisible))]
     [NotifyPropertyChangedFor(nameof(IsAppInventoryProgressVisible))]
-    private bool _hasLoadedInventory;
+    private partial bool HasLoadedInventory { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEmptyStateVisible))]
@@ -146,30 +146,30 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(OverallStatusText))]
     [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
     [NotifyPropertyChangedFor(nameof(IsOperationActive))]
-    private bool _isInventoryLoading;
+    private partial bool IsInventoryLoading { get; set; }
 
     [ObservableProperty]
-    private string _statusMessage = "Ready";
+    public partial string StatusMessage { get; set; } = "Ready";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(OverallStatusText))]
     [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
-    private bool _statusIsError;
+    public partial bool StatusIsError { get; set; }
 
     [ObservableProperty]
-    private bool _showAllApps;
+    public partial bool ShowAllApps { get; set; }
 
     [ObservableProperty]
-    private bool _blockContactsSearching;
+    public partial bool BlockContactsSearching { get; set; }
 
     [ObservableProperty]
-    private bool _disableVpnBeforeWorkLaunch;
+    public partial bool DisableVpnBeforeWorkLaunch { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsVpnAfterFreezeClientPickerVisible))]
     [NotifyPropertyChangedFor(nameof(IsToggleOnlyVpnAfterFreezeWarningVisible))]
     [NotifyPropertyChangedFor(nameof(IsTunguskaAutomationTokenVisible))]
-    private bool _enableVpnAfterWorkFreeze;
+    public partial bool EnableVpnAfterWorkFreeze { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsFlClashVpnAfterFreezeSelected))]
@@ -182,34 +182,34 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsNekoBoxPlusVpnAfterFreezeSelected))]
     [NotifyPropertyChangedFor(nameof(IsToggleOnlyVpnAfterFreezeWarningVisible))]
     [NotifyPropertyChangedFor(nameof(IsTunguskaAutomationTokenVisible))]
-    private VpnAutomationClientKind _vpnAfterWorkFreezeClient = VpnAutomationClientKind.FlClash;
+    private partial VpnAutomationClientKind VpnAfterWorkFreezeClient { get; set; } = VpnAutomationClientKind.FlClash;
 
     [ObservableProperty]
-    private string _tunguskaAutomationToken = string.Empty;
+    public partial string TunguskaAutomationToken { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private bool _isLogWindowOpen;
+    public partial bool IsLogWindowOpen { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PermissionSummary))]
-    private bool _isPermissionsWindowOpen;
+    public partial bool IsPermissionsWindowOpen { get; set; }
 
     [ObservableProperty]
-    private bool _loggingEnabled = true;
+    public partial bool LoggingEnabled { get; set; } = true;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsAgnosiaThemeSelected))]
     [NotifyPropertyChangedFor(nameof(IsDarkThemeSelected))]
     [NotifyPropertyChangedFor(nameof(IsLightThemeSelected))]
-    private AppThemeKind _selectedTheme = AppThemeKind.Agnosia;
+    private partial AppThemeKind SelectedTheme { get; set; } = AppThemeKind.Agnosia;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LastRefreshSummary))]
-    private DateTimeOffset? _lastRefreshedAt;
+    private partial DateTimeOffset? LastRefreshedAt { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsOnboardingVisible))]
-    private bool _onboardingCompleted = true;
+    private partial bool OnboardingCompleted { get; set; } = true;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsWorkProfileRecoveryVisible))]
@@ -220,21 +220,21 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
     [NotifyPropertyChangedFor(nameof(CanStartProvisioning))]
     [NotifyCanExecuteChangedFor(nameof(StartProvisioningCommand))]
-    private WorkProfileStateKind _workProfileState;
+    private partial WorkProfileStateKind WorkProfileState { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsWorkProfileRecoveryVisible))]
     [NotifyPropertyChangedFor(nameof(WorkProfileRecoveryTitle))]
     [NotifyPropertyChangedFor(nameof(WorkProfileRecoveryMessage))]
-    private WorkProfileRecoveryKind _workProfileRecovery;
+    private partial WorkProfileRecoveryKind WorkProfileRecovery { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(WorkProfileRecoveryMessage))]
-    private string _workProfileDiagnosticReason = string.Empty;
+    private partial string WorkProfileDiagnosticReason { get; set; } = string.Empty;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsWorkProfileRecoveryVisible))]
-    private bool _workProfileRecoveryDismissed;
+    public partial bool WorkProfileRecoveryDismissed { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsOnboardingWelcomeStep))]
@@ -243,7 +243,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsOnboardingFinalStep))]
     [NotifyPropertyChangedFor(nameof(OnboardingStepLabel))]
     [NotifyPropertyChangedFor(nameof(CanContinueOnboardingFromWorkProfile))]
-    private OnboardingStep _onboardingStep = OnboardingStep.Welcome;
+    public partial OnboardingStep OnboardingStep { get; set; } = OnboardingStep.Welcome;
 
     public int PersonalAppsCount => _personalApps.Length;
 
@@ -319,21 +319,29 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     public string WorkProfileRecoveryMessage => WorkProfileRecovery switch
     {
         WorkProfileRecoveryKind.WorkProfileQuietMode =>
-            WithDiagnosticReason("Android сообщает, что рабочий профиль находится в режиме паузы. Включите рабочий профиль в быстрых настройках или настройках Android, затем обновите экран."),
+            WithDiagnosticReason(
+                "Android сообщает, что рабочий профиль находится в режиме паузы. Включите рабочий профиль в быстрых настройках или настройках Android, затем обновите экран."),
         WorkProfileRecoveryKind.WorkProfileUnavailable =>
-            WithDiagnosticReason("Android видит профиль в группе пользователя, но не предоставляет его для межпрофильных операций. Включите или разблокируйте рабочий профиль в настройках Android, затем обновите экран."),
+            WithDiagnosticReason(
+                "Android видит профиль в группе пользователя, но не предоставляет его для межпрофильных операций. Включите или разблокируйте рабочий профиль в настройках Android, затем обновите экран."),
         WorkProfileRecoveryKind.WorkProfileCommandTargetUnavailable =>
-            WithDiagnosticReason("Рабочий профиль доступен Android, но командная активность Agnosia в нем не находится. Подождите завершения установки/запуска профиля, проверьте что Agnosia установлена в рабочем профиле, затем обновите экран."),
+            WithDiagnosticReason(
+                "Рабочий профиль доступен Android, но командная активность Agnosia в нем не находится. Подождите завершения установки/запуска профиля, проверьте что Agnosia установлена в рабочем профиле, затем обновите экран."),
         WorkProfileRecoveryKind.WorkProfileCommandChannelUnavailable =>
-            WithDiagnosticReason("Командная активность Agnosia найдена в рабочем профиле, но подтвержденный ping не прошел. Разблокируйте или включите рабочий профиль и обновите экран."),
+            WithDiagnosticReason(
+                "Командная активность Agnosia найдена в рабочем профиле, но подтвержденный ping не прошел. Разблокируйте или включите рабочий профиль и обновите экран."),
         WorkProfileRecoveryKind.WorkProfileCreatedButAppNotReady =>
-            WithDiagnosticReason("Android видит рабочий профиль, но Agnosia в нем пока не отвечает. Подождите, разблокируйте или включите рабочий профиль и обновите экран."),
+            WithDiagnosticReason(
+                "Android видит рабочий профиль, но Agnosia в нем пока не отвечает. Подождите, разблокируйте или включите рабочий профиль и обновите экран."),
         WorkProfileRecoveryKind.AppInstalledInWorkProfileButNotOwner =>
-            WithDiagnosticReason("Agnosia ответила из рабочего профиля, но Android сообщил, что она не владелец профиля. Чтобы Agnosia управляла этим профилем, удалите старый рабочий профиль в настройках Android и создайте его заново."),
+            WithDiagnosticReason(
+                "Agnosia ответила из рабочего профиля, но Android сообщил, что она не владелец профиля. Чтобы Agnosia управляла этим профилем, удалите старый рабочий профиль в настройках Android и создайте его заново."),
         WorkProfileRecoveryKind.ForeignProfileOwner =>
-            WithDiagnosticReason("Диагностика Android указывает на другого владельца рабочего профиля. Удалите этот рабочий профиль в настройках Android, затем создайте профиль Agnosia заново."),
+            WithDiagnosticReason(
+                "Диагностика Android указывает на другого владельца рабочего профиля. Удалите этот рабочий профиль в настройках Android, затем создайте профиль Agnosia заново."),
         WorkProfileRecoveryKind.ErrorUnknownWithDiagnostics =>
-            WithDiagnosticReason("Agnosia не смогла надежно определить состояние рабочего профиля. Обновите экран или проверьте рабочий профиль в настройках Android."),
+            WithDiagnosticReason(
+                "Agnosia не смогла надежно определить состояние рабочего профиля. Обновите экран или проверьте рабочий профиль в настройках Android."),
         _ => string.Empty
     };
 
@@ -446,10 +454,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }
 
         CancelVisibleIconLoads();
-        if (IsInventoryLoading)
-        {
-            CancelInventoryLoad(updateProgressState: true);
-        }
+        if (IsInventoryLoading) CancelInventoryLoad(true);
     }
 
     partial void OnSelectedProfileChanged(ProfileKind value)
@@ -463,13 +468,10 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     {
         QueueSearchRefresh();
     }
-    
+
     partial void OnSelectedThemeChanged(AppThemeKind value)
     {
-        if (!_isApplyingSnapshot)
-        {
-            AppThemeManager.Apply(value);
-        }
+        if (!_isApplyingSnapshot) AppThemeManager.Apply(value);
 
         QueueSettingsSave();
     }
@@ -487,35 +489,49 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         QueueSettingsSave();
     }
 
-    partial void OnShowAllAppsChanged(bool value) => QueueSettingsSave();
+    partial void OnShowAllAppsChanged(bool value)
+    {
+        QueueSettingsSave();
+    }
 
-    partial void OnBlockContactsSearchingChanged(bool value) => QueueSettingsSave();
+    partial void OnBlockContactsSearchingChanged(bool value)
+    {
+        QueueSettingsSave();
+    }
 
-    partial void OnDisableVpnBeforeWorkLaunchChanged(bool value) => QueueSettingsSave();
+    partial void OnDisableVpnBeforeWorkLaunchChanged(bool value)
+    {
+        QueueSettingsSave();
+    }
 
-    partial void OnEnableVpnAfterWorkFreezeChanged(bool value) => QueueSettingsSave();
+    partial void OnEnableVpnAfterWorkFreezeChanged(bool value)
+    {
+        QueueSettingsSave();
+    }
 
-    partial void OnVpnAfterWorkFreezeClientChanged(VpnAutomationClientKind value) => QueueSettingsSave();
+    partial void OnVpnAfterWorkFreezeClientChanged(VpnAutomationClientKind value)
+    {
+        QueueSettingsSave();
+    }
 
-    partial void OnTunguskaAutomationTokenChanged(string value) => QueueSettingsSave();
+    partial void OnTunguskaAutomationTokenChanged(string value)
+    {
+        QueueSettingsSave();
+    }
 
     partial void OnOnboardingCompletedChanged(bool value)
     {
-        if (value)
-        {
-            StopOnboardingMonitor();
-        }
+        if (value) StopOnboardingMonitor();
     }
 
     partial void OnWorkProfileAvailableChanged(bool value)
     {
-        if (value && IsOnboardingWorkProfileStep)
-        {
-            StartOnboardingMonitorIfNeeded();
-        }
+        if (value && IsOnboardingWorkProfileStep) StartOnboardingMonitorIfNeeded();
     }
 
-    public DashboardWorkspaceViewModel() : this(UnsupportedPlatformBridge.Instance) { }
+    public DashboardWorkspaceViewModel() : this(UnsupportedPlatformBridge.Instance)
+    {
+    }
 
     public DashboardWorkspaceViewModel(IPlatformBridge platformBridge)
         : this(
@@ -539,7 +555,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         IAppEventLogService eventLogService)
     {
         _dashboardService = dashboardService ?? throw new ArgumentNullException(nameof(dashboardService));
-        _platformEventLogReader = platformEventLogReader ?? throw new ArgumentNullException(nameof(platformEventLogReader));
+        _platformEventLogReader =
+            platformEventLogReader ?? throw new ArgumentNullException(nameof(platformEventLogReader));
         _permissionService = permissionService ?? throw new ArgumentNullException(nameof(permissionService));
         _onboardingService = onboardingService ?? throw new ArgumentNullException(nameof(onboardingService));
         _appCommandService = appCommandService ?? throw new ArgumentNullException(nameof(appCommandService));
@@ -564,14 +581,11 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public async Task EnsureInitializedAsync()
     {
-        if (_initialized)
-        {
-            return;
-        }
+        if (_initialized) return;
 
         _initialized = true;
         OnboardingCompleted = await _onboardingService.LoadOnboardingCompletedAsync();
-        await RefreshDashboardAsync(allowDuringOperation: false);
+        await RefreshDashboardAsync(false);
         if (!OnboardingCompleted)
         {
             await AdvanceOnboardingAsync(CancellationToken.None);
@@ -581,17 +595,17 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public void HandlePrimaryActivityResumed()
     {
-        if (!_refreshPermissionsOnResume)
-        {
-            return;
-        }
+        if (!_refreshPermissionsOnResume) return;
 
         _refreshPermissionsOnResume = false;
         _ = RefreshPermissionsAfterResumeAsync();
     }
 
     [RelayCommand]
-    private Task RefreshAsync() => RefreshDashboardAsync(allowDuringOperation: false);
+    private Task RefreshAsync()
+    {
+        return RefreshDashboardAsync(false);
+    }
 
     private async Task RefreshDashboardAsync(bool allowDuringOperation)
     {
@@ -599,7 +613,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             return;
 
         var refreshStartedAt = Stopwatch.GetTimestamp();
-        CancelInventoryLoad(updateProgressState: true);
+        CancelInventoryLoad(true);
         IsBusy = true;
         StatusIsError = false;
         StatusMessage = "Updating";
@@ -671,16 +685,14 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             || HasLoadedInventory
             || IsInventoryLoading
             || _lastProfileSnapshot is null)
-        {
             return;
-        }
 
         StartInventoryLoad(_lastProfileSnapshot);
     }
 
     private int BeginInventoryLoad(out CancellationTokenSource inventoryCancellation)
     {
-        CancelInventoryLoad(updateProgressState: false);
+        CancelInventoryLoad(false);
         inventoryCancellation = new CancellationTokenSource();
         _inventoryLoadCancellation = inventoryCancellation;
         return ++_inventoryLoadGeneration;
@@ -695,10 +707,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }
 
         ++_inventoryLoadGeneration;
-        if (updateProgressState)
-        {
-            IsInventoryLoading = false;
-        }
+        if (updateProgressState) IsInventoryLoading = false;
     }
 
     private async Task LoadInventoryForGenerationAsync(
@@ -719,10 +728,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                if (!IsCurrentInventoryLoad(generation, inventoryCancellation))
-                {
-                    return;
-                }
+                if (!IsCurrentInventoryLoad(generation, inventoryCancellation)) return;
 
                 ApplyInventorySnapshot(inventory);
                 HasLoadedInventory = true;
@@ -737,10 +743,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         {
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                if (!IsCurrentInventoryLoad(generation, inventoryCancellation))
-                {
-                    return;
-                }
+                if (!IsCurrentInventoryLoad(generation, inventoryCancellation)) return;
 
                 HasLoadedInventory = true;
                 IsInventoryLoading = false;
@@ -753,33 +756,36 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (ReferenceEquals(_inventoryLoadCancellation, inventoryCancellation))
-                {
                     _inventoryLoadCancellation = null;
-                }
             }, DispatcherPriority.Background);
             inventoryCancellation.Dispose();
         }
     }
 
-    private bool IsCurrentInventoryLoad(int generation, CancellationTokenSource inventoryCancellation) =>
-        generation == _inventoryLoadGeneration
-        && ReferenceEquals(_inventoryLoadCancellation, inventoryCancellation)
-        && !inventoryCancellation.IsCancellationRequested;
+    private bool IsCurrentInventoryLoad(int generation, CancellationTokenSource inventoryCancellation)
+    {
+        return generation == _inventoryLoadGeneration
+               && ReferenceEquals(_inventoryLoadCancellation, inventoryCancellation)
+               && !inventoryCancellation.IsCancellationRequested;
+    }
 
     [RelayCommand]
-    private void SelectPersonal() => SelectedProfile = ProfileKind.Personal;
+    private void SelectPersonal()
+    {
+        SelectedProfile = ProfileKind.Personal;
+    }
 
     [RelayCommand]
     private void SelectWork()
     {
-        if (WorkProfileAvailable)
-        {
-            SelectedProfile = ProfileKind.Work;
-        }
+        if (WorkProfileAvailable) SelectedProfile = ProfileKind.Work;
     }
 
     [RelayCommand]
-    private void OpenOverviewSection() => SelectedSection = DashboardSection.Overview;
+    private void OpenOverviewSection()
+    {
+        SelectedSection = DashboardSection.Overview;
+    }
 
     [RelayCommand]
     private void OpenAppsSection()
@@ -794,10 +800,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [RelayCommand]
     private void OpenSettingsSection()
     {
-        if (CanOpenSettingsSection)
-        {
-            SelectedSection = DashboardSection.Settings;
-        }
+        if (CanOpenSettingsSection) SelectedSection = DashboardSection.Settings;
     }
 
     [RelayCommand]
@@ -805,13 +808,16 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     {
         if (!LoggingEnabled)
             return;
-        
-        await ReloadPlatformLogsAsync(force: true);
+
+        await ReloadPlatformLogsAsync(true);
         IsLogWindowOpen = true;
     }
 
     [RelayCommand]
-    private void CloseLogs() => IsLogWindowOpen = false;
+    private void CloseLogs()
+    {
+        IsLogWindowOpen = false;
+    }
 
     [RelayCommand]
     private void ClearLogs()
@@ -828,40 +834,76 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void ClosePermissions() => IsPermissionsWindowOpen = false;
+    private void ClosePermissions()
+    {
+        IsPermissionsWindowOpen = false;
+    }
 
     [RelayCommand]
-    private void SelectAgnosiaTheme() => SelectedTheme = AppThemeKind.Agnosia;
+    private void SelectAgnosiaTheme()
+    {
+        SelectedTheme = AppThemeKind.Agnosia;
+    }
 
     [RelayCommand]
-    private void SelectDarkTheme() => SelectedTheme = AppThemeKind.Dark;
+    private void SelectDarkTheme()
+    {
+        SelectedTheme = AppThemeKind.Dark;
+    }
 
     [RelayCommand]
-    private void SelectLightTheme() => SelectedTheme = AppThemeKind.Light;
+    private void SelectLightTheme()
+    {
+        SelectedTheme = AppThemeKind.Light;
+    }
 
     [RelayCommand]
-    private void SelectFlClashVpnAfterFreeze() => VpnAfterWorkFreezeClient = VpnAutomationClientKind.FlClash;
+    private void SelectFlClashVpnAfterFreeze()
+    {
+        VpnAfterWorkFreezeClient = VpnAutomationClientKind.FlClash;
+    }
 
     [RelayCommand]
-    private void SelectClashMetaVpnAfterFreeze() => VpnAfterWorkFreezeClient = VpnAutomationClientKind.ClashMeta;
+    private void SelectClashMetaVpnAfterFreeze()
+    {
+        VpnAfterWorkFreezeClient = VpnAutomationClientKind.ClashMeta;
+    }
 
     [RelayCommand]
-    private void SelectHappVpnAfterFreeze() => VpnAfterWorkFreezeClient = VpnAutomationClientKind.Happ;
+    private void SelectHappVpnAfterFreeze()
+    {
+        VpnAfterWorkFreezeClient = VpnAutomationClientKind.Happ;
+    }
 
     [RelayCommand]
-    private void SelectTunguskaVpnAfterFreeze() => VpnAfterWorkFreezeClient = VpnAutomationClientKind.Tunguska;
+    private void SelectTunguskaVpnAfterFreeze()
+    {
+        VpnAfterWorkFreezeClient = VpnAutomationClientKind.Tunguska;
+    }
 
     [RelayCommand]
-    private void SelectIncyVpnAfterFreeze() => VpnAfterWorkFreezeClient = VpnAutomationClientKind.Incy;
+    private void SelectIncyVpnAfterFreeze()
+    {
+        VpnAfterWorkFreezeClient = VpnAutomationClientKind.Incy;
+    }
 
     [RelayCommand]
-    private void SelectExclaveVpnAfterFreeze() => VpnAfterWorkFreezeClient = VpnAutomationClientKind.Exclave;
+    private void SelectExclaveVpnAfterFreeze()
+    {
+        VpnAfterWorkFreezeClient = VpnAutomationClientKind.Exclave;
+    }
 
     [RelayCommand]
-    private void SelectHusiVpnAfterFreeze() => VpnAfterWorkFreezeClient = VpnAutomationClientKind.Husi;
+    private void SelectHusiVpnAfterFreeze()
+    {
+        VpnAfterWorkFreezeClient = VpnAutomationClientKind.Husi;
+    }
 
     [RelayCommand]
-    private void SelectNekoBoxPlusVpnAfterFreeze() => VpnAfterWorkFreezeClient = VpnAutomationClientKind.NekoBoxPlus;
+    private void SelectNekoBoxPlusVpnAfterFreeze()
+    {
+        VpnAfterWorkFreezeClient = VpnAutomationClientKind.NekoBoxPlus;
+    }
 
     [RelayCommand]
     private void StartOnboarding()
@@ -912,7 +954,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         await RunOperationAsync(
             () => _onboardingService.StartProvisioningAsync(),
             "ProvisioningStarted",
-            useBusyIndicator: true);
+            true);
         StartOnboardingMonitorIfNeeded();
     }
 
@@ -922,7 +964,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         await RunOperationAsync(
             () => _onboardingService.OpenWorkProfileSettingsAsync(),
             "WorkProfileSettingsOpened",
-            useBusyIndicator: true);
+            true);
     }
 
     [RelayCommand]
@@ -945,20 +987,19 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }
     }
 
-    internal Task CloneAsync(AppItemViewModel app) =>
-        RunAppOperationAsync(
+    internal Task CloneAsync(AppItemViewModel app)
+    {
+        return RunAppOperationAsync(
             app,
             snapshot => _appCommandService.CloneAsync(snapshot),
             app.Profile == ProfileKind.Personal
                 ? "CopyPersonalToWorkFinished"
                 : "CopyWorkToPersonalFinished");
+    }
 
     internal async Task MoveToWorkAsync(AppItemViewModel app)
     {
-        if (!app.CanMoveToWork || !TryBeginOperation())
-        {
-            return;
-        }
+        if (!app.CanMoveToWork || !TryBeginOperation()) return;
 
         var shouldRefresh = false;
 
@@ -971,9 +1012,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
                 StatusIsError = true;
                 StatusMessage = ResolveOperationMessage(cloneResult.Message, "CloneFailed");
                 if (IsStaleInstallSourceMessage(cloneResult.Message))
-                {
                     await RefreshAfterStaleInstallSourceAsync(StatusMessage);
-                }
 
                 return;
             }
@@ -993,10 +1032,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         finally
         {
             if (shouldRefresh)
-            {
                 try
                 {
-                    await RefreshDashboardAsync(allowDuringOperation: true);
+                    await RefreshDashboardAsync(true);
                 }
                 catch (Exception ex) when (!StatusIsError)
                 {
@@ -1007,7 +1045,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
                 {
                     StatusMessage = $"{StatusMessage}|ManualRefreshHint";
                 }
-            }
 
             try
             {
@@ -1021,46 +1058,53 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }
     }
 
-    internal Task UninstallAsync(AppItemViewModel app) =>
-        RunAppOperationAsync(app, snapshot => _appCommandService.UninstallAsync(snapshot), "Deleted");
+    internal Task UninstallAsync(AppItemViewModel app)
+    {
+        return RunAppOperationAsync(app, snapshot => _appCommandService.UninstallAsync(snapshot), "Deleted");
+    }
 
-    internal Task ToggleFrozenAsync(AppItemViewModel app) =>
-        RunAppOperationAsync(
+    internal Task ToggleFrozenAsync(AppItemViewModel app)
+    {
+        return RunAppOperationAsync(
             app,
             snapshot => _appCommandService.SetFrozenAsync(snapshot, !snapshot.IsHidden),
             app.IsHidden ? "Restored" : "Hidden");
+    }
 
-    internal Task ForceFreezeAsync(AppItemViewModel app) =>
-        RunAppOperationAsync(app, snapshot => _appCommandService.ForceFreezeAsync(snapshot), "ForceHidden");
+    internal Task ForceFreezeAsync(AppItemViewModel app)
+    {
+        return RunAppOperationAsync(app, snapshot => _appCommandService.ForceFreezeAsync(snapshot), "ForceHidden");
+    }
 
-    internal Task CreateShortcutAsync(AppItemViewModel app) =>
-        RunAppOperationAsync(app, snapshot => _appCommandService.CreateShortcutAsync(snapshot), "ShortcutRequested");
+    internal Task CreateShortcutAsync(AppItemViewModel app)
+    {
+        return RunAppOperationAsync(app, snapshot => _appCommandService.CreateShortcutAsync(snapshot),
+            "ShortcutRequested");
+    }
 
-    internal Task LaunchAsync(AppItemViewModel app) =>
-        RunAppOperationAsync(app, snapshot => _appCommandService.LaunchAsync(snapshot), "Launching");
+    internal Task LaunchAsync(AppItemViewModel app)
+    {
+        return RunAppOperationAsync(app, snapshot => _appCommandService.LaunchAsync(snapshot), "Launching");
+    }
 
-    internal Task ToggleInteractionAccessAsync(AppItemViewModel app) =>
-        RunAppOperationAsync(
+    internal Task ToggleInteractionAccessAsync(AppItemViewModel app)
+    {
+        return RunAppOperationAsync(
             app,
             snapshot => _appCommandService.SetInteractionAccessAsync(snapshot, !snapshot.InteractionAllowed),
             app.InteractionAllowed ? "InteractionDisabled" : "InteractionEnabled");
+    }
 
     internal async Task<byte[]?> LoadAppIconPngAsync(AppSnapshot snapshot, CancellationToken cancellationToken)
     {
-        if (snapshot.IconPng is { Length: > 0 } existingIcon)
-        {
-            return existingIcon;
-        }
+        if (snapshot.IconPng is { Length: > 0 } existingIcon) return existingIcon;
 
         return await QueueIconLoadAsync(snapshot, cancellationToken).ConfigureAwait(false);
     }
 
     private Task<byte[]?> QueueIconLoadAsync(AppSnapshot snapshot, CancellationToken cancellationToken)
     {
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return Task.FromCanceled<byte[]?>(cancellationToken);
-        }
+        if (cancellationToken.IsCancellationRequested) return Task.FromCanceled<byte[]?>(cancellationToken);
 
         var pendingIconLoad = new PendingIconLoad(snapshot, cancellationToken);
         lock (_iconBatchSync)
@@ -1090,16 +1134,10 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
                 _pendingIconLoads.Clear();
             }
 
-            foreach (var completedRequest in batch.Where(request => request.IsCompleted))
-            {
-                completedRequest.Dispose();
-            }
+            foreach (var completedRequest in batch.Where(request => request.IsCompleted)) completedRequest.Dispose();
 
             batch = batch.Where(request => !request.IsCompleted).ToArray();
-            if (batch.Length == 0)
-            {
-                continue;
-            }
+            if (batch.Length == 0) continue;
 
             await LoadIconBatchAsync(batch).ConfigureAwait(false);
         }
@@ -1123,10 +1161,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }
         catch (Exception exception)
         {
-            foreach (var request in batch)
-            {
-                request.TrySetException(exception);
-            }
+            foreach (var request in batch) request.TrySetException(exception);
 
             return;
         }
@@ -1144,18 +1179,12 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     internal async Task RequestPermissionAsync(PermissionItemViewModel permission)
     {
-        if (!permission.CanRequest || !TryBeginOperation())
-        {
-            return;
-        }
+        if (!permission.CanRequest || !TryBeginOperation()) return;
 
         try
         {
             var refreshOnResume = ShouldRefreshPermissionOnResume(permission.Kind);
-            if (refreshOnResume)
-            {
-                _refreshPermissionsOnResume = true;
-            }
+            if (refreshOnResume) _refreshPermissionsOnResume = true;
 
             var result = await _permissionService.RequestPermissionAsync(permission.Kind);
             StatusIsError = !result.Succeeded;
@@ -1165,19 +1194,13 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
             if (!refreshOnResume || !result.Succeeded)
             {
-                if (!result.Succeeded)
-                {
-                    _refreshPermissionsOnResume = false;
-                }
+                if (!result.Succeeded) _refreshPermissionsOnResume = false;
 
                 await ReloadPermissionsAsync();
                 await CompleteOnboardingIfReadyAsync();
             }
 
-            if (permission.Kind == PermissionKind.WorkProfile)
-            {
-                StartOnboardingMonitorIfNeeded();
-            }
+            if (permission.Kind == PermissionKind.WorkProfile) StartOnboardingMonitorIfNeeded();
         }
         catch (Exception ex)
         {
@@ -1200,10 +1223,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     internal async Task OpenAppDetailsSettingsAsync()
     {
-        if (!TryBeginOperation())
-        {
-            return;
-        }
+        if (!TryBeginOperation()) return;
 
         try
         {
@@ -1256,9 +1276,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             WorkProfileRecovery = snapshot.WorkProfileRecovery;
             if (WorkProfileRecovery == WorkProfileRecoveryKind.None
                 || WorkProfileRecovery != previousRecovery)
-            {
                 WorkProfileRecoveryDismissed = false;
-            }
 
             if (IsSupported
                 && !HasSetup
@@ -1283,10 +1301,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
             LastRefreshedAt = DateTimeOffset.Now;
 
-            if (!WorkProfileAvailable && SelectedProfile == ProfileKind.Work)
-            {
-                SelectedProfile = ProfileKind.Personal;
-            }
+            if (!WorkProfileAvailable && SelectedProfile == ProfileKind.Work) SelectedProfile = ProfileKind.Personal;
 
             OnPropertyChanged(nameof(CanOpenAppsSection));
             OnPropertyChanged(nameof(CanOpenSettingsSection));
@@ -1346,9 +1361,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
                 && ReferenceEquals(workApps, _workApps)
                 && selectedProfile == SelectedProfile
                 && string.Equals(searchText, SearchText, StringComparison.Ordinal))
-            {
                 SetVisibleApps(visibleApps);
-            }
         }, DispatcherPriority.Background);
     }
 
@@ -1369,15 +1382,15 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private Task RunAppOperationAsync(
         AppItemViewModel app,
         Func<AppSnapshot, Task<OperationResult>> operation,
-        string successFallback) =>
-        RunOperationAsync(() => operation(app.Snapshot), successFallback, useBusyIndicator: false);
+        string successFallback)
+    {
+        return RunOperationAsync(() => operation(app.Snapshot), successFallback, false);
+    }
 
     private void EnsureSelectedSectionIsAvailable()
     {
         if (!IsDashboardVisible && SelectedSection != DashboardSection.Overview)
-        {
             SelectedSection = DashboardSection.Overview;
-        }
     }
 
     private async Task RunOperationAsync(
@@ -1385,15 +1398,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         string successFallback,
         bool useBusyIndicator)
     {
-        if (!TryBeginOperation())
-        {
-            return;
-        }
+        if (!TryBeginOperation()) return;
 
-        if (useBusyIndicator)
-        {
-            IsBusy = true;
-        }
+        if (useBusyIndicator) IsBusy = true;
 
         try
         {
@@ -1402,13 +1409,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             StatusMessage = string.IsNullOrWhiteSpace(result.Message) ? successFallback : result.Message;
 
             if (result.Succeeded)
-            {
-                await RefreshDashboardAsync(allowDuringOperation: true);
-            }
+                await RefreshDashboardAsync(true);
             else if (IsStaleInstallSourceMessage(result.Message))
-            {
                 await RefreshAfterStaleInstallSourceAsync(StatusMessage);
-            }
         }
         catch (Exception ex)
         {
@@ -1423,10 +1426,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             }
             finally
             {
-                if (useBusyIndicator)
-                {
-                    IsBusy = false;
-                }
+                if (useBusyIndicator) IsBusy = false;
 
                 EndOperation();
                 _settingsSaveCoordinator.TryStartQueued();
@@ -1436,24 +1436,30 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private async Task RefreshAfterStaleInstallSourceAsync(string statusMessage)
     {
-        await RefreshDashboardAsync(allowDuringOperation: true);
+        await RefreshDashboardAsync(true);
         StatusIsError = true;
         StatusMessage = statusMessage;
     }
 
-    private static bool IsStaleInstallSourceMessage(string? message) =>
-        message?.Contains(StaleApkMessageMarker, StringComparison.Ordinal) == true;
+    private static bool IsStaleInstallSourceMessage(string? message)
+    {
+        return message?.Contains(StaleApkMessageMarker, StringComparison.Ordinal) == true;
+    }
 
-    private static bool IsRequiredOnboardingPermission(PermissionKind kind) =>
-        kind is PermissionKind.WorkProfile
+    private static bool IsRequiredOnboardingPermission(PermissionKind kind)
+    {
+        return kind is PermissionKind.WorkProfile
             or PermissionKind.UsageStats
             or PermissionKind.Notifications
             or PermissionKind.PackageInstall;
+    }
 
-    private static bool ShouldRefreshPermissionOnResume(PermissionKind kind) =>
-        kind is PermissionKind.UsageStats
+    private static bool ShouldRefreshPermissionOnResume(PermissionKind kind)
+    {
+        return kind is PermissionKind.UsageStats
             or PermissionKind.PackageInstall
             or PermissionKind.Overlay;
+    }
 
     private void StartOnboardingMonitorIfNeeded()
     {
@@ -1462,14 +1468,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             || OnboardingStep == OnboardingStep.Permissions
             || OnboardingStep == OnboardingStep.Final
             || _onboardingMonitorCancellation is not null)
-        {
             return;
-        }
 
-        if (OnboardingStep == OnboardingStep.WorkProfile && !IsSettingUp && !WorkProfileAvailable)
-        {
-            return;
-        }
+        if (OnboardingStep == OnboardingStep.WorkProfile && !IsSettingUp && !WorkProfileAvailable) return;
 
         _onboardingMonitorCancellation = new CancellationTokenSource();
         _ = MonitorOnboardingAsync(_onboardingMonitorCancellation.Token);
@@ -1492,9 +1493,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
                     || OnboardingStep == OnboardingStep.Welcome
                     || OnboardingStep == OnboardingStep.Permissions
                     || OnboardingStep == OnboardingStep.Final)
-                {
                     return;
-                }
 
                 await Task.Delay(OnboardingMonitorDelayMs, cancellationToken);
             }
@@ -1543,18 +1542,12 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private async Task AdvanceOnboardingAsync(CancellationToken cancellationToken)
     {
-        if (IsBusy || _isOperationInProgress)
-        {
-            return;
-        }
+        if (IsBusy || _isOperationInProgress) return;
 
         if (OnboardingStep == OnboardingStep.WorkProfile)
         {
             await RefreshAsync();
-            if (!WorkProfileAvailable)
-            {
-                return;
-            }
+            if (!WorkProfileAvailable) return;
 
             await ReloadPermissionsAsync();
             OnboardingStep = OnboardingStep.Permissions;
@@ -1571,17 +1564,12 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(AreOnboardingPermissionsGranted));
         if (OnboardingStep == OnboardingStep.Permissions && AreOnboardingPermissionsGranted)
-        {
             OnboardingStep = OnboardingStep.Final;
-        }
     }
 
     private bool TryBeginOperation()
     {
-        if (IsBusy || _isOperationInProgress)
-        {
-            return false;
-        }
+        if (IsBusy || _isOperationInProgress) return false;
 
         _isOperationInProgress = true;
         OnPropertyChanged(nameof(CanStartProvisioning));
@@ -1592,10 +1580,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private void EndOperation()
     {
-        if (!_isOperationInProgress)
-        {
-            return;
-        }
+        if (!_isOperationInProgress) return;
 
         _isOperationInProgress = false;
         OnPropertyChanged(nameof(CanStartProvisioning));
@@ -1603,8 +1588,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         StartProvisioningCommand.NotifyCanExecuteChanged();
     }
 
-    private AppSettingsSnapshot CaptureSettingsSnapshot() =>
-        new(
+    private AppSettingsSnapshot CaptureSettingsSnapshot()
+    {
+        return new AppSettingsSnapshot(
             ShowAllApps,
             BlockContactsSearching,
             DisableVpnBeforeWorkLaunch,
@@ -1613,6 +1599,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             EnableVpnAfterWorkFreeze,
             VpnAfterWorkFreezeClient,
             TunguskaAutomationToken);
+    }
 
     private void QueueSettingsSave()
     {
@@ -1622,10 +1609,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private void SetSettingsSaveStatus(bool isError, string? message)
     {
         StatusIsError = isError;
-        if (!string.IsNullOrWhiteSpace(message))
-        {
-            StatusMessage = message;
-        }
+        if (!string.IsNullOrWhiteSpace(message)) StatusMessage = message;
     }
 
     private void NotifyLogStateChanged()
@@ -1637,10 +1621,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private async Task ReloadPlatformLogsAsync(bool force = false)
     {
-        if (!LoggingEnabled || (!force && !IsLogWindowOpen))
-        {
-            return;
-        }
+        if (!LoggingEnabled || (!force && !IsLogWindowOpen)) return;
 
         var startedAt = Stopwatch.GetTimestamp();
         var logs = await _platformEventLogReader.LoadRecentLogsAsync();
@@ -1652,10 +1633,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     {
         lock (_permissionReloadSync)
         {
-            if (_permissionReloadTask is { IsCompleted: false })
-            {
-                return _permissionReloadTask;
-            }
+            if (_permissionReloadTask is { IsCompleted: false }) return _permissionReloadTask;
 
             _permissionReloadTask = ReloadPermissionsCoreAsync();
             return _permissionReloadTask;
@@ -1669,10 +1647,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
             _permissionItems.Clear();
-            foreach (var snapshot in snapshots)
-            {
-                _permissionItems.Add(new PermissionItemViewModel(this, snapshot));
-            }
+            foreach (var snapshot in snapshots) _permissionItems.Add(new PermissionItemViewModel(this, snapshot));
 
             OnPropertyChanged(nameof(PermissionSummary));
             OnPropertyChanged(nameof(AreOnboardingPermissionsGranted));
@@ -1683,9 +1658,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     {
         if (!_initialized
             || (!IsPermissionsWindowOpen && !IsOnboardingPermissionsStep))
-        {
             return;
-        }
 
         try
         {
@@ -1700,10 +1673,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private void ImportPlatformLogs(IEnumerable<AppLogEntry> logs)
     {
-        if (_eventLogService.ImportPlatformLogs(logs))
-        {
-            NotifyLogStateChanged();
-        }
+        if (_eventLogService.ImportPlatformLogs(logs)) NotifyLogStateChanged();
     }
 
     private async Task ReportErrorOnUiThreadAsync(Exception exception, string fallbackMessage)
@@ -1715,22 +1685,31 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }, DispatcherPriority.Background);
     }
 
-    private static string ResolveOperationMessage(string? message, string fallback) =>
-        string.IsNullOrWhiteSpace(message) ? fallback : message;
+    private static string ResolveOperationMessage(string? message, string fallback)
+    {
+        return string.IsNullOrWhiteSpace(message) ? fallback : message;
+    }
 
-    private static string ResolveExceptionMessage(Exception _, string fallback) => fallback;
+    private static string ResolveExceptionMessage(Exception _, string fallback)
+    {
+        return fallback;
+    }
 
-    private string WithDiagnosticReason(string message) =>
-        string.IsNullOrWhiteSpace(WorkProfileDiagnosticReason)
+    private string WithDiagnosticReason(string message)
+    {
+        return string.IsNullOrWhiteSpace(WorkProfileDiagnosticReason)
             ? message
             : $"{message} Причина: {WorkProfileDiagnosticReason}.";
+    }
 
-    private static string GetAppVersion() =>
-        typeof(DashboardWorkspaceViewModel)
+    private static string GetAppVersion()
+    {
+        return typeof(DashboardWorkspaceViewModel)
             .Assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             ?.InformationalVersion
             .Split('+')[0] ?? "0.9";
+    }
 
     private AppItemViewModel[] UpdateAppItems(
         IReadOnlyList<AppSnapshot> snapshots,
@@ -1769,10 +1748,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private void CancelVisibleIconLoads()
     {
-        foreach (var app in _visibleApps)
-        {
-            app.CancelIconLoad();
-        }
+        foreach (var app in _visibleApps) app.CancelIconLoad();
     }
 
     private void NotifyOverviewMetricsChanged()
@@ -1794,6 +1770,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     {
         private readonly TaskCompletionSource<byte[]?> _completion =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         private readonly CancellationToken _cancellationToken;
         private readonly CancellationTokenRegistration _cancellationRegistration;
 

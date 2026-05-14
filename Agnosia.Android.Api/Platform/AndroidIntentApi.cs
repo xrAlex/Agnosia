@@ -1,7 +1,7 @@
 using Android.Content;
-using Log = Agnosia.Android.Api.AgnosiaLog;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Platform;
 
 public static class AndroidIntentApi
 {

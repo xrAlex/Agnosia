@@ -33,8 +33,14 @@ public sealed partial class PermissionItemViewModel
 
 
     [RelayCommand(CanExecute = nameof(CanRequest))]
-    private Task RequestAsync() => _owner.RequestPermissionAsync(this);
+    private Task RequestAsync()
+    {
+        return _owner.RequestPermissionAsync(this);
+    }
 
     [RelayCommand]
-    private Task OpenAppDetailsSettingsAsync() => _owner.OpenAppDetailsSettingsAsync();
+    private Task OpenAppDetailsSettingsAsync()
+    {
+        return _owner.OpenAppDetailsSettingsAsync();
+    }
 }

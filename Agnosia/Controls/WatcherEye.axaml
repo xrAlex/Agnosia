@@ -5,76 +5,76 @@
              Height="33"
              VerticalAlignment="Center"
              IsHitTestVisible="False">
-  <Grid>
-    <Path Stretch="Fill"
-          Fill="{StaticResource AppChromeBrush}"
-          Stroke="{StaticResource AppAccentBrush}"
-          StrokeThickness="2"
-          Data="M7,34 C28,12 104,12 125,34 C104,56 28,56 7,34 Z" />
+    <Grid>
+        <Path Stretch="Fill"
+              Fill="{StaticResource AppChromeBrush}"
+              Stroke="{StaticResource AppAccentBrush}"
+              StrokeThickness="2"
+              Data="M7,34 C28,12 104,12 125,34 C104,56 28,56 7,34 Z" />
 
-    <Path Margin="9,7"
-          Stretch="Fill"
-          Fill="{StaticResource AppSurfaceAltBrush}"
-          Data="M6,26 C25,10 91,10 110,26 C91,42 25,42 6,26 Z" />
+        <Path Margin="9,7"
+              Stretch="Fill"
+              Fill="{StaticResource AppSurfaceAltBrush}"
+              Data="M6,26 C25,10 91,10 110,26 C91,42 25,42 6,26 Z" />
 
-    <Grid x:Name="Iris"
-          Width="40"
-          Height="22"
-          HorizontalAlignment="Center"
-          VerticalAlignment="Center"
-          ClipToBounds="True">
-      <Grid.Clip>
-        <EllipseGeometry Center="20,9"
-                         RadiusX="16.6"
-                         RadiusY="14.4" />
-      </Grid.Clip>
-      <Grid x:Name="Pupil"
-            Width="13"
-            Height="13"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Center">
-        <Grid.RenderTransform>
-          <TranslateTransform />
-        </Grid.RenderTransform>
+        <Grid x:Name="Iris"
+              Width="40"
+              Height="22"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center"
+              ClipToBounds="True">
+            <Grid.Clip>
+                <EllipseGeometry Center="20,9"
+                                 RadiusX="16.6"
+                                 RadiusY="14.4" />
+            </Grid.Clip>
+            <Grid x:Name="Pupil"
+                  Width="13"
+                  Height="13"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center">
+                <Grid.RenderTransform>
+                    <TranslateTransform />
+                </Grid.RenderTransform>
 
-        <Grid>
-          <Ellipse x:Name="IrisDisc"
-                   Width="16"
-                   Height="14"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   Fill="{StaticResource AppAccentBrush}"
-                   Opacity="0.9"
-                   RenderTransformOrigin="0.5,0.5">
-            <Ellipse.RenderTransform>
-              <ScaleTransform />
-            </Ellipse.RenderTransform>
-          </Ellipse>
-          <Ellipse x:Name="PupilCore"
-                   Width="6"
-                   Height="6"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   Fill="{StaticResource AppBackgroundBrush}"
-                   RenderTransformOrigin="0.5,0.5">
-            <Ellipse.RenderTransform>
-              <ScaleTransform />
-            </Ellipse.RenderTransform>
-          </Ellipse>
-          <Ellipse x:Name="PupilHighlight"
-                   Width="2"
-                   Height="2"
-                   Margin="1,2,0,0"
-                   HorizontalAlignment="Left"
-                   VerticalAlignment="Top"
-                   Fill="{StaticResource AppTextPrimaryBrush}"
-                   Opacity="0.92">
-            <Ellipse.RenderTransform>
-              <TranslateTransform />
-            </Ellipse.RenderTransform>
-          </Ellipse>
+                <Grid>
+                    <Ellipse x:Name="IrisDisc"
+                             Width="16"
+                             Height="14"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center"
+                             Fill="{StaticResource AppAccentBrush}"
+                             Opacity="0.9"
+                             RenderTransformOrigin="0.5,0.5">
+                        <Ellipse.RenderTransform>
+                            <ScaleTransform />
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                    <Ellipse x:Name="PupilCore"
+                             Width="6"
+                             Height="6"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center"
+                             Fill="{StaticResource AppBackgroundBrush}"
+                             RenderTransformOrigin="0.5,0.5">
+                        <Ellipse.RenderTransform>
+                            <ScaleTransform />
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                    <Ellipse x:Name="PupilHighlight"
+                             Width="2"
+                             Height="2"
+                             Margin="1,2,0,0"
+                             HorizontalAlignment="Left"
+                             VerticalAlignment="Top"
+                             Fill="{StaticResource AppTextPrimaryBrush}"
+                             Opacity="0.92">
+                        <Ellipse.RenderTransform>
+                            <TranslateTransform />
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                </Grid>
+            </Grid>
         </Grid>
-      </Grid>
     </Grid>
-  </Grid>
 </UserControl>

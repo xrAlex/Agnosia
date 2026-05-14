@@ -1,16 +1,16 @@
 <Project>
-  <PropertyGroup>
-    <AppVersion>0.9</AppVersion>
-    <Version>$(AppVersion)</Version>
-    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).artifacts\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
-    <DefaultItemExcludes>$(DefaultItemExcludes);$(MSBuildProjectDirectory)\obj\**;$(MSBuildThisFileDirectory).artifacts\**</DefaultItemExcludes>
-    <AndroidSdkDirectory Condition="'$(AndroidSdkDirectory)' == '' and Exists('$(MSBuildThisFileDirectory).android_sdk')">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory).android_sdk'))</AndroidSdkDirectory>
-    <JavaSdkDirectory Condition="'$(JavaSdkDirectory)' == '' and Exists('$(MSBuildThisFileDirectory).android_jdk')">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory).android_jdk'))</JavaSdkDirectory>
-  </PropertyGroup>
+    <PropertyGroup>
+        <AppVersion>0.9</AppVersion>
+        <Version>$(AppVersion)</Version>
+        <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).artifacts\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+        <DefaultItemExcludes>$(DefaultItemExcludes);$(MSBuildProjectDirectory)\obj\**;$(MSBuildThisFileDirectory).artifacts\**</DefaultItemExcludes>
+        <AndroidSdkDirectory Condition="'$(AndroidSdkDirectory)' == '' and Exists('$(MSBuildThisFileDirectory).android_sdk')">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory).android_sdk'))</AndroidSdkDirectory>
+        <JavaSdkDirectory Condition="'$(JavaSdkDirectory)' == '' and Exists('$(MSBuildThisFileDirectory).android_jdk')">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory).android_jdk'))</JavaSdkDirectory>
+    </PropertyGroup>
 
-  <PropertyGroup Condition="$([System.String]::Copy('$(MSBuildProjectName)').Contains('Android'))">
-    <ApplicationVersion>$([System.Text.RegularExpressions.Regex]::Replace('$(AppVersion)', '[^0-9]', ''))</ApplicationVersion>
-    <ApplicationDisplayVersion>$(AppVersion)</ApplicationDisplayVersion>
-    <BaseIntermediateOutputPath>$(LocalAppData)\Agnosia\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
-  </PropertyGroup>
+    <PropertyGroup Condition="$([System.String]::Copy('$(MSBuildProjectName)').Contains('Android'))">
+        <ApplicationVersion>$([System.Text.RegularExpressions.Regex]::Replace('$(AppVersion)', '[^0-9]', ''))</ApplicationVersion>
+        <ApplicationDisplayVersion>$(AppVersion)</ApplicationDisplayVersion>
+        <BaseIntermediateOutputPath>$(LocalAppData)\Agnosia\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    </PropertyGroup>
 </Project>

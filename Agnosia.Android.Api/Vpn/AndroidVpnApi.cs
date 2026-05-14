@@ -1,8 +1,9 @@
+using Agnosia.Android.Api.Platform;
 using Android.Content;
 using Android.Net;
-using Log = Agnosia.Android.Api.AgnosiaLog;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Vpn;
 
 public static class AndroidVpnApi
 {
@@ -10,10 +11,7 @@ public static class AndroidVpnApi
 
     public static bool IsVpnActive(Context context)
     {
-        if (AndroidSystemApi.GetConnectivityManager(context) is not { } connectivityManager)
-        {
-            return false;
-        }
+        if (AndroidSystemApi.GetConnectivityManager(context) is not { } connectivityManager) return false;
 
         try
         {
@@ -28,10 +26,7 @@ public static class AndroidVpnApi
 #pragma warning restore CA1422
             foreach (var network in networks)
             {
-                if (!HasVpnTransport(connectivityManager, network))
-                {
-                    continue;
-                }
+                if (!HasVpnTransport(connectivityManager, network)) continue;
 
                 Log.Info(LogTag, $"VPN detected among available networks: {network}.");
                 return true;
@@ -47,7 +42,9 @@ public static class AndroidVpnApi
         }
     }
 
-    private static bool HasVpnTransport(ConnectivityManager connectivityManager, Network? network) =>
-        network is not null
-        && connectivityManager.GetNetworkCapabilities(network)?.HasTransport(TransportType.Vpn) == true;
+    private static bool HasVpnTransport(ConnectivityManager connectivityManager, Network? network)
+    {
+        return network is not null
+               && connectivityManager.GetNetworkCapabilities(network)?.HasTransport(TransportType.Vpn) == true;
+    }
 }

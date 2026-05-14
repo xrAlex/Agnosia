@@ -1,14 +1,16 @@
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Platform;
 
 public static class AndroidPackageAccessPolicy
 {
     private static readonly AndroidPackageAccessRule[] Rules =
     [
-        new("ru.sberbankmobile", AccessControlDisabled: true)
+        new("ru.sberbankmobile", true)
     ];
 
-    public static bool RequiresCrossProfileInteraction(string? packageName) =>
-        TryGetRule(packageName, out var rule) && rule.AccessControlDisabled;
+    public static bool RequiresCrossProfileInteraction(string? packageName)
+    {
+        return TryGetRule(packageName, out var rule) && rule.AccessControlDisabled;
+    }
 
     public static string[] ApplyRequiredCrossProfilePackages(IEnumerable<string>? packageNames)
     {
@@ -17,12 +19,8 @@ public static class AndroidPackageAccessPolicy
             StringComparer.Ordinal);
 
         foreach (var rule in Rules)
-        {
             if (rule.AccessControlDisabled)
-            {
                 merged.Add(rule.PackageName);
-            }
-        }
 
         return merged.Order(StringComparer.Ordinal).ToArray();
     }
@@ -30,16 +28,12 @@ public static class AndroidPackageAccessPolicy
     private static bool TryGetRule(string? packageName, out AndroidPackageAccessRule rule)
     {
         if (!string.IsNullOrWhiteSpace(packageName))
-        {
             foreach (var candidate in Rules)
-            {
                 if (string.Equals(candidate.PackageName, packageName, StringComparison.Ordinal))
                 {
                     rule = candidate;
                     return true;
                 }
-            }
-        }
 
         rule = default;
         return false;

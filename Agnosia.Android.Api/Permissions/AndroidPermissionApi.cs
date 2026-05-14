@@ -1,13 +1,15 @@
+using Agnosia.Android.Api.Gateways;
+using Agnosia.Android.Api.Platform;
 using Agnosia.Models;
 using Android;
 using Android.Content;
 using Android.Content.PM;
 using Android.Net;
 using Android.Provider;
-using Log = Agnosia.Android.Api.AgnosiaLog;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 using Uri = Android.Net.Uri;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Permissions;
 
 internal static class AndroidPermissionApi
 {
@@ -19,7 +21,7 @@ internal static class AndroidPermissionApi
         try
         {
             return !OperatingSystem.IsAndroidVersionAtLeast(33)
-                || activity.CheckSelfPermission(Manifest.Permission.PostNotifications) == Permission.Granted;
+                   || activity.CheckSelfPermission(Manifest.Permission.PostNotifications) == Permission.Granted;
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
@@ -34,9 +36,7 @@ internal static class AndroidPermissionApi
         {
             if (OperatingSystem.IsAndroidVersionAtLeast(33)
                 && activity.CheckSelfPermission(Manifest.Permission.PostNotifications) != Permission.Granted)
-            {
                 activity.RequestPermissions([Manifest.Permission.PostNotifications], NotificationPermissionRequestCode);
-            }
 
             return OperationResult.Success("Подтвердите разрешение на уведомления в системном диалоге.");
         }
@@ -76,17 +76,11 @@ internal static class AndroidPermissionApi
             return OperationResult.Failure("Android не смог открыть запрос доступа к VPN.");
         }
 
-        if (prepareIntent is null)
-        {
-            return OperationResult.Success("VPN-доступ уже подготовлен.");
-        }
+        if (prepareIntent is null) return OperationResult.Success("VPN-доступ уже подготовлен.");
 
         var result = await activityCommands.StartExternalActivityForResultAsync(prepareIntent, cancellationToken);
         var error = AndroidActivityResultApi.ExtractError(result);
-        if (!string.IsNullOrWhiteSpace(error))
-        {
-            return OperationResult.Failure(error);
-        }
+        if (!string.IsNullOrWhiteSpace(error)) return OperationResult.Failure(error);
 
         return result.ResultCode == Result.Ok
             ? OperationResult.Success("VPN-доступ подготовлен.")
@@ -113,13 +107,11 @@ internal static class AndroidPermissionApi
             var packageName = activity.PackageName;
 
             if (string.IsNullOrWhiteSpace(packageName))
-            {
                 return OperationResult.Failure("Не удалось определить имя пакета приложения.");
-            }
 
             var uri = Uri.FromParts("package", packageName, null);
             var intent = new Intent(Settings.ActionApplicationDetailsSettings);
-            
+
             intent.SetData(uri);
             activity.StartActivity(intent);
 

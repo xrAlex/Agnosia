@@ -1,11 +1,13 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Agnosia.Android.Api.Gateways;
+using Agnosia.Android.Api.Logging;
 using Agnosia.Models;
 using Android.Content;
 using ActivityNotFoundException = Android.Content.ActivityNotFoundException;
 using Exception = System.Exception;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Commands;
 
 public sealed record AndroidAppLaunchResult(
     string PackageName,
@@ -30,18 +32,20 @@ public sealed record AndroidAppLaunchResult(
                 normalizedPackage,
                 normalizedDisplay,
                 AndroidAppLaunchStage.CommandReceived,
-                Succeeded: false,
+                false,
                 AndroidAppLaunchIssueKind.None,
                 string.Empty,
                 [])
             .WithStage(AndroidAppLaunchStage.CommandReceived, "command_received");
     }
 
-    public AndroidAppLaunchResult WithDisplayName(string? displayName) =>
-        this with
+    public AndroidAppLaunchResult WithDisplayName(string? displayName)
+    {
+        return this with
         {
             DisplayName = NormalizeDisplayName(displayName, PackageName)
         };
+    }
 
     public AndroidAppLaunchResult WithStage(AndroidAppLaunchStage stage, string? detail = null)
     {
@@ -92,10 +96,12 @@ public sealed record AndroidAppLaunchResult(
         };
     }
 
-    public OperationResult ToOperationResult() =>
-        Succeeded
+    public OperationResult ToOperationResult()
+    {
+        return Succeeded
             ? OperationResult.Success(Message)
             : OperationResult.Failure(Message);
+    }
 
     public Intent ToIntent()
     {
@@ -104,8 +110,10 @@ public sealed record AndroidAppLaunchResult(
         return intent;
     }
 
-    public AndroidActivityResult ToActivityResult() =>
-        new(Succeeded ? Result.Ok : Result.Canceled, ToIntent());
+    public AndroidActivityResult ToActivityResult()
+    {
+        return new AndroidActivityResult(Succeeded ? Result.Ok : Result.Canceled, ToIntent());
+    }
 
     public void WriteToIntent(Intent intent)
     {
@@ -119,12 +127,17 @@ public sealed record AndroidAppLaunchResult(
         intent.PutExtra(AndroidCommandContract.ResultError, Message);
     }
 
-    public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
+    public string ToJson()
+    {
+        return JsonSerializer.Serialize(this, JsonOptions);
+    }
 
-    public void Log(string tag) =>
+    public void Log(string tag)
+    {
         AgnosiaLog.Info(
             tag,
             $"Launch result. package={PackageName}, displayName={DisplayName}, stage={Stage}, succeeded={Succeeded}, issue={Issue}, message={Message}");
+    }
 
     public static bool TryRead(Intent? intent, out AndroidAppLaunchResult result)
     {
@@ -150,10 +163,7 @@ public sealed record AndroidAppLaunchResult(
 
     public static AndroidAppLaunchIssueKind ClassifyStartActivityException(Exception exception)
     {
-        if (exception is ActivityNotFoundException)
-        {
-            return AndroidAppLaunchIssueKind.MissingLauncherActivity;
-        }
+        if (exception is ActivityNotFoundException) return AndroidAppLaunchIssueKind.MissingLauncherActivity;
 
         return HasBackgroundActivityLaunchSignal(exception)
             ? AndroidAppLaunchIssueKind.BackgroundActivityLaunchBlocked
@@ -164,7 +174,9 @@ public sealed record AndroidAppLaunchResult(
         AndroidAppLaunchStage stage,
         AndroidAppLaunchIssueKind issue,
         string message,
-        string? detail) =>
+        string? detail)
+    {
+        return
         [
             ..Events,
             new AndroidAppLaunchEvent(
@@ -174,14 +186,18 @@ public sealed record AndroidAppLaunchResult(
                 detail,
                 DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
         ];
+    }
 
-    private static bool IsSuccessfulStage(AndroidAppLaunchStage stage) =>
-        stage is AndroidAppLaunchStage.StartActivityAttempted
+    private static bool IsSuccessfulStage(AndroidAppLaunchStage stage)
+    {
+        return stage is AndroidAppLaunchStage.StartActivityAttempted
             or AndroidAppLaunchStage.TargetBecameForeground
             or AndroidAppLaunchStage.PackageRehidden;
+    }
 
-    private static string BuildStageMessage(AndroidAppLaunchStage stage, string displayName) =>
-        stage switch
+    private static string BuildStageMessage(AndroidAppLaunchStage stage, string displayName)
+    {
+        return stage switch
         {
             AndroidAppLaunchStage.CommandReceived =>
                 $"Команда запуска получена для {displayName}.",
@@ -199,9 +215,11 @@ public sealed record AndroidAppLaunchResult(
                 $"{displayName} снова скрыто в рабочем профиле.",
             _ => $"Состояние запуска {displayName}: {stage}."
         };
+    }
 
-    private static string BuildIssueMessage(AndroidAppLaunchIssueKind issue, string displayName) =>
-        issue switch
+    private static string BuildIssueMessage(AndroidAppLaunchIssueKind issue, string displayName)
+    {
+        return issue switch
         {
             AndroidAppLaunchIssueKind.QuietMode =>
                 $"Рабочий профиль на паузе. Включите его в Android и повторите запуск {displayName}.",
@@ -225,21 +243,26 @@ public sealed record AndroidAppLaunchResult(
                 $"Android не смог открыть {displayName}.",
             _ => $"Android не смог открыть {displayName}."
         };
+    }
 
     private static bool HasBackgroundActivityLaunchSignal(Exception exception)
     {
         var message = exception.ToString();
         return message.Contains("background activity", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("background start", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("BAL", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("not allowed to start", StringComparison.OrdinalIgnoreCase);
+               || message.Contains("background start", StringComparison.OrdinalIgnoreCase)
+               || message.Contains("BAL", StringComparison.OrdinalIgnoreCase)
+               || message.Contains("not allowed to start", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string NormalizePackageName(string? packageName) =>
-        string.IsNullOrWhiteSpace(packageName) ? "<unknown>" : packageName;
+    private static string NormalizePackageName(string? packageName)
+    {
+        return string.IsNullOrWhiteSpace(packageName) ? "<unknown>" : packageName;
+    }
 
-    private static string NormalizeDisplayName(string? displayName, string packageName) =>
-        string.IsNullOrWhiteSpace(displayName) ? packageName : displayName;
+    private static string NormalizeDisplayName(string? displayName, string packageName)
+    {
+        return string.IsNullOrWhiteSpace(displayName) ? packageName : displayName;
+    }
 }
 
 public sealed record AndroidAppLaunchEvent(

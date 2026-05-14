@@ -1,14 +1,14 @@
+using Agnosia.Android.Api.Platform;
 using Android.Content;
 using Android.Content.PM;
-using Android.OS;
 using Android.Provider;
 using AndroidUri = Android.Net.Uri;
 using JavaFile = Java.IO.File;
 using JavaFileNotFoundException = Java.IO.FileNotFoundException;
 using JavaIOException = Java.IO.IOException;
-using Log = Agnosia.Android.Api.AgnosiaLog;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Packages;
 
 public static class AndroidPackageApi
 {
@@ -16,10 +16,7 @@ public static class AndroidPackageApi
 
     public static bool CanRequestInstalls(Activity activity, string logTag)
     {
-        if (!OperatingSystem.IsAndroidVersionAtLeast(26))
-        {
-            return true;
-        }
+        if (!OperatingSystem.IsAndroidVersionAtLeast(26)) return true;
 
         try
         {
@@ -37,14 +34,12 @@ public static class AndroidPackageApi
         var intent = new Intent(Settings.ActionManageUnknownAppSources);
         intent.SetData(AndroidUri.Parse($"package:{activity.PackageName}"));
         if (AndroidIntentApi.TryStartActivity(
-            activity,
-            intent,
-            logTag,
-            "Android не смог открыть настройки установки APK.",
-            out var error))
-        {
+                activity,
+                intent,
+                logTag,
+                "Android не смог открыть настройки установки APK.",
+                out var error))
             return true;
-        }
 
         onError(error ?? "Android не смог открыть настройки установки APK.");
         return false;
@@ -58,40 +53,28 @@ public static class AndroidPackageApi
     {
         sourceDirectory = null;
         splitApks = [];
-        if (packageManager is null || string.IsNullOrWhiteSpace(packageName))
-        {
-            return false;
-        }
+        if (packageManager is null || string.IsNullOrWhiteSpace(packageName)) return false;
 
         try
         {
             var app = packageManager.GetApplicationInfo(packageName, PackageInfoFlags.MatchDisabledComponents);
             if ((app.Flags & ApplicationInfoFlags.Installed) == 0 || string.IsNullOrWhiteSpace(app.SourceDir))
-            {
                 return false;
-            }
 
             var parts = new List<string>();
             AddPart(parts, app.SourceDir);
             if (app.SplitSourceDirs is not null)
-            {
                 foreach (var splitSourceDir in app.SplitSourceDirs)
-                {
                     AddPart(parts, splitSourceDir);
-                }
-            }
 
-            if (!AreInstallPartsAvailable(parts))
-            {
-                return false;
-            }
+            if (!AreInstallPartsAvailable(parts)) return false;
 
             sourceDirectory = app.SourceDir;
             splitApks = app.SplitSourceDirs?.Where(path => !string.IsNullOrWhiteSpace(path)).ToArray() ?? [];
             return true;
         }
         catch (Exception exception) when (exception is PackageManager.NameNotFoundException
-            || AndroidRecoverableException.IsMatch(exception))
+                                          || AndroidRecoverableException.IsMatch(exception))
         {
             return false;
         }
@@ -114,7 +97,8 @@ public static class AndroidPackageApi
                 return true;
             }
 
-            var installParts = ResolveFreshInstallParts(activity.PackageManager, packageName, apkPath, splitApks, out var error);
+            var installParts =
+                ResolveFreshInstallParts(activity.PackageManager, packageName, apkPath, splitApks, out var error);
             if (installParts is null)
             {
                 onError(error ?? StaleApkMessage);
@@ -165,7 +149,8 @@ public static class AndroidPackageApi
         int sessionId;
         try
         {
-            sessionId = packageInstaller.CreateSession(new PackageInstaller.SessionParams(PackageInstallMode.FullInstall));
+            sessionId = packageInstaller.CreateSession(
+                new PackageInstaller.SessionParams(PackageInstallMode.FullInstall));
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
@@ -184,15 +169,12 @@ public static class AndroidPackageApi
                 foreach (var path in installParts)
                 {
                     var file = new JavaFile(path);
-                    if (!file.Exists() || !file.CanRead())
-                    {
-                        throw new StaleInstallSourceException(path);
-                    }
+                    if (!file.Exists() || !file.CanRead()) throw new StaleInstallSourceException(path);
 
                     var uri = AndroidUri.FromFile(file)
-                        ?? throw new InvalidOperationException($"Failed to prepare APK URI: {path}");
+                              ?? throw new InvalidOperationException($"Failed to prepare APK URI: {path}");
                     using var input = activity.ContentResolver?.OpenInputStream(uri)
-                        ?? throw new InvalidOperationException($"Failed to open APK: {uri}");
+                                      ?? throw new InvalidOperationException($"Failed to open APK: {uri}");
 
                     using var output = session.OpenWrite(Guid.NewGuid().ToString("N"), 0, -1);
                     input.CopyTo(output);
@@ -201,9 +183,7 @@ public static class AndroidPackageApi
                 }
 
                 if (writtenParts == 0)
-                {
                     throw new InvalidOperationException("Android did not provide any APKs for installation.");
-                }
 
                 session.Commit(callbackPendingIntent.IntentSender);
             }
@@ -253,35 +233,23 @@ public static class AndroidPackageApi
 
                 AddPart(parts, app.SourceDir);
                 if (app.SplitSourceDirs is not null)
-                {
                     foreach (var splitSourceDir in app.SplitSourceDirs)
-                    {
                         AddPart(parts, splitSourceDir);
-                    }
-                }
             }
             catch (PackageManager.NameNotFoundException) when (!string.IsNullOrWhiteSpace(apkPath))
             {
                 AddPart(parts, apkPath);
                 if (splitApks is not null)
-                {
                     foreach (var splitApk in splitApks)
-                    {
                         AddPart(parts, splitApk);
-                    }
-                }
             }
         }
         else
         {
             AddPart(parts, apkPath);
             if (splitApks is not null)
-            {
                 foreach (var splitApk in splitApks)
-                {
                     AddPart(parts, splitApk);
-                }
-            }
         }
 
         if (parts.Count == 0)
@@ -301,10 +269,7 @@ public static class AndroidPackageApi
 
     private static void AddPart(List<string> parts, string? path)
     {
-        if (!string.IsNullOrWhiteSpace(path))
-        {
-            parts.Add(path);
-        }
+        if (!string.IsNullOrWhiteSpace(path)) parts.Add(path);
     }
 
     private static bool AreInstallPartsAvailable(IReadOnlyList<string> parts)
@@ -312,25 +277,22 @@ public static class AndroidPackageApi
         foreach (var part in parts)
         {
             var file = new JavaFile(part);
-            if (!file.Exists() || !file.CanRead())
-            {
-                return false;
-            }
+            if (!file.Exists() || !file.CanRead()) return false;
         }
 
         return true;
     }
 
-    private static bool IsStaleInstallSourceException(Exception exception) =>
-        exception is StaleInstallSourceException
-            or JavaFileNotFoundException
-            or FileNotFoundException
-            || exception is JavaIOException javaIOException
-                && javaIOException.Message?.Contains("ENOENT", StringComparison.OrdinalIgnoreCase) == true
-            || exception.InnerException is not null && IsStaleInstallSourceException(exception.InnerException);
+    private static bool IsStaleInstallSourceException(Exception exception)
+    {
+        return exception is StaleInstallSourceException
+                   or JavaFileNotFoundException
+                   or FileNotFoundException
+               || (exception is JavaIOException javaIOException
+                   && javaIOException.Message?.Contains("ENOENT", StringComparison.OrdinalIgnoreCase) == true)
+               || (exception.InnerException is not null && IsStaleInstallSourceException(exception.InnerException));
+    }
 
     private sealed class StaleInstallSourceException(string path)
-        : IOException($"Install source is unavailable: {path}")
-    {
-    }
+        : IOException($"Install source is unavailable: {path}");
 }

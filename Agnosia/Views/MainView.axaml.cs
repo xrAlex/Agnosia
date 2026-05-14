@@ -13,10 +13,7 @@ public partial class MainView : UserControl
 
         AttachedToVisualTree += async (_, _) =>
         {
-            if (_initialized || DataContext is not DashboardWorkspaceViewModel viewModel)
-            {
-                return;
-            }
+            if (_initialized || DataContext is not DashboardWorkspaceViewModel viewModel) return;
 
             _initialized = true;
             await viewModel.EnsureInitializedAsync();

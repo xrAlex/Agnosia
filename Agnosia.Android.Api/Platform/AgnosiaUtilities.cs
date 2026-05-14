@@ -1,23 +1,29 @@
+using Agnosia.Android.Api.Commands;
 using Agnosia.Android.Api.Internal;
+using Agnosia.Android.Api.Storage;
 using Android.App.Admin;
 using Android.Content;
 using Android.Content.PM;
 using Android.OS;
 using Java.Lang;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Platform;
 
 public static class AgnosiaUtilities
 {
     private static readonly string[] ParentToManagedActions = AgnosiaActions.ParentToManagedCommandActions;
     private static readonly string[] ManagedToParentActions = AgnosiaActions.ManagedToParentCommandActions;
 
-    public static ComponentName GetAdminComponent(Context context, Type adminReceiverType) =>
-        new(context, Class.FromType(adminReceiverType));
+    public static ComponentName GetAdminComponent(Context context, Type adminReceiverType)
+    {
+        return new ComponentName(context, Class.FromType(adminReceiverType));
+    }
 
-    public static bool IsProfileOwner(Context context) =>
-        AndroidSystemApi.GetDevicePolicyManager(context) is { } manager
-        && manager.IsProfileOwnerApp(context.PackageName);
+    public static bool IsProfileOwner(Context context)
+    {
+        return AndroidSystemApi.GetDevicePolicyManager(context) is { } manager
+               && manager.IsProfileOwnerApp(context.PackageName);
+    }
 
     public static void TransferIntentToProfile(Context context, Intent intent)
     {
@@ -28,25 +34,18 @@ public static class AgnosiaUtilities
     private static void TransferIntentToProfileUnsigned(Context context, Intent intent)
     {
         if (!TryTransferIntentToProfileUnsigned(context, intent))
-        {
             throw new InvalidOperationException("Could not resolve the target-profile activity.");
-        }
     }
 
     private static bool TryTransferIntentToProfileUnsigned(Context context, Intent intent)
     {
         var target = ResolveProfileTargetActivity(context, intent);
-        if (target?.ActivityInfo is null)
-        {
-            return false;
-        }
+        if (target?.ActivityInfo is null) return false;
 
         var packageName = target.ActivityInfo.PackageName;
         var activityName = target.ActivityInfo.Name;
         if (string.IsNullOrWhiteSpace(packageName) || string.IsNullOrWhiteSpace(activityName))
-        {
             throw new InvalidOperationException("Android returned incomplete target-profile activity data.");
-        }
 
         intent.SetComponent(new ComponentName(packageName, activityName));
         return true;
@@ -60,29 +59,16 @@ public static class AgnosiaUtilities
 
     public static bool HasAssociatedProfile(Context context)
     {
-        if (AndroidSystemApi.GetCrossProfileApps(context) is not { } crossProfileApps)
-        {
-            return false;
-        }
+        if (AndroidSystemApi.GetCrossProfileApps(context) is not { } crossProfileApps) return false;
 
         var targetProfiles = crossProfileApps.TargetUserProfiles;
-        if (targetProfiles.Count == 0)
-        {
-            return false;
-        }
+        if (targetProfiles.Count == 0) return false;
 
-        if (!AndroidApiLevel.IsAtLeastVanillaIceCream())
-        {
-            return true;
-        }
+        if (!AndroidApiLevel.IsAtLeastVanillaIceCream()) return true;
 
         foreach (var userHandle in targetProfiles)
-        {
             if (crossProfileApps.IsManagedProfile(userHandle))
-            {
                 return true;
-            }
-        }
 
         return false;
     }
@@ -112,29 +98,19 @@ public static class AgnosiaUtilities
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         storage.SetBoolean(StorageKeys.IsSettingUp, true);
         storage.SetBoolean(StorageKeys.HasSetup, false);
-        if (storage.GetLong(StorageKeys.SetupStartedAtUtc) <= 0)
-        {
-            storage.SetLong(StorageKeys.SetupStartedAtUtc, now);
-        }
+        if (storage.GetLong(StorageKeys.SetupStartedAtUtc) <= 0) storage.SetLong(StorageKeys.SetupStartedAtUtc, now);
 
         storage.SetLong(StorageKeys.ManagedProfileProvisionedAtUtc, now);
 
         var managedProfileUser = AndroidProvisioningApi.GetManagedProfileUserHandle(intent);
-        if (managedProfileUser is null)
-        {
-            return;
-        }
+        if (managedProfileUser is null) return;
 
         storage.SetString(StorageKeys.ManagedProfileUserHandle, managedProfileUser.ToString());
         var userSerial = AndroidSystemApi.GetUserManager(context)?.GetSerialNumberForUser(managedProfileUser) ?? -1;
         if (userSerial >= 0)
-        {
             storage.SetLong(StorageKeys.ManagedProfileUserSerial, userSerial);
-        }
         else
-        {
             storage.Remove(StorageKeys.ManagedProfileUserSerial);
-        }
     }
 
     public static void ClearWorkProfileConfiguredState()
@@ -149,7 +125,7 @@ public static class AgnosiaUtilities
         storage.Remove(StorageKeys.ManagedProfileUserSerial);
     }
 
-    public static void DisableMainLauncherActivity(Context context, Type mainActivityType)
+    private static void DisableMainLauncherActivity(Context context, Type mainActivityType)
     {
         context.PackageManager?.SetComponentEnabledSetting(
             new ComponentName(context, Class.FromType(mainActivityType)),
@@ -157,44 +133,31 @@ public static class AgnosiaUtilities
             ComponentEnableOption.DontKillApp);
     }
 
-    public static void EnforceWorkProfilePolicies(Context context, Type adminReceiverType, Type mainActivityType, bool enableProfile = false)
+    public static void EnforceWorkProfilePolicies(Context context, Type adminReceiverType, Type mainActivityType,
+        bool enableProfile = false)
     {
         DisableMainLauncherActivity(context, mainActivityType);
         EnsureCrossProfileCommandActionsRegistered();
 
-        if (AndroidSystemApi.GetDevicePolicyManager(context) is not { } manager)
-        {
-            return;
-        }
+        if (AndroidSystemApi.GetDevicePolicyManager(context) is not { } manager) return;
 
         var admin = GetAdminComponent(context, adminReceiverType);
-        if (enableProfile)
-        {
-            manager.SetProfileEnabled(admin);
-        }
+        if (enableProfile) manager.SetProfileEnabled(admin);
 
         manager.ClearCrossProfileIntentFilters(admin);
 
-        foreach (var action in ParentToManagedActions)
-        {
-            AddParentToManagedCrossProfileIntent(manager, admin, action);
-        }
+        foreach (var action in ParentToManagedActions) AddParentToManagedCrossProfileIntent(manager, admin, action);
 
-        foreach (var action in ManagedToParentActions)
-        {
-            AddManagedToParentCrossProfileIntent(manager, admin, action);
-        }
+        foreach (var action in ManagedToParentActions) AddManagedToParentCrossProfileIntent(manager, admin, action);
 
-        AndroidPolicyApi.ApplyCrossProfileContactsPolicy(manager, admin, SettingsManager.Instance.GetBlockContactsSearchingEnabled());
+        AndroidPolicyApi.ApplyCrossProfileContactsPolicy(manager, admin,
+            SettingsManager.Instance.GetBlockContactsSearchingEnabled());
         AndroidPolicyApi.TryEnsureRequiredCrossProfilePackages(manager, admin, nameof(AgnosiaUtilities));
     }
 
     public static void EnforceUserRestrictions(Context context, Type adminReceiverType)
     {
-        if (AndroidSystemApi.GetDevicePolicyManager(context) is not { } manager)
-        {
-            return;
-        }
+        if (AndroidSystemApi.GetDevicePolicyManager(context) is not { } manager) return;
 
         var admin = GetAdminComponent(context, adminReceiverType);
         manager.ClearUserRestriction(admin, UserManager.DisallowInstallApps);
@@ -203,18 +166,25 @@ public static class AgnosiaUtilities
         AndroidPolicyApi.AddParentProfileAppLinking(manager, admin);
     }
 
-    private static void AddCrossProfileIntent(DevicePolicyManager manager, ComponentName admin, string action, DevicePolicyManagerFlags flag)
+    private static void AddCrossProfileIntent(DevicePolicyManager manager, ComponentName admin, string action,
+        DevicePolicyManagerFlags flag)
     {
         var filter = new IntentFilter(action);
         filter.AddCategory(Intent.CategoryDefault);
         manager.AddCrossProfileIntentFilter(admin, filter, flag);
     }
 
-    private static void AddParentToManagedCrossProfileIntent(DevicePolicyManager manager, ComponentName admin, string action) =>
+    private static void AddParentToManagedCrossProfileIntent(DevicePolicyManager manager, ComponentName admin,
+        string action)
+    {
         AddCrossProfileIntent(manager, admin, action, DevicePolicyManagerFlags.ManagedCanAccessParent);
+    }
 
-    private static void AddManagedToParentCrossProfileIntent(DevicePolicyManager manager, ComponentName admin, string action) =>
+    private static void AddManagedToParentCrossProfileIntent(DevicePolicyManager manager, ComponentName admin,
+        string action)
+    {
         AddCrossProfileIntent(manager, admin, action, DevicePolicyManagerFlags.ParentCanAccessManaged);
+    }
 
     private static void EnsureCrossProfileCommandActionsRegistered()
     {
@@ -225,10 +195,8 @@ public static class AgnosiaUtilities
             .Select(group => group.Key)
             .ToArray();
         if (duplicateActions.Length > 0)
-        {
             throw new InvalidOperationException(
                 "Duplicate cross-profile command action registration: " + string.Join(", ", duplicateActions));
-        }
 
         EnsureActionsRegistered(
             AgnosiaActions.ParentToManagedCommandActions,
@@ -250,10 +218,7 @@ public static class AgnosiaUtilities
         var missingActions = declaredActions
             .Where(action => !registered.Contains(action))
             .ToArray();
-        if (missingActions.Length == 0)
-        {
-            return;
-        }
+        if (missingActions.Length == 0) return;
 
         throw new InvalidOperationException(
             $"Missing {direction} cross-profile command action registration: {string.Join(", ", missingActions)}");
@@ -269,10 +234,7 @@ public static class AgnosiaUtilities
             .Where(action => !localOnlyActions.Contains(action))
             .Where(action => !crossProfileActions.Contains(action))
             .ToArray();
-        if (missingActions.Length == 0)
-        {
-            return;
-        }
+        if (missingActions.Length == 0) return;
 
         throw new InvalidOperationException(
             "Target-profile activity command actions are missing cross-profile filters: " +
@@ -283,24 +245,16 @@ public static class AgnosiaUtilities
     {
         var flags = AndroidSystemApi.GetQueryIntentActivityFlags();
         var activities = context.PackageManager?.QueryIntentActivities(intent, flags);
-        if (activities is null)
-        {
-            return null;
-        }
+        if (activities is null) return null;
 
         ResolveInfo? fallback = null;
         foreach (var activity in activities)
         {
-            if (AndroidSystemApi.IsCrossProfileIntentForwarder(activity))
-            {
-                return activity;
-            }
+            if (AndroidSystemApi.IsCrossProfileIntentForwarder(activity)) return activity;
 
             if (fallback is null
                 && !string.Equals(activity.ActivityInfo?.PackageName, context.PackageName, StringComparison.Ordinal))
-            {
                 fallback = activity;
-            }
         }
 
         return fallback;

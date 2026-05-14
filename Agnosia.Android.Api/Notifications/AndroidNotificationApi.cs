@@ -1,7 +1,8 @@
+using Agnosia.Android.Api.Platform;
 using Android.Content;
 using AndroidX.Core.App;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Notifications;
 
 public static class AndroidNotificationApi
 {
@@ -40,7 +41,7 @@ public static class AndroidNotificationApi
         }
 
         return builder.Build()
-            ?? throw new InvalidOperationException("Android could not build a notification.");
+               ?? throw new InvalidOperationException("Android could not build a notification.");
     }
 
     private static void EnsureNotificationChannel(
@@ -52,9 +53,7 @@ public static class AndroidNotificationApi
     {
         if (AndroidSystemApi.GetNotificationManager(context) is not { } manager
             || manager.GetNotificationChannel(channelId) is not null)
-        {
             return;
-        }
 
         var channel = new NotificationChannel(channelId, channelName, importance)
         {

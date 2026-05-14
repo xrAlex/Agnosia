@@ -1,10 +1,13 @@
 using System.Text.Json;
+using Agnosia.Android.Api.Commands;
+using Agnosia.Android.Api.Packages;
+using Agnosia.Android.Api.Platform;
 using Agnosia.Models;
 using Android.Content;
 using Android.OS;
-using Log = Agnosia.Android.Api.AgnosiaLog;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Gateways;
 
 public static class AndroidProfileCommandGateway
 {
@@ -23,9 +26,11 @@ public static class AndroidProfileCommandGateway
 
     internal static async Task<bool> CanReachWorkProfileAsync(
         AndroidActivityCommandGateway commandRunner,
-        CancellationToken cancellationToken) =>
-        (await CheckWorkProfileOwnerAsync(commandRunner, cancellationToken)).Kind
-        == WorkProfileOwnerCheckKind.AppIsProfileOwner;
+        CancellationToken cancellationToken)
+    {
+        return (await CheckWorkProfileOwnerAsync(commandRunner, cancellationToken)).Kind
+               == WorkProfileOwnerCheckKind.AppIsProfileOwner;
+    }
 
     internal static async Task<WorkProfileOwnerCheckResult> CheckWorkProfileOwnerAsync(
         AndroidActivityCommandGateway commandRunner,
@@ -34,18 +39,14 @@ public static class AndroidProfileCommandGateway
         cancellationToken.ThrowIfCancellationRequested();
         var activity = commandRunner.CurrentActivity;
         if (string.IsNullOrWhiteSpace(AuthenticationUtility.GetExistingKey()))
-        {
             return new WorkProfileOwnerCheckResult(
                 WorkProfileOwnerCheckKind.AuthenticationKeyMissing,
                 "authKey=missing");
-        }
 
         if (!AgnosiaUtilities.HasWorkProfileTarget(activity))
-        {
             return new WorkProfileOwnerCheckResult(
                 WorkProfileOwnerCheckKind.TargetUnavailable,
                 "crossProfileTarget=missing");
-        }
 
         using var pingCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         pingCancellation.CancelAfter(ProfilePingTimeout);
@@ -53,7 +54,7 @@ public static class AndroidProfileCommandGateway
         {
             var result = await commandRunner.StartActivityForResultAsync(
                 new Intent(AgnosiaActions.ProfilePing),
-                useWorkProfile: true,
+                true,
                 pingCancellation.Token);
             return InterpretProfilePingResult(result);
         }
@@ -73,16 +74,14 @@ public static class AndroidProfileCommandGateway
         CancellationToken cancellationToken)
     {
         if (profile == ProfileKind.Personal)
-        {
             return await QueryLocalAppsAsync(commandRunner.CurrentActivity, showAll, cancellationToken)
                 .ConfigureAwait(false);
-        }
 
         var intent = new Intent(AgnosiaActions.QueryApps);
         intent.PutExtra(ExtraShowAll, showAll);
         var result = await commandRunner.StartActivityForResultAsync(
             intent,
-            useWorkProfile: true,
+            true,
             cancellationToken).ConfigureAwait(false);
         if (result.ResultCode != Result.Ok || result.Data is null)
         {
@@ -93,7 +92,8 @@ public static class AndroidProfileCommandGateway
         var apps = DeserializeResult<IReadOnlyList<AppServiceModel>>(
             result.Data.GetStringExtra(AndroidCommandContract.ResultAppsJson),
             "work apps") ?? [];
-        var interactionPackages = result.Data.GetStringArrayExtra(AndroidCommandContract.ResultInteractionPackages) ?? [];
+        var interactionPackages =
+            result.Data.GetStringArrayExtra(AndroidCommandContract.ResultInteractionPackages) ?? [];
         return new ProfileAppsQueryResult(apps, interactionPackages);
     }
 
@@ -104,19 +104,17 @@ public static class AndroidProfileCommandGateway
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (app.Profile == ProfileKind.Personal)
-        {
             return await LoadLocalAppIconAsync(
                     commandRunner.CurrentActivity,
                     app.PackageName,
                     cancellationToken)
                 .ConfigureAwait(false);
-        }
 
         var intent = new Intent(AgnosiaActions.QueryAppIcon);
         intent.PutExtra(ExtraPackage, app.PackageName);
         var result = await commandRunner.StartActivityForResultAsync(
                 intent,
-                useWorkProfile: true,
+                true,
                 cancellationToken)
             .ConfigureAwait(false);
         if (result.ResultCode != Result.Ok || result.Data is null)
@@ -134,10 +132,7 @@ public static class AndroidProfileCommandGateway
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (apps.Count == 0)
-        {
-            return new Dictionary<string, byte[]?>(StringComparer.Ordinal);
-        }
+        if (apps.Count == 0) return new Dictionary<string, byte[]?>(StringComparer.Ordinal);
 
         var icons = new Dictionary<string, byte[]?>(StringComparer.Ordinal);
         var personalApps = apps.Where(app => app.Profile == ProfileKind.Personal).ToArray();
@@ -150,10 +145,7 @@ public static class AndroidProfileCommandGateway
                     personalApps.Select(app => app.PackageName).Distinct(StringComparer.Ordinal).ToArray(),
                     cancellationToken)
                 .ConfigureAwait(false);
-            foreach (var (packageName, iconPng) in personalIcons)
-            {
-                icons[packageName] = iconPng;
-            }
+            foreach (var (packageName, iconPng) in personalIcons) icons[packageName] = iconPng;
         }
 
         if (workApps.Length > 0)
@@ -166,24 +158,18 @@ public static class AndroidProfileCommandGateway
             intent.PutExtra(ExtraPackages, packageNames);
             var result = await commandRunner.StartActivityForResultAsync(
                     intent,
-                    useWorkProfile: true,
+                    true,
                     cancellationToken)
                 .ConfigureAwait(false);
             if (result.ResultCode != Result.Ok || result.Data is null)
             {
                 Log.Warn(LogTag, $"Failed to query {packageNames.Length} work app icons.");
-                foreach (var packageName in packageNames)
-                {
-                    icons.TryAdd(packageName, null);
-                }
+                foreach (var packageName in packageNames) icons.TryAdd(packageName, null);
             }
             else
             {
                 var bundle = result.Data.GetBundleExtra(AndroidCommandContract.ResultIconsBundle);
-                foreach (var packageName in packageNames)
-                {
-                    icons[packageName] = bundle?.GetByteArray(packageName);
-                }
+                foreach (var packageName in packageNames) icons[packageName] = bundle?.GetByteArray(packageName);
             }
         }
 
@@ -196,7 +182,7 @@ public static class AndroidProfileCommandGateway
     {
         var result = await commandRunner.StartActivityForResultAsync(
             new Intent(AgnosiaActions.QueryCrossProfilePackages),
-            useWorkProfile: true,
+            true,
             cancellationToken);
         if (result.ResultCode != Result.Ok || result.Data is null)
         {
@@ -213,7 +199,7 @@ public static class AndroidProfileCommandGateway
     {
         var result = await commandRunner.StartActivityForResultAsync(
             new Intent(AgnosiaActions.QueryLogs),
-            useWorkProfile: true,
+            true,
             cancellationToken);
         if (result.ResultCode != Result.Ok || result.Data is null)
         {
@@ -228,21 +214,25 @@ public static class AndroidProfileCommandGateway
 
     internal static Task<bool> QueryWorkUsageStatsAccessAsync(
         AndroidActivityCommandGateway commandRunner,
-        CancellationToken cancellationToken) =>
-        QueryWorkBooleanAsync(
+        CancellationToken cancellationToken)
+    {
+        return QueryWorkBooleanAsync(
             commandRunner,
             AgnosiaActions.QueryUsageStatsAccess,
             AndroidCommandContract.ResultUsageStatsAccess,
             cancellationToken);
+    }
 
     internal static Task<bool> QueryWorkPackageInstallAccessAsync(
         AndroidActivityCommandGateway commandRunner,
-        CancellationToken cancellationToken) =>
-        QueryWorkBooleanAsync(
+        CancellationToken cancellationToken)
+    {
+        return QueryWorkBooleanAsync(
             commandRunner,
             AgnosiaActions.QueryPackageInstallAccess,
             AndroidCommandContract.ResultPackageInstallAccess,
             cancellationToken);
+    }
 
     internal static Task<OperationResult> EnableSystemAppInWorkProfileAsync(
         AndroidActivityCommandGateway commandRunner,
@@ -286,14 +276,12 @@ public static class AndroidProfileCommandGateway
         intent.PutExtra(ExtraPackages, packages);
         var result = await commandRunner.StartActivityForResultAsync(
             intent,
-            useWorkProfile: true,
+            true,
             cancellationToken);
         if (result.ResultCode == Result.Canceled)
-        {
             return OperationResult.Failure(
                 AndroidActivityResultApi.ExtractError(result)
                 ?? "Android отклонил изменение межпрофильной политики.");
-        }
 
         return result.Data?.GetBooleanExtra(AndroidCommandContract.ResultToggleSuccess, false) == true
             ? OperationResult.Success(successMessage)
@@ -306,10 +294,7 @@ public static class AndroidProfileCommandGateway
         bool value,
         CancellationToken cancellationToken = default)
     {
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return Task.FromCanceled<OperationResult>(cancellationToken);
-        }
+        if (cancellationToken.IsCancellationRequested) return Task.FromCanceled<OperationResult>(cancellationToken);
 
         var intent = new Intent(AgnosiaActions.SynchronizePreference);
         intent.PutExtra(ExtraName, name);
@@ -352,17 +337,14 @@ public static class AndroidProfileCommandGateway
         string resultExtra,
         CancellationToken cancellationToken)
     {
-        if (TryGetCachedBooleanQuery(action, out var cachedValue))
-        {
-            return cachedValue;
-        }
+        if (TryGetCachedBooleanQuery(action, out var cachedValue)) return cachedValue;
 
         var result = await commandRunner.StartActivityForResultAsync(
             new Intent(action),
-            useWorkProfile: true,
+            true,
             cancellationToken);
         var value = result.ResultCode == Result.Ok
-            && result.Data?.GetBooleanExtra(resultExtra, false) == true;
+                    && result.Data?.GetBooleanExtra(resultExtra, false) == true;
         SetCachedBooleanQuery(action, value);
         return value;
     }
@@ -375,7 +357,7 @@ public static class AndroidProfileCommandGateway
     {
         var result = await commandRunner.StartActivityForResultAsync(
             intent,
-            useWorkProfile: true,
+            true,
             cancellationToken);
         return AndroidActivityResultApi.ToPackageOperationResult(result, successMessage);
     }
@@ -383,8 +365,9 @@ public static class AndroidProfileCommandGateway
     private static Task<ProfileAppsQueryResult?> QueryLocalAppsAsync(
         Context context,
         bool showAll,
-        CancellationToken cancellationToken) =>
-        Task.Run(() =>
+        CancellationToken cancellationToken)
+    {
+        return Task.Run(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (context.PackageManager is not { } packageManager)
@@ -397,38 +380,39 @@ public static class AndroidProfileCommandGateway
                 context,
                 packageManager,
                 AndroidSystemApi.GetDevicePolicyManager(context),
-                admin: null,
+                null,
                 showAll,
                 cancellationToken);
             return new ProfileAppsQueryResult(apps, []);
         }, cancellationToken);
+    }
 
     private static Task<byte[]?> LoadLocalAppIconAsync(
         Context context,
         string packageName,
-        CancellationToken cancellationToken) =>
-        Task.Run(() =>
+        CancellationToken cancellationToken)
+    {
+        return Task.Run(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
             return context.PackageManager is { } packageManager
                 ? AndroidAppInventoryApi.LoadAppIconPng(context, packageManager, packageName, cancellationToken)
                 : null;
         }, cancellationToken);
+    }
 
     private static Task<IReadOnlyDictionary<string, byte[]?>> LoadLocalAppIconsAsync(
         Context context,
         IReadOnlyList<string> packageNames,
-        CancellationToken cancellationToken) =>
-        Task.Run<IReadOnlyDictionary<string, byte[]?>>(() =>
+        CancellationToken cancellationToken)
+    {
+        return Task.Run<IReadOnlyDictionary<string, byte[]?>>(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
             var icons = new Dictionary<string, byte[]?>(StringComparer.Ordinal);
             if (context.PackageManager is not { } packageManager)
             {
-                foreach (var packageName in packageNames)
-                {
-                    icons[packageName] = null;
-                }
+                foreach (var packageName in packageNames) icons[packageName] = null;
 
                 return icons;
             }
@@ -445,6 +429,7 @@ public static class AndroidProfileCommandGateway
 
             return icons;
         }, cancellationToken);
+    }
 
     private static Intent CreateSystemPackageIntent(string action, string packageName)
     {
@@ -488,7 +473,7 @@ public static class AndroidProfileCommandGateway
         }
 
         var mainLooper = Looper.MainLooper
-            ?? throw new InvalidOperationException("Android main looper is unavailable.");
+                         ?? throw new InvalidOperationException("Android main looper is unavailable.");
         new Handler(mainLooper).Post(() =>
         {
             try
@@ -506,10 +491,7 @@ public static class AndroidProfileCommandGateway
 
     private static T? DeserializeResult<T>(string? raw, string description)
     {
-        if (string.IsNullOrWhiteSpace(raw))
-        {
-            return default;
-        }
+        if (string.IsNullOrWhiteSpace(raw)) return default;
 
         try
         {
@@ -553,11 +535,9 @@ public static class AndroidProfileCommandGateway
         if (result.Data?.GetBooleanExtra(AndroidCommandContract.ResultProfileOwnerCheckPerformed, false) == true)
         {
             if (!AuthenticationUtility.CheckIntent(result.Data))
-            {
                 return new WorkProfileOwnerCheckResult(
                     WorkProfileOwnerCheckKind.Unreachable,
                     "profilePing=unsignedOwnerCheck");
-            }
 
             var isProfileOwner = result.Data.GetBooleanExtra(AndroidCommandContract.ResultIsProfileOwner, false);
             return isProfileOwner

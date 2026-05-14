@@ -5,16 +5,16 @@
              x:Class="Agnosia.Views.PermissionListView"
              x:Name="Root"
              x:DataType="views:PermissionListView">
-  <ItemsControl ItemsSource="{Binding Items, ElementName=Root}">
-    <ItemsControl.ItemsPanel>
-      <ItemsPanelTemplate>
-        <StackPanel Orientation="Vertical" />
-      </ItemsPanelTemplate>
-    </ItemsControl.ItemsPanel>
-    <ItemsControl.ItemTemplate>
-      <DataTemplate x:DataType="vm:PermissionItemViewModel">
-        <views:PermissionItemView />
-      </DataTemplate>
-    </ItemsControl.ItemTemplate>
-  </ItemsControl>
+    <ItemsControl ItemsSource="{Binding Items, ElementName=Root}">
+        <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+                <StackPanel Orientation="Vertical" />
+            </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:PermissionItemViewModel">
+                <views:PermissionItemView />
+            </DataTemplate>
+        </ItemsControl.ItemTemplate>
+    </ItemsControl>
 </UserControl>

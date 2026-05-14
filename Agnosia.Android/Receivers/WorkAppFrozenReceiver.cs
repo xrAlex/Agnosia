@@ -1,7 +1,10 @@
-using Agnosia.Android.Api;
+using Agnosia.Android.Api.Commands;
+using Agnosia.Android.Api.Gateways;
+using Agnosia.Android.Api.Platform;
+using Agnosia.Android.Api.Vpn;
 using Agnosia.Android.Services;
 using Android.Content;
-using Log = Agnosia.Android.Api.AgnosiaLog;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Receivers;
 
@@ -14,10 +17,7 @@ public sealed class WorkAppFrozenReceiver : BroadcastReceiver
 
     public override void OnReceive(Context? context, Intent? intent)
     {
-        if (context is null)
-        {
-            return;
-        }
+        if (context is null) return;
 
         if (intent is null)
         {
@@ -39,7 +39,6 @@ public sealed class WorkAppFrozenReceiver : BroadcastReceiver
 
         var pendingResult = GoAsync();
         var appContext = context.ApplicationContext ?? context;
-        var resultToFinish = pendingResult;
         var trigger = intent.GetStringExtra(AndroidProfileCommandGateway.ExtraTrigger) ?? "work_app_frozen_broadcast";
         _ = Task.Run(async () =>
         {
@@ -52,11 +51,13 @@ public sealed class WorkAppFrozenReceiver : BroadcastReceiver
                 var result = await AndroidVpnAutomationApi.EnableConfiguredVpnAfterWorkFreezeAsync(appContext, trigger);
                 if (result.Succeeded)
                 {
-                    Log.Info(LogTag, $"Work-app frozen broadcast handled successfully. trigger={trigger}, message={result.Message}");
+                    Log.Info(LogTag,
+                        $"Work-app frozen broadcast handled successfully. trigger={trigger}, message={result.Message}");
                     return;
                 }
 
-                Log.Warn(LogTag, $"Work-app frozen broadcast handling failed. trigger={trigger}, message={result.Message}");
+                Log.Warn(LogTag,
+                    $"Work-app frozen broadcast handling failed. trigger={trigger}, message={result.Message}");
             }
             catch (Exception exception)
             {
@@ -74,7 +75,7 @@ public sealed class WorkAppFrozenReceiver : BroadcastReceiver
                     Log.Warn(LogTag, $"Failed to hide overlay after work-app frozen: {hideException.Message}");
                 }
 
-                resultToFinish?.Finish();
+                pendingResult?.Finish();
             }
         });
     }

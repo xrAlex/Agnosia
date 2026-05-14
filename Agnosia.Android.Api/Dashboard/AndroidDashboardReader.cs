@@ -1,8 +1,12 @@
+using Agnosia.Android.Api.Gateways;
+using Agnosia.Android.Api.Logging;
+using Agnosia.Android.Api.Platform;
+using Agnosia.Android.Api.Storage;
 using Agnosia.Models;
 using Android.Content.PM;
-using Log = Agnosia.Android.Api.AgnosiaLog;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Dashboard;
 
 internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway commandRunner)
 {
@@ -34,10 +38,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             packageManager?.HasSystemFeature(PackageManager.FeatureDeviceAdmin) == true &&
             packageManager.HasSystemFeature(PackageManager.FeatureManagedUsers);
 
-        if (!isSupported)
-        {
-            return DashboardSnapshot.Unsupported;
-        }
+        if (!isSupported) return DashboardSnapshot.Unsupported;
 
         var storage = LocalStorageManager.Instance;
         var settings = AndroidSettingsStore.LoadSnapshot(storage);
@@ -55,7 +56,8 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
                 hasWorkProfileTarget,
                 hasManagedProfileProvisionedSignal))
         {
-            Log.Warn(LogTag, "Provisioning state timed out without a reachable work profile. Clearing stale setup state.");
+            Log.Warn(LogTag,
+                "Provisioning state timed out without a reachable work profile. Clearing stale setup state.");
             AgnosiaUtilities.ClearWorkProfileConfiguredState();
             isSettingUp = false;
             storedHasSetup = false;
@@ -64,8 +66,8 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         }
 
         var ownerCheck = hasWorkProfileTarget
-            && profileDiagnostics.AvailableToCrossProfileApps
-            && profileDiagnostics.QuietModeEnabled != true
+                         && profileDiagnostics.AvailableToCrossProfileApps
+                         && profileDiagnostics.QuietModeEnabled != true
             ? await TryCheckWorkProfileOwnerWithRetryAsync(cancellationToken).ConfigureAwait(false)
             : new WorkProfileOwnerCheckResult(
                 WorkProfileOwnerCheckKind.TargetUnavailable,
@@ -108,26 +110,24 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             onboardingCompleted,
             ownerCheck);
         if (recoveryKind != WorkProfileRecoveryKind.None)
-        {
             Log.Warn(
                 LogTag,
                 $"Work profile needs user attention. state={workProfileState}, recovery={recoveryKind}, reason={diagnosticReason}.");
-        }
 
         var hasSetup = storedHasSetup && (workProfileAvailable || recoveryKind != WorkProfileRecoveryKind.None);
         isSettingUp = storage.GetBoolean(StorageKeys.IsSettingUp) && !hasSetup;
 
         return new DashboardSnapshot(
-            IsSupported: true,
-            HasSetup: hasSetup,
-            IsSettingUp: isSettingUp,
-            WorkProfileAvailable: workProfileAvailable,
-            WorkProfileState: workProfileState,
-            WorkProfileRecovery: recoveryKind,
-            WorkProfileDiagnosticReason: diagnosticReason,
-            PersonalApps: [],
-            WorkApps: [],
-            Settings: settings);
+            true,
+            hasSetup,
+            isSettingUp,
+            workProfileAvailable,
+            workProfileState,
+            recoveryKind,
+            diagnosticReason,
+            [],
+            [],
+            settings);
     }
 
     public async Task<DashboardAppInventorySnapshot> LoadAppInventoryAsync(
@@ -135,10 +135,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!profileSnapshot.IsSupported || !profileSnapshot.HasSetup)
-        {
-            return DashboardAppInventorySnapshot.Empty;
-        }
+        if (!profileSnapshot.IsSupported || !profileSnapshot.HasSetup) return DashboardAppInventorySnapshot.Empty;
 
         var showAllApps = profileSnapshot.Settings.ShowAllApps;
         var personalAppsTask = QueryAppsAsync(ProfileKind.Personal, showAllApps, cancellationToken);
@@ -157,36 +154,32 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             MapApps(workAppsQuery.Apps, ProfileKind.Work, interactionPackages));
     }
 
-    public Task<byte[]?> LoadAppIconAsync(AppSnapshot app, CancellationToken cancellationToken) =>
-        AndroidProfileCommandGateway.LoadAppIconAsync(commandRunner, app, cancellationToken);
+    public Task<byte[]?> LoadAppIconAsync(AppSnapshot app, CancellationToken cancellationToken)
+    {
+        return AndroidProfileCommandGateway.LoadAppIconAsync(commandRunner, app, cancellationToken);
+    }
 
     public Task<IReadOnlyDictionary<string, byte[]?>> LoadAppIconsAsync(
         IReadOnlyList<AppSnapshot> apps,
-        CancellationToken cancellationToken) =>
-        AndroidProfileCommandGateway.LoadAppIconsAsync(commandRunner, apps, cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        return AndroidProfileCommandGateway.LoadAppIconsAsync(commandRunner, apps, cancellationToken);
+    }
 
     public async Task<IReadOnlyList<AppLogEntry>> LoadRecentLogsAsync(CancellationToken cancellationToken)
     {
         var activity = commandRunner.CurrentActivity;
         AgnosiaRuntime.Initialize(activity);
 
-        if (!LocalStorageManager.Instance.GetBoolean(StorageKeys.LoggingEnabled, true))
-        {
-            return [];
-        }
+        if (!LocalStorageManager.Instance.GetBoolean(StorageKeys.LoggingEnabled, true)) return [];
 
         var logs = AndroidAppLogArchive.Load(activity).ToList();
         if (AgnosiaUtilities.HasWorkProfileTarget(activity)
             && (await TryCheckWorkProfileOwnerWithRetryAsync(cancellationToken).ConfigureAwait(false)).Kind
             == WorkProfileOwnerCheckKind.AppIsProfileOwner)
-        {
             logs.AddRange(await AndroidProfileCommandGateway.QueryWorkLogsAsync(commandRunner, cancellationToken));
-        }
 
-        if (logs.Count == 0)
-        {
-            return [];
-        }
+        if (logs.Count == 0) return [];
 
         var seenIds = new HashSet<string>(StringComparer.Ordinal);
         var mergedLogs = new List<AppLogEntry>(logs.Count);
@@ -198,9 +191,9 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
     }
 
     private async Task<AppQueryResult> QueryAppsAsync(
-            ProfileKind profile,
-            bool showAll,
-            CancellationToken cancellationToken)
+        ProfileKind profile,
+        bool showAll,
+        CancellationToken cancellationToken)
     {
         var payload = await AndroidProfileCommandGateway.QueryAppsAsync(
             commandRunner,
@@ -216,10 +209,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
     private async Task<WorkProfileOwnerCheckResult> TryCheckWorkProfileOwnerWithRetryAsync(
         CancellationToken cancellationToken)
     {
-        if (TryGetCachedWorkProfileOwnerCheck(out var cachedResult))
-        {
-            return cachedResult;
-        }
+        if (TryGetCachedWorkProfileOwnerCheck(out var cachedResult)) return cachedResult;
 
         const int maxAttempts = 5;
         const int delayMs = 500;
@@ -241,10 +231,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
                 return lastResult;
             }
 
-            if (attempt < maxAttempts - 1)
-            {
-                await Task.Delay(delayMs, cancellationToken).ConfigureAwait(false);
-            }
+            if (attempt < maxAttempts - 1) await Task.Delay(delayMs, cancellationToken).ConfigureAwait(false);
         }
 
         SetCachedWorkProfileOwnerCheck(lastResult);
@@ -286,24 +273,16 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         var startedAtUnixSeconds = storage.GetLong(StorageKeys.SetupStartedAtUtc);
         if (hasManagedProfileProvisionedSignal
             && !IsSetupStartedBefore(ProvisionedSetupStateTimeout, startedAtUnixSeconds))
-        {
             return false;
-        }
 
-        if (startedAtUnixSeconds <= 0)
-        {
-            return !hasAssociatedProfile && !hasWorkProfileTarget;
-        }
+        if (startedAtUnixSeconds <= 0) return !hasAssociatedProfile && !hasWorkProfileTarget;
 
         return IsSetupStartedBefore(SetupStateTimeout, startedAtUnixSeconds);
     }
 
     private static bool IsSetupStartedBefore(TimeSpan timeout, long startedAtUnixSeconds)
     {
-        if (startedAtUnixSeconds <= 0)
-        {
-            return false;
-        }
+        if (startedAtUnixSeconds <= 0) return false;
 
         var startedAt = DateTimeOffset.FromUnixTimeSeconds(startedAtUnixSeconds);
         return DateTimeOffset.UtcNow - startedAt >= timeout;
@@ -318,56 +297,35 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         bool onboardingCompleted,
         WorkProfileOwnerCheckResult ownerCheck)
     {
-        if (workProfileAvailable)
-        {
-            return WorkProfileStateKind.AppIsProfileOwner;
-        }
+        if (workProfileAvailable) return WorkProfileStateKind.AppIsProfileOwner;
 
         if (ownerCheck.Kind == WorkProfileOwnerCheckKind.AppInstalledButNotOwner)
-        {
             return WorkProfileStateKind.AppInstalledInWorkProfileButNotOwner;
-        }
 
-        if (isSettingUp)
-        {
-            return WorkProfileStateKind.ProvisioningInProgress;
-        }
+        if (isSettingUp) return WorkProfileStateKind.ProvisioningInProgress;
 
-        if (profileDiagnostics.QuietModeEnabled == true)
-        {
-            return WorkProfileStateKind.WorkProfileQuietMode;
-        }
+        if (profileDiagnostics.QuietModeEnabled == true) return WorkProfileStateKind.WorkProfileQuietMode;
 
         if (profileDiagnostics.ManagedProfileExists && !profileDiagnostics.AvailableToCrossProfileApps)
-        {
             return WorkProfileStateKind.WorkProfileUnavailable;
-        }
 
         if (profileDiagnostics.ManagedProfileExists && !profileDiagnostics.CommandTargetResolvable)
-        {
             return WorkProfileStateKind.WorkProfileCommandTargetUnavailable;
-        }
 
         if (profileDiagnostics.ManagedProfileExists && ownerCheck.Kind == WorkProfileOwnerCheckKind.Unreachable)
-        {
             return WorkProfileStateKind.WorkProfileCommandChannelUnavailable;
-        }
 
-        if (hasManagedProfileProvisionedSignal)
-        {
-            return WorkProfileStateKind.WorkProfileCreatedButAppNotReady;
-        }
+        if (hasManagedProfileProvisionedSignal) return WorkProfileStateKind.WorkProfileCreatedButAppNotReady;
 
         if (storedHasSetup || onboardingCompleted || profileDiagnostics.CommandTargetResolvable)
-        {
             return WorkProfileStateKind.ErrorUnknownWithDiagnostics;
-        }
 
         return WorkProfileStateKind.NoWorkProfile;
     }
 
-    private static WorkProfileRecoveryKind GetWorkProfileRecoveryKind(WorkProfileStateKind state) =>
-        state switch
+    private static WorkProfileRecoveryKind GetWorkProfileRecoveryKind(WorkProfileStateKind state)
+    {
+        return state switch
         {
             WorkProfileStateKind.WorkProfileQuietMode =>
                 WorkProfileRecoveryKind.WorkProfileQuietMode,
@@ -387,6 +345,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
                 WorkProfileRecoveryKind.ErrorUnknownWithDiagnostics,
             _ => WorkProfileRecoveryKind.None
         };
+    }
 
     private static string BuildDiagnosticReason(
         WorkProfileStateKind state,
@@ -394,11 +353,13 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         WorkProfileDiagnostics profileDiagnostics,
         bool storedHasSetup,
         bool onboardingCompleted,
-        WorkProfileOwnerCheckResult ownerCheck) =>
-        $"state={state}; managedProfileProvisioned={hasManagedProfileProvisionedSignal}; " +
-        $"{profileDiagnostics.ToLogString()}; " +
-        $"storedSetup={storedHasSetup}; onboardingCompleted={onboardingCompleted}; " +
-        $"ownerCheck={ownerCheck.Kind}; {ownerCheck.DiagnosticReason}";
+        WorkProfileOwnerCheckResult ownerCheck)
+    {
+        return $"state={state}; managedProfileProvisioned={hasManagedProfileProvisionedSignal}; " +
+               $"{profileDiagnostics.ToLogString()}; " +
+               $"storedSetup={storedHasSetup}; onboardingCompleted={onboardingCompleted}; " +
+               $"ownerCheck={ownerCheck.Kind}; {ownerCheck.DiagnosticReason}";
+    }
 
     private static AppSnapshot[] MapApps(
         IReadOnlyList<AppServiceModel> apps,

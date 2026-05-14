@@ -1,11 +1,14 @@
+using Agnosia.Android.Api.Gateways;
+using Agnosia.Android.Api.Notifications;
+using Agnosia.Android.Api.Platform;
 using Agnosia.Models;
 using Android.Content;
 using Android.Content.PM;
 using Android.Net;
 using Android.OS;
-using Log = Agnosia.Android.Api.AgnosiaLog;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Vpn;
 
 [Service(
     Name = "com.agnosia.app.TransientVpnDisconnectService",
@@ -21,7 +24,10 @@ public sealed class TransientVpnDisconnectService : VpnService
     private const int NotificationId = 0x57C41;
     private const string NotificationChannelId = "agnosia.transient-vpn";
     private const string NotificationChannelName = "Agnosia VPN";
-    private const string NotificationChannelDescription = "Временное отключение стороннего VPN перед запуском рабочего приложения";
+
+    private const string NotificationChannelDescription =
+        "Временное отключение стороннего VPN перед запуском рабочего приложения";
+
     private static readonly TimeSpan EstablishHoldTime = TimeSpan.FromMilliseconds(350);
     private static readonly TimeSpan PostCloseDelay = TimeSpan.FromMilliseconds(120);
     private static readonly Lock Sync = new();
@@ -37,14 +43,13 @@ public sealed class TransientVpnDisconnectService : VpnService
     {
         var activity = activityCommands.CurrentActivity;
         var prepareIntent = Prepare(activity);
-        if (prepareIntent is null) 
+        if (prepareIntent is null)
             return await DisconnectPreparedVpnAsync(activity, cancellationToken);
-        
-        var prepareResult = await activityCommands.StartExternalActivityForResultAsync(prepareIntent, cancellationToken);
+
+        var prepareResult =
+            await activityCommands.StartExternalActivityForResultAsync(prepareIntent, cancellationToken);
         if (prepareResult.ResultCode != Result.Ok)
-        {
             return OperationResult.Failure("Android не выдал Agnosia временное управление VPN.");
-        }
 
         return await DisconnectPreparedVpnAsync(activity, cancellationToken);
     }
@@ -53,8 +58,8 @@ public sealed class TransientVpnDisconnectService : VpnService
         Context context,
         CancellationToken cancellationToken = default)
     {
-        return Prepare(context) is not null 
-            ? Task.FromResult(OperationResult.Failure("Android еще не выдал Agnosia управление VPN.")) 
+        return Prepare(context) is not null
+            ? Task.FromResult(OperationResult.Failure("Android еще не выдал Agnosia управление VPN."))
             : StartDisconnectServiceAsync(context, cancellationToken);
     }
 
@@ -72,16 +77,14 @@ public sealed class TransientVpnDisconnectService : VpnService
             }
             else
             {
-                _pendingCompletion = new TaskCompletionSource<OperationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+                _pendingCompletion =
+                    new TaskCompletionSource<OperationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
                 completionTask = _pendingCompletion.Task;
                 shouldStartService = true;
             }
         }
 
-        if (!shouldStartService)
-        {
-            return await completionTask;
-        }
+        if (!shouldStartService) return await completionTask;
 
         var intent = new Intent(context, typeof(TransientVpnDisconnectService));
         intent.SetAction(ActionDisconnect);
@@ -154,7 +157,10 @@ public sealed class TransientVpnDisconnectService : VpnService
         base.OnDestroy();
     }
 
-    public override IBinder? OnBind(Intent? intent) => null;
+    public override IBinder? OnBind(Intent? intent)
+    {
+        return null;
+    }
 
     private async Task RunDisconnectAsync(int startId)
     {
@@ -224,10 +230,7 @@ public sealed class TransientVpnDisconnectService : VpnService
     {
         lock (Sync)
         {
-            if (_completed)
-            {
-                return;
-            }
+            if (_completed) return;
 
             _completed = true;
             _pendingCompletion?.TrySetResult(result);

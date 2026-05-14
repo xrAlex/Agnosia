@@ -1,8 +1,10 @@
 using System.Text.Json;
+using Agnosia.Android.Api.Platform;
+using Agnosia.Android.Api.Storage;
 using Agnosia.Models;
 using Android.Content;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Logging;
 
 public static class AndroidAppLogArchive
 {
@@ -12,28 +14,24 @@ public static class AndroidAppLogArchive
     private static readonly Lock Sync = new();
     private static readonly TimeSpan FlushDelay = TimeSpan.FromSeconds(1);
     private static readonly List<AppLogEntry> PendingEntries = [];
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
+
     private static Context? FlushContext;
     private static bool FlushScheduled;
 
     public static void Append(Context context, AppLogLevel level, string tag, string message)
     {
-        if (string.IsNullOrWhiteSpace(message))
-        {
-            return;
-        }
+        if (string.IsNullOrWhiteSpace(message)) return;
 
         AgnosiaRuntime.Initialize(context);
         var appContext = context.ApplicationContext ?? context;
         lock (Sync)
         {
-            if (!LocalStorageManager.Instance.GetBoolean(StorageKeys.LoggingEnabled, true))
-            {
-                return;
-            }
+            if (!LocalStorageManager.Instance.GetBoolean(StorageKeys.LoggingEnabled, true)) return;
 
             PendingEntries.Add(new AppLogEntry(
                 Guid.NewGuid().ToString("N"),
@@ -71,10 +69,7 @@ public static class AndroidAppLogArchive
     private static void EnsureFlushScheduledLocked(Context context)
     {
         FlushContext = context;
-        if (FlushScheduled)
-        {
-            return;
-        }
+        if (FlushScheduled) return;
 
         FlushScheduled = true;
         _ = FlushAfterDelayAsync();
@@ -103,15 +98,9 @@ public static class AndroidAppLogArchive
 
     private static void FlushPendingLocked(Context? context)
     {
-        if (context is not null)
-        {
-            AgnosiaRuntime.Initialize(context);
-        }
+        if (context is not null) AgnosiaRuntime.Initialize(context);
 
-        if (PendingEntries.Count == 0)
-        {
-            return;
-        }
+        if (PendingEntries.Count == 0) return;
 
         if (!LocalStorageManager.Instance.GetBoolean(StorageKeys.LoggingEnabled, true))
         {
@@ -134,7 +123,7 @@ public static class AndroidAppLogArchive
         var raw = LocalStorageManager.Instance.GetString(StorageKeys.LogEntries);
         if (string.IsNullOrWhiteSpace(raw))
             return [];
-        
+
         try
         {
             var entries = JsonSerializer.Deserialize<List<AppLogEntry>>(raw, JsonOptions) ?? [];
@@ -148,17 +137,18 @@ public static class AndroidAppLogArchive
         }
     }
 
-    private static void SaveCore(List<AppLogEntry> entries) =>
+    private static void SaveCore(List<AppLogEntry> entries)
+    {
         LocalStorageManager.Instance.SetString(StorageKeys.LogEntries, JsonSerializer.Serialize(entries, JsonOptions));
+    }
 
     private static void Trim(List<AppLogEntry> entries)
     {
-        while (entries.Count > MaxEntries)
-        {
-            entries.RemoveAt(0);
-        }
+        while (entries.Count > MaxEntries) entries.RemoveAt(0);
     }
 
-    private static ProfileKind ResolveProfile(Context context) =>
-        AgnosiaUtilities.IsProfileOwner(context) ? ProfileKind.Work : ProfileKind.Personal;
+    private static ProfileKind ResolveProfile(Context context)
+    {
+        return AgnosiaUtilities.IsProfileOwner(context) ? ProfileKind.Work : ProfileKind.Personal;
+    }
 }

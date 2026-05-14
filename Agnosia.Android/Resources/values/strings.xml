@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <string name="app_name">Agnosia</string>
-  <string name="device_admin_receiver_description">Agnosia требуется доступ владельца профиля для управления рабочим профилем.</string>
+    <string name="app_name">Agnosia</string>
+    <string name="device_admin_receiver_description">Agnosia требуется доступ владельца профиля для управления рабочим
+        профилем.
+    </string>
 </resources>

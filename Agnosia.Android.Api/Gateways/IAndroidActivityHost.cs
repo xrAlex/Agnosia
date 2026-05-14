@@ -1,6 +1,6 @@
 using Android.Content;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Gateways;
 
 public interface IAndroidActivityHost
 {

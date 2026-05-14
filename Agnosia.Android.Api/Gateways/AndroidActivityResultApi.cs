@@ -1,20 +1,27 @@
+using Agnosia.Android.Api.Commands;
 using Agnosia.Models;
 using Android.Content;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Gateways;
 
 public static class AndroidActivityResultApi
 {
-    public static string? ExtractMessage(AndroidActivityResult result) =>
-        result.Data?.GetStringExtra(AndroidCommandContract.ResultMessage);
+    public static string? ExtractMessage(AndroidActivityResult result)
+    {
+        return result.Data?.GetStringExtra(AndroidCommandContract.ResultMessage);
+    }
 
-    public static string? ExtractError(AndroidActivityResult result) =>
-        result.Data?.GetStringExtra(AndroidCommandContract.ResultError);
+    public static string? ExtractError(AndroidActivityResult result)
+    {
+        return result.Data?.GetStringExtra(AndroidCommandContract.ResultError);
+    }
 
-    public static AndroidAppLaunchResult? ExtractLaunchResult(AndroidActivityResult result) =>
-        AndroidAppLaunchResult.TryRead(result.Data, out var launchResult)
+    private static AndroidAppLaunchResult? ExtractLaunchResult(AndroidActivityResult result)
+    {
+        return AndroidAppLaunchResult.TryRead(result.Data, out var launchResult)
             ? launchResult
             : null;
+    }
 
     public static AndroidActivityResult CreateCanceledResult(string error)
     {
@@ -33,9 +40,8 @@ public static class AndroidActivityResultApi
 
         var error = ExtractError(result);
         if (string.Equals(error, AndroidCommandContract.ErrorSystemAppUnsupported, StringComparison.Ordinal))
-        {
-            return OperationResult.Failure("Системные приложения можно включать или скрывать только внутри рабочего профиля.");
-        }
+            return OperationResult.Failure(
+                "Системные приложения можно включать или скрывать только внутри рабочего профиля.");
 
         return OperationResult.Failure(string.IsNullOrWhiteSpace(error)
             ? "Android не смог выполнить операцию с пакетом."
@@ -44,10 +50,7 @@ public static class AndroidActivityResultApi
 
     public static OperationResult ToVoidOperationResult(AndroidActivityResult result, string successMessage)
     {
-        if (ExtractLaunchResult(result) is { } launchResult)
-        {
-            return launchResult.ToOperationResult();
-        }
+        if (ExtractLaunchResult(result) is { } launchResult) return launchResult.ToOperationResult();
 
         var message = ExtractMessage(result);
         var error = ExtractError(result);

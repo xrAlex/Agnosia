@@ -1,4 +1,5 @@
-using Agnosia.Android.Api;
+using Agnosia.Android.Api.Commands;
+using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Shortcuts;
 using Android.Content;
 
@@ -17,7 +18,7 @@ public sealed class ShortcutPinReceiver : BroadcastReceiver
         var packageName = intent?.GetStringExtra("packageName");
         if (string.IsNullOrWhiteSpace(packageName))
             return;
-        
+
         HiddenAppShortcutManager.HandlePinnedShortcutConfirmation(context, packageName);
     }
 }

@@ -9,9 +9,7 @@ public sealed class DebouncedAsyncAction
     public DebouncedAsyncAction(TimeSpan delay, Func<Exception, Task>? onError = null)
     {
         if (delay < TimeSpan.Zero)
-        {
             throw new ArgumentOutOfRangeException(nameof(delay), delay, "Debounce delay cannot be negative.");
-        }
 
         _delay = delay;
         _onError = onError;
@@ -46,17 +44,11 @@ public sealed class DebouncedAsyncAction
         }
         catch (Exception exception)
         {
-            if (_onError is not null)
-            {
-                await _onError(exception);
-            }
+            if (_onError is not null) await _onError(exception);
         }
         finally
         {
-            if (ReferenceEquals(_pendingCancellation, cancellation))
-            {
-                _pendingCancellation = null;
-            }
+            if (ReferenceEquals(_pendingCancellation, cancellation)) _pendingCancellation = null;
 
             cancellation.Dispose();
         }

@@ -1,8 +1,9 @@
 using Agnosia.Android.Activities;
-using Agnosia.Android.Api;
+using Agnosia.Android.Api.Commands;
+using Agnosia.Android.Api.Platform;
 using Android.Content;
 using Android.Content.PM;
-using Log = Agnosia.Android.Api.AgnosiaLog;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Receivers;
 
@@ -22,12 +23,10 @@ public sealed class PackageInstallerCallbackReceiver : BroadcastReceiver
         if (intent is null)
             return;
 
-        if (context is not null)
-        {
-            AgnosiaRuntime.Initialize(context);
-        }
+        if (context is not null) AgnosiaRuntime.Initialize(context);
 
-        var status = (PackageInstallStatus)(intent.Extras?.GetInt(PackageInstaller.ExtraStatus) ?? (int)PackageInstallStatus.Failure);
+        var status = (PackageInstallStatus)(intent.Extras?.GetInt(PackageInstaller.ExtraStatus) ??
+                                            (int)PackageInstallStatus.Failure);
         Log.Info(LogTag, $"Broadcast callback status={status}.");
 
         DummyActivity.DispatchPackageInstallerCallback(intent);

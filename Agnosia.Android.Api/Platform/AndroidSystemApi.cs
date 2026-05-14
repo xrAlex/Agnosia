@@ -5,7 +5,7 @@ using Android.Content.PM;
 using Android.Net;
 using Android.OS;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Platform;
 
 public static class AndroidSystemApi
 {
@@ -17,40 +17,64 @@ public static class AndroidSystemApi
     private const string UsageStatsServiceName = "usagestats";
     private const string UserServiceName = "user";
 
-    public static ActivityManager? GetActivityManager(Context context) =>
-        context.GetSystemService(ActivityServiceName) as ActivityManager;
+    public static ActivityManager? GetActivityManager(Context context)
+    {
+        return context.GetSystemService(ActivityServiceName) as ActivityManager;
+    }
 
-    public static AppOpsManager? GetAppOpsManager(Context context) =>
-        context.GetSystemService(AppOpsServiceName) as AppOpsManager;
+    public static AppOpsManager? GetAppOpsManager(Context context)
+    {
+        return context.GetSystemService(AppOpsServiceName) as AppOpsManager;
+    }
 
-    public static UsageStatsManager? GetUsageStatsManager(Context context) =>
-        context.GetSystemService(UsageStatsServiceName) as UsageStatsManager;
+    public static UsageStatsManager? GetUsageStatsManager(Context context)
+    {
+        return context.GetSystemService(UsageStatsServiceName) as UsageStatsManager;
+    }
 
-    public static DevicePolicyManager? GetDevicePolicyManager(Context context) =>
-        context.GetSystemService(DevicePolicyServiceName) as DevicePolicyManager;
+    public static DevicePolicyManager? GetDevicePolicyManager(Context context)
+    {
+        return context.GetSystemService(DevicePolicyServiceName) as DevicePolicyManager;
+    }
 
-    public static ConnectivityManager? GetConnectivityManager(Context context) =>
-        context.GetSystemService(ConnectivityServiceName) as ConnectivityManager;
+    public static ConnectivityManager? GetConnectivityManager(Context context)
+    {
+        return context.GetSystemService(ConnectivityServiceName) as ConnectivityManager;
+    }
 
-    public static NotificationManager? GetNotificationManager(Context context) =>
-        context.GetSystemService(NotificationServiceName) as NotificationManager;
+    public static NotificationManager? GetNotificationManager(Context context)
+    {
+        return context.GetSystemService(NotificationServiceName) as NotificationManager;
+    }
 
-    public static PowerManager? GetPowerManager(Context context) =>
-        context.GetSystemService(Context.PowerService) as PowerManager;
+    public static PowerManager? GetPowerManager(Context context)
+    {
+        return context.GetSystemService(Context.PowerService) as PowerManager;
+    }
 
-    public static UserManager? GetUserManager(Context context) =>
-        context.GetSystemService(UserServiceName) as UserManager;
+    public static UserManager? GetUserManager(Context context)
+    {
+        return context.GetSystemService(UserServiceName) as UserManager;
+    }
 
-    public static CrossProfileApps? GetCrossProfileApps(Context context) =>
-        context.GetSystemService(Context.CrossProfileAppsService) as CrossProfileApps;
+    public static CrossProfileApps? GetCrossProfileApps(Context context)
+    {
+        return context.GetSystemService(Context.CrossProfileAppsService) as CrossProfileApps;
+    }
 
-    public static PackageInfoFlags GetQueryIntentActivityFlags() =>
-        PackageInfoFlags.MatchAll;
+    public static PackageInfoFlags GetQueryIntentActivityFlags()
+    {
+        return PackageInfoFlags.MatchAll;
+    }
 
-    public static PackageInfoFlags GetInstalledApplicationFlags() =>
-        PackageInfoFlags.MatchDisabledComponents | PackageInfoFlags.MatchUninstalledPackages;
+    public static PackageInfoFlags GetInstalledApplicationFlags()
+    {
+        return PackageInfoFlags.MatchDisabledComponents | PackageInfoFlags.MatchUninstalledPackages;
+    }
 
-    public static bool IsCrossProfileIntentForwarder(ResolveInfo resolveInfo) =>
-        resolveInfo.ActivityInfo is not null
-        && resolveInfo.IsCrossProfileIntentForwarderActivity;
+    public static bool IsCrossProfileIntentForwarder(ResolveInfo resolveInfo)
+    {
+        return resolveInfo.ActivityInfo is not null
+               && resolveInfo.IsCrossProfileIntentForwarderActivity;
+    }
 }

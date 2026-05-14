@@ -3,60 +3,60 @@
              xmlns:vm="using:Agnosia.ViewModels"
              x:Class="Agnosia.Views.BottomNavigationView"
              x:DataType="vm:DashboardWorkspaceViewModel">
-  <Border Classes="bottom-nav"
-          HorizontalAlignment="Stretch">
-    <Grid HorizontalAlignment="Stretch"
-          ColumnDefinitions="*,*,*"
-          ColumnSpacing="8">
-      <Button Grid.Column="0"
-              Classes="nav"
-              HorizontalAlignment="Stretch"
-              Classes.active="{Binding IsOverviewSectionSelected}"
-              Command="{Binding OpenOverviewSectionCommand}">
-        <StackPanel HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    Spacing="4">
-          <PathIcon Classes="nav-icon"
-                    Data="{StaticResource IconOverviewGeometry}" />
-          <TextBlock Classes="nav-label"
-                     HorizontalAlignment="Center"
-                     Text="Главная" />
-        </StackPanel>
-      </Button>
+    <Border Classes="bottom-nav"
+            HorizontalAlignment="Stretch">
+        <Grid HorizontalAlignment="Stretch"
+              ColumnDefinitions="*,*,*"
+              ColumnSpacing="8">
+            <Button Grid.Column="0"
+                    Classes="nav"
+                    HorizontalAlignment="Stretch"
+                    Classes.active="{Binding IsOverviewSectionSelected}"
+                    Command="{Binding OpenOverviewSectionCommand}">
+                <StackPanel HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="4">
+                    <PathIcon Classes="nav-icon"
+                              Data="{StaticResource IconOverviewGeometry}" />
+                    <TextBlock Classes="nav-label"
+                               HorizontalAlignment="Center"
+                               Text="Главная" />
+                </StackPanel>
+            </Button>
 
-      <Button Grid.Column="1"
-              Classes="nav"
-              HorizontalAlignment="Stretch"
-              Classes.active="{Binding IsAppsSectionSelected}"
-              Command="{Binding OpenAppsSectionCommand}"
-              IsEnabled="{Binding CanOpenAppsSection}">
-        <StackPanel HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    Spacing="4">
-          <PathIcon Classes="nav-icon"
-                    Data="{StaticResource IconAppsGeometry}" />
-          <TextBlock Classes="nav-label"
-                     HorizontalAlignment="Center"
-                     Text="Приложения" />
-        </StackPanel>
-      </Button>
+            <Button Grid.Column="1"
+                    Classes="nav"
+                    HorizontalAlignment="Stretch"
+                    Classes.active="{Binding IsAppsSectionSelected}"
+                    Command="{Binding OpenAppsSectionCommand}"
+                    IsEnabled="{Binding CanOpenAppsSection}">
+                <StackPanel HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="4">
+                    <PathIcon Classes="nav-icon"
+                              Data="{StaticResource IconAppsGeometry}" />
+                    <TextBlock Classes="nav-label"
+                               HorizontalAlignment="Center"
+                               Text="Приложения" />
+                </StackPanel>
+            </Button>
 
-      <Button Grid.Column="2"
-              Classes="nav"
-              HorizontalAlignment="Stretch"
-              Classes.active="{Binding IsSettingsSectionSelected}"
-              Command="{Binding OpenSettingsSectionCommand}"
-              IsEnabled="{Binding CanOpenSettingsSection}">
-        <StackPanel HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    Spacing="4">
-          <PathIcon Classes="nav-icon"
-                    Data="{StaticResource IconSettingsGeometry}" />
-          <TextBlock Classes="nav-label"
-                     HorizontalAlignment="Center"
-                     Text="Настройки" />
-        </StackPanel>
-      </Button>
-    </Grid>
-  </Border>
+            <Button Grid.Column="2"
+                    Classes="nav"
+                    HorizontalAlignment="Stretch"
+                    Classes.active="{Binding IsSettingsSectionSelected}"
+                    Command="{Binding OpenSettingsSectionCommand}"
+                    IsEnabled="{Binding CanOpenSettingsSection}">
+                <StackPanel HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="4">
+                    <PathIcon Classes="nav-icon"
+                              Data="{StaticResource IconSettingsGeometry}" />
+                    <TextBlock Classes="nav-label"
+                               HorizontalAlignment="Center"
+                               Text="Настройки" />
+                </StackPanel>
+            </Button>
+        </Grid>
+    </Border>
 </UserControl>

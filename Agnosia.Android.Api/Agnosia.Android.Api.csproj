@@ -9,10 +9,10 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Xamarin.AndroidX.Core" />
+        <PackageReference Include="Xamarin.AndroidX.Core"/>
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Agnosia\Agnosia.csproj" />
+        <ProjectReference Include="..\Agnosia\Agnosia.csproj"/>
     </ItemGroup>
 </Project>

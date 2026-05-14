@@ -14,10 +14,7 @@ public partial class LogOverlayView : UserControl
 
     private async void OnCopyLogsClick(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is not DashboardWorkspaceViewModel viewModel)
-        {
-            return;
-        }
+        if (DataContext is not DashboardWorkspaceViewModel viewModel) return;
 
         var topLevel = TopLevel.GetTopLevel(this);
         if (topLevel?.Clipboard is null)

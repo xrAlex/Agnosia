@@ -1,14 +1,17 @@
+using Agnosia.Android.Api.Logging;
+using Agnosia.Android.Api.Platform;
 using Agnosia.Models;
-using Log = Agnosia.Android.Api.AgnosiaLog;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Storage;
 
 public static class AndroidSettingsStore
 {
     private const string LogTag = "AgnosiaSettings";
 
-    public static AppSettingsSnapshot LoadSnapshot(LocalStorageManager storage) =>
-        new(
+    public static AppSettingsSnapshot LoadSnapshot(LocalStorageManager storage)
+    {
+        return new AppSettingsSnapshot(
             storage.GetBoolean(StorageKeys.ShowAllApps),
             SettingsManager.Instance.GetBlockContactsSearchingEnabled(),
             storage.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch),
@@ -17,6 +20,7 @@ public static class AndroidSettingsStore
             storage.GetBoolean(StorageKeys.EnableVpnAfterWorkFreeze),
             LoadVpnAfterWorkFreezeClient(storage),
             storage.GetString(StorageKeys.TunguskaAutomationToken) ?? string.Empty);
+    }
 
     public static async Task<OperationResult> SaveAsync(
         Activity activity,
@@ -27,8 +31,10 @@ public static class AndroidSettingsStore
 
         var storage = LocalStorageManager.Instance;
         var loggingChanged = storage.GetBoolean(StorageKeys.LoggingEnabled, true) != settings.LoggingEnabled;
-        var blockContactsChanged = SettingsManager.Instance.GetBlockContactsSearchingEnabled() != settings.BlockContactsSearching;
-        var disableVpnBeforeLaunchChanged = storage.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch) != settings.DisableVpnBeforeWorkLaunch;
+        var blockContactsChanged = SettingsManager.Instance.GetBlockContactsSearchingEnabled() !=
+                                   settings.BlockContactsSearching;
+        var disableVpnBeforeLaunchChanged = storage.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch) !=
+                                            settings.DisableVpnBeforeWorkLaunch;
         var vpnAfterFreezeClientChanged = LoadVpnAfterWorkFreezeClient(storage) != settings.VpnAfterWorkFreezeClient;
         var tunguskaToken = settings.TunguskaAutomationToken.Trim();
 
@@ -39,48 +45,44 @@ public static class AndroidSettingsStore
         storage.SetString(StorageKeys.TunguskaAutomationToken, tunguskaToken);
         storage.SetBoolean(StorageKeys.LoggingEnabled, settings.LoggingEnabled);
         storage.SetString(StorageKeys.AppTheme, settings.Theme.ToString());
-        SettingsManager.Instance.SetBlockContactsSearchingEnabled(settings.BlockContactsSearching, syncToWorkProfile: false);
+        SettingsManager.Instance.SetBlockContactsSearchingEnabled(settings.BlockContactsSearching, false);
 
-        if (loggingChanged && !settings.LoggingEnabled)
-        {
-            AndroidAppLogArchive.Clear(activity);
-        }
+        if (loggingChanged && !settings.LoggingEnabled) AndroidAppLogArchive.Clear(activity);
 
         if (loggingChanged)
-        {
-            await TrySyncBooleanSettingToWorkProfileAsync(activity, StorageKeys.LoggingEnabled, settings.LoggingEnabled, cancellationToken);
-        }
+            await TrySyncBooleanSettingToWorkProfileAsync(activity, StorageKeys.LoggingEnabled, settings.LoggingEnabled,
+                cancellationToken);
 
         if (blockContactsChanged)
-        {
-            await TrySyncBooleanSettingToWorkProfileAsync(activity, StorageKeys.BlockContactsSearching, settings.BlockContactsSearching, cancellationToken);
-        }
+            await TrySyncBooleanSettingToWorkProfileAsync(activity, StorageKeys.BlockContactsSearching,
+                settings.BlockContactsSearching, cancellationToken);
 
         if (disableVpnBeforeLaunchChanged || settings.DisableVpnBeforeWorkLaunch)
-        {
-            await TrySyncBooleanSettingToWorkProfileAsync(activity, StorageKeys.DisableVpnBeforeWorkLaunch, settings.DisableVpnBeforeWorkLaunch, cancellationToken);
-        }
+            await TrySyncBooleanSettingToWorkProfileAsync(activity, StorageKeys.DisableVpnBeforeWorkLaunch,
+                settings.DisableVpnBeforeWorkLaunch, cancellationToken);
 
         if (vpnAfterFreezeClientChanged)
-        {
             Log.Info(LogTag, $"VPN after work freeze client changed: client={settings.VpnAfterWorkFreezeClient}.");
-        }
 
         return OperationResult.Success("Настройки сохранены.");
     }
 
-    public static AppThemeKind LoadAppTheme(LocalStorageManager storage) =>
-        Enum.TryParse<AppThemeKind>(storage.GetString(StorageKeys.AppTheme), ignoreCase: true, out var theme)
+    public static AppThemeKind LoadAppTheme(LocalStorageManager storage)
+    {
+        return Enum.TryParse<AppThemeKind>(storage.GetString(StorageKeys.AppTheme), true, out var theme)
             ? theme
             : AppThemeKind.Agnosia;
+    }
 
-    public static VpnAutomationClientKind LoadVpnAfterWorkFreezeClient(LocalStorageManager storage) =>
-        Enum.TryParse<VpnAutomationClientKind>(
+    public static VpnAutomationClientKind LoadVpnAfterWorkFreezeClient(LocalStorageManager storage)
+    {
+        return Enum.TryParse<VpnAutomationClientKind>(
             storage.GetString(StorageKeys.VpnAfterWorkFreezeClient),
-            ignoreCase: true,
+            true,
             out var client)
             ? client
             : VpnAutomationClientKind.FlClash;
+    }
 
     private static async Task TrySyncBooleanSettingToWorkProfileAsync(
         Activity activity,
@@ -88,18 +90,13 @@ public static class AndroidSettingsStore
         bool value,
         CancellationToken cancellationToken)
     {
-        if (!AgnosiaUtilities.HasWorkProfileTarget(activity))
-        {
-            return;
-        }
+        if (!AgnosiaUtilities.HasWorkProfileTarget(activity)) return;
 
         try
         {
             var result = await SettingsManager.Instance.SyncBooleanSettingAsync(name, value, cancellationToken);
             if (!result.Succeeded)
-            {
                 Log.Warn(LogTag, $"Failed to synchronize {name} to the work profile: {result.Message}");
-            }
         }
         catch (Exception exception)
         {

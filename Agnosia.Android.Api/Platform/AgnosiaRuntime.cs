@@ -1,6 +1,7 @@
+using Agnosia.Android.Api.Storage;
 using Android.Content;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Platform;
 
 public static class AgnosiaRuntime
 {

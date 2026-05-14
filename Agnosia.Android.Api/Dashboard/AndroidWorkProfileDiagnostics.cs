@@ -1,8 +1,10 @@
+using Agnosia.Android.Api.Platform;
+using Agnosia.Android.Api.Storage;
 using Android.Content;
 using Android.OS;
-using Log = Agnosia.Android.Api.AgnosiaLog;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Dashboard;
 
 internal static class AndroidWorkProfileDiagnosticsReader
 {
@@ -34,8 +36,8 @@ internal static class AndroidWorkProfileDiagnosticsReader
             storedManagedProfileSerial,
             notes);
         var managedProfileExists = managedProfile is not null
-            || userProfiles.Any(profile => !IsSameUser(userManager, currentUser, profile, notes))
-            || targetProfiles.Count > 0;
+                                   || userProfiles.Any(profile => !IsSameUser(userManager, currentUser, profile, notes))
+                                   || targetProfiles.Count > 0;
         var availableToCrossProfileApps = managedProfile is not null
             ? targetProfiles.Any(target => IsSameUser(userManager, managedProfile, target, notes))
             : targetProfiles.Count > 0;
@@ -51,25 +53,25 @@ internal static class AndroidWorkProfileDiagnosticsReader
             : TryReadUserUnlocked(userManager, managedProfile, notes);
 
         return new WorkProfileDiagnostics(
-            ManagedProfileExists: managedProfileExists,
-            AvailableToCrossProfileApps: availableToCrossProfileApps,
-            QuietModeEnabled: quietModeEnabled,
-            UserRunning: userRunning,
-            UserUnlocked: userUnlocked,
-            CommandTargetResolvable: commandTargetResolvable,
-            CurrentUserSerial: currentUserSerial,
-            ManagedProfileUserSerial: managedProfileSerial,
-            ManagedProfileHandle: ToSafeHandleString(managedProfile),
-            UserProfileCount: userProfiles.Count,
-            TargetProfileCount: targetProfiles.Count,
-            Notes: string.Join(",", notes.Distinct(StringComparer.Ordinal)));
+            managedProfileExists,
+            availableToCrossProfileApps,
+            quietModeEnabled,
+            userRunning,
+            userUnlocked,
+            commandTargetResolvable,
+            currentUserSerial,
+            managedProfileSerial,
+            ToSafeHandleString(managedProfile),
+            userProfiles.Count,
+            targetProfiles.Count,
+            string.Join(",", notes.Distinct(StringComparer.Ordinal)));
     }
 
     private static UserHandle? GetCurrentUser(List<string> notes)
     {
         try
         {
-            return global::Android.OS.Process.MyUserHandle();
+            return Process.MyUserHandle();
         }
         catch (Exception exception)
         {
@@ -130,14 +132,9 @@ internal static class AndroidWorkProfileDiagnosticsReader
         if (storedManagedProfileSerial >= 0
             && TryGetUserForSerial(userManager, storedManagedProfileSerial, notes) is { } storedUser
             && !IsSameUser(userManager, currentUser, storedUser, notes))
-        {
             return storedUser;
-        }
 
-        if (targetProfiles.Count > 0)
-        {
-            return targetProfiles[0];
-        }
+        if (targetProfiles.Count > 0) return targetProfiles[0];
 
         return userProfiles.FirstOrDefault(profile => !IsSameUser(userManager, currentUser, profile, notes));
     }
@@ -147,10 +144,7 @@ internal static class AndroidWorkProfileDiagnosticsReader
         long userSerial,
         List<string> notes)
     {
-        if (userManager is null)
-        {
-            return null;
-        }
+        if (userManager is null) return null;
 
         try
         {
@@ -169,10 +163,7 @@ internal static class AndroidWorkProfileDiagnosticsReader
         long storedManagedProfileSerial,
         List<string> notes)
     {
-        if (managedProfile is not null)
-        {
-            return GetUserSerial(userManager, managedProfile, notes);
-        }
+        if (managedProfile is not null) return GetUserSerial(userManager, managedProfile, notes);
 
         return storedManagedProfileSerial >= 0 ? storedManagedProfileSerial : null;
     }
@@ -182,10 +173,7 @@ internal static class AndroidWorkProfileDiagnosticsReader
         UserHandle? userHandle,
         List<string> notes)
     {
-        if (userManager is null || userHandle is null)
-        {
-            return null;
-        }
+        if (userManager is null || userHandle is null) return null;
 
         try
         {
@@ -205,17 +193,11 @@ internal static class AndroidWorkProfileDiagnosticsReader
         UserHandle? right,
         List<string> notes)
     {
-        if (left is null || right is null)
-        {
-            return false;
-        }
+        if (left is null || right is null) return false;
 
         var leftSerial = GetUserSerial(userManager, left, notes);
         var rightSerial = GetUserSerial(userManager, right, notes);
-        if (leftSerial is not null && rightSerial is not null)
-        {
-            return leftSerial.Value == rightSerial.Value;
-        }
+        if (leftSerial is not null && rightSerial is not null) return leftSerial.Value == rightSerial.Value;
 
         return left.Equals(right);
     }
@@ -238,10 +220,7 @@ internal static class AndroidWorkProfileDiagnosticsReader
         UserHandle managedProfile,
         List<string> notes)
     {
-        if (userManager is null)
-        {
-            return null;
-        }
+        if (userManager is null) return null;
 
         try
         {
@@ -259,10 +238,7 @@ internal static class AndroidWorkProfileDiagnosticsReader
         UserHandle managedProfile,
         List<string> notes)
     {
-        if (userManager is null)
-        {
-            return null;
-        }
+        if (userManager is null) return null;
 
         try
         {
@@ -286,8 +262,10 @@ internal static class AndroidWorkProfileDiagnosticsReader
         return null;
     }
 
-    private static string? ToSafeHandleString(UserHandle? userHandle) =>
-        userHandle?.ToString();
+    private static string? ToSafeHandleString(UserHandle? userHandle)
+    {
+        return userHandle?.ToString();
+    }
 }
 
 internal sealed record WorkProfileDiagnostics(
@@ -304,19 +282,23 @@ internal sealed record WorkProfileDiagnostics(
     int TargetProfileCount,
     string Notes)
 {
-    public string ToLogString() =>
-        $"managedProfileExists={ManagedProfileExists}; " +
-        $"crossProfileAvailable={AvailableToCrossProfileApps}; " +
-        $"quietMode={FormatNullable(QuietModeEnabled)}; " +
-        $"userRunning={FormatNullable(UserRunning)}; " +
-        $"userUnlocked={FormatNullable(UserUnlocked)}; " +
-        $"commandTarget={CommandTargetResolvable}; " +
-        $"currentUserSerial={CurrentUserSerial?.ToString() ?? "unknown"}; " +
-        $"managedUserSerial={ManagedProfileUserSerial?.ToString() ?? "unknown"}; " +
-        $"managedHandle={ManagedProfileHandle ?? "unknown"}; " +
-        $"userProfiles={UserProfileCount}; targetProfiles={TargetProfileCount}; " +
-        $"notes={Notes}";
+    public string ToLogString()
+    {
+        return $"managedProfileExists={ManagedProfileExists}; " +
+               $"crossProfileAvailable={AvailableToCrossProfileApps}; " +
+               $"quietMode={FormatNullable(QuietModeEnabled)}; " +
+               $"userRunning={FormatNullable(UserRunning)}; " +
+               $"userUnlocked={FormatNullable(UserUnlocked)}; " +
+               $"commandTarget={CommandTargetResolvable}; " +
+               $"currentUserSerial={CurrentUserSerial?.ToString() ?? "unknown"}; " +
+               $"managedUserSerial={ManagedProfileUserSerial?.ToString() ?? "unknown"}; " +
+               $"managedHandle={ManagedProfileHandle ?? "unknown"}; " +
+               $"userProfiles={UserProfileCount}; targetProfiles={TargetProfileCount}; " +
+               $"notes={Notes}";
+    }
 
-    private static string FormatNullable(bool? value) =>
-        value?.ToString() ?? "unknown";
+    private static string FormatNullable(bool? value)
+    {
+        return value?.ToString() ?? "unknown";
+    }
 }

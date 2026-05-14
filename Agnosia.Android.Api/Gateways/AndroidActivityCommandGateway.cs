@@ -1,11 +1,15 @@
+using Agnosia.Android.Api.Commands;
+using Agnosia.Android.Api.Dashboard;
+using Agnosia.Android.Api.Packages;
+using Agnosia.Android.Api.Platform;
 using Agnosia.Models;
 using Android.Content;
 using Java.Lang;
 using Stopwatch = System.Diagnostics.Stopwatch;
 using Exception = System.Exception;
-using Log = Agnosia.Android.Api.AgnosiaLog;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Gateways;
 
 internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> getActivityHost)
 {
@@ -35,8 +39,10 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
         return AndroidActivityResultApi.ToVoidOperationResult(result, successMessage);
     }
 
-    public Task<bool> CanReachWorkProfileAsync(CancellationToken cancellationToken) =>
-        AndroidProfileCommandGateway.CanReachWorkProfileAsync(this, cancellationToken);
+    public Task<bool> CanReachWorkProfileAsync(CancellationToken cancellationToken)
+    {
+        return AndroidProfileCommandGateway.CanReachWorkProfileAsync(this, cancellationToken);
+    }
 
     public PendingIntent CreateWorkAppFrozenCallbackPendingIntent(string packageName)
     {
@@ -84,9 +90,7 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
             if (useWorkProfile
                 && isLaunchCommand
                 && TryCreatePreflightLaunchFailure(activity, intent) is { } preflightFailure)
-            {
                 return preflightFailure;
-            }
 
             if (useWorkProfile)
             {
@@ -100,7 +104,8 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
 
             if (!useWorkProfile)
             {
-                Log.Debug(ActivityResultLogTag, $"Starting local activity command. action={intent.Action ?? "<none>"}.");
+                Log.Debug(ActivityResultLogTag,
+                    $"Starting local activity command. action={intent.Action ?? "<none>"}.");
                 var localStartedAt = Stopwatch.GetTimestamp();
                 var localResult = await host.StartForResultAsync(intent, cancellationToken);
                 Log.Debug(
@@ -170,18 +175,24 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
         }
     }
 
-    private static bool IsLaunchCommand(Intent intent) =>
-        string.Equals(intent.Action, AgnosiaActions.UnfreezeAndLaunch, StringComparison.Ordinal);
+    private static bool IsLaunchCommand(Intent intent)
+    {
+        return string.Equals(intent.Action, AgnosiaActions.UnfreezeAndLaunch, StringComparison.Ordinal);
+    }
 
-    private static TimeSpan GetProfileCommandTimeout(Intent intent) =>
-        string.Equals(intent.Action, AgnosiaActions.InstallPackage, StringComparison.Ordinal)
+    private static TimeSpan GetProfileCommandTimeout(Intent intent)
+    {
+        return string.Equals(intent.Action, AgnosiaActions.InstallPackage, StringComparison.Ordinal)
             ? InstallPackageProfileCommandTimeout
             : DefaultProfileCommandTimeout;
+    }
 
-    private static AndroidAppLaunchResult CreateLaunchResult(Intent intent) =>
-        AndroidAppLaunchResult.CommandReceived(
+    private static AndroidAppLaunchResult CreateLaunchResult(Intent intent)
+    {
+        return AndroidAppLaunchResult.CommandReceived(
             intent.GetStringExtra("packageName"),
             intent.GetStringExtra("displayName"));
+    }
 
     private static AndroidActivityResult? TryCreatePreflightLaunchFailure(Activity activity, Intent intent)
     {

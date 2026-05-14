@@ -12,10 +12,7 @@ internal static class AppCatalogFilter
     {
         var source = selectedProfile == ProfileKind.Work ? workApps : personalApps;
         var query = searchText.Trim();
-        if (string.IsNullOrWhiteSpace(query))
-        {
-            return source;
-        }
+        if (string.IsNullOrWhiteSpace(query)) return source;
 
         return source.Where(app =>
                 app.Label.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||

@@ -1,6 +1,9 @@
 using System.Globalization;
 using Agnosia.Android.Activities;
-using Agnosia.Android.Api;
+using Agnosia.Android.Api.Commands;
+using Agnosia.Android.Api.Gateways;
+using Agnosia.Android.Api.Platform;
+using Agnosia.Android.Api.Storage;
 using Agnosia.Android.Receivers;
 using Agnosia.Android.Services;
 using Agnosia.Infrastructure;
@@ -12,7 +15,7 @@ using Avalonia.Android;
 using Avalonia.Controls;
 using AvaloniaPoint = Avalonia.Point;
 using JavaSystem = Java.Lang.JavaSystem;
-using Log = Agnosia.Android.Api.AgnosiaLog;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android;
 
@@ -88,10 +91,7 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
                 RunOnUiThread(() => ApplyPreferredDisplayMode());
                 WorkProfileLockFreezeService.EnsureRunning(this);
 
-                if (!AgnosiaUtilities.IsProfileOwner(this))
-                {
-                    return;
-                }
+                if (!AgnosiaUtilities.IsProfileOwner(this)) return;
 
                 RunOnUiThread(BootstrapWorkProfileAndFinish);
             }
@@ -124,7 +124,7 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
                 this,
                 typeof(AgnosiaDeviceAdminReceiver),
                 typeof(MainActivity),
-                enableProfile: true);
+                true);
             AgnosiaUtilities.EnforceUserRestrictions(this, typeof(AgnosiaDeviceAdminReceiver));
             WorkProfileLockFreezeService.EnsureRunning(this);
             Log.Info(LogTag, "Work-profile MainActivity bootstrap completed; finishing without primary UI.");
@@ -160,10 +160,7 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
     {
         base.OnWindowFocusChanged(hasFocus);
 
-        if (hasFocus)
-        {
-            ApplyPreferredDisplayMode();
-        }
+        if (hasFocus) ApplyPreferredDisplayMode();
     }
 
     public override bool DispatchTouchEvent(MotionEvent? ev)
@@ -201,22 +198,13 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
 
     private void ApplyPreferredDisplayMode()
     {
-        if (Window is null)
-        {
-            return;
-        }
+        if (Window is null) return;
 
-        if (OperatingSystem.IsAndroidVersionAtLeast(35))
-        {
-            Window.FrameRatePowerSavingsBalanced = false;
-        }
+        if (OperatingSystem.IsAndroidVersionAtLeast(35)) Window.FrameRatePowerSavingsBalanced = false;
 
         var display = Display;
         var attributes = Window.Attributes;
-        if (attributes is null)
-        {
-            return;
-        }
+        if (attributes is null) return;
 
         var preferredMode = GetHighestRefreshMode(display);
         if (preferredMode is not null)
@@ -230,18 +218,12 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
 
     private void PublishTouchEvent(MotionEvent? ev)
     {
-        if (ev is null)
-        {
-            return;
-        }
+        if (ev is null) return;
 
         if (ev.ActionMasked == MotionEventActions.Move)
         {
             var now = System.Environment.TickCount64;
-            if (now - _lastPublishedMoveAtMilliseconds < 32)
-            {
-                return;
-            }
+            if (now - _lastPublishedMoveAtMilliseconds < 32) return;
 
             _lastPublishedMoveAtMilliseconds = now;
         }
@@ -276,10 +258,7 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
 
     private static void ApplyStartupMitigations()
     {
-        if (_startupMitigationsApplied)
-        {
-            return;
-        }
+        if (_startupMitigationsApplied) return;
 
         _startupMitigationsApplied = true;
         CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
@@ -315,7 +294,6 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
             $"Activity result request registered. requestCode={requestCode}, action={intent.Action ?? "<none>"}, isResumed={_isResumed}.");
 
         if (cancellationToken.CanBeCanceled)
-        {
             cancellationRegistration = cancellationToken.Register(() =>
             {
                 lock (RequestSync)
@@ -328,7 +306,6 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
                     $"Activity result request canceled. requestCode={requestCode}, action={intent.Action ?? "<none>"}.");
                 completionSource.TrySetCanceled(cancellationToken);
             });
-        }
 
         _ = completionSource.Task.ContinueWith(
             static (_, state) => ((CancellationTokenRegistration)state!).Dispose(),
@@ -378,10 +355,7 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
             ActivityStartRequest request;
             lock (RequestSync)
             {
-                if (PendingActivityStarts.Count == 0)
-                {
-                    return;
-                }
+                if (PendingActivityStarts.Count == 0) return;
 
                 Log.Debug(LogTag, $"Draining queued activity start. remainingBefore={PendingActivityStarts.Count}.");
                 request = PendingActivityStarts.Dequeue();
@@ -391,30 +365,19 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
             drained++;
         }
 
-        if (_isResumed && HasPendingActivityStarts())
-        {
-            SchedulePendingActivityDrain();
-        }
+        if (_isResumed && HasPendingActivityStarts()) SchedulePendingActivityDrain();
     }
 
     private void QueueActivityStart(ActivityStartRequest request)
     {
         lock (RequestSync)
         {
-            if (!PendingResults.ContainsKey(request.RequestCode))
-            {
-                return;
-            }
+            if (!PendingResults.ContainsKey(request.RequestCode)) return;
 
-            if (IsIconCommand(request.Intent))
-            {
-                DropQueuedIconRequestsLocked("coalesced_icon_request");
-            }
+            if (IsIconCommand(request.Intent)) DropQueuedIconRequestsLocked("coalesced_icon_request");
 
             while (PendingActivityStarts.Count >= MaxPendingActivityStarts)
-            {
                 DropOldestPendingActivityStartLocked("pending_start_queue_limit");
-            }
 
             Log.Debug(
                 LogTag,
@@ -422,20 +385,14 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
             PendingActivityStarts.Enqueue(request);
         }
 
-        if (_isResumed)
-        {
-            SchedulePendingActivityDrain();
-        }
+        if (_isResumed) SchedulePendingActivityDrain();
     }
 
     private void StartActivityForResultRequest(ActivityStartRequest request)
     {
         lock (RequestSync)
         {
-            if (!PendingResults.ContainsKey(request.RequestCode))
-            {
-                return;
-            }
+            if (!PendingResults.ContainsKey(request.RequestCode)) return;
         }
 
         try
@@ -468,22 +425,17 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
 
     private void SchedulePendingActivityDrain()
     {
-        if (_pendingDrainScheduled)
-        {
-            return;
-        }
+        if (_pendingDrainScheduled) return;
 
         _pendingDrainScheduled = true;
-        var handler = new Handler(Looper.MainLooper ?? throw new InvalidOperationException("Android main looper is unavailable."));
+        var handler = new Handler(Looper.MainLooper ??
+                                  throw new InvalidOperationException("Android main looper is unavailable."));
         handler.PostDelayed(DrainPendingActivityStarts, PendingDrainDelayMilliseconds);
     }
 
     private static void DropQueuedIconRequestsLocked(string reason)
     {
-        if (PendingActivityStarts.Count == 0)
-        {
-            return;
-        }
+        if (PendingActivityStarts.Count == 0) return;
 
         var retained = new Queue<ActivityStartRequest>();
         while (PendingActivityStarts.Count > 0)
@@ -498,18 +450,12 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
             retained.Enqueue(queued);
         }
 
-        while (retained.Count > 0)
-        {
-            PendingActivityStarts.Enqueue(retained.Dequeue());
-        }
+        while (retained.Count > 0) PendingActivityStarts.Enqueue(retained.Dequeue());
     }
 
     private static void DropOldestPendingActivityStartLocked(string reason)
     {
-        if (PendingActivityStarts.Count == 0)
-        {
-            return;
-        }
+        if (PendingActivityStarts.Count == 0) return;
 
         var request = PendingActivityStarts.Dequeue();
         CancelQueuedActivityStartLocked(request, reason);
@@ -525,9 +471,11 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
             AndroidActivityResultApi.CreateCanceledResult("Android отменил устаревшую фоновую команду."));
     }
 
-    private static bool IsIconCommand(Intent intent) =>
-        string.Equals(intent.Action, AgnosiaActions.QueryAppIcon, StringComparison.Ordinal)
-        || string.Equals(intent.Action, AgnosiaActions.QueryAppIcons, StringComparison.Ordinal);
+    private static bool IsIconCommand(Intent intent)
+    {
+        return string.Equals(intent.Action, AgnosiaActions.QueryAppIcon, StringComparison.Ordinal)
+               || string.Equals(intent.Action, AgnosiaActions.QueryAppIcons, StringComparison.Ordinal);
+    }
 
     Activity IAndroidActivityHost.CurrentActivity => this;
 
@@ -537,8 +485,11 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
 
     Type IAndroidActivityHost.WorkAppFrozenReceiverType => typeof(WorkAppFrozenReceiver);
 
-    Task<AndroidActivityResult> IAndroidActivityHost.StartForResultAsync(Intent intent, CancellationToken cancellationToken) =>
-        StartForResultAsync(intent, cancellationToken);
+    Task<AndroidActivityResult> IAndroidActivityHost.StartForResultAsync(Intent intent,
+        CancellationToken cancellationToken)
+    {
+        return StartForResultAsync(intent, cancellationToken);
+    }
 
     private sealed record ActivityStartRequest(
         Intent Intent,

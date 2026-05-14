@@ -8,93 +8,93 @@
              mc:Ignorable="d"
              x:Class="Agnosia.Views.MainView"
              x:DataType="vm:DashboardWorkspaceViewModel">
-  <Design.DataContext>
-    <vm:DashboardWorkspaceViewModel />
-  </Design.DataContext>
+    <Design.DataContext>
+        <vm:DashboardWorkspaceViewModel />
+    </Design.DataContext>
 
-  <Grid Background="{StaticResource AppBackgroundBrush}"
-        RowDefinitions="Auto,*,Auto">
-    <Grid Grid.RowSpan="3"
-          IsHitTestVisible="False"
-          ClipToBounds="True">
-      <controls:PlexusBackground LineBrush="{StaticResource AppPlexusLineBrush}"
-                                 NodeBrush="{StaticResource AppPlexusNodeBrush}"
-                                 GlowBrush="{StaticResource AppPlexusGlowBrush}" />
-    </Grid>
+    <Grid Background="{StaticResource AppBackgroundBrush}"
+          RowDefinitions="Auto,*,Auto">
+        <Grid Grid.RowSpan="3"
+              IsHitTestVisible="False"
+              ClipToBounds="True">
+            <controls:PlexusBackground LineBrush="{StaticResource AppPlexusLineBrush}"
+                                       NodeBrush="{StaticResource AppPlexusNodeBrush}"
+                                       GlowBrush="{StaticResource AppPlexusGlowBrush}" />
+        </Grid>
 
-    <views:AppHeaderView Grid.Row="0" />
+        <views:AppHeaderView Grid.Row="0" />
 
-    <Grid Grid.Row="1">
-      <views:OverviewSectionView IsVisible="{Binding IsOverviewSectionSelected}" />
-      <views:AppsSectionView IsVisible="{Binding IsAppsSectionSelected}" />
-      <views:SettingsSectionView IsVisible="{Binding IsSettingsSectionSelected}" />
-    </Grid>
+        <Grid Grid.Row="1">
+            <views:OverviewSectionView IsVisible="{Binding IsOverviewSectionSelected}" />
+            <views:AppsSectionView IsVisible="{Binding IsAppsSectionSelected}" />
+            <views:SettingsSectionView IsVisible="{Binding IsSettingsSectionSelected}" />
+        </Grid>
 
-    <views:BottomNavigationView Grid.Row="2" />
+        <views:BottomNavigationView Grid.Row="2" />
 
-    <ProgressBar Grid.Row="0"
-                 Classes="operation-progress"
-                 VerticalAlignment="Top"
-                 IsHitTestVisible="False"
-                 IsVisible="{Binding IsOperationActive}"
-                 IsIndeterminate="True" />
+        <ProgressBar Grid.Row="0"
+                     Classes="operation-progress"
+                     VerticalAlignment="Top"
+                     IsHitTestVisible="False"
+                     IsVisible="{Binding IsOperationActive}"
+                     IsIndeterminate="True" />
 
-    <views:LogOverlayView Grid.Row="0" Grid.RowSpan="3" />
+        <views:LogOverlayView Grid.Row="0" Grid.RowSpan="3" />
 
-    <views:PermissionsOverlayView Grid.Row="0" Grid.RowSpan="3" />
+        <views:PermissionsOverlayView Grid.Row="0" Grid.RowSpan="3" />
 
-    <views:OnboardingOverlayView Grid.Row="0" Grid.RowSpan="3" />
+        <views:OnboardingOverlayView Grid.Row="0" Grid.RowSpan="3" />
 
-    <Grid Grid.Row="0"
-          Grid.RowSpan="3"
-          Background="#99000000"
-          IsVisible="{Binding IsWorkProfileRecoveryVisible}">
-      <Border Classes="surface-card"
-              MaxWidth="560"
-              Margin="18"
-              Padding="22"
-              HorizontalAlignment="Center"
-              VerticalAlignment="Center">
-        <StackPanel Spacing="18">
-          <Grid RowDefinitions="Auto,Auto,Auto"
-                RowSpacing="10">
-            <Border Classes="icon-tile large"
-                    HorizontalAlignment="Center">
-              <PathIcon Classes="section-icon centered"
-                        Data="{StaticResource IconAlertGeometry}" />
+        <Grid Grid.Row="0"
+              Grid.RowSpan="3"
+              Background="#99000000"
+              IsVisible="{Binding IsWorkProfileRecoveryVisible}">
+            <Border Classes="surface-card"
+                    MaxWidth="560"
+                    Margin="18"
+                    Padding="22"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                <StackPanel Spacing="18">
+                    <Grid RowDefinitions="Auto,Auto,Auto"
+                          RowSpacing="10">
+                        <Border Classes="icon-tile large"
+                                HorizontalAlignment="Center">
+                            <PathIcon Classes="section-icon centered"
+                                      Data="{StaticResource IconAlertGeometry}" />
+                        </Border>
+                        <TextBlock Grid.Row="1"
+                                   Classes="section-title"
+                                   TextAlignment="Center"
+                                   Text="{Binding WorkProfileRecoveryTitle}" />
+                        <TextBlock Grid.Row="2"
+                                   Classes="page-caption"
+                                   TextAlignment="Left"
+                                   Text="{Binding WorkProfileRecoveryMessage}" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,*"
+                          ColumnSpacing="12">
+                        <Button MinHeight="58"
+                                Command="{Binding DismissWorkProfileRecoveryCommand}">
+                            <TextBlock Classes="button-label"
+                                       TextAlignment="Center"
+                                       HorizontalAlignment="Center"
+                                       Text="Позже" />
+                        </Button>
+                        <Button Grid.Column="1"
+                                Classes="primary"
+                                MinHeight="58"
+                                HorizontalAlignment="Right"
+                                Command="{Binding OpenWorkProfileSettingsCommand}">
+                            <TextBlock Classes="button-label"
+                                       TextAlignment="Center"
+                                       HorizontalAlignment="Center"
+                                       Text="Открыть настройки" />
+                        </Button>
+                    </Grid>
+                </StackPanel>
             </Border>
-            <TextBlock Grid.Row="1"
-                       Classes="section-title"
-                       TextAlignment="Center"
-                       Text="{Binding WorkProfileRecoveryTitle}" />
-            <TextBlock Grid.Row="2"
-                       Classes="page-caption"
-                       TextAlignment="Left"
-                       Text="{Binding WorkProfileRecoveryMessage}" />
-          </Grid>
-
-          <Grid ColumnDefinitions="*,*"
-                ColumnSpacing="12">
-            <Button MinHeight="58"
-                    Command="{Binding DismissWorkProfileRecoveryCommand}">
-              <TextBlock Classes="button-label"
-                         TextAlignment="Center"
-                         HorizontalAlignment="Center"
-                         Text="Позже" />
-            </Button>
-            <Button Grid.Column="1"
-                    Classes="primary"
-                    MinHeight="58"
-                    HorizontalAlignment="Right"
-                    Command="{Binding OpenWorkProfileSettingsCommand}">
-              <TextBlock Classes="button-label"
-                         TextAlignment="Center"
-                         HorizontalAlignment="Center"
-                         Text="Открыть настройки" />
-            </Button>
-          </Grid>
-        </StackPanel>
-      </Border>
+        </Grid>
     </Grid>
-  </Grid>
 </UserControl>

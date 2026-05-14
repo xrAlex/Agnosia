@@ -1,5 +1,12 @@
 using System.Text.Json;
-using Agnosia.Android.Api;
+using Agnosia.Android.Api.Commands;
+using Agnosia.Android.Api.Gateways;
+using Agnosia.Android.Api.Logging;
+using Agnosia.Android.Api.Packages;
+using Agnosia.Android.Api.Permissions;
+using Agnosia.Android.Api.Platform;
+using Agnosia.Android.Api.Storage;
+using Agnosia.Android.Api.Vpn;
 using Agnosia.Android.Receivers;
 using Agnosia.Android.Services;
 using Agnosia.Android.Shortcuts;
@@ -8,7 +15,7 @@ using Android.Content;
 using Android.Content.PM;
 using Java.Lang;
 using Exception = System.Exception;
-using Log = Agnosia.Android.Api.AgnosiaLog;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Activities;
 
@@ -100,10 +107,7 @@ public sealed class DummyActivity : Activity
     {
         lock (PackageInstallerCallbackSync)
         {
-            if (ReferenceEquals(_activeInstance, this))
-            {
-                _activeInstance = null;
-            }
+            if (ReferenceEquals(_activeInstance, this)) _activeInstance = null;
         }
 
         base.OnPause();
@@ -114,10 +118,7 @@ public sealed class DummyActivity : Activity
         _destroyCancellation.Cancel();
         lock (PackageInstallerCallbackSync)
         {
-            if (ReferenceEquals(_activeInstance, this))
-            {
-                _activeInstance = null;
-            }
+            if (ReferenceEquals(_activeInstance, this)) _activeInstance = null;
         }
 
         _destroyCancellation.Dispose();
@@ -129,7 +130,7 @@ public sealed class DummyActivity : Activity
         base.OnNewIntent(intent);
         if (intent is null)
             return;
-        
+
         Intent = intent;
         if (string.Equals(intent.Action, AgnosiaActions.PackageInstallerCallback, StringComparison.Ordinal))
         {
@@ -143,13 +144,10 @@ public sealed class DummyActivity : Activity
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
     {
         base.OnActivityResult(requestCode, resultCode, data);
-        if (requestCode != ProxyLaunchRequestCode)
-        {
-            return;
-        }
+        if (requestCode != ProxyLaunchRequestCode) return;
 
         var fallback = _pendingProxyLaunchResult
-            ?? AndroidAppLaunchResult.CommandReceived(null, null);
+                       ?? AndroidAppLaunchResult.CommandReceived(null, null);
         _pendingProxyLaunchResult = null;
 
         if (AndroidAppLaunchResult.TryRead(data, out var launchResult))
@@ -187,7 +185,8 @@ public sealed class DummyActivity : Activity
         if (!AuthenticationUtility.CheckIntent(Intent)
             && !AuthenticationUtility.CheckWorkAppFrozenCallback(Intent))
         {
-            Log.Warn(LogTag, $"Rejected signed action={action}: authentication check failed. isProfileOwner={_isProfileOwner}.");
+            Log.Warn(LogTag,
+                $"Rejected signed action={action}: authentication check failed. isProfileOwner={_isProfileOwner}.");
             Finish();
             return;
         }
@@ -202,7 +201,8 @@ public sealed class DummyActivity : Activity
                     pingResult.PutExtra(AndroidCommandContract.ResultIsProfileOwner, _isProfileOwner);
                     if (!_isProfileOwner)
                     {
-                        pingResult.PutExtra(AndroidCommandContract.ResultError, "Рабочий профиль не управляется Agnosia.");
+                        pingResult.PutExtra(AndroidCommandContract.ResultError,
+                            "Рабочий профиль не управляется Agnosia.");
                         AuthenticationUtility.SignIntent(pingResult);
                         FinishWithResult(Result.Canceled, pingResult);
                         break;
@@ -255,16 +255,17 @@ public sealed class DummyActivity : Activity
                     ActionUninstallPackage();
                     break;
                 case AgnosiaActions.PrepareHiddenShortcut:
-                    RunAction(ActionPrepareHiddenShortcutAsync, "Android не смог подготовить ярлык скрытого приложения.");
+                    RunAction(ActionPrepareHiddenShortcutAsync,
+                        "Android не смог подготовить ярлык скрытого приложения.");
                     break;
                 case AgnosiaActions.CreateHiddenShortcut:
                     ActionCreateHiddenShortcut();
                     break;
                 case AgnosiaActions.FreezePackage:
-                    ActionFreezePackage(hidden: true);
+                    ActionFreezePackage(true);
                     break;
                 case AgnosiaActions.UnfreezePackage:
-                    ActionFreezePackage(hidden: false);
+                    ActionFreezePackage(false);
                     break;
                 case AgnosiaActions.UnfreezeAndLaunch:
                     ActionUnfreezeAndLaunch();
@@ -349,9 +350,8 @@ public sealed class DummyActivity : Activity
             result.PutExtra(AndroidCommandContract.ResultAppsJson, JsonSerializer.Serialize(models));
 
             if (admin is not null && policyManager is not null)
-            {
-                result.PutExtra(AndroidCommandContract.ResultInteractionPackages, AndroidPolicyApi.GetCrossProfilePackages(policyManager, admin));
-            }
+                result.PutExtra(AndroidCommandContract.ResultInteractionPackages,
+                    AndroidPolicyApi.GetCrossProfilePackages(policyManager, admin));
 
             FinishWithResult(Result.Ok, result);
         }
@@ -385,10 +385,7 @@ public sealed class DummyActivity : Activity
                 packageName,
                 cancellationToken), cancellationToken);
             var result = new Intent();
-            if (iconPng is { Length: > 0 })
-            {
-                result.PutExtra(AndroidCommandContract.ResultIconPng, iconPng);
-            }
+            if (iconPng is { Length: > 0 }) result.PutExtra(AndroidCommandContract.ResultIconPng, iconPng);
 
             FinishWithResult(Result.Ok, result);
         }
@@ -434,12 +431,8 @@ public sealed class DummyActivity : Activity
             var result = new Intent();
             var bundle = new Bundle();
             foreach (var (packageName, iconPng) in icons)
-            {
                 if (iconPng is { Length: > 0 })
-                {
                     bundle.PutByteArray(packageName, iconPng);
-                }
-            }
 
             result.PutExtra(AndroidCommandContract.ResultIconsBundle, bundle);
             FinishWithResult(Result.Ok, result);
@@ -484,7 +477,8 @@ public sealed class DummyActivity : Activity
     private void ActionQueryUsageStatsAccess()
     {
         var result = new Intent();
-        result.PutExtra(AndroidCommandContract.ResultUsageStatsAccess, AndroidUsageStatsAccessApi.HasAccess(this, LogTag));
+        result.PutExtra(AndroidCommandContract.ResultUsageStatsAccess,
+            AndroidUsageStatsAccessApi.HasAccess(this, LogTag));
         FinishWithResult(Result.Ok, result);
     }
 
@@ -497,15 +491,15 @@ public sealed class DummyActivity : Activity
         }
 
         if (AndroidUsageStatsAccessApi.TryOpenSettings(this, LogTag, FinishWithError))
-        {
-            FinishWithSuccessMessage("Откройте Agnosia в настройках Android и включите доступ к истории использования.");
-        }
+            FinishWithSuccessMessage(
+                "Откройте Agnosia в настройках Android и включите доступ к истории использования.");
     }
 
     private void ActionQueryPackageInstallAccess()
     {
         var result = new Intent();
-        result.PutExtra(AndroidCommandContract.ResultPackageInstallAccess, AndroidPackageApi.CanRequestInstalls(this, LogTag));
+        result.PutExtra(AndroidCommandContract.ResultPackageInstallAccess,
+            AndroidPackageApi.CanRequestInstalls(this, LogTag));
         FinishWithResult(Result.Ok, result);
     }
 
@@ -518,9 +512,7 @@ public sealed class DummyActivity : Activity
         }
 
         if (AndroidPackageApi.TryOpenUnknownSourcesSettings(this, LogTag, FinishWithError))
-        {
             FinishWithSuccessMessage("Включите установку APK из Agnosia в рабочем профиле.");
-        }
     }
 
     private void ActionInstallPackage()
@@ -561,16 +553,14 @@ public sealed class DummyActivity : Activity
             packageName,
             AndroidCommandContract.PackageInstallerOperationInstall);
         if (!AndroidPackageApi.TryStartInstall(
-            this,
-            packageName,
-            intent.GetStringExtra("apk"),
-            intent.GetStringArrayExtra("split_apks"),
-            callbackPendingIntent,
-            LogTag,
-            FinishWithError))
-        {
+                this,
+                packageName,
+                intent.GetStringExtra("apk"),
+                intent.GetStringArrayExtra("split_apks"),
+                callbackPendingIntent,
+                LogTag,
+                FinishWithError))
             FinishWithResult(Result.Canceled);
-        }
     }
 
     private void ActionUninstallPackage()
@@ -594,12 +584,12 @@ public sealed class DummyActivity : Activity
         if (isSystem && _isProfileOwner && _policyManager is not null)
         {
             if (!AndroidPolicyApi.TrySetApplicationHidden(
-                _policyManager,
-                AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType),
-                packageName,
-                hidden: true,
-                LogTag,
-                out var error))
+                    _policyManager,
+                    AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType),
+                    packageName,
+                    true,
+                    LogTag,
+                    out var error))
             {
                 FinishWithError(error ?? $"Android не смог скрыть {packageName}.");
                 return;
@@ -615,25 +605,25 @@ public sealed class DummyActivity : Activity
             AgnosiaActions.PackageInstallerCallback,
             packageName,
             AndroidCommandContract.PackageInstallerOperationUninstall);
-        if (!AndroidPackageApi.TryStartUninstall(this, packageName, pendingIntent))
-        {
-            FinishWithResult(Result.Canceled);
-        }
+        if (!AndroidPackageApi.TryStartUninstall(this, packageName, pendingIntent)) FinishWithResult(Result.Canceled);
     }
 
     private void ActionFreezePackage(bool hidden)
     {
         var packageName = Intent?.GetStringExtra("package");
-        Log.Info(LogTag, $"Freeze package command received. package={packageName ?? "<none>"}, hidden={hidden}, isProfileOwner={_isProfileOwner}.");
+        Log.Info(LogTag,
+            $"Freeze package command received. package={packageName ?? "<none>"}, hidden={hidden}, isProfileOwner={_isProfileOwner}.");
         if (!_isProfileOwner || _policyManager is null || string.IsNullOrWhiteSpace(packageName))
         {
-            Log.Warn(LogTag, $"Freeze package command rejected. package={packageName ?? "<none>"}, hidden={hidden}, isProfileOwner={_isProfileOwner}, hasPolicyManager={_policyManager is not null}.");
+            Log.Warn(LogTag,
+                $"Freeze package command rejected. package={packageName ?? "<none>"}, hidden={hidden}, isProfileOwner={_isProfileOwner}, hasPolicyManager={_policyManager is not null}.");
             FinishWithResult(Result.Canceled);
             return;
         }
 
         var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
-        if (!AndroidPolicyApi.TrySetApplicationHidden(_policyManager, admin, packageName, hidden, LogTag, out var error))
+        if (!AndroidPolicyApi.TrySetApplicationHidden(_policyManager, admin, packageName, hidden, LogTag,
+                out var error))
         {
             FinishWithError(error ?? (hidden
                 ? $"Android не смог скрыть {packageName}."
@@ -668,7 +658,8 @@ public sealed class DummyActivity : Activity
 
             if (!await WaitForPackageAvailableAsync(packageName, cancellationToken))
             {
-                FinishWithError($"Android не успел подготовить {packageName} после установки. Повторите действие через несколько секунд.");
+                FinishWithError(
+                    $"Android не успел подготовить {packageName} после установки. Повторите действие через несколько секунд.");
                 return;
             }
 
@@ -737,16 +728,16 @@ public sealed class DummyActivity : Activity
             if (IsPackageAvailable(packageName))
             {
                 if (attempt > 1)
-                {
-                    Log.Info(LogTag, $"Package {packageName} became available for hidden shortcut preparation on attempt {attempt}.");
-                }
+                    Log.Info(LogTag,
+                        $"Package {packageName} became available for hidden shortcut preparation on attempt {attempt}.");
 
                 return true;
             }
 
             if (DateTimeOffset.UtcNow >= deadline)
             {
-                Log.Warn(LogTag, $"Timed out waiting for package {packageName} to become available after install. timeoutMs={PackageAvailabilityWaitTimeout.TotalMilliseconds:0}, pollMs={PackageAvailabilityRetryDelay.TotalMilliseconds:0}.");
+                Log.Warn(LogTag,
+                    $"Timed out waiting for package {packageName} to become available after install. timeoutMs={PackageAvailabilityWaitTimeout.TotalMilliseconds:0}, pollMs={PackageAvailabilityRetryDelay.TotalMilliseconds:0}.");
                 return false;
             }
 
@@ -762,11 +753,10 @@ public sealed class DummyActivity : Activity
             var packageInfo = PackageManager?.GetPackageInfo(packageName, PackageInfoFlags.MatchDisabledComponents);
             var applicationInfo = packageInfo?.ApplicationInfo;
             var isInstalled = applicationInfo is not null
-                && (applicationInfo.Flags & ApplicationInfoFlags.Installed) != 0;
+                              && (applicationInfo.Flags & ApplicationInfoFlags.Installed) != 0;
             if (!isInstalled)
-            {
-                Log.Debug(LogTag, $"Package is not installed yet. package={packageName}, hasPackageInfo={packageInfo is not null}, hasApplicationInfo={applicationInfo is not null}.");
-            }
+                Log.Debug(LogTag,
+                    $"Package is not installed yet. package={packageName}, hasPackageInfo={packageInfo is not null}, hasApplicationInfo={applicationInfo is not null}.");
 
             return isInstalled;
         }
@@ -777,7 +767,8 @@ public sealed class DummyActivity : Activity
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
-            Log.Warn(LogTag, $"Failed to query package availability. package={packageName}, exception={exception.GetType().FullName}: {exception}");
+            Log.Warn(LogTag,
+                $"Failed to query package availability. package={packageName}, exception={exception.GetType().FullName}: {exception}");
             return false;
         }
     }
@@ -787,30 +778,26 @@ public sealed class DummyActivity : Activity
         string packageName,
         CancellationToken cancellationToken)
     {
-        if (_policyManager is null)
-        {
-            return $"Android не смог скрыть {packageName} после установки.";
-        }
+        if (_policyManager is null) return $"Android не смог скрыть {packageName} после установки.";
 
         var deadline = DateTimeOffset.UtcNow + HideAfterInstallRetryTimeout;
         var attempt = 1;
-        string? hideError = null;
         while (true)
         {
             LogTechnicalHidePreflight(admin, packageName, attempt);
-            if (AndroidPolicyApi.TrySetApplicationHidden(_policyManager, admin, packageName, hidden: true, LogTag, out hideError))
+            if (AndroidPolicyApi.TrySetApplicationHidden(_policyManager, admin, packageName, true, LogTag,
+                    out var hideError))
             {
                 if (attempt > 1)
-                {
                     Log.Info(LogTag, $"Package {packageName} was hidden after install on attempt {attempt}.");
-                }
 
                 return null;
             }
 
             if (DateTimeOffset.UtcNow >= deadline)
             {
-                Log.Warn(LogTag, $"Timed out hiding package {packageName} after install. lastError={hideError ?? "<none>"}.");
+                Log.Warn(LogTag,
+                    $"Timed out hiding package {packageName} after install. lastError={hideError ?? "<none>"}.");
                 return hideError ?? $"Android не смог скрыть {packageName} после установки.";
             }
 
@@ -831,7 +818,8 @@ public sealed class DummyActivity : Activity
             }
             catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
             {
-                Log.Warn(LogTag, $"PREPARE_HIDDEN_SHORTCUT hidden-state preflight failed. package={packageName}, attempt={attempt}, exception={exception.GetType().FullName}: {exception.Message}");
+                Log.Warn(LogTag,
+                    $"PREPARE_HIDDEN_SHORTCUT hidden-state preflight failed. package={packageName}, attempt={attempt}, exception={exception.GetType().FullName}: {exception.Message}");
             }
 
             Log.Info(
@@ -840,7 +828,8 @@ public sealed class DummyActivity : Activity
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
-            Log.Warn(LogTag, $"PREPARE_HIDDEN_SHORTCUT hide preflight failed. package={packageName}, attempt={attempt}, exception={exception.GetType().FullName}: {exception}");
+            Log.Warn(LogTag,
+                $"PREPARE_HIDDEN_SHORTCUT hide preflight failed. package={packageName}, attempt={attempt}, exception={exception.GetType().FullName}: {exception}");
         }
     }
 
@@ -892,17 +881,14 @@ public sealed class DummyActivity : Activity
         {
             var launchRequest = new Intent(AgnosiaActions.UnfreezeAndLaunch);
             launchRequest.PutExtra("packageName", packageName);
-            if (!string.IsNullOrWhiteSpace(displayName))
-            {
-                launchRequest.PutExtra("displayName", displayName);
-            }
+            if (!string.IsNullOrWhiteSpace(displayName)) launchRequest.PutExtra("displayName", displayName);
 
             if (!AndroidIntentApi.TryTransferToProfileAndStartActivity(
-                this,
-                launchRequest,
-                LogTag,
-                $"Android не смог открыть {packageName} в рабочем профиле.",
-                out var error))
+                    this,
+                    launchRequest,
+                    LogTag,
+                    $"Android не смог открыть {packageName} в рабочем профиле.",
+                    out var error))
             {
                 FinishWithError(error ?? $"Android не смог открыть {packageName} в рабочем профиле.");
                 return;
@@ -921,9 +907,7 @@ public sealed class DummyActivity : Activity
         {
             var proxyIntent = HiddenAppShortcutManager.CreateInternalLaunchIntent(packageName, label: displayName);
             if (ReadParentFrozenCallback(Intent) is { } parentFrozenCallback)
-            {
                 proxyIntent.PutExtra(AndroidCommandContract.ExtraParentFrozenCallback, parentFrozenCallback);
-            }
 
             launchResult.WriteToIntent(proxyIntent);
             AuthenticationUtility.SignIntent(proxyIntent);
@@ -945,17 +929,12 @@ public sealed class DummyActivity : Activity
 
     private static PendingIntent? ReadParentFrozenCallback(Intent? intent)
     {
-        if (intent is null)
-        {
-            return null;
-        }
+        if (intent is null) return null;
 
         if (OperatingSystem.IsAndroidVersionAtLeast(33))
-        {
             return intent.GetParcelableExtra(
                 AndroidCommandContract.ExtraParentFrozenCallback,
                 Class.FromType(typeof(PendingIntent))) as PendingIntent;
-        }
 
 #pragma warning disable CA1422
         return intent.GetParcelableExtra(AndroidCommandContract.ExtraParentFrozenCallback) as PendingIntent;
@@ -993,19 +972,14 @@ public sealed class DummyActivity : Activity
             var booleanValue = intent.GetBooleanExtra("boolean", false);
             LocalStorageManager.Instance.SetBoolean(name, booleanValue);
             if (string.Equals(name, StorageKeys.LoggingEnabled, StringComparison.Ordinal) && !booleanValue)
-            {
                 AndroidAppLogArchive.Clear(this);
-            }
         }
         else if (intent?.HasExtra("int") == true)
         {
             LocalStorageManager.Instance.SetInt(name, intent.GetIntExtra("int", int.MinValue));
         }
 
-        if (_isProfileOwner)
-        {
-            AgnosiaUtilities.EnforceWorkProfilePolicies(this, AdminReceiverType, MainActivityType);
-        }
+        if (_isProfileOwner) AgnosiaUtilities.EnforceWorkProfilePolicies(this, AdminReceiverType, MainActivityType);
 
         FinishWithResult(Result.Ok);
     }
@@ -1030,7 +1004,8 @@ public sealed class DummyActivity : Activity
             cancellationToken.ThrowIfCancellationRequested();
             if (result.Succeeded)
             {
-                Log.Info(LogTag, $"Work-app frozen event handled successfully. trigger={trigger}, message={result.Message}");
+                Log.Info(LogTag,
+                    $"Work-app frozen event handled successfully. trigger={trigger}, message={result.Message}");
                 FinishWithSuccessMessage(result.Message);
                 return;
             }
@@ -1119,43 +1094,40 @@ public sealed class DummyActivity : Activity
 
     private void FinishWithResult(Result resultCode, Intent? data = null)
     {
-        if (_finishRequested || _destroyCancellation.IsCancellationRequested)
-        {
-            return;
-        }
+        if (_finishRequested || _destroyCancellation.IsCancellationRequested) return;
 
         _finishRequested = true;
         Log.Debug(
             LogTag,
             $"Finishing action={Intent?.Action ?? "<none>"} with result={resultCode}, hasData={data is not null}.");
         if (data is null)
-        {
             SetResult(resultCode);
-        }
         else
-        {
             SetResult(resultCode, data);
-        }
 
         Finish();
     }
 
-    private void HandlePackageInstallerCallback(Intent? intent) =>
+    private void HandlePackageInstallerCallback(Intent? intent)
+    {
         RunAction(
             cancellationToken => HandlePackageInstallerCallbackAsync(intent, cancellationToken),
             "Android не смог обработать результат установки пакета.");
+    }
 
     private async Task HandlePackageInstallerCallbackAsync(
         Intent? intent,
         CancellationToken cancellationToken)
     {
-        var status = (PackageInstallStatus)(intent?.Extras?.GetInt(PackageInstaller.ExtraStatus) ?? (int)PackageInstallStatus.Failure);
+        var status = (PackageInstallStatus)(intent?.Extras?.GetInt(PackageInstaller.ExtraStatus) ??
+                                            (int)PackageInstallStatus.Failure);
         var callbackPackage = intent?.GetStringExtra(AndroidCommandContract.ExtraCallbackPackage)
-            ?? intent?.GetStringExtra(PackageInstaller.ExtraPackageName);
+                              ?? intent?.GetStringExtra(PackageInstaller.ExtraPackageName);
         var operation = intent?.GetStringExtra(AndroidCommandContract.ExtraPackageInstallerOperation);
         var statusMessage = intent?.GetStringExtra(PackageInstaller.ExtraStatusMessage);
 
-        Log.Info(LogTag, $"PackageInstaller callback status={status}, operation={operation ?? "<unknown>"}, package={callbackPackage ?? "<unknown>"}, statusMessage={statusMessage ?? "<none>"}.");
+        Log.Info(LogTag,
+            $"PackageInstaller callback status={status}, operation={operation ?? "<unknown>"}, package={callbackPackage ?? "<unknown>"}, statusMessage={statusMessage ?? "<none>"}.");
 
         if (status == PackageInstallStatus.PendingUserAction)
         {
@@ -1163,14 +1135,12 @@ public sealed class DummyActivity : Activity
             if (confirmationIntent is not null)
             {
                 if (!AndroidIntentApi.TryStartActivity(
-                    this,
-                    confirmationIntent,
-                    LogTag,
-                    "Android не смог открыть подтверждение установки пакета.",
-                    out var error))
-                {
+                        this,
+                        confirmationIntent,
+                        LogTag,
+                        "Android не смог открыть подтверждение установки пакета.",
+                        out var error))
                     FinishWithError(error ?? "Android не смог открыть подтверждение установки пакета.");
-                }
 
                 return;
             }
@@ -1181,7 +1151,8 @@ public sealed class DummyActivity : Activity
 
         if (status == PackageInstallStatus.Success)
         {
-            if (string.Equals(operation, AndroidCommandContract.PackageInstallerOperationInstall, StringComparison.Ordinal)
+            if (string.Equals(operation, AndroidCommandContract.PackageInstallerOperationInstall,
+                    StringComparison.Ordinal)
                 && !string.IsNullOrWhiteSpace(callbackPackage)
                 && !await WaitForPackageAvailableAsync(callbackPackage, cancellationToken))
             {
@@ -1210,10 +1181,7 @@ public sealed class DummyActivity : Activity
             }
         }
 
-        if (pendingIntent is not null)
-        {
-            HandlePackageInstallerCallback(pendingIntent);
-        }
+        if (pendingIntent is not null) HandlePackageInstallerCallback(pendingIntent);
     }
 
     internal static void DispatchPackageInstallerCallback(Intent intent)

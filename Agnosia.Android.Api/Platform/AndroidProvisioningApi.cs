@@ -3,12 +3,14 @@ using Android.Content;
 using Android.OS;
 using Java.Lang;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Platform;
 
 public static class AndroidProvisioningApi
 {
-    public static bool CanStartManagedProfileProvisioning(DevicePolicyManager policyManager) =>
-        policyManager.IsProvisioningAllowed(DevicePolicyManager.ActionProvisionManagedProfile);
+    public static bool CanStartManagedProfileProvisioning(DevicePolicyManager policyManager)
+    {
+        return policyManager.IsProvisioningAllowed(DevicePolicyManager.ActionProvisionManagedProfile);
+    }
 
     public static void ConfigureManagedProfileProvisioningIntent(
         Intent intent,
@@ -32,17 +34,12 @@ public static class AndroidProvisioningApi
 
     public static UserHandle? GetManagedProfileUserHandle(Intent? intent)
     {
-        if (intent is null)
-        {
-            return null;
-        }
+        if (intent is null) return null;
 
         if (OperatingSystem.IsAndroidVersionAtLeast(33))
-        {
             return intent.GetParcelableExtra(
                 Intent.ExtraUser,
                 Class.FromType(typeof(UserHandle))) as UserHandle;
-        }
 
 #pragma warning disable CA1422
         return intent.GetParcelableExtra(Intent.ExtraUser) as UserHandle;
@@ -51,17 +48,12 @@ public static class AndroidProvisioningApi
 
     private static PersistableBundle? GetProvisioningAdminExtras(Intent? intent)
     {
-        if (intent is null)
-        {
-            return null;
-        }
+        if (intent is null) return null;
 
         if (OperatingSystem.IsAndroidVersionAtLeast(33))
-        {
             return intent.GetParcelableExtra(
                 DevicePolicyManager.ExtraProvisioningAdminExtrasBundle,
                 Class.FromType(typeof(PersistableBundle))) as PersistableBundle;
-        }
 
 #pragma warning disable CA1422
         return intent.GetParcelableExtra(DevicePolicyManager.ExtraProvisioningAdminExtrasBundle) as PersistableBundle;

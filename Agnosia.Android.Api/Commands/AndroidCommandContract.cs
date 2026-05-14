@@ -1,4 +1,4 @@
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Commands;
 
 public static class AndroidCommandContract
 {

@@ -14,14 +14,14 @@ public sealed record DashboardSnapshot(
 {
     public static DashboardSnapshot Unsupported { get; } =
         new(
-            IsSupported: false,
-            HasSetup: false,
-            IsSettingUp: false,
-            WorkProfileAvailable: false,
-            WorkProfileState: WorkProfileStateKind.NoWorkProfile,
-            WorkProfileRecovery: WorkProfileRecoveryKind.None,
-            WorkProfileDiagnosticReason: string.Empty,
-            PersonalApps: [],
-            WorkApps: [],
-            Settings: AppSettingsSnapshot.Default);
+            false,
+            false,
+            false,
+            false,
+            WorkProfileStateKind.NoWorkProfile,
+            WorkProfileRecoveryKind.None,
+            string.Empty,
+            [],
+            [],
+            AppSettingsSnapshot.Default);
 }

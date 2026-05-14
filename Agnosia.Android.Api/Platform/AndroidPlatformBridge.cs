@@ -1,11 +1,16 @@
+using Agnosia.Android.Api.Commands;
+using Agnosia.Android.Api.Dashboard;
+using Agnosia.Android.Api.Gateways;
+using Agnosia.Android.Api.Permissions;
+using Agnosia.Android.Api.Storage;
 using Agnosia.Models;
 using Agnosia.Platform;
 using Android.App.Admin;
 using Android.Content;
 using Android.Provider;
-using Log = Agnosia.Android.Api.AgnosiaLog;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Platform;
 
 public sealed class AndroidPlatformBridge : IPlatformBridge
 {
@@ -49,35 +54,52 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         CancelPendingProvisioningReadinessPolling();
     }
 
-    public Task<DashboardSnapshot> LoadDashboardAsync(CancellationToken cancellationToken = default) =>
-        _dashboardReader.LoadDashboardAsync(cancellationToken);
+    public Task<DashboardSnapshot> LoadDashboardAsync(CancellationToken cancellationToken = default)
+    {
+        return _dashboardReader.LoadDashboardAsync(cancellationToken);
+    }
 
-    public Task<DashboardSnapshot> LoadDashboardProfileAsync(CancellationToken cancellationToken = default) =>
-        _dashboardReader.LoadDashboardProfileAsync(cancellationToken);
+    public Task<DashboardSnapshot> LoadDashboardProfileAsync(CancellationToken cancellationToken = default)
+    {
+        return _dashboardReader.LoadDashboardProfileAsync(cancellationToken);
+    }
 
     public Task<DashboardAppInventorySnapshot> LoadAppInventoryAsync(
         DashboardSnapshot profileSnapshot,
-        CancellationToken cancellationToken = default) =>
-        _dashboardReader.LoadAppInventoryAsync(profileSnapshot, cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        return _dashboardReader.LoadAppInventoryAsync(profileSnapshot, cancellationToken);
+    }
 
     public Task<byte[]?> LoadAppIconAsync(
         AppSnapshot app,
-        CancellationToken cancellationToken = default) =>
-        _dashboardReader.LoadAppIconAsync(app, cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        return _dashboardReader.LoadAppIconAsync(app, cancellationToken);
+    }
 
     public Task<IReadOnlyDictionary<string, byte[]?>> LoadAppIconsAsync(
         IReadOnlyList<AppSnapshot> apps,
-        CancellationToken cancellationToken = default) =>
-        _dashboardReader.LoadAppIconsAsync(apps, cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        return _dashboardReader.LoadAppIconsAsync(apps, cancellationToken);
+    }
 
-    public Task<IReadOnlyList<AppLogEntry>> LoadRecentLogsAsync(CancellationToken cancellationToken = default) =>
-        _dashboardReader.LoadRecentLogsAsync(cancellationToken);
+    public Task<IReadOnlyList<AppLogEntry>> LoadRecentLogsAsync(CancellationToken cancellationToken = default)
+    {
+        return _dashboardReader.LoadRecentLogsAsync(cancellationToken);
+    }
 
-    public Task<IReadOnlyList<PermissionSnapshot>> LoadPermissionsAsync(CancellationToken cancellationToken = default) =>
-        _permissionCoordinator.LoadPermissionsAsync(cancellationToken);
+    public Task<IReadOnlyList<PermissionSnapshot>> LoadPermissionsAsync(CancellationToken cancellationToken = default)
+    {
+        return _permissionCoordinator.LoadPermissionsAsync(cancellationToken);
+    }
 
-    public Task<OperationResult> RequestPermissionAsync(PermissionKind permission, CancellationToken cancellationToken = default) =>
-        _permissionCoordinator.RequestPermissionAsync(permission, cancellationToken);
+    public Task<OperationResult> RequestPermissionAsync(PermissionKind permission,
+        CancellationToken cancellationToken = default)
+    {
+        return _permissionCoordinator.RequestPermissionAsync(permission, cancellationToken);
+    }
 
     public Task<OperationResult> OpenAppDetailsSettingsAsync(CancellationToken cancellationToken = default)
     {
@@ -107,11 +129,11 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
 
         if (AndroidSystemApi.GetDevicePolicyManager(activity) is not { } policyManager)
             return OperationResult.Failure("На этом устройстве недоступны API политики устройства.");
-        
+
 
         if (!AndroidProvisioningApi.CanStartManagedProfileProvisioning(policyManager))
             return OperationResult.Failure("Android сообщает, что создание рабочего профиля сейчас недоступно.");
-        
+
         AuthenticationUtility.Reset();
         AgnosiaUtilities.MarkWorkProfileSetupStarted();
         var authKey = AuthenticationUtility.CreateAndStoreKey();
@@ -128,7 +150,8 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
             if (AgnosiaUtilities.HasAssociatedProfile(activity))
             {
                 TryStartPendingProvisioningReadinessPolling("provisioning_result_with_associated_profile");
-                return OperationResult.Success("Рабочий профиль создан, но Android не вернул код успешного завершения. Проверяем доступность профиля.");
+                return OperationResult.Success(
+                    "Рабочий профиль создан, но Android не вернул код успешного завершения. Проверяем доступность профиля.");
             }
 
             AgnosiaUtilities.ClearWorkProfileConfiguredState();
@@ -145,10 +168,12 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         if (AgnosiaUtilities.HasAssociatedProfile(activity))
         {
             TryStartPendingProvisioningReadinessPolling("provisioning_result_pending_work_profile");
-            return OperationResult.Success("Рабочий профиль создан. Android еще завершает запуск, обновите состояние через несколько секунд.");
+            return OperationResult.Success(
+                "Рабочий профиль создан. Android еще завершает запуск, обновите состояние через несколько секунд.");
         }
 
-        return OperationResult.Success("Создание рабочего профиля запущено. Завершите шаги Android и вернитесь в Agnosia.");
+        return OperationResult.Success(
+            "Создание рабочего профиля запущено. Завершите шаги Android и вернитесь в Agnosia.");
     }
 
     public async Task<OperationResult> OpenWorkProfileSettingsAsync(CancellationToken cancellationToken = default)
@@ -162,39 +187,55 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
             && !string.IsNullOrWhiteSpace(AndroidActivityResultApi.ExtractError(result)))
         {
             var fallbackIntent = new Intent(Settings.ActionSettings);
-            var fallbackResult = await _commandRunner.StartExternalActivityForResultAsync(fallbackIntent, cancellationToken);
+            var fallbackResult =
+                await _commandRunner.StartExternalActivityForResultAsync(fallbackIntent, cancellationToken);
             if (fallbackResult.ResultCode == Result.Canceled
                 && !string.IsNullOrWhiteSpace(AndroidActivityResultApi.ExtractError(fallbackResult)))
-            {
                 return OperationResult.Failure("Android не смог открыть настройки устройства.");
-            }
         }
 
         return OperationResult.Success("Проверяем состояние рабочего профиля после возврата из настроек.");
     }
 
-    public Task<OperationResult> CloneAsync(AppSnapshot app, CancellationToken cancellationToken = default) =>
-        _appCommandCoordinator.CloneAsync(app, cancellationToken);
+    public Task<OperationResult> CloneAsync(AppSnapshot app, CancellationToken cancellationToken = default)
+    {
+        return _appCommandCoordinator.CloneAsync(app, cancellationToken);
+    }
 
-    public Task<OperationResult> UninstallAsync(AppSnapshot app, CancellationToken cancellationToken = default) =>
-        _appCommandCoordinator.UninstallAsync(app, cancellationToken);
+    public Task<OperationResult> UninstallAsync(AppSnapshot app, CancellationToken cancellationToken = default)
+    {
+        return _appCommandCoordinator.UninstallAsync(app, cancellationToken);
+    }
 
-    public Task<OperationResult> SetFrozenAsync(AppSnapshot app, bool hidden, CancellationToken cancellationToken = default) =>
-        _appCommandCoordinator.SetFrozenAsync(app, hidden, cancellationToken);
+    public Task<OperationResult> SetFrozenAsync(AppSnapshot app, bool hidden,
+        CancellationToken cancellationToken = default)
+    {
+        return _appCommandCoordinator.SetFrozenAsync(app, hidden, cancellationToken);
+    }
 
-    public Task<OperationResult> ForceFreezeAsync(AppSnapshot app, CancellationToken cancellationToken = default) =>
-        _appCommandCoordinator.ForceFreezeAsync(app, cancellationToken);
+    public Task<OperationResult> ForceFreezeAsync(AppSnapshot app, CancellationToken cancellationToken = default)
+    {
+        return _appCommandCoordinator.ForceFreezeAsync(app, cancellationToken);
+    }
 
-    public Task<OperationResult> CreateShortcutAsync(AppSnapshot app, CancellationToken cancellationToken = default) =>
-        _appCommandCoordinator.CreateShortcutAsync(app, cancellationToken);
+    public Task<OperationResult> CreateShortcutAsync(AppSnapshot app, CancellationToken cancellationToken = default)
+    {
+        return _appCommandCoordinator.CreateShortcutAsync(app, cancellationToken);
+    }
 
-    public Task<OperationResult> LaunchAsync(AppSnapshot app, CancellationToken cancellationToken = default) =>
-        _appCommandCoordinator.LaunchAsync(app, cancellationToken);
+    public Task<OperationResult> LaunchAsync(AppSnapshot app, CancellationToken cancellationToken = default)
+    {
+        return _appCommandCoordinator.LaunchAsync(app, cancellationToken);
+    }
 
-    public Task<OperationResult> SetInteractionAccessAsync(AppSnapshot app, bool enabled, CancellationToken cancellationToken = default) =>
-        _appCommandCoordinator.SetInteractionAccessAsync(app, enabled, cancellationToken);
+    public Task<OperationResult> SetInteractionAccessAsync(AppSnapshot app, bool enabled,
+        CancellationToken cancellationToken = default)
+    {
+        return _appCommandCoordinator.SetInteractionAccessAsync(app, enabled, cancellationToken);
+    }
 
-    public Task<OperationResult> SaveSettingsAsync(AppSettingsSnapshot settings, CancellationToken cancellationToken = default)
+    public Task<OperationResult> SaveSettingsAsync(AppSettingsSnapshot settings,
+        CancellationToken cancellationToken = default)
     {
         var activity = GetActivityHost().CurrentActivity;
         return AndroidSettingsStore.SaveAsync(activity, settings, cancellationToken);
@@ -215,15 +256,10 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         var activity = GetActivityHost().CurrentActivity;
         for (var attempt = 0; attempt < attempts; attempt++)
         {
-            if (AgnosiaUtilities.HasWorkProfileTarget(activity) && await _commandRunner.CanReachWorkProfileAsync(cancellationToken))
-            {
-                return true;
-            }
+            if (AgnosiaUtilities.HasWorkProfileTarget(activity) &&
+                await _commandRunner.CanReachWorkProfileAsync(cancellationToken)) return true;
 
-            if (attempt < attempts - 1)
-            {
-                await Task.Delay(delayMilliseconds, cancellationToken);
-            }
+            if (attempt < attempts - 1) await Task.Delay(delayMilliseconds, cancellationToken);
         }
 
         return false;
@@ -231,24 +267,19 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
 
     private void TryStartPendingProvisioningReadinessPolling(string trigger)
     {
-        if (!ShouldPollForProvisioningReadiness())
-        {
-            return;
-        }
+        if (!ShouldPollForProvisioningReadiness()) return;
 
         if (!TryGetActivityHost(out _))
         {
-            Log.Info(LogTag, $"Deferred work-profile readiness polling until the primary activity is attached. trigger={trigger}.");
+            Log.Info(LogTag,
+                $"Deferred work-profile readiness polling until the primary activity is attached. trigger={trigger}.");
             return;
         }
 
         CancellationTokenSource pollingCancellation;
         lock (_provisioningReadinessPollingSync)
         {
-            if (_provisioningReadinessPollingCancellation is { IsCancellationRequested: false })
-            {
-                return;
-            }
+            if (_provisioningReadinessPollingCancellation is { IsCancellationRequested: false }) return;
 
             pollingCancellation = new CancellationTokenSource();
             _provisioningReadinessPollingCancellation = pollingCancellation;
@@ -261,8 +292,8 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
     {
         var storage = LocalStorageManager.Instance;
         return !storage.GetBoolean(StorageKeys.HasSetup)
-            && (storage.GetBoolean(StorageKeys.IsSettingUp)
-                || storage.GetLong(StorageKeys.ManagedProfileProvisionedAtUtc) > 0);
+               && (storage.GetBoolean(StorageKeys.IsSettingUp)
+                   || storage.GetLong(StorageKeys.ManagedProfileProvisionedAtUtc) > 0);
     }
 
     private async Task PollForWorkProfileReadinessAsync(
@@ -315,9 +346,7 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         lock (_provisioningReadinessPollingSync)
         {
             if (ReferenceEquals(_provisioningReadinessPollingCancellation, pollingCancellation))
-            {
                 _provisioningReadinessPollingCancellation = null;
-            }
         }
 
         pollingCancellation.Dispose();
@@ -341,5 +370,4 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
             ? activityHost
             : throw new InvalidOperationException("Agnosia is not attached to an active Android activity.");
     }
-
 }

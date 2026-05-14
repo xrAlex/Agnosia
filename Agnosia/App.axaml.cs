@@ -7,6 +7,7 @@ using Avalonia.Markup.Xaml;
 using Application = Avalonia.Application;
 
 namespace Agnosia;
+
 //
 // Satis iam passi estis; insurgite!
 //
@@ -22,13 +23,9 @@ public class App : Application
         if (ServiceRegistry.SuppressPrimaryUiStartup)
         {
             if (ApplicationLifetime is IActivityApplicationLifetime activityLifetime)
-            {
                 activityLifetime.MainViewFactory = static () => new UserControl();
-            }
             else if (ApplicationLifetime is ISingleViewApplicationLifetime singleViewPlatform)
-            {
                 singleViewPlatform.MainView = new UserControl();
-            }
 
             base.OnFrameworkInitializationCompleted();
             return;
@@ -39,26 +36,20 @@ public class App : Application
         ServiceRegistry.PrimaryActivityResumed += workspaceViewModel.HandlePrimaryActivityResumed;
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-        {
             desktop.MainWindow = new MainWindow
             {
                 DataContext = workspaceViewModel
             };
-        }
         else if (ApplicationLifetime is IActivityApplicationLifetime activityLifetime)
-        {
             activityLifetime.MainViewFactory = () => new MainView
             {
                 DataContext = workspaceViewModel
             };
-        }
         else if (ApplicationLifetime is ISingleViewApplicationLifetime singleViewPlatform)
-        {
             singleViewPlatform.MainView = new MainView
             {
                 DataContext = workspaceViewModel
             };
-        }
 
         base.OnFrameworkInitializationCompleted();
     }

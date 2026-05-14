@@ -1,13 +1,16 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using Agnosia.Android.Activities;
-using Agnosia.Android.Api;
+using Agnosia.Android.Api.Commands;
+using Agnosia.Android.Api.Gateways;
+using Agnosia.Android.Api.Platform;
+using Agnosia.Android.Api.Storage;
 using Agnosia.Android.Receivers;
 using Android.Content;
 using Android.Content.PM;
 using Android.Graphics;
 using Android.Graphics.Drawables;
-using Log = Agnosia.Android.Api.AgnosiaLog;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Shortcuts;
 
@@ -38,9 +41,7 @@ internal static class HiddenAppShortcutManager
             if (TryBuildMetadataCore(context, packageName, out var metadata, out var error))
             {
                 if (attempt > 1)
-                {
                     Log.Info(LogTag, $"Shortcut metadata for {packageName} became available on attempt {attempt}.");
-                }
 
                 return HiddenAppShortcutBuildResult.Success(metadata);
             }
@@ -57,11 +58,12 @@ internal static class HiddenAppShortcutManager
         return HiddenAppShortcutBuildResult.Failure($"Не удалось подготовить данные ярлыка для {packageName}.");
     }
 
-    public static ShortcutFreezePreparationResult CreateOrUpdatePinnedShortcut(Context context, HiddenAppShortcutMetadata metadata)
+    public static ShortcutFreezePreparationResult CreateOrUpdatePinnedShortcut(Context context,
+        HiddenAppShortcutMetadata metadata)
     {
         if (GetShortcutManager(context) is not { } shortcutManager)
             return ShortcutFreezePreparationResult.Failure("Android не предоставил сервис ярлыков.");
-        
+
         WriteMetadata(metadata);
 
         var shortcutInfo = BuildShortcutInfo(context, metadata);
@@ -75,7 +77,8 @@ internal static class HiddenAppShortcutManager
         if (!shortcutManager.IsRequestPinShortcutSupported)
         {
             Log.Warn(LogTag, $"Launcher does not support pin shortcuts for {metadata.ShortcutId}.");
-            return ShortcutFreezePreparationResult.Failure("Текущий лаунчер не поддерживает закрепленные ярлыки для скрытых приложений.");
+            return ShortcutFreezePreparationResult.Failure(
+                "Текущий лаунчер не поддерживает закрепленные ярлыки для скрытых приложений.");
         }
 
         var callbackIntent = new Intent(context, typeof(ShortcutPinReceiver));
@@ -89,13 +92,15 @@ internal static class HiddenAppShortcutManager
             PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
 
         if (callbackPendingIntent is null)
-            return ShortcutFreezePreparationResult.Failure("Android не смог подготовить обратный вызов для закрепления ярлыка.");
-        
+            return ShortcutFreezePreparationResult.Failure(
+                "Android не смог подготовить обратный вызов для закрепления ярлыка.");
+
         Log.Info(LogTag, $"Requesting pin shortcut {metadata.ShortcutId} in the current profile.");
         var requested = shortcutManager.RequestPinShortcut(shortcutInfo, callbackPendingIntent.IntentSender);
         Log.Info(LogTag, $"requestPinShortcut result for {metadata.ShortcutId}: requested={requested}.");
         return requested
-            ? ShortcutFreezePreparationResult.Deferred("Подтвердите добавление ярлыка на главный экран. После подтверждения приложение будет скрыто.")
+            ? ShortcutFreezePreparationResult.Deferred(
+                "Подтвердите добавление ярлыка на главный экран. После подтверждения приложение будет скрыто.")
             : ShortcutFreezePreparationResult.Failure("Лаунчер отклонил запрос на создание ярлыка.");
     }
 
@@ -112,7 +117,7 @@ internal static class HiddenAppShortcutManager
     {
         if (intent is null)
             return null;
-        
+
         var packageName = intent.GetStringExtra(ExtraPackageName);
         var label = intent.GetStringExtra(ExtraLabel);
         var iconBase64 = intent.GetStringExtra(ExtraIconBase64);
@@ -121,17 +126,15 @@ internal static class HiddenAppShortcutManager
             || string.IsNullOrWhiteSpace(label)
             || string.IsNullOrWhiteSpace(iconBase64)
             || string.IsNullOrWhiteSpace(token))
-        {
             return null;
-        }
 
         return new HiddenAppShortcutMetadata(
-            ShortcutId: GetShortcutId(packageName),
-            TargetPackage: packageName,
-            TargetActivity: intent.GetStringExtra(ExtraTargetActivity),
-            Label: label,
-            IconBase64: iconBase64,
-            Token: token);
+            GetShortcutId(packageName),
+            packageName,
+            intent.GetStringExtra(ExtraTargetActivity),
+            label,
+            iconBase64,
+            token);
     }
 
     public static Intent CreateInternalLaunchIntent(string packageName,
@@ -145,15 +148,10 @@ internal static class HiddenAppShortcutManager
 
         var effectiveTargetActivity = targetActivity ?? storedMetadata?.TargetActivity;
         if (!string.IsNullOrWhiteSpace(effectiveTargetActivity))
-        {
             intent.PutExtra(ExtraTargetActivity, effectiveTargetActivity);
-        }
 
         var effectiveLabel = label ?? storedMetadata?.Label;
-        if (!string.IsNullOrWhiteSpace(effectiveLabel))
-        {
-            intent.PutExtra(ExtraLabel, effectiveLabel);
-        }
+        if (!string.IsNullOrWhiteSpace(effectiveLabel)) intent.PutExtra(ExtraLabel, effectiveLabel);
 
         AuthenticationUtility.SignIntent(intent);
         return intent;
@@ -164,19 +162,13 @@ internal static class HiddenAppShortcutManager
         request = HiddenAppLaunchRequest.Empty;
         if (intent is null)
             return false;
-        
+
         if (string.Equals(intent.Action, AgnosiaActions.LaunchAppProxy, StringComparison.Ordinal))
         {
-            if (!AuthenticationUtility.CheckIntent(intent))
-            {
-                return false;
-            }
+            if (!AuthenticationUtility.CheckIntent(intent)) return false;
 
             var packageName = intent.GetStringExtra(ExtraPackageName);
-            if (string.IsNullOrWhiteSpace(packageName))
-            {
-                return false;
-            }
+            if (string.IsNullOrWhiteSpace(packageName)) return false;
 
             var storedMetadata = ReadMetadata(packageName);
             request = new HiddenAppLaunchRequest(
@@ -188,7 +180,7 @@ internal static class HiddenAppShortcutManager
 
         if (!string.Equals(intent.Action, AgnosiaActions.LaunchHiddenAppShortcut, StringComparison.Ordinal))
             return false;
-        
+
         var shortcutPackage = intent.GetStringExtra(ExtraPackageName);
         var shortcutToken = intent.GetStringExtra(ExtraShortcutToken);
         if (string.IsNullOrWhiteSpace(shortcutPackage) || string.IsNullOrWhiteSpace(shortcutToken))
@@ -197,12 +189,12 @@ internal static class HiddenAppShortcutManager
         var pinnedMetadata = ReadMetadata(shortcutPackage);
         if (pinnedMetadata is null || !string.Equals(pinnedMetadata.Token, shortcutToken, StringComparison.Ordinal))
             return false;
-        
+
         request = new HiddenAppLaunchRequest(
             pinnedMetadata.TargetPackage,
             pinnedMetadata.TargetActivity,
             pinnedMetadata.Label);
-        
+
         return true;
     }
 
@@ -220,7 +212,8 @@ internal static class HiddenAppShortcutManager
 
             Log.Info(LogTag, $"Shortcut pin callback for {packageName} is being forwarded to the work profile.");
             ForwardFreezeToManagedProfile(context, packageName);
-            Toast.MakeText(context, "Ярлык создан, приложение скрывается в рабочем профиле.", ToastLength.Short)?.Show();
+            Toast.MakeText(context, "Ярлык создан, приложение скрывается в рабочем профиле.", ToastLength.Short)
+                ?.Show();
         }
         catch (Exception exception)
         {
@@ -233,19 +226,16 @@ internal static class HiddenAppShortcutManager
     {
         if (AndroidSystemApi.GetDevicePolicyManager(context) is not { } manager)
             throw new InvalidOperationException("Android did not provide DevicePolicyManager.");
-        
+
         var admin = AgnosiaUtilities.GetAdminComponent(context, typeof(AgnosiaDeviceAdminReceiver));
         AndroidPolicyApi.TrySetApplicationHidden(
             manager,
             admin,
             packageName,
-            hidden: true,
+            true,
             LogTag,
             out var error);
-        if (error is not null)
-        {
-            throw new InvalidOperationException(error);
-        }
+        if (error is not null) throw new InvalidOperationException(error);
     }
 
     private static void ForwardFreezeToManagedProfile(Context context, string packageName)
@@ -257,9 +247,7 @@ internal static class HiddenAppShortcutManager
                 packageName,
                 "Приложение скрыто.");
             if (!result.Succeeded)
-            {
                 Log.Warn(LogTag, $"Android не смог скрыть {packageName} в рабочем профиле: {result.Message}");
-            }
         });
     }
 
@@ -269,7 +257,7 @@ internal static class HiddenAppShortcutManager
         var raw = LocalStorageManager.Instance.GetString(storageKey);
         if (string.IsNullOrWhiteSpace(raw))
             return null;
-        
+
         try
         {
             return JsonSerializer.Deserialize<HiddenAppShortcutMetadata>(raw, JsonOptions);
@@ -288,7 +276,8 @@ internal static class HiddenAppShortcutManager
         LocalStorageManager.Instance.SetString(GetStorageKey(metadata.TargetPackage), raw);
     }
 
-    private static bool TryBuildMetadataCore(Context context, string packageName, out HiddenAppShortcutMetadata metadata, out string error)
+    private static bool TryBuildMetadataCore(Context context, string packageName,
+        out HiddenAppShortcutMetadata metadata, out string error)
     {
         var existing = ReadMetadata(packageName);
         var label = ResolveLabel(context, packageName) ?? existing?.Label ?? packageName;
@@ -303,27 +292,32 @@ internal static class HiddenAppShortcutManager
         }
 
         metadata = new HiddenAppShortcutMetadata(
-            ShortcutId: GetShortcutId(packageName),
-            TargetPackage: packageName,
-            TargetActivity: targetActivity,
-            Label: label,
-            IconBase64: iconBase64,
-            Token: existing?.Token ?? Convert.ToHexString(RandomNumberGenerator.GetBytes(16)));
+            GetShortcutId(packageName),
+            packageName,
+            targetActivity,
+            label,
+            iconBase64,
+            existing?.Token ?? Convert.ToHexString(RandomNumberGenerator.GetBytes(16)));
         error = string.Empty;
         return true;
     }
 
-    private static ShortcutManager? GetShortcutManager(Context context) =>
-        context.GetSystemService(Context.ShortcutService) as ShortcutManager;
+    private static ShortcutManager? GetShortcutManager(Context context)
+    {
+        return context.GetSystemService(Context.ShortcutService) as ShortcutManager;
+    }
 
-    private static bool IsPinned(ShortcutManager shortcutManager, string shortcutId) =>
-        shortcutManager.PinnedShortcuts.Any(shortcut => string.Equals(shortcut.Id, shortcutId, StringComparison.Ordinal));
+    private static bool IsPinned(ShortcutManager shortcutManager, string shortcutId)
+    {
+        return shortcutManager.PinnedShortcuts.Any(shortcut =>
+            string.Equals(shortcut.Id, shortcutId, StringComparison.Ordinal));
+    }
 
     private static ShortcutInfo BuildShortcutInfo(Context context, HiddenAppShortcutMetadata metadata)
     {
         var iconBytes = Convert.FromBase64String(metadata.IconBase64);
         using var iconBitmap = BitmapFactory.DecodeByteArray(iconBytes, 0, iconBytes.Length)
-            ?? throw new InvalidOperationException("Failed to decode the stored shortcut icon.");
+                               ?? throw new InvalidOperationException("Failed to decode the stored shortcut icon.");
 
         var launchIntent = new Intent(context, typeof(ProxyActivity));
         launchIntent.SetAction(AgnosiaActions.LaunchHiddenAppShortcut);
@@ -331,9 +325,7 @@ internal static class HiddenAppShortcutManager
         launchIntent.PutExtra(ExtraShortcutToken, metadata.Token);
 
         if (!string.IsNullOrWhiteSpace(metadata.TargetActivity))
-        {
             launchIntent.PutExtra(ExtraTargetActivity, metadata.TargetActivity);
-        }
 
         launchIntent.AddFlags(ActivityFlags.NewTask | ActivityFlags.ClearTop);
 
@@ -350,8 +342,9 @@ internal static class HiddenAppShortcutManager
         try
         {
             var packageManager = context.PackageManager;
-            return packageManager?.GetApplicationInfo(packageName, PackageInfoFlags.MatchDisabledComponents) is not { } applicationInfo 
-                ? null 
+            return packageManager?.GetApplicationInfo(packageName, PackageInfoFlags.MatchDisabledComponents) is not
+                { } applicationInfo
+                ? null
                 : packageManager.GetApplicationLabel(applicationInfo);
         }
         catch (PackageManager.NameNotFoundException)
@@ -365,7 +358,7 @@ internal static class HiddenAppShortcutManager
         var launchIntent = context.PackageManager?.GetLaunchIntentForPackage(packageName);
         if (launchIntent?.Component is { } component && !string.IsNullOrWhiteSpace(component.ClassName))
             return component.ClassName;
-        
+
         var resolveInfo = launchIntent is null
             ? null
             : context.PackageManager?.ResolveActivity(launchIntent, AndroidSystemApi.GetQueryIntentActivityFlags());
@@ -380,13 +373,16 @@ internal static class HiddenAppShortcutManager
             var drawable = context.PackageManager?.GetApplicationIcon(packageName);
             if (drawable is null)
                 return null;
-            
+
             using var bitmap = RenderDrawable(drawable);
             using var stream = new MemoryStream();
-            bitmap.Compress(Bitmap.CompressFormat.Png ?? throw new InvalidOperationException("PNG compress format is unavailable."), 100, stream);
+            bitmap.Compress(
+                Bitmap.CompressFormat.Png ?? throw new InvalidOperationException("PNG compress format is unavailable."),
+                100, stream);
             return Convert.ToBase64String(stream.ToArray());
         }
-        catch (Exception exception) when (exception is PackageManager.NameNotFoundException or InvalidOperationException)
+        catch (Exception exception) when
+            (exception is PackageManager.NameNotFoundException or InvalidOperationException)
         {
             Log.Warn(LogTag, $"Failed to load icon for {packageName}: {exception.Message}");
             return null;
@@ -397,7 +393,7 @@ internal static class HiddenAppShortcutManager
     {
         if (drawable is BitmapDrawable bitmapDrawable && bitmapDrawable.Bitmap is { } existingBitmap)
             return Bitmap.CreateScaledBitmap(existingBitmap, ShortcutIconSizePixels, ShortcutIconSizePixels, true);
-        
+
 
         var bitmap = Bitmap.CreateBitmap(
             ShortcutIconSizePixels,
@@ -409,9 +405,15 @@ internal static class HiddenAppShortcutManager
         return bitmap;
     }
 
-    private static string GetShortcutId(string packageName) => $"hidden:{packageName}";
+    private static string GetShortcutId(string packageName)
+    {
+        return $"hidden:{packageName}";
+    }
 
-    private static string GetStorageKey(string packageName) => $"{StorageKeys.HiddenShortcutMetadataPrefix}{packageName}";
+    private static string GetStorageKey(string packageName)
+    {
+        return $"{StorageKeys.HiddenShortcutMetadataPrefix}{packageName}";
+    }
 
     private static int GetStableRequestCode(string packageName)
     {
@@ -445,11 +447,20 @@ internal sealed record ShortcutFreezePreparationResult(
     bool HideImmediately,
     string Message)
 {
-    public static ShortcutFreezePreparationResult Failure(string message) => new(false, false, message);
+    public static ShortcutFreezePreparationResult Failure(string message)
+    {
+        return new ShortcutFreezePreparationResult(false, false, message);
+    }
 
-    public static ShortcutFreezePreparationResult Immediate(string message) => new(true, true, message);
+    public static ShortcutFreezePreparationResult Immediate(string message)
+    {
+        return new ShortcutFreezePreparationResult(true, true, message);
+    }
 
-    public static ShortcutFreezePreparationResult Deferred(string message) => new(true, false, message);
+    public static ShortcutFreezePreparationResult Deferred(string message)
+    {
+        return new ShortcutFreezePreparationResult(true, false, message);
+    }
 }
 
 internal sealed record HiddenAppShortcutBuildResult(
@@ -457,11 +468,15 @@ internal sealed record HiddenAppShortcutBuildResult(
     HiddenAppShortcutMetadata Metadata,
     string Error)
 {
-    public static HiddenAppShortcutBuildResult Success(HiddenAppShortcutMetadata metadata) =>
-        new(true, metadata, string.Empty);
+    public static HiddenAppShortcutBuildResult Success(HiddenAppShortcutMetadata metadata)
+    {
+        return new HiddenAppShortcutBuildResult(true, metadata, string.Empty);
+    }
 
-    public static HiddenAppShortcutBuildResult Failure(string error) =>
-        new(false, HiddenAppShortcutMetadata.Empty, error);
+    public static HiddenAppShortcutBuildResult Failure(string error)
+    {
+        return new HiddenAppShortcutBuildResult(false, HiddenAppShortcutMetadata.Empty, error);
+    }
 }
 
 internal sealed record HiddenAppShortcutMetadata(
@@ -472,5 +487,6 @@ internal sealed record HiddenAppShortcutMetadata(
     string IconBase64,
     string Token)
 {
-    public static HiddenAppShortcutMetadata Empty { get; } = new(string.Empty, string.Empty, null, string.Empty, string.Empty, string.Empty);
+    public static HiddenAppShortcutMetadata Empty { get; } =
+        new(string.Empty, string.Empty, null, string.Empty, string.Empty, string.Empty);
 }

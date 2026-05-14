@@ -1,3 +1,3 @@
 <Project>
-  <Target Name="AvaloniaStats" />
+    <Target Name="AvaloniaStats"/>
 </Project>

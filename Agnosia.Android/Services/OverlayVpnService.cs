@@ -1,4 +1,4 @@
-using Agnosia.Android.Api;
+using Agnosia.Android.Api.Platform;
 using Android.Content;
 using Android.Graphics;
 using Android.OS;
@@ -6,7 +6,7 @@ using Android.Provider;
 using Android.Views;
 using Exception = Java.Lang.Exception;
 using Extensions = Android.Runtime.Extensions;
-using Log = Agnosia.Android.Api.AgnosiaLog;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Services;
 
@@ -26,17 +26,6 @@ public sealed class OverlayVpnService : Service
     private IWindowManager? _windowManager;
     private View? _overlayView;
     private WindowManagerLayoutParams? _layoutParams;
-
-    public static void ShowOverlay(Context context)
-    {
-        var intent = new Intent(context, typeof(OverlayVpnService));
-        intent.SetAction(ActionShowOverlay);
-        AndroidServiceApi.TryStartService(
-            context,
-            intent,
-            LogTag,
-            "Android не смог запустить overlay-сервис.");
-    }
 
     public static void HideOverlay(Context context)
     {
@@ -64,9 +53,7 @@ public sealed class OverlayVpnService : Service
 
         if (!string.Equals(action, ActionShowOverlay, StringComparison.Ordinal)
             && !string.Equals(action, ActionHideOverlay, StringComparison.Ordinal))
-        {
             StopSelf(startId);
-        }
 
         return StartCommandResult.NotSticky;
     }
@@ -77,7 +64,10 @@ public sealed class OverlayVpnService : Service
         base.OnDestroy();
     }
 
-    public override IBinder? OnBind(Intent? intent) => null;
+    public override IBinder? OnBind(Intent? intent)
+    {
+        return null;
+    }
 
     private void ShowOverlayWindow()
     {
@@ -145,10 +135,7 @@ public sealed class OverlayVpnService : Service
 
     private void HideOverlayWindow()
     {
-        if (_windowManager is null || _overlayView is null)
-        {
-            return;
-        }
+        if (_windowManager is null || _overlayView is null) return;
 
         try
         {

@@ -1,8 +1,8 @@
-using Agnosia.Android.Api;
-using Agnosia.Android.Receivers;
+using Agnosia.Android.Api.Platform;
+using Agnosia.Android.Api.Vpn;
 using Android.Content;
 using Android.OS;
-using Log = Agnosia.Android.Api.AgnosiaLog;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Services;
 
@@ -52,14 +52,14 @@ public sealed class WorkProfileLockFreezeService : Service
         base.OnDestroy();
     }
 
-    public override IBinder? OnBind(Intent? intent) => null;
+    public override IBinder? OnBind(Intent? intent)
+    {
+        return null;
+    }
 
     private void RegisterScreenReceiver()
     {
-        if (_receiverRegistered)
-        {
-            return;
-        }
+        if (_receiverRegistered) return;
 
         RegisterReceiver(_screenStateReceiver, new IntentFilter(Intent.ActionScreenOff));
         _receiverRegistered = true;
@@ -67,10 +67,7 @@ public sealed class WorkProfileLockFreezeService : Service
 
     private void FreezeIfDeviceIsAlreadyNonInteractive(string trigger)
     {
-        if (AndroidSystemApi.GetPowerManager(this)?.IsInteractive != false)
-        {
-            return;
-        }
+        if (AndroidSystemApi.GetPowerManager(this)?.IsInteractive != false) return;
 
         if (!AgnosiaUtilities.IsProfileOwner(this))
         {
@@ -92,10 +89,8 @@ public sealed class WorkProfileLockFreezeService : Service
     {
         public override void OnReceive(Context? context, Intent? intent)
         {
-            if (context is null || !string.Equals(intent?.Action, Intent.ActionScreenOff, StringComparison.Ordinal))
-            {
-                return;
-            }
+            if (context is null ||
+                !string.Equals(intent?.Action, Intent.ActionScreenOff, StringComparison.Ordinal)) return;
 
             var pendingResult = GoAsync();
             var appContext = context.ApplicationContext ?? context;
@@ -104,13 +99,9 @@ public sealed class WorkProfileLockFreezeService : Service
                 try
                 {
                     if (AgnosiaUtilities.IsProfileOwner(appContext))
-                    {
                         FreezeWorkProfileApps(appContext, "screen_lock");
-                    }
                     else
-                    {
                         EnableParentVpnAfterScreenLock(appContext, "screen_lock");
-                    }
                 }
                 finally
                 {
@@ -122,10 +113,7 @@ public sealed class WorkProfileLockFreezeService : Service
 
     private static void FreezeWorkProfileApps(Context context, string trigger)
     {
-        if (!AgnosiaUtilities.IsProfileOwner(context))
-        {
-            return;
-        }
+        if (!AgnosiaUtilities.IsProfileOwner(context)) return;
 
         if (HiddenAppSessionMonitorService.CompletePersistedSessionForScreenLock(context))
         {
@@ -144,18 +132,12 @@ public sealed class WorkProfileLockFreezeService : Service
 
     private static void EnableParentVpnAfterScreenLock(Context context, string trigger)
     {
-        if (AgnosiaUtilities.IsProfileOwner(context))
-        {
-            return;
-        }
+        if (AgnosiaUtilities.IsProfileOwner(context)) return;
 
         var result = AndroidVpnAutomationApi
             .EnableConfiguredVpnAfterWorkFreezeAsync(context, $"parent_screen_lock:{trigger}")
             .GetAwaiter()
             .GetResult();
-        if (!result.Succeeded)
-        {
-            Log.Warn(LogTag, $"Parent VPN restore after screen lock failed: {result.Message}");
-        }
+        if (!result.Succeeded) Log.Warn(LogTag, $"Parent VPN restore after screen lock failed: {result.Message}");
     }
 }

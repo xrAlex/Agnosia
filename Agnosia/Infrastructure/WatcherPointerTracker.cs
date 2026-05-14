@@ -14,9 +14,13 @@ public static class WatcherPointerTracker
 {
     public static event EventHandler<WatcherPointerEvent>? PointerChanged;
 
-    public static void Move(Point rootPosition) =>
+    public static void Move(Point rootPosition)
+    {
         PointerChanged?.Invoke(null, new WatcherPointerEvent(rootPosition, WatcherPointerState.Move));
+    }
 
-    public static void Release(Point rootPosition) =>
+    public static void Release(Point rootPosition)
+    {
         PointerChanged?.Invoke(null, new WatcherPointerEvent(rootPosition, WatcherPointerState.Release));
+    }
 }

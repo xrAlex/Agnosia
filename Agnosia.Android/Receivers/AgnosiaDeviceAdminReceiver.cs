@@ -1,8 +1,9 @@
-using Agnosia.Android.Api;
+using Agnosia.Android.Api.Commands;
+using Agnosia.Android.Api.Platform;
 using Android;
 using Android.App.Admin;
 using Android.Content;
-using Log = Agnosia.Android.Api.AgnosiaLog;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Receivers;
 
@@ -46,10 +47,11 @@ public sealed class AgnosiaDeviceAdminReceiver : DeviceAdminReceiver
                 context,
                 typeof(AgnosiaDeviceAdminReceiver),
                 typeof(MainActivity),
-                enableProfile: true);
+                true);
             AgnosiaUtilities.EnforceUserRestrictions(context, typeof(AgnosiaDeviceAdminReceiver));
             NotifyParentProvisioningFinalized(context);
-            Log.Info(LogTag, "Work profile provisioning finalized and profile enabled; lock-freeze monitor startup deferred to profile activity bootstrap.");
+            Log.Info(LogTag,
+                "Work profile provisioning finalized and profile enabled; lock-freeze monitor startup deferred to profile activity bootstrap.");
         }
         catch (Exception exception)
         {
@@ -67,8 +69,6 @@ public sealed class AgnosiaDeviceAdminReceiver : DeviceAdminReceiver
                 LogTag,
                 "Android не смог уведомить основной профиль о завершении настройки.",
                 out _))
-        {
             Log.Warn(LogTag, "Parent profile provisioning finalization notification was not delivered.");
-        }
     }
 }

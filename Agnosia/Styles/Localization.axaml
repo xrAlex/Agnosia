@@ -41,7 +41,7 @@
     <system:String x:Key="String.Dashboard.WP.QuietMode">Пауза</system:String>
     <system:String x:Key="String.Dashboard.WP.Disabled">Выключен</system:String>
     <system:String x:Key="String.Dashboard.WP.CommandIssue">Нет связи</system:String>
-    
+
     <system:String x:Key="String.Dashboard.State.Loading">Загрузка состояния профиля</system:String>
     <system:String x:Key="String.Dashboard.State.NotSupported">Рабочие профили не поддерживаются на этом устройстве</system:String>
     <system:String x:Key="String.Dashboard.State.NotSetup">Первичная настройка устройства не завершена</system:String>
@@ -83,7 +83,7 @@
     <!-- App Item -->
     <system:String x:Key="String.App.Profile.Work">Рабочий</system:String>
     <system:String x:Key="String.App.Profile.Personal">Личный</system:String>
-    
+
     <system:String x:Key="String.App.Action.Open">Открыть</system:String>
     <system:String x:Key="String.App.Action.UnfreezeAndOpen">Разморозить и открыть</system:String>
     <system:String x:Key="String.App.Action.CopyToWork">Копировать в рабочий</system:String>

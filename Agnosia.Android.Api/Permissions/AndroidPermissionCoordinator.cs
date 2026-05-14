@@ -1,7 +1,12 @@
+using Agnosia.Android.Api.Commands;
+using Agnosia.Android.Api.Dashboard;
+using Agnosia.Android.Api.Gateways;
+using Agnosia.Android.Api.Platform;
+using Agnosia.Android.Api.Storage;
 using Agnosia.Models;
 using Android.Content;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Permissions;
 
 internal sealed class AndroidPermissionCoordinator(
     AndroidActivityCommandGateway commandRunner,
@@ -15,16 +20,18 @@ internal sealed class AndroidPermissionCoordinator(
         var profileDiagnostics = AndroidWorkProfileDiagnosticsReader.Read(activity);
         var hasWorkProfileTarget = profileDiagnostics.CommandTargetResolvable;
         var workProfileAvailable = hasWorkProfileTarget
-            && profileDiagnostics.AvailableToCrossProfileApps
-            && profileDiagnostics.QuietModeEnabled != true
-            && await commandRunner.CanReachWorkProfileAsync(cancellationToken);
+                                   && profileDiagnostics.AvailableToCrossProfileApps
+                                   && profileDiagnostics.QuietModeEnabled != true
+                                   && await commandRunner.CanReachWorkProfileAsync(cancellationToken);
         var hasSetup = LocalStorageManager.Instance.GetBoolean(StorageKeys.HasSetup)
-            || hasWorkProfileTarget
-            || profileDiagnostics.ManagedProfileExists;
+                       || hasWorkProfileTarget
+                       || profileDiagnostics.ManagedProfileExists;
         var usageAccessGranted = workProfileAvailable
-            && await AndroidProfileCommandGateway.QueryWorkUsageStatsAccessAsync(commandRunner, cancellationToken);
+                                 && await AndroidProfileCommandGateway.QueryWorkUsageStatsAccessAsync(commandRunner,
+                                     cancellationToken);
         var workPackageInstallGranted = workProfileAvailable
-            && await AndroidProfileCommandGateway.QueryWorkPackageInstallAccessAsync(commandRunner, cancellationToken);
+                                        && await AndroidProfileCommandGateway.QueryWorkPackageInstallAccessAsync(
+                                            commandRunner, cancellationToken);
 
         return
         [
@@ -84,7 +91,7 @@ internal sealed class AndroidPermissionCoordinator(
                 2. Выберите 'Разрешить доступ к настройкам'.
                 3. Пролистайте вниз.
                 4. Разрешите 'Поверх других приложений'.
-                
+
                 На некоторых версиях Android необходимо сперва пролистать вниз, нажать 'Поверх других приложений', 
                 потом вернуться назад и только тогда появится возмоджность дать разрешения (⋮)
                 Тоесть: перед тем как выдать разрешения сперва пункт 3, потом 4 и тогда уже  1 -> 2 -> 3 -> 4
@@ -108,7 +115,8 @@ internal sealed class AndroidPermissionCoordinator(
             PermissionKind.WorkProfile => await startProvisioningAsync(cancellationToken),
             PermissionKind.UsageStats => await RequestUsageStatsAccessAsync(cancellationToken),
             PermissionKind.Notifications => AndroidPermissionApi.RequestNotificationPermission(activity),
-            PermissionKind.VpnControl => await AndroidPermissionApi.RequestVpnControlAsync(commandRunner, cancellationToken),
+            PermissionKind.VpnControl => await AndroidPermissionApi.RequestVpnControlAsync(commandRunner,
+                cancellationToken),
             PermissionKind.PackageInstall => await RequestPackageInstallAccessAsync(cancellationToken),
             PermissionKind.Overlay => AndroidPermissionApi.OpenAppDetailsSettings(activity),
             _ => OperationResult.Failure("Неизвестное разрешение.")
@@ -118,10 +126,7 @@ internal sealed class AndroidPermissionCoordinator(
     public async Task EnsureUsageStatsAccessRequestedAsync(CancellationToken cancellationToken)
     {
         var storage = LocalStorageManager.Instance;
-        if (storage.GetBoolean(StorageKeys.UsageStatsAccessPrompted))
-        {
-            return;
-        }
+        if (storage.GetBoolean(StorageKeys.UsageStatsAccessPrompted)) return;
 
         if (await AndroidProfileCommandGateway.QueryWorkUsageStatsAccessAsync(commandRunner, cancellationToken))
         {
@@ -130,10 +135,7 @@ internal sealed class AndroidPermissionCoordinator(
         }
 
         var requestResult = await RequestUsageStatsAccessAsync(cancellationToken);
-        if (requestResult.Succeeded)
-        {
-            storage.SetBoolean(StorageKeys.UsageStatsAccessPrompted, true);
-        }
+        if (requestResult.Succeeded) storage.SetBoolean(StorageKeys.UsageStatsAccessPrompted, true);
     }
 
     private async Task<OperationResult> RequestUsageStatsAccessAsync(CancellationToken cancellationToken)
@@ -141,13 +143,10 @@ internal sealed class AndroidPermissionCoordinator(
         var intent = new Intent(AgnosiaActions.RequestUsageStatsAccess);
         var result = await commandRunner.RunVoidOperationAsync(
             intent,
-            useWorkProfile: true,
+            true,
             cancellationToken,
             "Откройте Agnosia в списке и включите доступ к истории использования.");
-        if (result.Succeeded)
-        {
-            LocalStorageManager.Instance.SetBoolean(StorageKeys.UsageStatsAccessPrompted, true);
-        }
+        if (result.Succeeded) LocalStorageManager.Instance.SetBoolean(StorageKeys.UsageStatsAccessPrompted, true);
 
         return result;
     }
@@ -157,7 +156,7 @@ internal sealed class AndroidPermissionCoordinator(
         var intent = new Intent(AgnosiaActions.RequestPackageInstallAccess);
         return commandRunner.RunVoidOperationAsync(
             intent,
-            useWorkProfile: true,
+            true,
             cancellationToken,
             "Включите установку APK из Agnosia в рабочем профиле.");
     }

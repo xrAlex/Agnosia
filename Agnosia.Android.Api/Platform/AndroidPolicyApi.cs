@@ -3,9 +3,9 @@ using Agnosia.Android.Api.Internal;
 using Android.App.Admin;
 using Android.Content;
 using Android.OS;
-using Log = Agnosia.Android.Api.AgnosiaLog;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
-namespace Agnosia.Android.Api;
+namespace Agnosia.Android.Api.Platform;
 
 public static class AndroidPolicyApi
 {
@@ -20,11 +20,15 @@ public static class AndroidPolicyApi
         SetCrossProfileContactsSearchDisabled(manager, admin, disabled);
     }
 
-    public static void AddParentProfileAppLinking(DevicePolicyManager manager, ComponentName admin) =>
+    public static void AddParentProfileAppLinking(DevicePolicyManager manager, ComponentName admin)
+    {
         manager.AddUserRestriction(admin, UserManager.AllowParentProfileAppLinking);
+    }
 
-    public static string[] GetCrossProfilePackages(DevicePolicyManager manager, ComponentName admin) =>
-        AndroidPackageAccessPolicy.ApplyRequiredCrossProfilePackages(manager.GetCrossProfilePackages(admin));
+    public static string[] GetCrossProfilePackages(DevicePolicyManager manager, ComponentName admin)
+    {
+        return AndroidPackageAccessPolicy.ApplyRequiredCrossProfilePackages(manager.GetCrossProfilePackages(admin));
+    }
 
     public static bool TryEnableSystemApp(
         DevicePolicyManager manager,
@@ -63,15 +67,18 @@ public static class AndroidPolicyApi
             }
             catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
             {
-                Log.Warn(logTag, $"Could not read hidden state before SetApplicationHidden. package={packageName}, requestedHidden={hidden}, exception={exception.GetType().FullName}: {exception.Message}");
+                Log.Warn(logTag,
+                    $"Could not read hidden state before SetApplicationHidden. package={packageName}, requestedHidden={hidden}, exception={exception.GetType().FullName}: {exception.Message}");
             }
 
             var hiddenApplied = manager.SetApplicationHidden(admin, packageName, hidden);
             var currentHidden = manager.IsApplicationHidden(admin, packageName);
-            Log.Info(logTag, $"SetApplicationHidden result. package={packageName}, requestedHidden={hidden}, returned={hiddenApplied}, hiddenBefore={hiddenBefore?.ToString() ?? "<unknown>"}, currentHidden={currentHidden}, adminPackage={admin.PackageName}.");
+            Log.Info(logTag,
+                $"SetApplicationHidden result. package={packageName}, requestedHidden={hidden}, returned={hiddenApplied}, hiddenBefore={hiddenBefore?.ToString() ?? "<unknown>"}, currentHidden={currentHidden}, adminPackage={admin.PackageName}.");
             if (!hiddenApplied && currentHidden != hidden)
             {
-                Log.Warn(logTag, $"SetApplicationHidden rejected. package={packageName}, requestedHidden={hidden}, returned={hiddenApplied}, hiddenBefore={hiddenBefore?.ToString() ?? "<unknown>"}, currentHidden={currentHidden}, adminPackage={admin.PackageName}.");
+                Log.Warn(logTag,
+                    $"SetApplicationHidden rejected. package={packageName}, requestedHidden={hidden}, returned={hiddenApplied}, hiddenBefore={hiddenBefore?.ToString() ?? "<unknown>"}, currentHidden={currentHidden}, adminPackage={admin.PackageName}.");
                 error = hidden
                     ? $"Android не смог скрыть {packageName}."
                     : $"Android не смог восстановить {packageName}.";
@@ -83,7 +90,8 @@ public static class AndroidPolicyApi
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
-            Log.Warn(logTag, $"Failed to change hidden state. package={packageName}, requestedHidden={hidden}, adminPackage={admin.PackageName}, exception={exception.GetType().FullName}: {exception}");
+            Log.Warn(logTag,
+                $"Failed to change hidden state. package={packageName}, requestedHidden={hidden}, adminPackage={admin.PackageName}, exception={exception.GetType().FullName}: {exception}");
             error = hidden
                 ? $"Android не смог скрыть {packageName}."
                 : $"Android не смог восстановить {packageName}.";
@@ -99,7 +107,8 @@ public static class AndroidPolicyApi
     {
         try
         {
-            manager.SetCrossProfilePackages(admin, AndroidPackageAccessPolicy.ApplyRequiredCrossProfilePackages(packages));
+            manager.SetCrossProfilePackages(admin,
+                AndroidPackageAccessPolicy.ApplyRequiredCrossProfilePackages(packages));
             return true;
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
@@ -120,9 +129,7 @@ public static class AndroidPolicyApi
             var required = AndroidPackageAccessPolicy.ApplyRequiredCrossProfilePackages(current);
             if (current.Length == required.Length
                 && current.ToHashSet(StringComparer.Ordinal).SetEquals(required))
-            {
                 return true;
-            }
 
             manager.SetCrossProfilePackages(admin, required);
             return true;
@@ -135,13 +142,18 @@ public static class AndroidPolicyApi
     }
 
     [UnsupportedOSPlatform("android34.0")]
-    private static void SetCrossProfileContactsSearchDisabled(DevicePolicyManager manager, ComponentName admin, bool disabled) =>
+    private static void SetCrossProfileContactsSearchDisabled(DevicePolicyManager manager, ComponentName admin,
+        bool disabled)
+    {
         manager.SetCrossProfileContactsSearchDisabled(admin, disabled);
+    }
 
     [SupportedOSPlatform("android34.0")]
-    private static void SetManagedProfileContactsAccessPolicy(DevicePolicyManager manager, bool disabled) =>
+    private static void SetManagedProfileContactsAccessPolicy(DevicePolicyManager manager, bool disabled)
+    {
         manager.ManagedProfileContactsAccessPolicy = new PackagePolicy(
             disabled
                 ? PackagePolicyMode.Allowlist
                 : PackagePolicyMode.Blocklist);
+    }
 }
