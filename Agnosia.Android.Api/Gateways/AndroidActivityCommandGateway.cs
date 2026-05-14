@@ -10,7 +10,8 @@ namespace Agnosia.Android.Api;
 internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> getActivityHost)
 {
     private const string ActivityResultLogTag = "AgnosiaActivityResult";
-    private static readonly TimeSpan ProfileCommandTimeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan DefaultProfileCommandTimeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan InstallPackageProfileCommandTimeout = TimeSpan.FromMinutes(3);
 
     public Activity CurrentActivity => getActivityHost().CurrentActivity;
 
@@ -108,13 +109,14 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
                 return localResult;
             }
 
+            var profileCommandTimeout = GetProfileCommandTimeout(intent);
             using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCancellation.CancelAfter(ProfileCommandTimeout);
+            timeoutCancellation.CancelAfter(profileCommandTimeout);
             try
             {
                 Log.Debug(
                     ActivityResultLogTag,
-                    $"Starting work-profile activity command. action={intent.Action ?? "<none>"}, timeoutMs={ProfileCommandTimeout.TotalMilliseconds:0}.");
+                    $"Starting work-profile activity command. action={intent.Action ?? "<none>"}, timeoutMs={profileCommandTimeout.TotalMilliseconds:0}.");
                 var workStartedAt = Stopwatch.GetTimestamp();
                 var workResult = await host.StartForResultAsync(intent, timeoutCancellation.Token);
                 Log.Debug(
@@ -126,14 +128,14 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
             {
                 Log.Warn(
                     ActivityResultLogTag,
-                    $"Timed out waiting for work-profile activity result. action={intent.Action ?? "<none>"}, timeoutMs={ProfileCommandTimeout.TotalMilliseconds:0}.");
+                    $"Timed out waiting for work-profile activity result. action={intent.Action ?? "<none>"}, timeoutMs={profileCommandTimeout.TotalMilliseconds:0}.");
                 if (isLaunchCommand)
                 {
                     var launchResult = CreateLaunchResult(intent)
                         .Fail(
                             AndroidAppLaunchStage.CommandReceived,
                             AndroidAppLaunchIssueKind.WorkProfileUnavailable,
-                            $"timeoutMs={ProfileCommandTimeout.TotalMilliseconds:0}");
+                            $"timeoutMs={profileCommandTimeout.TotalMilliseconds:0}");
                     launchResult.Log(ActivityResultLogTag);
                     return launchResult.ToActivityResult();
                 }
@@ -170,6 +172,11 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
 
     private static bool IsLaunchCommand(Intent intent) =>
         string.Equals(intent.Action, AgnosiaActions.UnfreezeAndLaunch, StringComparison.Ordinal);
+
+    private static TimeSpan GetProfileCommandTimeout(Intent intent) =>
+        string.Equals(intent.Action, AgnosiaActions.InstallPackage, StringComparison.Ordinal)
+            ? InstallPackageProfileCommandTimeout
+            : DefaultProfileCommandTimeout;
 
     private static AndroidAppLaunchResult CreateLaunchResult(Intent intent) =>
         AndroidAppLaunchResult.CommandReceived(

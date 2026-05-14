@@ -45,6 +45,10 @@ public sealed class DummyActivity : Activity
 {
     private const string LogTag = "AgnosiaDummyActivity";
     private const int ProxyLaunchRequestCode = 7201;
+    private static readonly TimeSpan PackageAvailabilityWaitTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan PackageAvailabilityRetryDelay = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan HideAfterInstallRetryTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan HideAfterInstallRetryDelay = TimeSpan.FromMilliseconds(500);
     private static readonly Lock PackageInstallerCallbackSync = new();
     private static DummyActivity? _activeInstance;
     private static Intent? _pendingPackageInstallerCallback;
@@ -540,6 +544,12 @@ public sealed class DummyActivity : Activity
 
             Log.Info(LogTag, $"Starting hidden shortcut preparation for {packageName}.");
 
+            if (!await WaitForPackageAvailableAsync(packageName))
+            {
+                FinishWithError($"Android не успел подготовить {packageName} после установки. Повторите действие через несколько секунд.");
+                return;
+            }
+
             HiddenAppShortcutBuildResult metadataResult;
             try
             {
@@ -559,11 +569,10 @@ public sealed class DummyActivity : Activity
             }
 
             var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
-            string? hideError = null;
-            if (_policyManager is null
-                || !AndroidPolicyApi.TrySetApplicationHidden(_policyManager, admin, packageName, hidden: true, LogTag, out hideError))
+            var hideError = await TryHidePackageAfterInstallAsync(admin, packageName);
+            if (hideError is not null)
             {
-                FinishWithError(hideError ?? $"Android не смог скрыть {packageName} после установки.");
+                FinishWithError(hideError);
                 return;
             }
 
@@ -577,6 +586,85 @@ public sealed class DummyActivity : Activity
         {
             Log.Error(LogTag, $"ActionPrepareHiddenShortcut failed: {ex}");
             FinishWithError("Android не смог подготовить ярлык скрытого приложения.");
+        }
+    }
+
+    private async Task<bool> WaitForPackageAvailableAsync(string packageName)
+    {
+        var deadline = DateTimeOffset.UtcNow + PackageAvailabilityWaitTimeout;
+        var attempt = 1;
+        while (true)
+        {
+            if (IsPackageAvailable(packageName))
+            {
+                if (attempt > 1)
+                {
+                    Log.Info(LogTag, $"Package {packageName} became available for hidden shortcut preparation on attempt {attempt}.");
+                }
+
+                return true;
+            }
+
+            if (DateTimeOffset.UtcNow >= deadline)
+            {
+                Log.Warn(LogTag, $"Timed out waiting for package {packageName} to become available after install.");
+                return false;
+            }
+
+            await Task.Delay(PackageAvailabilityRetryDelay);
+            attempt++;
+        }
+    }
+
+    private bool IsPackageAvailable(string packageName)
+    {
+        try
+        {
+            var applicationInfo = PackageManager?.GetApplicationInfo(packageName, PackageInfoFlags.MatchDisabledComponents);
+            return applicationInfo is not null
+                && (applicationInfo.Flags & ApplicationInfoFlags.Installed) != 0;
+        }
+        catch (PackageManager.NameNotFoundException)
+        {
+            return false;
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn(LogTag, $"Failed to query package availability for {packageName}: {exception}");
+            return false;
+        }
+    }
+
+    private async Task<string?> TryHidePackageAfterInstallAsync(ComponentName admin, string packageName)
+    {
+        if (_policyManager is null)
+        {
+            return $"Android не смог скрыть {packageName} после установки.";
+        }
+
+        var deadline = DateTimeOffset.UtcNow + HideAfterInstallRetryTimeout;
+        var attempt = 1;
+        string? hideError = null;
+        while (true)
+        {
+            if (AndroidPolicyApi.TrySetApplicationHidden(_policyManager, admin, packageName, hidden: true, LogTag, out hideError))
+            {
+                if (attempt > 1)
+                {
+                    Log.Info(LogTag, $"Package {packageName} was hidden after install on attempt {attempt}.");
+                }
+
+                return null;
+            }
+
+            if (DateTimeOffset.UtcNow >= deadline)
+            {
+                Log.Warn(LogTag, $"Timed out hiding package {packageName} after install. lastError={hideError ?? "<none>"}.");
+                return hideError ?? $"Android не смог скрыть {packageName} после установки.";
+            }
+
+            await Task.Delay(HideAfterInstallRetryDelay);
+            attempt++;
         }
     }
 
