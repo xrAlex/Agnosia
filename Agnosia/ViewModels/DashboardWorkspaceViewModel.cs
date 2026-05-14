@@ -16,6 +16,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private const int SettingsSaveDelayMs = 350;
     private const int OnboardingMonitorDelayMs = 1500;
     private const int VisibleIconPrefetchCount = 18;
+    private const string StaleApkMessageMarker = "APK изменился";
     private readonly IDashboardPlatformService _dashboardService;
     private readonly IPlatformEventLogReader _platformEventLogReader;
     private readonly IPermissionPlatformService _permissionService;
@@ -907,6 +908,11 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             {
                 StatusIsError = true;
                 StatusMessage = ResolveOperationMessage(cloneResult.Message, "CloneFailed");
+                if (IsStaleInstallSourceMessage(cloneResult.Message))
+                {
+                    await RefreshAfterStaleInstallSourceAsync(StatusMessage);
+                }
+
                 return;
             }
 
@@ -1233,6 +1239,10 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             {
                 await RefreshDashboardAsync(allowDuringOperation: true);
             }
+            else if (IsStaleInstallSourceMessage(result.Message))
+            {
+                await RefreshAfterStaleInstallSourceAsync(StatusMessage);
+            }
         }
         catch (Exception ex)
         {
@@ -1257,6 +1267,16 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             }
         }
     }
+
+    private async Task RefreshAfterStaleInstallSourceAsync(string statusMessage)
+    {
+        await RefreshDashboardAsync(allowDuringOperation: true);
+        StatusIsError = true;
+        StatusMessage = statusMessage;
+    }
+
+    private static bool IsStaleInstallSourceMessage(string? message) =>
+        message?.Contains(StaleApkMessageMarker, StringComparison.Ordinal) == true;
 
     private void StartOnboardingMonitorIfNeeded()
     {

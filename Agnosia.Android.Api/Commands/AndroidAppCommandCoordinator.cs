@@ -31,8 +31,21 @@ internal sealed class AndroidAppCommandCoordinator(
 
             if (!app.IsSystem)
             {
-                intent.PutExtra("apk", app.SourceDirectory);
-                intent.PutExtra("split_apks", app.SplitApks.ToArray());
+                var sourceDirectory = app.SourceDirectory;
+                var splitApks = app.SplitApks.ToArray();
+                if (app.Profile == ProfileKind.Personal
+                    && !AndroidPackageApi.TryResolveInstalledPackageSource(
+                        commandRunner.CurrentActivity.PackageManager,
+                        app.PackageName,
+                        out sourceDirectory,
+                        out splitApks))
+                {
+                    _ = await loadDashboardAsync(cancellationToken);
+                    return OperationResult.Failure("APK изменился или приложение было обновлено. Обновите список и повторите.");
+                }
+
+                intent.PutExtra("apk", sourceDirectory);
+                intent.PutExtra("split_apks", splitApks);
             }
 
             result = await (app.Profile == ProfileKind.Personal
