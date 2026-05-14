@@ -335,7 +335,7 @@ internal static class HiddenAppShortcutManager
             launchIntent.PutExtra(ExtraTargetActivity, metadata.TargetActivity);
         }
 
-        launchIntent.AddFlags(ActivityFlags.NewTask | ActivityFlags.ClearTop | ActivityFlags.NoAnimation);
+        launchIntent.AddFlags(ActivityFlags.NewTask | ActivityFlags.ClearTop);
 
         return new ShortcutInfo.Builder(context, metadata.ShortcutId)
             .SetShortLabel(metadata.Label)

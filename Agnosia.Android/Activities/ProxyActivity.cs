@@ -15,7 +15,7 @@ namespace Agnosia.Android.Activities;
 
 [Activity(
     Name = "com.agnosia.app.ProxyActivity",
-    Theme = "@android:style/Theme.Translucent.NoTitleBar",
+    Theme = "@style/Agnosia.ProxyTheme",
     Exported = true,
     ExcludeFromRecents = true,
     NoHistory = true,
@@ -238,7 +238,7 @@ public sealed class ProxyActivity : Activity
             {
                 try
                 {
-                    StartActivityForResult(launchIntent, LaunchRequestCode);
+                    StartActivity(launchIntent);
                     var startedResult = resultToStart.WithStage(AndroidAppLaunchStage.StartActivityAttempted);
                     if (!AndroidUsageStatsAccessApi.HasAccess(this, LogTag, fallbackWhenUnavailable: false))
                     {
@@ -248,6 +248,9 @@ public sealed class ProxyActivity : Activity
                     }
 
                     _launchResult = startedResult;
+                    Log.Info(
+                        LogTag,
+                        $"StartActivity returned for {request.PackageName}. component={launchIntent.Component?.FlattenToShortString() ?? "<none>"}, flags={launchIntent.Flags}, proxyTaskId={TaskId}.");
                     Log.Info(LogTag, $"Starting hidden-session monitor for {request.PackageName}, taskId={TaskId}.");
                     HiddenAppSessionMonitorService.StartMonitoring(
                         this,
@@ -375,9 +378,6 @@ public sealed class ProxyActivity : Activity
         {
             try
             {
-                // Show overlay before launching work app so it's visible when VPN TempActivity starts after freeze.
-                OverlayVpnService.ShowOverlay(this);
-
                 var proxyIntent = HiddenAppShortcutManager.CreateInternalLaunchIntent(request.PackageName,
                     request.TargetActivity,
                     request.DisplayName);
@@ -422,9 +422,13 @@ public sealed class ProxyActivity : Activity
             launchIntent.SetComponent(new ComponentName(request.PackageName, request.TargetActivity));
         }
 
-        var flagsToClear = ActivityFlags.NewTask | ActivityFlags.ResetTaskIfNeeded;
+        var flagsToClear = ActivityFlags.NoAnimation;
         launchIntent.SetFlags(launchIntent.Flags & ~flagsToClear);
-        launchIntent.AddFlags(ActivityFlags.ClearTop | ActivityFlags.SingleTop);
+        launchIntent.AddFlags(
+            ActivityFlags.NewTask
+            | ActivityFlags.ResetTaskIfNeeded
+            | ActivityFlags.ClearTop
+            | ActivityFlags.SingleTop);
         return launchIntent;
     }
 

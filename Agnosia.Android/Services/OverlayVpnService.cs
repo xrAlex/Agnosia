@@ -62,7 +62,13 @@ public sealed class OverlayVpnService : Service
             StopSelf(startId);
         }
 
-        return StartCommandResult.Sticky;
+        if (!string.Equals(action, ActionShowOverlay, StringComparison.Ordinal)
+            && !string.Equals(action, ActionHideOverlay, StringComparison.Ordinal))
+        {
+            StopSelf(startId);
+        }
+
+        return StartCommandResult.NotSticky;
     }
 
     public override void OnDestroy()
