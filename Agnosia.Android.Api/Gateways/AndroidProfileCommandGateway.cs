@@ -354,8 +354,8 @@ public static class AndroidProfileCommandGateway
         {
             AgnosiaRuntime.Initialize(context);
             intent.AddFlags(ActivityFlags.NewTask);
-            AgnosiaUtilities.TransferIntentToProfile(context, intent);
             intent.AddCategory(Intent.CategoryDefault);
+            AgnosiaUtilities.TransferIntentToProfile(context, intent);
             Log.Debug(
                 LogTag,
                 $"Starting other-profile activity. action={intent.Action ?? "<none>"}, component={intent.Component?.PackageName ?? "<none>"}/{intent.Component?.ClassName ?? "<none>"}.");

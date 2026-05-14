@@ -206,6 +206,7 @@ public static class AgnosiaUtilities
     private static void AddCrossProfileIntent(DevicePolicyManager manager, ComponentName admin, string action, DevicePolicyManagerFlags flag)
     {
         var filter = new IntentFilter(action);
+        filter.AddCategory(Intent.CategoryDefault);
         manager.AddCrossProfileIntentFilter(admin, filter, flag);
     }
 
