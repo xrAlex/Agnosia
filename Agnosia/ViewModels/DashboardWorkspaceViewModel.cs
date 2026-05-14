@@ -454,7 +454,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     partial void OnSelectedProfileChanged(ProfileKind value)
     {
-        CancelPendingSearchRefresh(); 
+        CancelVisibleIconLoads();
+        CancelPendingSearchRefresh();
         RefreshVisibleApps();
     }
 

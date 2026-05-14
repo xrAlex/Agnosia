@@ -65,7 +65,8 @@ public static class AndroidAppInventoryApi
 
         try
         {
-            var app = packageManager.GetApplicationInfo(packageName, PackageInfoFlags.MatchDisabledComponents);
+            var app = TryGetApplicationInfo(packageManager, packageName, AndroidSystemApi.GetInstalledApplicationFlags())
+                ?? packageManager.GetApplicationInfo(packageName, PackageInfoFlags.MatchDisabledComponents);
             cancellationToken.ThrowIfCancellationRequested();
             return ResolveAppIconPng(context, packageManager, app, packageName, cancellationToken);
         }
@@ -94,7 +95,8 @@ public static class AndroidAppInventoryApi
 
         var isSystem = AndroidWorkProfilePackageClassifier.IsSystemApp(app);
         var isInstalled = (app.Flags & ApplicationInfoFlags.Installed) != 0;
-        if (!showAll && (isSystem || !isInstalled))
+        var isHidden = TryIsApplicationHidden(policyManager, admin, packageName);
+        if (!showAll && (isSystem || (!isInstalled && !isHidden)))
         {
             return null;
         }
@@ -106,11 +108,47 @@ public static class AndroidAppInventoryApi
             SourceDirectory = app.SourceDir,
             SplitApks = app.SplitSourceDirs?.ToArray() ?? [],
             IsSystem = isSystem,
-            IsHidden = admin is not null && policyManager?.IsApplicationHidden(admin, packageName) == true,
+            IsHidden = isHidden,
             CanLaunch = packageManager.GetLaunchIntentForPackage(packageName) is not null,
             IsInstalled = isInstalled,
             IconPng = TryGetMemoryCachedIcon(packageManager, packageName, out var cachedIcon) ? cachedIcon : null
         };
+    }
+
+    private static bool TryIsApplicationHidden(
+        DevicePolicyManager? policyManager,
+        ComponentName? admin,
+        string packageName)
+    {
+        if (policyManager is null || admin is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            return policyManager.IsApplicationHidden(admin, packageName);
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            return false;
+        }
+    }
+
+    private static ApplicationInfo? TryGetApplicationInfo(
+        PackageManager packageManager,
+        string packageName,
+        PackageInfoFlags flags)
+    {
+        try
+        {
+            return packageManager.GetApplicationInfo(packageName, flags);
+        }
+        catch (Exception exception) when (exception is PackageManager.NameNotFoundException
+            || AndroidRecoverableException.IsMatch(exception))
+        {
+            return null;
+        }
     }
 
     private static byte[]? ResolveAppIconPng(
@@ -185,7 +223,8 @@ public static class AndroidAppInventoryApi
     {
         try
         {
-            var packageInfo = packageManager.GetPackageInfo(packageName, 0);
+            var packageInfo = TryGetPackageInfo(packageManager, packageName, AndroidSystemApi.GetInstalledApplicationFlags())
+                ?? packageManager.GetPackageInfo(packageName, 0);
             if (packageInfo is null)
             {
                 identity = default;
@@ -195,10 +234,27 @@ public static class AndroidAppInventoryApi
             identity = new PackageIdentity(packageInfo.LongVersionCode, packageInfo.LastUpdateTime);
             return true;
         }
-        catch (PackageManager.NameNotFoundException)
+        catch (Exception exception) when (exception is PackageManager.NameNotFoundException
+            || AndroidRecoverableException.IsMatch(exception))
         {
             identity = default;
             return false;
+        }
+    }
+
+    private static PackageInfo? TryGetPackageInfo(
+        PackageManager packageManager,
+        string packageName,
+        PackageInfoFlags flags)
+    {
+        try
+        {
+            return packageManager.GetPackageInfo(packageName, flags);
+        }
+        catch (Exception exception) when (exception is PackageManager.NameNotFoundException
+            || AndroidRecoverableException.IsMatch(exception))
+        {
+            return null;
         }
     }
 
@@ -212,8 +268,15 @@ public static class AndroidAppInventoryApi
         {
             if (IconCache.TryGetValue(packageName, out var entry) && entry.Identity == identity)
             {
-                iconPng = entry.IconPng;
-                return true;
+                if (entry.IconPng is { Length: > 0 })
+                {
+                    iconPng = entry.IconPng;
+                    return true;
+                }
+
+                IconCache.Remove(packageName);
+                iconPng = null;
+                return false;
             }
         }
 
@@ -246,8 +309,14 @@ public static class AndroidAppInventoryApi
         {
             if (IconCache.TryGetValue(packageName, out var entry) && entry.Identity == identity)
             {
-                iconPng = entry.IconPng;
-                return true;
+                if (entry.IconPng is { Length: > 0 })
+                {
+                    iconPng = entry.IconPng;
+                    return true;
+                }
+
+                IconCache.Remove(packageName);
+                return false;
             }
         }
 
@@ -278,7 +347,18 @@ public static class AndroidAppInventoryApi
         }
 
         var missingPath = Path.Combine(directory, cacheKey + MissingIconCacheFileExtension);
-        return File.Exists(missingPath);
+        if (File.Exists(missingPath))
+        {
+            try
+            {
+                File.Delete(missingPath);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+            }
+        }
+
+        return false;
     }
 
     private static void CacheIcon(
@@ -287,6 +367,17 @@ public static class AndroidAppInventoryApi
         PackageIdentity identity,
         byte[]? iconPng)
     {
+        if (iconPng is not { Length: > 0 })
+        {
+            lock (IconCacheSync)
+            {
+                IconCache.Remove(packageName);
+            }
+
+            WriteDiskCachedIcon(context, GetIconCacheKey(packageName, identity), null);
+            return;
+        }
+
         lock (IconCacheSync)
         {
             IconCache[packageName] = new AppIconCacheEntry(identity, iconPng);
@@ -314,7 +405,7 @@ public static class AndroidAppInventoryApi
                 return;
             }
 
-            File.WriteAllText(missingPath, string.Empty);
+            File.Delete(missingPath);
             File.Delete(iconPath);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)

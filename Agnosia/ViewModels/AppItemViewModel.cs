@@ -241,6 +241,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
     {
         var startedAt = Stopwatch.GetTimestamp();
         Bitmap? decodedIcon = null;
+        var iconLoaded = false;
         try
         {
             var iconPng = Snapshot.IconPng is { Length: > 0 } existingIcon
@@ -273,6 +274,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
                 Icon = decodedIcon;
                 decodedIcon = null;
+                iconLoaded = true;
                 OnPropertyChanged(nameof(HasIcon));
                 OnPropertyChanged(nameof(ShowMonogram));
             }, DispatcherPriority.Background);
@@ -287,6 +289,17 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         finally
         {
             TracePerf("IconLoad", startedAt, $"profile={Snapshot.Profile}; package={Snapshot.PackageName}");
+            if (!iconLoaded && !iconLoadCancellation.IsCancellationRequested)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (!_disposed && ReferenceEquals(_iconLoadCancellation, iconLoadCancellation))
+                    {
+                        _iconLoadRequested = false;
+                    }
+                }, DispatcherPriority.Background);
+            }
+
             iconLoadCancellation.Dispose();
             if (ReferenceEquals(_iconLoadCancellation, iconLoadCancellation))
             {
