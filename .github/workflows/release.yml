@@ -63,7 +63,7 @@ jobs:
           [IO.File]::WriteAllBytes($keystorePath, [Convert]::FromBase64String("${{ secrets.ANDROID_KEYSTORE_BASE64 }}"))
           "ANDROID_KEYSTORE_PATH=$keystorePath" >> $env:GITHUB_ENV
 
-      - name: Publish APK
+      - name: Publish APK variants
         shell: pwsh
         env:
           ANDROID_KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
@@ -74,32 +74,68 @@ jobs:
           $displayVersion = $tag.TrimStart("v")
           New-Item -ItemType Directory -Force -Path $env:RELEASE_DIR | Out-Null
 
-          dotnet publish $env:PROJECT_PATH `
-            -f net10.0-android `
-            -c Release `
-            -p:AppVersion=$displayVersion `
-            -p:Version=$displayVersion `
-            -p:ApplicationDisplayVersion=$displayVersion `
-            -p:ApplicationVersion=$env:GITHUB_RUN_NUMBER `
-            -p:AndroidPackageFormat=apk `
-            -p:AndroidKeyStore=true `
-            -p:AndroidSigningKeyStore="$env:ANDROID_KEYSTORE_PATH" `
-            -p:AndroidSigningKeyAlias="$env:ANDROID_KEYSTORE_ALIAS" `
-            -p:AndroidSigningStorePass=env:ANDROID_KEYSTORE_PASSWORD `
-            -p:AndroidSigningKeyPass=env:ANDROID_KEY_PASSWORD
+          $variants = @(
+            @{
+              Name = "universal"
+              AssetName = "Agnosia-universal.apk"
+              PackageVariant = "universal"
+              RuntimeIdentifier = $null
+            },
+            @{
+              Name = "armeabi-v7a"
+              AssetName = "Agnosia-armeabi-v7a.apk"
+              RuntimeIdentifier = "android-arm"
+            },
+            @{
+              Name = "arm64-v8a"
+              AssetName = "Agnosia-arm64-v8a.apk"
+              RuntimeIdentifier = "android-arm64"
+            }
+          )
 
-          $apk = Get-ChildItem -Path Agnosia.Android/bin/Release/net10.0-android -Recurse -Filter "*.apk" |
-            Where-Object { $_.FullName -match "\\publish\\" } |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 1
+          foreach ($variant in $variants) {
+            $variantName = $variant.Name
+            $publishArgs = @(
+              "publish", $env:PROJECT_PATH,
+              "-f", "net10.0-android",
+              "-c", "Release",
+              "-p:AppVersion=$displayVersion",
+              "-p:Version=$displayVersion",
+              "-p:ApplicationDisplayVersion=$displayVersion",
+              "-p:ApplicationVersion=$env:GITHUB_RUN_NUMBER",
+              "-p:AndroidPackageFormat=apk",
+              "-p:AndroidKeyStore=true",
+              "-p:AndroidSigningKeyStore=$env:ANDROID_KEYSTORE_PATH",
+              "-p:AndroidSigningKeyAlias=$env:ANDROID_KEYSTORE_ALIAS",
+              "-p:AndroidSigningStorePass=env:ANDROID_KEYSTORE_PASSWORD",
+              "-p:AndroidSigningKeyPass=env:ANDROID_KEY_PASSWORD"
+            )
 
-          if (-not $apk) {
-            throw "Published APK was not found."
+            if (-not [string]::IsNullOrWhiteSpace($variant.RuntimeIdentifier)) {
+              $publishArgs += @("-r", $variant.RuntimeIdentifier)
+            }
+
+            if (-not [string]::IsNullOrWhiteSpace($variant.PackageVariant)) {
+              $publishArgs += @("-p:AgnosiaAndroidPackageVariant=$($variant.PackageVariant)")
+            }
+
+            dotnet @publishArgs
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+
+            $apk = Get-ChildItem -Path Agnosia.Android/bin/Release/net10.0-android -Recurse -Filter "*.apk" |
+              Where-Object { $_.FullName -match "\\publish\\" } |
+              Sort-Object LastWriteTime -Descending |
+              Select-Object -First 1
+
+            if (-not $apk) {
+              throw "Published APK for $variantName was not found."
+            }
+
+            $assetPath = Join-Path $env:RELEASE_DIR $variant.AssetName
+            Copy-Item -LiteralPath $apk.FullName -Destination $assetPath -Force
           }
-
-          $assetPath = Join-Path $env:RELEASE_DIR "Agnosia.apk"
-          Copy-Item -LiteralPath $apk.FullName -Destination $assetPath -Force
-          "APK_ASSET=$assetPath" >> $env:GITHUB_ENV
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -113,7 +149,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create $env:GITHUB_REF_NAME $env:APK_ASSET `
+          $apkAssets = Get-ChildItem -Path $env:RELEASE_DIR -Filter "*.apk" |
+            Sort-Object Name |
+            ForEach-Object { $_.FullName }
+
+          if (-not $apkAssets) {
+            throw "No APK assets were found."
+          }
+
+          gh release create $env:GITHUB_REF_NAME @apkAssets `
             --verify-tag `
             --generate-notes `
             --title "Agnosia $env:GITHUB_REF_NAME"

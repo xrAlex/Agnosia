@@ -12,6 +12,11 @@
         <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
     </PropertyGroup>
 
+    <PropertyGroup Condition="'$(AgnosiaAndroidPackageVariant)' == 'universal'">
+        <!-- Release universal APK should include 32-bit and 64-bit Android ABIs. -->
+        <RuntimeIdentifiers>android-arm;android-arm64;android-x86;android-x64</RuntimeIdentifiers>
+    </PropertyGroup>
+
     <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
         <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
         <!-- The app runs in both personal and work profiles; the Android debug transport uses a fixed localhost port. -->
