@@ -80,24 +80,36 @@ internal sealed class AndroidAppCommandCoordinator(
             : OperationResult.Success("Приложение скопировано в рабочий профиль.");
     }
 
-    public Task<OperationResult> UninstallAsync(AppSnapshot app, CancellationToken cancellationToken)
+    public async Task<OperationResult> UninstallAsync(AppSnapshot app, CancellationToken cancellationToken)
     {
+        OperationResult result;
         if (app.IsSystem && app.Profile == ProfileKind.Work)
-            return AndroidProfileCommandGateway.HideSystemAppInWorkProfileAsync(
+        {
+            result = await AndroidProfileCommandGateway.HideSystemAppInWorkProfileAsync(
                 commandRunner,
                 app.PackageName,
                 "Приложение удалено из рабочего профиля.",
                 cancellationToken);
+        }
+        else
+        {
+            var intent = new Intent(AgnosiaActions.UninstallPackage);
+            intent.PutExtra("package", app.PackageName);
+            intent.PutExtra("is_system", app.IsSystem);
 
-        var intent = new Intent(AgnosiaActions.UninstallPackage);
-        intent.PutExtra("package", app.PackageName);
-        intent.PutExtra("is_system", app.IsSystem);
+            result = await (app.Profile == ProfileKind.Work
+                ? commandRunner.RunPackageOperationAsync(intent, true, cancellationToken,
+                    "Приложение удалено из рабочего профиля.")
+                : commandRunner.RunPackageOperationAsync(intent, false, cancellationToken,
+                    "Приложение удалено из личного профиля."));
+        }
 
-        return app.Profile == ProfileKind.Work
-            ? commandRunner.RunPackageOperationAsync(intent, true, cancellationToken,
-                "Приложение удалено из рабочего профиля.")
-            : commandRunner.RunPackageOperationAsync(intent, false, cancellationToken,
-                "Приложение удалено из личного профиля.");
+        if (!result.Succeeded || app.Profile != ProfileKind.Work) return result;
+
+        var shortcutResult = await InvalidateHiddenShortcutInParentAsync(app.PackageName, cancellationToken);
+        if (shortcutResult.Succeeded) return result;
+
+        return OperationResult.Success($"{result.Message} {shortcutResult.Message}");
     }
 
     public async Task<OperationResult> SetFrozenAsync(
@@ -304,6 +316,19 @@ internal sealed class AndroidAppCommandCoordinator(
             createResult.Data?.GetBooleanExtra(AndroidCommandContract.ResultHideImmediately, false) == true,
             createResult.Data?.GetStringExtra(AndroidCommandContract.ResultMessage)
             ?? "Подготовка ярлыка завершена.");
+    }
+
+    private async Task<OperationResult> InvalidateHiddenShortcutInParentAsync(
+        string packageName,
+        CancellationToken cancellationToken)
+    {
+        var intent = new Intent(AgnosiaActions.InvalidateHiddenShortcut);
+        intent.PutExtra("package", packageName);
+
+        var result = await commandRunner.StartActivityForResultAsync(intent, false, cancellationToken);
+        return AndroidActivityResultApi.ToVoidOperationResult(
+            result,
+            "Ярлык скрытого приложения отключен.");
     }
 
     private static void CopyExtraIfPresent(Intent source, Intent target, string extraName)

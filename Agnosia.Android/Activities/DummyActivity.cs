@@ -44,6 +44,7 @@ namespace Agnosia.Android.Activities;
     AgnosiaActions.UnfreezePackage,
     AgnosiaActions.PrepareHiddenShortcut,
     AgnosiaActions.CreateHiddenShortcut,
+    AgnosiaActions.InvalidateHiddenShortcut,
     AgnosiaActions.UnfreezeAndLaunch,
     AgnosiaActions.SetCrossProfileInteraction,
     AgnosiaActions.SynchronizePreference,
@@ -260,6 +261,9 @@ public sealed class DummyActivity : Activity
                     break;
                 case AgnosiaActions.CreateHiddenShortcut:
                     ActionCreateHiddenShortcut();
+                    break;
+                case AgnosiaActions.InvalidateHiddenShortcut:
+                    ActionInvalidateHiddenShortcut();
                     break;
                 case AgnosiaActions.FreezePackage:
                     ActionFreezePackage(true);
@@ -854,6 +858,25 @@ public sealed class DummyActivity : Activity
         result.PutExtra(AndroidCommandContract.ResultMessage, shortcutPreparation.Message);
         result.PutExtra(AndroidCommandContract.ResultHideImmediately, shortcutPreparation.HideImmediately);
         FinishWithResult(Result.Ok, result);
+    }
+
+    private void ActionInvalidateHiddenShortcut()
+    {
+        var packageName = Intent?.GetStringExtra("package");
+        if (string.IsNullOrWhiteSpace(packageName))
+        {
+            FinishWithResult(Result.Canceled);
+            return;
+        }
+
+        var result = HiddenAppShortcutManager.InvalidatePinnedShortcut(this, packageName);
+        if (!result.Succeeded)
+        {
+            FinishWithError(result.Message);
+            return;
+        }
+
+        FinishWithSuccessMessage(result.Message);
     }
 
     private void ActionUnfreezeAndLaunch()

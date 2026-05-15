@@ -104,6 +104,34 @@ internal static class HiddenAppShortcutManager
             : ShortcutFreezePreparationResult.Failure("Лаунчер отклонил запрос на создание ярлыка.");
     }
 
+    public static HiddenAppShortcutInvalidationResult InvalidatePinnedShortcut(Context context, string packageName)
+    {
+        var shortcutId = GetShortcutId(packageName);
+        RemoveMetadata(packageName);
+
+        if (GetShortcutManager(context) is not { } shortcutManager)
+        {
+            Log.Warn(LogTag, $"Shortcut service unavailable while invalidating {shortcutId}.");
+            return HiddenAppShortcutInvalidationResult.Failure(
+                "Приложение удалено, но Android не предоставил сервис ярлыков. Удалите ярлык с главного экрана вручную.");
+        }
+
+        try
+        {
+            using var disabledMessage = new Java.Lang.String("Это приложение удалено из рабочего профиля.");
+            shortcutManager.DisableShortcuts([shortcutId], disabledMessage);
+            Log.Info(LogTag, $"Disabled pinned shortcut {shortcutId} after package removal.");
+            return HiddenAppShortcutInvalidationResult.Success(
+                "Приложение удалено из рабочего профиля, ярлык отключен.");
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn(LogTag, $"Failed to disable pinned shortcut {shortcutId}: {exception}");
+            return HiddenAppShortcutInvalidationResult.Failure(
+                "Приложение удалено, но Android не смог отключить ярлык. Удалите его с главного экрана вручную.");
+        }
+    }
+
     public static void WriteMetadataToIntent(Intent intent, HiddenAppShortcutMetadata metadata)
     {
         intent.PutExtra(ExtraPackageName, metadata.TargetPackage);
@@ -274,6 +302,11 @@ internal static class HiddenAppShortcutManager
     {
         var raw = JsonSerializer.Serialize(metadata, JsonOptions);
         LocalStorageManager.Instance.SetString(GetStorageKey(metadata.TargetPackage), raw);
+    }
+
+    private static void RemoveMetadata(string packageName)
+    {
+        LocalStorageManager.Instance.Remove(GetStorageKey(packageName));
     }
 
     private static bool TryBuildMetadataCore(Context context, string packageName,
@@ -460,6 +493,21 @@ internal sealed record ShortcutFreezePreparationResult(
     public static ShortcutFreezePreparationResult Deferred(string message)
     {
         return new ShortcutFreezePreparationResult(true, false, message);
+    }
+}
+
+internal sealed record HiddenAppShortcutInvalidationResult(
+    bool Succeeded,
+    string Message)
+{
+    public static HiddenAppShortcutInvalidationResult Success(string message)
+    {
+        return new HiddenAppShortcutInvalidationResult(true, message);
+    }
+
+    public static HiddenAppShortcutInvalidationResult Failure(string message)
+    {
+        return new HiddenAppShortcutInvalidationResult(false, message);
     }
 }
 
