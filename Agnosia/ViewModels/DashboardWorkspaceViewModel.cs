@@ -1467,6 +1467,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             || OnboardingStep == OnboardingStep.Welcome
             || OnboardingStep == OnboardingStep.Permissions
             || OnboardingStep == OnboardingStep.Final
+            || _isOperationInProgress
             || _onboardingMonitorCancellation is not null)
             return;
 
@@ -1487,6 +1488,12 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         {
             while (!cancellationToken.IsCancellationRequested && !OnboardingCompleted)
             {
+                if (_isOperationInProgress)
+                {
+                    await Task.Delay(OnboardingMonitorDelayMs, cancellationToken);
+                    continue;
+                }
+
                 await InvokeOnUiThreadAsync(() => AdvanceOnboardingAsync(cancellationToken));
 
                 if (OnboardingCompleted
@@ -1549,7 +1556,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             await RefreshAsync();
             if (!WorkProfileAvailable) return;
 
-            await ReloadPermissionsAsync();
             OnboardingStep = OnboardingStep.Permissions;
         }
 

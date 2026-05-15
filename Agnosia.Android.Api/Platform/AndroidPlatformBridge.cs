@@ -134,9 +134,10 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         if (!AndroidProvisioningApi.CanStartManagedProfileProvisioning(policyManager))
             return OperationResult.Failure("Android сообщает, что создание рабочего профиля сейчас недоступно.");
 
+        var authKey = AuthenticationUtility.CreateAndStoreKey();
         AuthenticationUtility.Reset();
         AgnosiaUtilities.MarkWorkProfileSetupStarted();
-        var authKey = AuthenticationUtility.CreateAndStoreKey();
+        AuthenticationUtility.TryStoreProvisioningKey(authKey);
 
         var intent = new Intent(DevicePolicyManager.ActionProvisionManagedProfile);
         AndroidProvisioningApi.ConfigureManagedProfileProvisioningIntent(
