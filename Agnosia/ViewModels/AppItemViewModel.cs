@@ -10,11 +10,22 @@ namespace Agnosia.ViewModels;
 
 public partial class AppItemViewModel : ObservableObject, IDisposable
 {
+    private static readonly TimeSpan[] IconRetryDelays =
+    [
+        TimeSpan.FromSeconds(2),
+        TimeSpan.FromSeconds(5),
+        TimeSpan.FromSeconds(10),
+        TimeSpan.FromSeconds(20),
+        TimeSpan.FromSeconds(30)
+    ];
+
     private readonly DashboardWorkspaceViewModel _owner;
     private bool _iconLoadRequested;
     private bool _disposed;
+    private int _iconLoadAttempts;
     private Bitmap? _icon;
     private CancellationTokenSource? _iconLoadCancellation;
+    private CancellationTokenSource? _iconRetryCancellation;
 
     public AppItemViewModel(DashboardWorkspaceViewModel owner, AppSnapshot snapshot)
     {
@@ -164,6 +175,8 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         _disposed = true;
         _iconLoadCancellation?.Cancel();
         _iconLoadCancellation = null;
+        _iconRetryCancellation?.Cancel();
+        _iconRetryCancellation = null;
         _icon?.Dispose();
         _icon = null;
     }
@@ -225,6 +238,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         if (_disposed || _iconLoadRequested) return;
 
         _iconLoadRequested = true;
+        _iconLoadAttempts++;
         _iconLoadCancellation = new CancellationTokenSource();
         _ = LoadIconAsync(_iconLoadCancellation);
     }
@@ -233,6 +247,8 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
     {
         if (_icon is not null) return;
 
+        _iconRetryCancellation?.Cancel();
+        _iconRetryCancellation = null;
         _iconLoadCancellation?.Cancel();
         _iconLoadCancellation = null;
         _iconLoadRequested = false;
@@ -270,6 +286,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
                 Icon = decodedIcon;
                 decodedIcon = null;
                 iconLoaded = true;
+                _iconLoadAttempts = 0;
                 OnPropertyChanged(nameof(HasIcon));
                 OnPropertyChanged(nameof(ShowMonogram));
             }, DispatcherPriority.Background);
@@ -288,7 +305,10 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     if (!_disposed && ReferenceEquals(_iconLoadCancellation, iconLoadCancellation))
+                    {
                         _iconLoadRequested = false;
+                        QueueIconRetry();
+                    }
                 }, DispatcherPriority.Background);
 
             iconLoadCancellation.Dispose();
@@ -300,10 +320,51 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
     {
         _iconLoadCancellation?.Cancel();
         _iconLoadCancellation = null;
+        _iconRetryCancellation?.Cancel();
+        _iconRetryCancellation = null;
         _iconLoadRequested = false;
+        _iconLoadAttempts = 0;
         Icon = null;
         OnPropertyChanged(nameof(HasIcon));
         OnPropertyChanged(nameof(ShowMonogram));
+    }
+
+    private void QueueIconRetry()
+    {
+        if (_iconLoadAttempts > IconRetryDelays.Length) return;
+
+        _iconRetryCancellation?.Cancel();
+        _iconRetryCancellation = new CancellationTokenSource();
+        var delay = IconRetryDelays[_iconLoadAttempts - 1];
+        _ = RetryIconLoadAsync(delay, _iconRetryCancellation);
+    }
+
+    private async Task RetryIconLoadAsync(TimeSpan delay, CancellationTokenSource retryCancellation)
+    {
+        try
+        {
+            await Task.Delay(delay, retryCancellation.Token).ConfigureAwait(false);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (!_disposed && ReferenceEquals(_iconRetryCancellation, retryCancellation))
+                    _iconRetryCancellation = null;
+
+                if (!_disposed && _icon is null && !_iconLoadRequested)
+                    RequestIconLoad();
+            }, DispatcherPriority.Background);
+        }
+        catch (OperationCanceledException) when (retryCancellation.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (ReferenceEquals(_iconRetryCancellation, retryCancellation))
+                    _iconRetryCancellation = null;
+            }, DispatcherPriority.Background);
+            retryCancellation.Dispose();
+        }
     }
 
     private void NotifyCommandStateChanged()

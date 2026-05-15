@@ -1,0 +1,100 @@
+using Android.Content;
+using Android.Content.PM;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
+
+namespace Agnosia.Android.Api.Packages;
+
+public static class AndroidAppIconWarmupQueue
+{
+    private const string LogTag = "AgnosiaIconWarmup";
+    private static readonly TimeSpan HungIconLogDelay = TimeSpan.FromSeconds(2);
+    private static readonly Lock Sync = new();
+    private static readonly Queue<WarmupRequest> Pending = new();
+    private static readonly HashSet<string> InFlight = new(StringComparer.Ordinal);
+    private static bool _processorRunning;
+
+    public static byte[]? TryLoadCachedOrQueue(
+        Context context,
+        PackageManager packageManager,
+        string packageName)
+    {
+        var cachedIcon = AndroidAppInventoryApi.TryLoadCachedAppIconPng(context, packageManager, packageName);
+        if (cachedIcon is { Length: > 0 }) return cachedIcon;
+
+        QueueWarmup(context, packageManager, packageName);
+        return null;
+    }
+
+    private static void QueueWarmup(
+        Context context,
+        PackageManager packageManager,
+        string packageName)
+    {
+        if (string.IsNullOrWhiteSpace(packageName)) return;
+
+        var appContext = context.ApplicationContext ?? context;
+        lock (Sync)
+        {
+            if (!InFlight.Add(packageName)) return;
+
+            Pending.Enqueue(new WarmupRequest(appContext, packageManager, packageName));
+            if (_processorRunning) return;
+
+            _processorRunning = true;
+        }
+
+        _ = ProcessQueueAsync();
+    }
+
+    private static async Task ProcessQueueAsync()
+    {
+        while (true)
+        {
+            WarmupRequest request;
+            lock (Sync)
+            {
+                if (Pending.Count == 0)
+                {
+                    _processorRunning = false;
+                    return;
+                }
+
+                request = Pending.Dequeue();
+            }
+
+            await WarmupAsync(request).ConfigureAwait(false);
+        }
+    }
+
+    private static async Task WarmupAsync(WarmupRequest request)
+    {
+        try
+        {
+            var loadTask = Task.Run(() => AndroidAppInventoryApi.LoadAppIconPng(
+                request.Context,
+                request.PackageManager,
+                request.PackageName,
+                CancellationToken.None));
+            var delayTask = Task.Delay(HungIconLogDelay);
+            if (await Task.WhenAny(loadTask, delayTask).ConfigureAwait(false) == delayTask)
+                Log.Debug(
+                    LogTag,
+                    $"Icon load is still running after {HungIconLogDelay.TotalMilliseconds:0}ms. package={request.PackageName}.");
+
+            await loadTask.ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            Log.Debug(LogTag, $"Icon warm-up failed. package={request.PackageName}, error={exception.GetType().Name}.");
+        }
+        finally
+        {
+            lock (Sync)
+            {
+                InFlight.Remove(request.PackageName);
+            }
+        }
+    }
+
+    private sealed record WarmupRequest(Context Context, PackageManager PackageManager, string PackageName);
+}

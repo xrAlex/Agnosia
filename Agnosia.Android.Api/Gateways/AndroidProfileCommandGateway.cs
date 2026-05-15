@@ -150,27 +150,8 @@ public static class AndroidProfileCommandGateway
 
         if (workApps.Length > 0)
         {
-            var packageNames = workApps
-                .Select(app => app.PackageName)
-                .Distinct(StringComparer.Ordinal)
-                .ToArray();
-            var intent = new Intent(AgnosiaActions.QueryAppIcons);
-            intent.PutExtra(ExtraPackages, packageNames);
-            var result = await commandRunner.StartActivityForResultAsync(
-                    intent,
-                    true,
-                    cancellationToken)
-                .ConfigureAwait(false);
-            if (result.ResultCode != Result.Ok || result.Data is null)
-            {
-                Log.Warn(LogTag, $"Failed to query {packageNames.Length} work app icons.");
-                foreach (var packageName in packageNames) icons.TryAdd(packageName, null);
-            }
-            else
-            {
-                var bundle = result.Data.GetBundleExtra(AndroidCommandContract.ResultIconsBundle);
-                foreach (var packageName in packageNames) icons[packageName] = bundle?.GetByteArray(packageName);
-            }
+            foreach (var app in workApps)
+                icons[app.PackageName] = app.IconPng;
         }
 
         return icons;
@@ -396,7 +377,7 @@ public static class AndroidProfileCommandGateway
         {
             cancellationToken.ThrowIfCancellationRequested();
             return context.PackageManager is { } packageManager
-                ? AndroidAppInventoryApi.LoadAppIconPng(context, packageManager, packageName, cancellationToken)
+                ? AndroidAppIconWarmupQueue.TryLoadCachedOrQueue(context, packageManager, packageName)
                 : null;
         }, cancellationToken);
     }
@@ -420,11 +401,10 @@ public static class AndroidProfileCommandGateway
             foreach (var packageName in packageNames)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                icons[packageName] = AndroidAppInventoryApi.LoadAppIconPng(
+                icons[packageName] = AndroidAppIconWarmupQueue.TryLoadCachedOrQueue(
                     context,
                     packageManager,
-                    packageName,
-                    cancellationToken);
+                    packageName);
             }
 
             return icons;

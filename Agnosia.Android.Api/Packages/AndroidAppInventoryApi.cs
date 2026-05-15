@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Agnosia.Android.Api.Platform;
 using Android.App.Admin;
 using Android.Content;
@@ -74,6 +76,30 @@ public static class AndroidAppInventoryApi
         }
     }
 
+    public static byte[]? TryLoadCachedAppIconPng(
+        Context context,
+        PackageManager packageManager,
+        string packageName)
+    {
+        if (string.IsNullOrWhiteSpace(packageName)
+            || string.Equals(packageName, context.PackageName, StringComparison.Ordinal))
+            return null;
+
+        try
+        {
+            return TryGetPackageIdentity(packageManager, packageName, out var identity)
+                   && TryGetCachedIcon(context, packageName, identity, out var cachedIcon)
+                ? cachedIcon
+                : null;
+        }
+        catch (Exception exception) when (exception is PackageManager.NameNotFoundException
+                                              or InvalidOperationException
+                                          || AndroidRecoverableException.IsMatch(exception))
+        {
+            return null;
+        }
+    }
+
     private static AppServiceModel? TryCreateModel(
         Context context,
         PackageManager packageManager,
@@ -104,7 +130,9 @@ public static class AndroidAppInventoryApi
             IsHidden = isHidden,
             CanLaunch = packageManager.GetLaunchIntentForPackage(packageName) is not null,
             IsInstalled = isInstalled,
-            IconPng = TryGetMemoryCachedIcon(context, packageName, identity, out var cachedIcon) ? cachedIcon : null
+            IconPng = TryGetCachedIcon(context, packageName, identity, out var cachedIcon)
+                ? cachedIcon
+                : AndroidAppIconWarmupQueue.TryLoadCachedOrQueue(context, packageManager, packageName)
         };
     }
 
@@ -181,6 +209,8 @@ public static class AndroidAppInventoryApi
         try
         {
             using var drawable = TryGetApplicationIcon(packageManager, app) ?? ResolveLauncherIcon(context, packageName);
+            if (drawable is null) return null;
+
             using var bitmap = RenderAppIcon(drawable);
             using var stream = new MemoryStream();
             bitmap.Compress(
@@ -452,8 +482,8 @@ public static class AndroidAppInventoryApi
 
     private static string GetIconCacheKey(string packageName, PackageIdentity identity)
     {
-        var packageHash = (uint)packageName.GetHashCode(StringComparison.Ordinal);
-        return $"{packageHash:X8}.{identity.VersionCode}";
+        var packageHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(packageName))).Substring(0, 16);
+        return $"{packageHash}.{identity.VersionCode}";
     }
 
     private readonly record struct PackageIdentity(long VersionCode);

@@ -379,11 +379,10 @@ public sealed class DummyActivity : Activity
 
         try
         {
-            var iconPng = await Task.Run(() => AndroidAppInventoryApi.LoadAppIconPng(
+            var iconPng = await Task.Run(() => AndroidAppIconWarmupQueue.TryLoadCachedOrQueue(
                 this,
                 packageManager,
-                packageName,
-                cancellationToken), cancellationToken);
+                packageName), cancellationToken);
             var result = new Intent();
             if (iconPng is { Length: > 0 }) result.PutExtra(AndroidCommandContract.ResultIconPng, iconPng);
 
@@ -418,11 +417,10 @@ public sealed class DummyActivity : Activity
                 foreach (var packageName in packageNames.Distinct(StringComparer.Ordinal))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    loadedIcons[packageName] = AndroidAppInventoryApi.LoadAppIconPng(
+                    loadedIcons[packageName] = AndroidAppIconWarmupQueue.TryLoadCachedOrQueue(
                         this,
                         packageManager,
-                        packageName,
-                        cancellationToken);
+                        packageName);
                 }
 
                 return loadedIcons;
