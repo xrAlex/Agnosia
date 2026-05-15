@@ -119,20 +119,24 @@ internal sealed class AndroidAppCommandCoordinator(
         bool hidden,
         CancellationToken cancellationToken)
     {
+        ShortcutPreparationResult? shortcutResult = null;
         if (hidden)
         {
             await permissionCoordinator.EnsureUsageStatsAccessRequestedAsync(cancellationToken);
-            var shortcutResult = await PreparePinnedShortcutInParentAsync(app.PackageName, cancellationToken);
+            shortcutResult = await PreparePinnedShortcutInParentAsync(app.PackageName, cancellationToken);
             if (!shortcutResult.Succeeded || !shortcutResult.HideImmediately)
                 return new OperationResult(shortcutResult.Succeeded, shortcutResult.Message);
         }
 
-        return await AndroidProfileCommandGateway.SetPackageHiddenInWorkProfileAsync(
+        var hideResult = await AndroidProfileCommandGateway.SetPackageHiddenInWorkProfileAsync(
             commandRunner,
             app.PackageName,
             hidden,
             hidden ? "Приложение скрыто." : "Приложение восстановлено.",
             cancellationToken);
+        return hideResult.Succeeded || shortcutResult is null
+            ? hideResult
+            : OperationResult.Failure(FormatShortcutCreatedButHideFailed(shortcutResult, hideResult.Message));
     }
 
     private async Task<OperationResult> HideClonedWorkAppAsync(
@@ -148,12 +152,15 @@ internal sealed class AndroidAppCommandCoordinator(
         var shortcutResult = await PreparePinnedShortcutInParentAsync(app.PackageName, cancellationToken);
         if (!shortcutResult.Succeeded) return new OperationResult(false, shortcutResult.Message);
 
-        return await AndroidProfileCommandGateway.SetPackageHiddenInWorkProfileAsync(
+        var hideResult = await AndroidProfileCommandGateway.SetPackageHiddenInWorkProfileAsync(
             commandRunner,
             app.PackageName,
             true,
             "Приложение скрыто.",
             cancellationToken);
+        return hideResult.Succeeded
+            ? hideResult
+            : OperationResult.Failure(FormatShortcutCreatedButHideFailed(shortcutResult, hideResult.Message));
     }
 
     public Task<OperationResult> ForceFreezeAsync(AppSnapshot app, CancellationToken cancellationToken)
@@ -178,9 +185,13 @@ internal sealed class AndroidAppCommandCoordinator(
             return OperationResult.Failure("Ярлыки доступны только для приложений рабочего профиля.");
 
         var shortcutResult = await PreparePinnedShortcutInParentAsync(app.PackageName, cancellationToken);
-        return shortcutResult.Succeeded
+        if (!shortcutResult.Succeeded) return OperationResult.Failure(shortcutResult.Message);
+
+        return string.IsNullOrWhiteSpace(shortcutResult.PreHideError)
             ? OperationResult.Success(shortcutResult.Message)
-            : OperationResult.Failure(shortcutResult.Message);
+            : OperationResult.Failure(FormatShortcutCreatedButHideFailed(
+                shortcutResult,
+                shortcutResult.PreHideError));
     }
 
     public async Task<OperationResult> LaunchAsync(AppSnapshot app, CancellationToken cancellationToken)
@@ -297,6 +308,11 @@ internal sealed class AndroidAppCommandCoordinator(
                 : error);
         }
 
+        var preHideSucceeded = prepareResult.Data.GetBooleanExtra(
+            AndroidCommandContract.ResultPreHideSucceeded,
+            true);
+        var preHideError = prepareResult.Data.GetStringExtra(AndroidCommandContract.ResultError);
+
         var createIntent = new Intent(AgnosiaActions.CreateHiddenShortcut);
         CopyExtraIfPresent(prepareResult.Data, createIntent, "packageName");
         CopyExtraIfPresent(prepareResult.Data, createIntent, "targetActivity");
@@ -317,7 +333,8 @@ internal sealed class AndroidAppCommandCoordinator(
             true,
             createResult.Data?.GetBooleanExtra(AndroidCommandContract.ResultHideImmediately, false) == true,
             createResult.Data?.GetStringExtra(AndroidCommandContract.ResultMessage)
-            ?? "Подготовка ярлыка завершена.");
+            ?? "Подготовка ярлыка завершена.",
+            preHideSucceeded ? null : preHideError);
     }
 
     private static void CopyExtraIfPresent(Intent source, Intent target, string extraName)
@@ -326,10 +343,18 @@ internal sealed class AndroidAppCommandCoordinator(
         if (!string.IsNullOrWhiteSpace(value)) target.PutExtra(extraName, value);
     }
 
+    private static string FormatShortcutCreatedButHideFailed(
+        ShortcutPreparationResult shortcutResult,
+        string hideError)
+    {
+        return $"{shortcutResult.Message} Но Android не смог скрыть приложение: {hideError}";
+    }
+
     private sealed record ShortcutPreparationResult(
         bool Succeeded,
         bool HideImmediately,
-        string Message)
+        string Message,
+        string? PreHideError = null)
     {
         public static ShortcutPreparationResult Failure(string message)
         {

@@ -697,17 +697,23 @@ public sealed class DummyActivity : Activity
                 var hideError = await Task.Run(
                     () => TryHidePackageAfterInstallAsync(admin, packageName, cancellationToken),
                     cancellationToken);
-                if (hideError is not null)
+                var preHideSucceeded = hideError is null;
+                if (preHideSucceeded)
                 {
-                    FinishWithError(hideError);
-                    return;
+                    restoreHiddenState = false;
+                    Log.Info(LogTag, $"Installed hidden app {packageName} was frozen before shortcut creation.");
                 }
-
-                restoreHiddenState = false;
-                Log.Info(LogTag, $"Installed hidden app {packageName} was frozen before shortcut creation.");
+                else
+                {
+                    Log.Warn(LogTag,
+                        $"Continuing hidden shortcut creation after pre-hide failure. package={packageName}, error={hideError}");
+                }
 
                 var result = new Intent();
                 HiddenAppShortcutManager.WriteMetadataToIntent(result, metadataResult.Metadata);
+                result.PutExtra(AndroidCommandContract.ResultPreHideSucceeded, preHideSucceeded);
+                if (!preHideSucceeded && !string.IsNullOrWhiteSpace(hideError))
+                    result.PutExtra(AndroidCommandContract.ResultError, hideError);
                 FinishWithResult(Result.Ok, result);
             }
             finally
