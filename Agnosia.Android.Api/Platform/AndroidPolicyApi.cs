@@ -73,7 +73,7 @@ public static class AndroidPolicyApi
 
             var hiddenApplied = manager.SetApplicationHidden(admin, packageName, hidden);
             var currentHidden = manager.IsApplicationHidden(admin, packageName);
-            Log.Info(logTag,
+            Log.Debug(logTag,
                 $"SetApplicationHidden result. package={packageName}, requestedHidden={hidden}, returned={hiddenApplied}, hiddenBefore={hiddenBefore?.ToString() ?? "<unknown>"}, currentHidden={currentHidden}, adminPackage={admin.PackageName}.");
             if (!hiddenApplied && currentHidden != hidden)
             {

@@ -17,7 +17,7 @@ public static class AndroidVpnApi
         {
             if (HasVpnTransport(connectivityManager, connectivityManager.ActiveNetwork))
             {
-                Log.Info(LogTag, "VPN detected via ActiveNetwork.");
+                Log.Debug(LogTag, "VPN detected via ActiveNetwork.");
                 return true;
             }
 
@@ -28,7 +28,7 @@ public static class AndroidVpnApi
             {
                 if (!HasVpnTransport(connectivityManager, network)) continue;
 
-                Log.Info(LogTag, $"VPN detected among available networks: {network}.");
+                Log.Debug(LogTag, $"VPN detected among available networks: {network}.");
                 return true;
             }
 

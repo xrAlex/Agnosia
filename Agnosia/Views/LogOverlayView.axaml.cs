@@ -26,7 +26,7 @@ public partial class LogOverlayView : UserControl
 
         try
         {
-            await topLevel.Clipboard.SetTextAsync(viewModel.LogOutput);
+            await topLevel.Clipboard.SetTextAsync(viewModel.LogOutputWithDeviceInfo);
             viewModel.StatusIsError = false;
             viewModel.StatusMessage = "Журнал скопирован в буфер обмена.";
         }

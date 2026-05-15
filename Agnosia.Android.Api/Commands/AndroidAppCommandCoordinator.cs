@@ -250,19 +250,19 @@ internal sealed class AndroidAppCommandCoordinator(
         if (!storage.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch))
         {
             storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
-            Log.Info(LogTag, "Disable-VPN-before-launch is disabled in settings.");
+            Log.Debug(LogTag, "Disable-VPN-before-launch is disabled in settings.");
             return new OperationResult(true, string.Empty);
         }
 
         if (!AndroidVpnApi.IsVpnActive(activity))
         {
             storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
-            Log.Info(LogTag, "No active VPN detected, continuing without the transient VPN service.");
+            Log.Debug(LogTag, "No active VPN detected, continuing without the transient VPN service.");
             return new OperationResult(true, string.Empty);
         }
 
         storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
-        Log.Info(LogTag, "Active VPN detected, starting transient VpnService.");
+        Log.Debug(LogTag, "Active VPN detected, starting transient VpnService.");
         var disconnectResult = await TransientVpnDisconnectService.DisconnectActiveVpnAsync(
             commandRunner,
             cancellationToken);

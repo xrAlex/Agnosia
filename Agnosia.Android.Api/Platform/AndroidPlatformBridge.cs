@@ -7,8 +7,11 @@ using Agnosia.Models;
 using Agnosia.Platform;
 using Android.App.Admin;
 using Android.Content;
+using Android.Content.PM;
+using Android.OS;
 using Android.Provider;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
+using OperationCanceledException = System.OperationCanceledException;
 
 namespace Agnosia.Android.Api.Platform;
 
@@ -240,6 +243,32 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
     {
         var activity = GetActivityHost().CurrentActivity;
         return AndroidSettingsStore.SaveAsync(activity, settings, cancellationToken);
+    }
+
+    public string GetDeviceInfoString()
+    {
+        try
+        {
+            var activity = GetActivityHost().CurrentActivity;
+            var appVersion = activity.PackageManager?.GetPackageInfo(
+                activity.PackageName!, PackageInfoFlags.MatchAll)?.VersionName ?? "?";
+
+            var manufacturer = Build.Manufacturer ?? "?";
+            var model = Build.Model ?? "?";
+            var brand = Build.Brand ?? "?";
+            var device = Build.Device ?? "?";
+            var release = Build.VERSION.Release ?? "?";
+            var sdk = (int)Build.VERSION.SdkInt;
+
+            return $"Agnosia v{appVersion}\n"
+                + $"Device: {manufacturer} {model} ({device})\n"
+                + $"Brand: {brand}\n"
+                + $"Android: {release} (API {sdk})";
+        }
+        catch
+        {
+            return "Agnosia (device info unavailable)";
+        }
     }
 
     public void NotifyManagedProfileProvisioned(Context context, Intent? intent)

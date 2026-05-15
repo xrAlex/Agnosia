@@ -117,7 +117,7 @@ public sealed class ProxyActivity : Activity
             return;
         }
 
-        Log.Info(
+        Log.Debug(
             LogTag,
             $"Proxy launch request accepted. package={request.PackageName}, targetActivity={request.TargetActivity ?? "<none>"}, displayName={request.DisplayName}.");
         _launchStarted = true;
@@ -224,7 +224,7 @@ public sealed class ProxyActivity : Activity
                 AndroidAppLaunchStage.LaunchIntentResolved,
                 $"component={launchIntent.Component?.FlattenToShortString() ?? "<none>"}");
             _launchResult = launchResult;
-            Log.Info(
+            Log.Debug(
                 LogTag,
                 $"Resolved launch intent for {request.PackageName}. component={launchIntent.Component?.FlattenToShortString() ?? "<none>"}, flags={launchIntent.Flags}.");
 
@@ -241,10 +241,10 @@ public sealed class ProxyActivity : Activity
                             "usageStatsAccess=denied");
 
                     _launchResult = startedResult;
-                    Log.Info(
+                    Log.Debug(
                         LogTag,
                         $"StartActivity returned for {request.PackageName}. component={launchIntent.Component?.FlattenToShortString() ?? "<none>"}, flags={launchIntent.Flags}, proxyTaskId={TaskId}.");
-                    Log.Info(LogTag, $"Starting hidden-session monitor for {request.PackageName}, taskId={TaskId}.");
+                    Log.Debug(LogTag, $"Starting hidden-session monitor for {request.PackageName}, taskId={TaskId}.");
                     HiddenAppSessionMonitorService.StartMonitoring(
                         this,
                         request.PackageName,
@@ -252,7 +252,7 @@ public sealed class ProxyActivity : Activity
                         TaskId,
                         startedResult,
                         ReadParentFrozenCallback(Intent));
-                    Log.Info(LogTag, $"Monitor service request sent for {request.PackageName}.");
+                    Log.Debug(LogTag, $"Monitor service request sent for {request.PackageName}.");
                     FinishWithLaunchResult(startedResult, false);
                 }
                 catch (ActivityNotFoundException exception)
@@ -296,7 +296,7 @@ public sealed class ProxyActivity : Activity
             if (!LocalStorageManager.Instance.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch))
             {
                 LocalStorageManager.Instance.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
-                Log.Info(LogTag, "Disable-VPN-before-shortcut-launch is disabled in settings.");
+                Log.Debug(LogTag, "Disable-VPN-before-shortcut-launch is disabled in settings.");
                 ForwardLaunchToManagedProfile(request);
                 return;
             }
@@ -304,7 +304,7 @@ public sealed class ProxyActivity : Activity
             if (!AndroidVpnApi.IsVpnActive(this))
             {
                 LocalStorageManager.Instance.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
-                Log.Info(LogTag, "Shortcut launch: no active VPN detected.");
+                Log.Debug(LogTag, "Shortcut launch: no active VPN detected.");
                 ForwardLaunchToManagedProfile(request);
                 return;
             }
@@ -313,7 +313,7 @@ public sealed class ProxyActivity : Activity
             LocalStorageManager.Instance.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
             if (prepareIntent is not null)
             {
-                Log.Info(LogTag, "Shortcut launch: Android confirmation is required for VPN control.");
+                Log.Debug(LogTag, "Shortcut launch: Android confirmation is required for VPN control.");
                 _pendingVpnDisconnectRequest = request;
                 RunOnUiThread(() => StartActivityForResult(prepareIntent, PrepareVpnRequestCode));
                 return;

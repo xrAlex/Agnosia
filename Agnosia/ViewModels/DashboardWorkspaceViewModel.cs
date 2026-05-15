@@ -397,6 +397,18 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public string LogOutput => _eventLogService.Output;
 
+    public string LogOutputWithDeviceInfo
+    {
+        get
+        {
+            var deviceInfo = _platformEventLogReader.GetDeviceInfoString();
+            var logs = _eventLogService.Output;
+            return _eventLogService.Output.Length == 0
+                ? deviceInfo
+                : deviceInfo + Environment.NewLine + new string('=', 44) + Environment.NewLine + logs;
+        }
+    }
+
     public IReadOnlyList<string> LogLines => _eventLogService.Lines;
 
     public bool IsUnsupportedVisible => HasLoadedSnapshot && !IsSupported;

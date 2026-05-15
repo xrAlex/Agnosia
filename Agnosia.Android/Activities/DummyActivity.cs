@@ -611,8 +611,6 @@ public sealed class DummyActivity : Activity
     private void ActionFreezePackage(bool hidden)
     {
         var packageName = Intent?.GetStringExtra("package");
-        Log.Info(LogTag,
-            $"Freeze package command received. package={packageName ?? "<none>"}, hidden={hidden}, isProfileOwner={_isProfileOwner}.");
         if (!_isProfileOwner || _policyManager is null || string.IsNullOrWhiteSpace(packageName))
         {
             Log.Warn(LogTag,
@@ -631,7 +629,6 @@ public sealed class DummyActivity : Activity
             return;
         }
 
-        Log.Info(LogTag, $"Freeze package command completed. package={packageName}, hidden={hidden}.");
         FinishWithSuccessMessage(hidden
             ? "Приложение скрыто."
             : "Приложение снова доступно в рабочем профиле.");
@@ -654,7 +651,7 @@ public sealed class DummyActivity : Activity
                 return;
             }
 
-            Log.Info(LogTag, $"Starting hidden shortcut preparation for {packageName}.");
+            Log.Debug(LogTag, $"Starting hidden shortcut preparation for {packageName}.");
             var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
             var restoreHiddenState = false;
 
@@ -910,7 +907,7 @@ public sealed class DummyActivity : Activity
             return;
         }
 
-        Log.Info(LogTag, $"Creating or updating pinned shortcut {metadata.ShortcutId} for {metadata.TargetPackage}.");
+        Log.Debug(LogTag, $"Creating or updating pinned shortcut {metadata.ShortcutId} for {metadata.TargetPackage}.");
         var shortcutPreparation = HiddenAppShortcutManager.CreateOrUpdatePinnedShortcut(this, metadata);
         if (!shortcutPreparation.Succeeded)
         {
@@ -931,9 +928,6 @@ public sealed class DummyActivity : Activity
         var displayName = intent?.GetStringExtra("displayName") ?? packageName;
         var launchResult = AndroidAppLaunchResult.CommandReceived(packageName, displayName);
         launchResult.Log(LogTag);
-        Log.Info(
-            LogTag,
-            $"Unfreeze-and-launch command received. package={packageName ?? "<none>"}, isProfileOwner={_isProfileOwner}, hasParentFrozenCallback={ReadParentFrozenCallback(intent) is not null}.");
         if (string.IsNullOrWhiteSpace(packageName))
         {
             var failedResult = launchResult.Fail(
@@ -962,7 +956,7 @@ public sealed class DummyActivity : Activity
                 return;
             }
 
-            Log.Info(LogTag, $"Unfreeze-and-launch command forwarded to work profile. package={packageName}.");
+            Log.Debug(LogTag, $"Unfreeze-and-launch command forwarded to work profile. package={packageName}.");
             var forwardedResult = launchResult.WithIssue(
                 AndroidAppLaunchIssueKind.None,
                 "forwarded_to_work_profile",
@@ -980,7 +974,7 @@ public sealed class DummyActivity : Activity
             launchResult.WriteToIntent(proxyIntent);
             AuthenticationUtility.SignIntent(proxyIntent);
             _pendingProxyLaunchResult = launchResult;
-            Log.Info(LogTag, $"Starting ProxyActivity for launch result. package={packageName}.");
+            Log.Debug(LogTag, $"Starting ProxyActivity for launch result. package={packageName}.");
             StartActivityForResult(proxyIntent, ProxyLaunchRequestCode);
         }
         catch (Exception exception)
@@ -1064,7 +1058,6 @@ public sealed class DummyActivity : Activity
         {
             cancellationToken.ThrowIfCancellationRequested();
             var trigger = Intent?.GetStringExtra(AndroidProfileCommandGateway.ExtraTrigger) ?? "work_app_frozen";
-            Log.Info(LogTag, $"Work-app frozen event received in parent profile. trigger={trigger}");
 
             // The overlay is already visible from the work-app launch; VPN TempActivity
             // will start without BAL_BLOCK because Android sees a visible non-app window.
@@ -1072,8 +1065,6 @@ public sealed class DummyActivity : Activity
             cancellationToken.ThrowIfCancellationRequested();
             if (result.Succeeded)
             {
-                Log.Info(LogTag,
-                    $"Work-app frozen event handled successfully. trigger={trigger}, message={result.Message}");
                 FinishWithSuccessMessage(result.Message);
                 return;
             }

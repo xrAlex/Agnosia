@@ -31,7 +31,6 @@ public sealed class WorkProfileLockFreezeService : Service
         base.OnCreate();
         AgnosiaRuntime.Initialize(this);
         RegisterScreenReceiver();
-        Log.Info(LogTag, "Work profile lock-freeze monitor started.");
     }
 
     public override StartCommandResult OnStartCommand(Intent? intent, StartCommandFlags flags, int startId)
@@ -120,8 +119,6 @@ public sealed class WorkProfileLockFreezeService : Service
             Log.Info(LogTag, $"Screen lock freeze completed from active hidden session. trigger={trigger}.");
             return;
         }
-
-        Log.Debug(LogTag, $"Screen lock has no active hidden session; skipping full package scan. trigger={trigger}.");
     }
 
     private static void EnableParentVpnAfterScreenLockAsync(Context context, string trigger)

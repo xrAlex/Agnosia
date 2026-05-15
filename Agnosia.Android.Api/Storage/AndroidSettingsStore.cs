@@ -62,7 +62,7 @@ public static class AndroidSettingsStore
                 settings.DisableVpnBeforeWorkLaunch, cancellationToken);
 
         if (vpnAfterFreezeClientChanged)
-            Log.Info(LogTag, $"VPN after work freeze client changed: client={settings.VpnAfterWorkFreezeClient}.");
+            Log.Debug(LogTag, $"VPN after work freeze client changed: client={settings.VpnAfterWorkFreezeClient}.");
 
         return OperationResult.Success("Настройки сохранены.");
     }

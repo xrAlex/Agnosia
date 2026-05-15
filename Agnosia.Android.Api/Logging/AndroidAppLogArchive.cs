@@ -8,7 +8,7 @@ namespace Agnosia.Android.Api.Logging;
 
 public static class AndroidAppLogArchive
 {
-    private const int MaxEntries = 200;
+    private const int MaxEntries = 100;
     private const string PerfLogTag = "AgnosiaPerf";
 
     private static readonly Lock Sync = new();

@@ -66,6 +66,11 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
                 .ToDictionary(packageName => packageName, byte[]? (_) => null, StringComparer.Ordinal));
     }
 
+    public string GetDeviceInfoString()
+    {
+        return "Agnosia (unsupported platform)";
+    }
+
     public Task<IReadOnlyList<AppLogEntry>> LoadRecentLogsAsync(CancellationToken cancellationToken = default)
     {
         return EmptyLogsTask;

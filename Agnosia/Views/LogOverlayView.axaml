@@ -100,7 +100,7 @@
               RowDefinitions="Auto,Auto"
               RowSpacing="10">
             <TextBlock Classes="page-caption"
-                       Text="Показываются последние 200 сообщений" />
+                       Text="Показываются последние 100 сообщений" />
 
             <Border Grid.Row="1"
                     Classes="tag-chip dense">

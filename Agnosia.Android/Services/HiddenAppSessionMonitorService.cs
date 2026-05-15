@@ -122,7 +122,6 @@ public sealed class HiddenAppSessionMonitorService : Service
             var launchResult = GetSessionLaunchResult(session)
                 .WithStage(AndroidAppLaunchStage.PackageRehidden, ScreenLockPersistedReason);
             launchResult.Log(LogTag);
-            Log.Info(LogTag, $"Persisted hidden-app session completed on screen lock for {session.PackageName}.");
             return true;
         }
         catch (Exception exception)
@@ -138,12 +137,11 @@ public sealed class HiddenAppSessionMonitorService : Service
         base.OnCreate();
         AgnosiaRuntime.Initialize(this);
         _adminComponent = AgnosiaUtilities.GetAdminComponent(this, typeof(AgnosiaDeviceAdminReceiver));
-        Log.Info(LogTag, "HiddenAppSessionMonitorService created.");
     }
 
     public override StartCommandResult OnStartCommand(Intent? intent, StartCommandFlags flags, int startId)
     {
-        Log.Info(LogTag, $"OnStartCommand action={intent?.Action ?? "<null>"} startId={startId}.");
+        Log.Debug(LogTag, $"OnStartCommand action={intent?.Action ?? "<null>"} startId={startId}.");
         try
         {
             var action = intent?.Action;
@@ -515,24 +513,23 @@ public sealed class HiddenAppSessionMonitorService : Service
             var launchResult = GetSessionLaunchResult(session)
                 .WithStage(AndroidAppLaunchStage.PackageRehidden, reason);
             launchResult.Log(LogTag);
-            Log.Info(LogTag, $"App {session.PackageName} hidden again. reason={reason}");
             if (string.Equals(reason, SessionReplacedReason, StringComparison.Ordinal))
             {
-                Log.Info(LogTag,
+                Log.Debug(LogTag,
                     $"Skipping VPN enable after replacing {session.PackageName}; another hidden-app session is active.");
                 return;
             }
 
             if (string.Equals(reason, ScreenNonInteractiveReason, StringComparison.Ordinal))
             {
-                Log.Info(LogTag,
+                Log.Debug(LogTag,
                     $"Skipping session-level VPN enable after screen-lock freeze for {session.PackageName}; lock service handles it.");
                 return;
             }
 
             if (TryNotifyParentWithPendingIntent(session, reason)) return;
 
-            Log.Info(LogTag, $"Notifying parent profile about frozen app {session.PackageName}. reason={reason}");
+            Log.Debug(LogTag, $"Notifying parent profile about frozen app {session.PackageName}. reason={reason}");
             var result = AndroidProfileCommandGateway.NotifyParentWorkAppFrozen(
                 this,
                 $"session_hide:{reason}:{session.PackageName}");
@@ -542,9 +539,6 @@ public sealed class HiddenAppSessionMonitorService : Service
                     $"Could not notify parent profile about frozen app {session.PackageName}: {result.Message}");
                 return;
             }
-
-            Log.Info(LogTag,
-                $"Parent profile notification accepted for frozen app {session.PackageName}. reason={reason}");
         }
         catch (Exception exception)
         {
@@ -563,7 +557,7 @@ public sealed class HiddenAppSessionMonitorService : Service
 
         try
         {
-            Log.Info(LogTag,
+            Log.Debug(LogTag,
                 $"Sending parent pending-intent callback for frozen app {session.PackageName}. reason={reason}");
             callback.Send(
                 this,
@@ -573,8 +567,6 @@ public sealed class HiddenAppSessionMonitorService : Service
                 null,
                 null,
                 AndroidPendingIntentApi.CreateSenderBackgroundActivityStartOptions());
-            Log.Info(LogTag,
-                $"Parent pending-intent callback sent for frozen app {session.PackageName}. reason={reason}");
             return true;
         }
         catch (PendingIntent.CanceledException exception)

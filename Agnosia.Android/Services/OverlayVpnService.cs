@@ -50,7 +50,6 @@ public sealed class OverlayVpnService : Service
             if (appContext.BindService(intent, connection, default(Bind))) return;
 
             ReleaseHideConnection(connection);
-            Log.Debug(LogTag, "Overlay service is not running; no overlay hide command is needed.");
         }
         catch (Exception exception)
         {
@@ -94,7 +93,6 @@ public sealed class OverlayVpnService : Service
     {
         if (_overlayView is not null)
         {
-            Log.Debug(LogTag, "Overlay window is already visible; skipping duplicate show.");
             return;
         }
 
@@ -142,10 +140,6 @@ public sealed class OverlayVpnService : Service
         try
         {
             _windowManager!.AddView(_overlayView!, _layoutParams!);
-            Log.Info(
-                LogTag,
-                $"Overlay window shown. size={OverlaySizeDp}dp x {OverlaySizeDp}dp, " +
-                $"margin={OverlayMarginDp}dp, alpha={OverlayAlpha}, gravity=TOP|RIGHT.");
         }
         catch (Exception exception)
         {
@@ -161,7 +155,6 @@ public sealed class OverlayVpnService : Service
         try
         {
             _windowManager.RemoveView(_overlayView);
-            Log.Info(LogTag, "Overlay window hidden.");
         }
         catch (Exception exception)
         {
