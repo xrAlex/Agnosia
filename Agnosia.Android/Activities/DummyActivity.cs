@@ -659,56 +659,72 @@ public sealed class DummyActivity : Activity
             }
 
             Log.Info(LogTag, $"Starting hidden shortcut preparation for {packageName}.");
+            var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
+            var restoreHiddenState = false;
 
-            if (!await WaitForPackageAvailableAsync(packageName, cancellationToken))
+            if (!TryMakePackageVisibleForShortcutPreparation(admin, packageName, out restoreHiddenState, out var visibilityError))
             {
-                FinishWithError(
-                    $"Android не успел подготовить {packageName} после установки. Повторите действие через несколько секунд.");
+                FinishWithError(visibilityError ?? $"Android не смог восстановить {packageName} для подготовки ярлыка.");
                 return;
             }
 
-            HiddenAppShortcutBuildResult metadataResult;
             try
             {
-                metadataResult = await Task.Run(
-                    () => HiddenAppShortcutManager.BuildMetadataAsync(
-                        this,
-                        packageName,
-                        cancellationToken),
+                if (!await WaitForPackageAvailableAsync(packageName, cancellationToken))
+                {
+                    FinishWithError(
+                        $"Android не видит {packageName} в рабочем профиле. Проверьте, что приложение установлено в рабочем профиле, и повторите действие.");
+                    return;
+                }
+
+                HiddenAppShortcutBuildResult metadataResult;
+                try
+                {
+                    metadataResult = await Task.Run(
+                        () => HiddenAppShortcutManager.BuildMetadataAsync(
+                            this,
+                            packageName,
+                            cancellationToken),
+                        cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    Log.Error(LogTag, $"Failed to prepare hidden shortcut for {packageName}: {exception}");
+                    FinishWithError($"Android не смог подготовить данные ярлыка для {packageName}.");
+                    return;
+                }
+
+                if (!metadataResult.Succeeded)
+                {
+                    FinishWithError(metadataResult.Error);
+                    return;
+                }
+
+                var hideError = await Task.Run(
+                    () => TryHidePackageAfterInstallAsync(admin, packageName, cancellationToken),
                     cancellationToken);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                Log.Error(LogTag, $"Failed to prepare hidden shortcut for {packageName}: {exception}");
-                FinishWithError($"Android не смог подготовить данные ярлыка для {packageName}.");
-                return;
-            }
+                if (hideError is not null)
+                {
+                    FinishWithError(hideError);
+                    return;
+                }
 
-            if (!metadataResult.Succeeded)
-            {
-                FinishWithError(metadataResult.Error);
-                return;
+                restoreHiddenState = false;
+                Log.Info(LogTag, $"Installed hidden app {packageName} was frozen before shortcut creation.");
+
+                var result = new Intent();
+                HiddenAppShortcutManager.WriteMetadataToIntent(result, metadataResult.Metadata);
+                FinishWithResult(Result.Ok, result);
             }
-
-            var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
-            var hideError = await Task.Run(
-                () => TryHidePackageAfterInstallAsync(admin, packageName, cancellationToken),
-                cancellationToken);
-            if (hideError is not null)
+            finally
             {
-                FinishWithError(hideError);
-                return;
+                if (restoreHiddenState)
+                    RestoreHiddenStateAfterShortcutPreparation(admin, packageName);
             }
-
-            Log.Info(LogTag, $"Installed hidden app {packageName} was frozen before shortcut creation.");
-
-            var result = new Intent();
-            HiddenAppShortcutManager.WriteMetadataToIntent(result, metadataResult.Metadata);
-            FinishWithResult(Result.Ok, result);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -719,6 +735,58 @@ public sealed class DummyActivity : Activity
             Log.Error(LogTag, $"ActionPrepareHiddenShortcut failed: {ex}");
             FinishWithError("Android не смог подготовить ярлык скрытого приложения.");
         }
+    }
+
+    private bool TryMakePackageVisibleForShortcutPreparation(
+        ComponentName admin,
+        string packageName,
+        out bool restoreHiddenState,
+        out string? error)
+    {
+        restoreHiddenState = false;
+        error = null;
+
+        if (_policyManager is null)
+        {
+            error = $"Android не смог проверить состояние {packageName} в рабочем профиле.";
+            return false;
+        }
+
+        bool isHidden;
+        try
+        {
+            isHidden = _policyManager.IsApplicationHidden(admin, packageName);
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn(LogTag,
+                $"Could not read hidden state before hidden shortcut preparation. package={packageName}, exception={exception.GetType().FullName}: {exception.Message}");
+            return true;
+        }
+
+        if (!isHidden) return true;
+
+        Log.Info(LogTag,
+            $"Package {packageName} is hidden before shortcut preparation; temporarily unhiding it to resolve metadata.");
+        if (AndroidPolicyApi.TrySetApplicationHidden(_policyManager, admin, packageName, false, LogTag, out error))
+        {
+            restoreHiddenState = true;
+            return true;
+        }
+
+        error ??= $"Android не смог восстановить {packageName} для подготовки ярлыка.";
+        return false;
+    }
+
+    private void RestoreHiddenStateAfterShortcutPreparation(ComponentName admin, string packageName)
+    {
+        if (_policyManager is null) return;
+
+        Log.Info(LogTag,
+            $"Restoring hidden state after incomplete shortcut preparation. package={packageName}.");
+        if (!AndroidPolicyApi.TrySetApplicationHidden(_policyManager, admin, packageName, true, LogTag, out var error))
+            Log.Warn(LogTag,
+                $"Failed to restore hidden state after incomplete shortcut preparation. package={packageName}, error={error ?? "<none>"}.");
     }
 
     private async Task<bool> WaitForPackageAvailableAsync(
