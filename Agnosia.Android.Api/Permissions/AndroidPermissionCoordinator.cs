@@ -45,15 +45,6 @@ internal sealed class AndroidPermissionCoordinator(
                 "Подключен",
                 hasSetup ? "Проверить профиль" : "Создать профиль"),
             new PermissionSnapshot(
-                PermissionKind.UsageStats,
-                "Доступ к истории использования",
-                "Рабочий профиль",
-                "Позволяет Agnosia понять, когда вы перестали использовать приложение, и заморозить его",
-                usageAccessGranted,
-                workProfileAvailable,
-                "Получено",
-                "Открыть настройки"),
-            new PermissionSnapshot(
                 PermissionKind.Notifications,
                 "Уведомления",
                 "Основной профиль",
@@ -81,25 +72,51 @@ internal sealed class AndroidPermissionCoordinator(
                 "Получено",
                 "Открыть настройки"),
             new PermissionSnapshot(
+                PermissionKind.UsageStats,
+                "Доступ к истории использования",
+                "Рабочий профиль",
+                """
+                Позволяет Agnosia понять, когда вы перестали использовать приложение, и заморозить его
+
+                1. Нажмите Разрешить
+                2. Пролистайте вниз
+                3. Активируйте 'Доступ к истории использования'
+
+                Если на этом шаге Android не выдал разрешение, тогда:
+
+                4. Вернитесь назад
+                5. В верхней правой части экрана нажмите на ⋮
+                6. Выберите 'Разрешить доступ к настройкам'
+                7. Пролистайте вниз
+                8. Активируйте 'Доступ к истории использования'
+                """,
+                usageAccessGranted,
+                workProfileAvailable,
+                "Получено",
+                "Открыть настройки"),
+            new PermissionSnapshot(
                 PermissionKind.Overlay,
                 "Поверх окон",
                 "Основной профиль",
                 """
                 Необходимо для показа overlay-окна, которое позволяет запускать VPN после заморозки приложения в рабочем профиле.
 
-                1. В верхней правой части экрана нажмите на ⋮.
-                2. Выберите 'Разрешить доступ к настройкам'.
-                3. Пролистайте вниз.
-                4. Разрешите 'Поверх других приложений'.
-
-                На некоторых версиях Android необходимо сперва пролистать вниз, нажать 'Поверх других приложений', 
-                потом вернуться назад и только тогда появится возмоджность дать разрешения (⋮)
-                Тоесть: перед тем как выдать разрешения сперва пункт 3, потом 4 и тогда уже  1 -> 2 -> 3 -> 4
+                1. Нажмите Разрешить
+                2. Пролистайте вниз
+                3. Активируйте 'Поверх других приложений'
+                
+                Если на этом шаге Android не выдал разрешение, тогда:
+                
+                4. Вернитесь назад
+                5. В верхней правой части экрана нажмите на ⋮
+                6. Выберите 'Разрешить доступ к настройкам'
+                7. Пролистайте вниз
+                8. Активируйте 'Поверх других приложений'
                 """,
                 AndroidPermissionApi.HasOverlayPermission(activity),
                 true,
                 "Получено",
-                "Разрешить")
+                "Открыть настройки")
         ];
     }
 
@@ -115,8 +132,7 @@ internal sealed class AndroidPermissionCoordinator(
             PermissionKind.WorkProfile => await startProvisioningAsync(cancellationToken),
             PermissionKind.UsageStats => await RequestUsageStatsAccessAsync(cancellationToken),
             PermissionKind.Notifications => AndroidPermissionApi.RequestNotificationPermission(activity),
-            PermissionKind.VpnControl => await AndroidPermissionApi.RequestVpnControlAsync(commandRunner,
-                cancellationToken),
+            PermissionKind.VpnControl => await AndroidPermissionApi.RequestVpnControlAsync(commandRunner, cancellationToken),
             PermissionKind.PackageInstall => await RequestPackageInstallAccessAsync(cancellationToken),
             PermissionKind.Overlay => AndroidPermissionApi.OpenAppDetailsSettings(activity),
             _ => OperationResult.Failure("Неизвестное разрешение.")

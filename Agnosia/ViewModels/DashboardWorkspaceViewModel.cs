@@ -24,7 +24,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         PermissionKind.WorkProfile,
         PermissionKind.UsageStats,
         PermissionKind.Notifications,
-        PermissionKind.PackageInstall
+        PermissionKind.VpnControl,
+        PermissionKind.PackageInstall,
+        PermissionKind.Overlay
     ];
 
     private readonly IDashboardPlatformService _dashboardService;

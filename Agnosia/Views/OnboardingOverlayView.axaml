@@ -93,7 +93,7 @@
                                     <TextBlock Classes="group-title"
                                                Text="Изоляция" />
                                     <TextBlock Classes="page-caption"
-                                               Text="Банки, маркетплейсы, карты и соцсети часто видят то, что не должны. Их лучше держать отдельно" />
+                                               Text="Agnosia помогает запускать отдельные приложения так, чтобы они видели меньше данных о вашем устройстве" />
                                 </StackPanel>
                             </Grid>
                         </Border>
@@ -108,7 +108,7 @@
                                     <TextBlock Classes="group-title"
                                                Text="Рабочий профиль" />
                                     <TextBlock Classes="page-caption"
-                                               Text="Это встроенная песочница Android: отдельные приложения, настройки, по сути смартфон в смартфоне" />
+                                               Text="Это встроенная возможность Android: отдельные приложения и настройки внутри вашего телефона" />
                                 </StackPanel>
                             </Grid>
                         </Border>
@@ -124,7 +124,7 @@
                                     <TextBlock Classes="group-title"
                                                Text="Слежка" />
                                     <TextBlock Classes="page-caption"
-                                               Text="Т-Банк, Ozon, WB, VK, Яндекс, Макс и прочие РФ-сервисы, созданные для удобства, теперь стали доносчиками. Лучше их удалить или хотя бы изолировать" />
+                                               Text="Т-Банк, Ozon, WB, VK, Яндекс, Макс - те кто хотят знать о вас слишком много, удалите или ограничьте их с помощью Agnosia" />
                                 </StackPanel>
                             </Grid>
                         </Border>
@@ -139,7 +139,7 @@
                                     <TextBlock Classes="group-title"
                                                Text="VPN" />
                                     <TextBlock Classes="page-caption"
-                                               Text="Боитесь, что ваше окно в иной мир закроют? Agnosia позаботится, чтобы приложения не смогли увидеть ваш сервер" />
+                                               Text="Agnosia позаботится, чтобы приложения в рабочем профиле не смогли увидеть ваш VPN сервер" />
                                 </StackPanel>
                             </Grid>
                         </Border>
@@ -155,7 +155,7 @@
                                     <TextBlock Classes="group-title"
                                                Text="Тише в фоне" />
                                     <TextBlock Classes="page-caption"
-                                               Text="Чем меньше сервисов работает постоянно, тем дольше батарея вашего смартфона будет радовать вас" />
+                                               Text="Agnosia может останавливать ненужную работу приложений в фоне. Это помогает экономить заряд батареи" />
                                 </StackPanel>
                             </Grid>
                         </Border>
@@ -191,7 +191,7 @@
                                 <TextBlock Classes="page-caption"
                                            Text="{Binding WorkProfileStatusText, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.Dashboard.WP.'}" />
                                 <TextBlock Classes="page-caption"
-                                           Text="После подключения профиля Agnosia автоматически перейдет к разрешениям." />
+                                           Text="Agnosia настроит рабочий профиль и перейдет к разрешениям." />
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -215,8 +215,6 @@
                                        Text="Разрешения" />
                             <TextBlock Classes="page-caption"
                                        Text="Выдайте доступы в указанных профилях" />
-                            <TextBlock Classes="page-caption"
-                                       Text="VPN и доступ поверх окон можно включить позже в настройках приложения." />
                         </StackPanel>
 
                         <Border Grid.Column="1"
