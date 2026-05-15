@@ -304,6 +304,13 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
 
         if (isSettingUp) return WorkProfileStateKind.ProvisioningInProgress;
 
+        if (!HasAgnosiaWorkProfileSignal(
+                hasManagedProfileProvisionedSignal,
+                profileDiagnostics,
+                storedHasSetup,
+                onboardingCompleted))
+            return WorkProfileStateKind.NoWorkProfile;
+
         if (profileDiagnostics.QuietModeEnabled == true) return WorkProfileStateKind.WorkProfileQuietMode;
 
         if (profileDiagnostics.ManagedProfileExists && !profileDiagnostics.AvailableToCrossProfileApps)
@@ -321,6 +328,18 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             return WorkProfileStateKind.ErrorUnknownWithDiagnostics;
 
         return WorkProfileStateKind.NoWorkProfile;
+    }
+
+    private static bool HasAgnosiaWorkProfileSignal(
+        bool hasManagedProfileProvisionedSignal,
+        WorkProfileDiagnostics profileDiagnostics,
+        bool storedHasSetup,
+        bool onboardingCompleted)
+    {
+        return storedHasSetup
+               || onboardingCompleted
+               || hasManagedProfileProvisionedSignal
+               || profileDiagnostics.CommandTargetResolvable;
     }
 
     private static WorkProfileRecoveryKind GetWorkProfileRecoveryKind(WorkProfileStateKind state)

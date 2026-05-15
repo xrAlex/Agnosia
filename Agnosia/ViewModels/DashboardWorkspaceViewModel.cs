@@ -19,6 +19,14 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private const int OnboardingMonitorDelayMs = 1500;
     private const int IconBatchDelayMs = 60;
     private const string StaleApkMessageMarker = "APK изменился";
+    private static readonly PermissionKind[] RequiredOnboardingPermissionKinds =
+    [
+        PermissionKind.WorkProfile,
+        PermissionKind.UsageStats,
+        PermissionKind.Notifications,
+        PermissionKind.PackageInstall
+    ];
+
     private readonly IDashboardPlatformService _dashboardService;
     private readonly IPlatformEventLogReader _platformEventLogReader;
     private readonly IPermissionPlatformService _permissionService;
@@ -42,6 +50,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private bool _initialized;
     private bool _isApplyingSnapshot;
     private bool _isOperationInProgress;
+    private bool _isPreparingOnboardingPermissions;
     private bool _refreshPermissionsOnResume;
     private int _inventoryLoadGeneration;
     private CancellationTokenSource? _inventoryLoadCancellation;
@@ -120,6 +129,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(WorkProfileStatusText))]
     [NotifyPropertyChangedFor(nameof(OverviewHeadline))]
     [NotifyPropertyChangedFor(nameof(CanContinueOnboardingFromWorkProfile))]
+    [NotifyPropertyChangedFor(nameof(IsOnboardingWorkProfileStep))]
+    [NotifyPropertyChangedFor(nameof(IsOnboardingPermissionsStep))]
+    [NotifyPropertyChangedFor(nameof(OnboardingStepLabel))]
     [NotifyPropertyChangedFor(nameof(OverallStatusText))]
     [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
     public partial bool WorkProfileAvailable { get; set; }
@@ -295,10 +307,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             : $"GrantedCount|{_permissionItems.Count(item => item.IsGranted)}|{_permissionItems.Count}";
 
     public bool AreOnboardingPermissionsGranted =>
-        _permissionItems.Count > 0
-        && _permissionItems
-            .Where(item => IsRequiredOnboardingPermission(item.Kind))
-            .All(item => item.IsGranted);
+        RequiredOnboardingPermissionKinds.All(kind =>
+            _permissionItems.Any(item => item.Kind == kind && item.IsGranted));
 
     public bool IsWorkProfileRecoveryVisible =>
         WorkProfileRecovery != WorkProfileRecoveryKind.None && !WorkProfileRecoveryDismissed;
@@ -349,21 +359,27 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public bool IsOnboardingWelcomeStep => OnboardingStep == OnboardingStep.Welcome;
 
-    public bool IsOnboardingWorkProfileStep => OnboardingStep == OnboardingStep.WorkProfile;
+    public bool IsOnboardingWorkProfileStep =>
+        OnboardingStep == OnboardingStep.WorkProfile
+        && !WorkProfileAvailable
+        && !_isPreparingOnboardingPermissions;
 
-    public bool IsOnboardingPermissionsStep => OnboardingStep == OnboardingStep.Permissions;
+    public bool IsOnboardingPermissionsStep =>
+        OnboardingStep == OnboardingStep.Permissions
+        || (OnboardingStep == OnboardingStep.WorkProfile
+            && WorkProfileAvailable
+            && _permissionItems.Count > 0);
 
     public bool IsOnboardingFinalStep => OnboardingStep == OnboardingStep.Final;
 
     public bool CanContinueOnboardingFromWorkProfile => WorkProfileAvailable;
 
-    public string OnboardingStepLabel => OnboardingStep switch
-    {
-        OnboardingStep.Welcome => "1",
-        OnboardingStep.WorkProfile => "2",
-        OnboardingStep.Permissions => "3",
-        _ => "4"
-    };
+    public string OnboardingStepLabel =>
+        IsOnboardingWelcomeStep ? "1" :
+        IsOnboardingWorkProfileStep ? "2" :
+        IsOnboardingPermissionsStep ? "3" :
+        IsOnboardingFinalStep ? "4" :
+        string.Empty;
 
 
     public string LastRefreshSummary =>
@@ -526,7 +542,11 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     partial void OnWorkProfileAvailableChanged(bool value)
     {
-        if (value && IsOnboardingWorkProfileStep) StartOnboardingMonitorIfNeeded();
+        if (value && OnboardingStep == OnboardingStep.WorkProfile)
+        {
+            SetPreparingOnboardingPermissions(true);
+            StartOnboardingMonitorIfNeeded();
+        }
     }
 
     public DashboardWorkspaceViewModel() : this(UnsupportedPlatformBridge.Instance)
@@ -930,7 +950,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
         await ReloadPermissionsAsync();
         OnboardingStep = OnboardingStep.Permissions;
-        await CompleteOnboardingIfReadyAsync();
     }
 
     [RelayCommand]
@@ -1448,10 +1467,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private static bool IsRequiredOnboardingPermission(PermissionKind kind)
     {
-        return kind is PermissionKind.WorkProfile
-            or PermissionKind.UsageStats
-            or PermissionKind.Notifications
-            or PermissionKind.PackageInstall;
+        return RequiredOnboardingPermissionKinds.Contains(kind);
     }
 
     private static bool ShouldRefreshPermissionOnResume(PermissionKind kind)
@@ -1553,10 +1569,23 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
         if (OnboardingStep == OnboardingStep.WorkProfile)
         {
-            await RefreshAsync();
-            if (!WorkProfileAvailable) return;
+            SetPreparingOnboardingPermissions(true);
+            try
+            {
+                await RefreshAsync();
+                if (!WorkProfileAvailable)
+                {
+                    SetPreparingOnboardingPermissions(false);
+                    return;
+                }
 
-            OnboardingStep = OnboardingStep.Permissions;
+                await ReloadPermissionsAsync();
+                OnboardingStep = OnboardingStep.Permissions;
+            }
+            finally
+            {
+                SetPreparingOnboardingPermissions(false);
+            }
         }
 
         if (OnboardingStep == OnboardingStep.Permissions)
@@ -1571,6 +1600,16 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(AreOnboardingPermissionsGranted));
         if (OnboardingStep == OnboardingStep.Permissions && AreOnboardingPermissionsGranted)
             OnboardingStep = OnboardingStep.Final;
+    }
+
+    private void SetPreparingOnboardingPermissions(bool value)
+    {
+        if (_isPreparingOnboardingPermissions == value) return;
+
+        _isPreparingOnboardingPermissions = value;
+        OnPropertyChanged(nameof(IsOnboardingWorkProfileStep));
+        OnPropertyChanged(nameof(IsOnboardingPermissionsStep));
+        OnPropertyChanged(nameof(OnboardingStepLabel));
     }
 
     private bool TryBeginOperation()
@@ -1657,6 +1696,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
             OnPropertyChanged(nameof(PermissionSummary));
             OnPropertyChanged(nameof(AreOnboardingPermissionsGranted));
+            OnPropertyChanged(nameof(IsOnboardingPermissionsStep));
+            OnPropertyChanged(nameof(OnboardingStepLabel));
         }, DispatcherPriority.Background);
     }
 
