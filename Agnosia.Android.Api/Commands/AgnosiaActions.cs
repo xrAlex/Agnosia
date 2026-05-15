@@ -20,7 +20,6 @@ public static class AgnosiaActions
     public const string UnfreezeAndLaunch = "agnosia.action.UNFREEZE_AND_LAUNCH";
     public const string PrepareHiddenShortcut = "agnosia.action.PREPARE_HIDDEN_SHORTCUT";
     public const string CreateHiddenShortcut = "agnosia.action.CREATE_HIDDEN_SHORTCUT";
-    public const string InvalidateHiddenShortcut = "agnosia.action.INVALIDATE_HIDDEN_SHORTCUT";
     public const string LaunchHiddenAppShortcut = "agnosia.action.LAUNCH_HIDDEN_APP_SHORTCUT";
     public const string LaunchAppProxy = "agnosia.action.LAUNCH_APP_PROXY";
     public const string ShortcutPinned = "agnosia.action.SHORTCUT_PINNED";
@@ -78,7 +77,6 @@ public static class AgnosiaActions
         UnfreezePackage,
         PrepareHiddenShortcut,
         CreateHiddenShortcut,
-        InvalidateHiddenShortcut,
         UnfreezeAndLaunch,
         LaunchAppProxy,
         SetCrossProfileInteraction,
@@ -89,7 +87,6 @@ public static class AgnosiaActions
 
     public static readonly string[] LocalOnlyTargetProfileActivityActions =
     [
-        InvalidateHiddenShortcut,
         PackageInstallerCallback
     ];
 }

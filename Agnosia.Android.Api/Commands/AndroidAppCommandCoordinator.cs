@@ -2,6 +2,7 @@ using Agnosia.Android.Api.Gateways;
 using Agnosia.Android.Api.Packages;
 using Agnosia.Android.Api.Permissions;
 using Agnosia.Android.Api.Platform;
+using Agnosia.Android.Api.Shortcuts;
 using Agnosia.Android.Api.Storage;
 using Agnosia.Android.Api.Vpn;
 using Agnosia.Models;
@@ -106,8 +107,9 @@ internal sealed class AndroidAppCommandCoordinator(
 
         if (!result.Succeeded || app.Profile != ProfileKind.Work) return result;
 
-        var shortcutResult = await InvalidateHiddenShortcutInParentAsync(app.PackageName, cancellationToken);
-        if (shortcutResult.Succeeded) return result;
+        var shortcutResult = AndroidHiddenShortcutApi.InvalidatePinnedShortcut(
+            commandRunner.CurrentActivity,
+            app.PackageName);
 
         return OperationResult.Success($"{result.Message} {shortcutResult.Message}");
     }
@@ -316,19 +318,6 @@ internal sealed class AndroidAppCommandCoordinator(
             createResult.Data?.GetBooleanExtra(AndroidCommandContract.ResultHideImmediately, false) == true,
             createResult.Data?.GetStringExtra(AndroidCommandContract.ResultMessage)
             ?? "Подготовка ярлыка завершена.");
-    }
-
-    private async Task<OperationResult> InvalidateHiddenShortcutInParentAsync(
-        string packageName,
-        CancellationToken cancellationToken)
-    {
-        var intent = new Intent(AgnosiaActions.InvalidateHiddenShortcut);
-        intent.PutExtra("package", packageName);
-
-        var result = await commandRunner.StartActivityForResultAsync(intent, false, cancellationToken);
-        return AndroidActivityResultApi.ToVoidOperationResult(
-            result,
-            "Ярлык скрытого приложения отключен.");
     }
 
     private static void CopyExtraIfPresent(Intent source, Intent target, string extraName)
