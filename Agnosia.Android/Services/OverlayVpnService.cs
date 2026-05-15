@@ -1,4 +1,3 @@
-using Agnosia.Android.Api.Platform;
 using Android.Content;
 using Android.Graphics;
 using Android.OS;
@@ -22,20 +21,42 @@ public sealed class OverlayVpnService : Service
     private const int OverlayAlpha = 60;
 
     private static readonly Color OverlayColor = Color.Argb(OverlayAlpha, 100, 150, 255);
+    private static readonly object HideConnectionsGate = new();
+    private static readonly HashSet<HideOverlayServiceConnection> HideConnections = [];
 
     private IWindowManager? _windowManager;
     private View? _overlayView;
     private WindowManagerLayoutParams? _layoutParams;
+    private readonly OverlayBinder _binder;
+
+    public OverlayVpnService()
+    {
+        _binder = new OverlayBinder(this);
+    }
 
     public static void HideOverlay(Context context)
     {
         var intent = new Intent(context, typeof(OverlayVpnService));
-        intent.SetAction(ActionHideOverlay);
-        AndroidServiceApi.TryStartService(
-            context,
-            intent,
-            LogTag,
-            "Android не смог отправить команду скрытия overlay.");
+        var appContext = context.ApplicationContext ?? context;
+        var connection = new HideOverlayServiceConnection(appContext);
+
+        lock (HideConnectionsGate)
+        {
+            HideConnections.Add(connection);
+        }
+
+        try
+        {
+            if (appContext.BindService(intent, connection, default(Bind))) return;
+
+            ReleaseHideConnection(connection);
+            Log.Debug(LogTag, "Overlay service is not running; no overlay hide command is needed.");
+        }
+        catch (Exception exception)
+        {
+            ReleaseHideConnection(connection);
+            Log.Warn(LogTag, $"Android не смог привязаться к overlay service для скрытия overlay. Details: {exception}");
+        }
     }
 
     public override StartCommandResult OnStartCommand(Intent? intent, StartCommandFlags flags, int startId)
@@ -66,7 +87,7 @@ public sealed class OverlayVpnService : Service
 
     public override IBinder? OnBind(Intent? intent)
     {
-        return null;
+        return _binder;
     }
 
     private void ShowOverlayWindow()
@@ -155,5 +176,62 @@ public sealed class OverlayVpnService : Service
         _overlayView = null;
         _layoutParams = null;
         _windowManager = null;
+    }
+
+    private static void ReleaseHideConnection(HideOverlayServiceConnection connection)
+    {
+        lock (HideConnectionsGate)
+        {
+            HideConnections.Remove(connection);
+        }
+    }
+
+    private sealed class OverlayBinder(OverlayVpnService service) : Binder
+    {
+        public OverlayVpnService Service { get; } = service;
+    }
+
+    private sealed class HideOverlayServiceConnection(Context context) : Java.Lang.Object, IServiceConnection
+    {
+        public void OnServiceConnected(ComponentName? name, IBinder? service)
+        {
+            try
+            {
+                if (service is OverlayBinder binder)
+                {
+                    binder.Service.HideOverlayWindow();
+                    binder.Service.StopSelf();
+                }
+                else
+                {
+                    Log.Warn(LogTag, "Overlay service returned an unexpected binder while hiding overlay.");
+                }
+            }
+            finally
+            {
+                UnbindAndRelease();
+            }
+        }
+
+        public void OnServiceDisconnected(ComponentName? name)
+        {
+            ReleaseHideConnection(this);
+        }
+
+        private void UnbindAndRelease()
+        {
+            try
+            {
+                context.UnbindService(this);
+            }
+            catch (Exception exception)
+            {
+                Log.Warn(LogTag, $"Android не смог отвязаться от overlay service после скрытия overlay. Details: {exception}");
+            }
+            finally
+            {
+                ReleaseHideConnection(this);
+            }
+        }
     }
 }
