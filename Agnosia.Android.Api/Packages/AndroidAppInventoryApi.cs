@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using Agnosia.Android.Api.Platform;
 using Android.App.Admin;
 using Android.Content;
@@ -59,11 +57,14 @@ public static class AndroidAppInventoryApi
 
         try
         {
+            if (!TryGetPackageIdentity(packageManager, packageName, out var identity)) return null;
+
             var app = TryGetApplicationInfo(packageManager, packageName,
                           AndroidSystemApi.GetInstalledApplicationFlags())
                       ?? packageManager.GetApplicationInfo(packageName, PackageInfoFlags.MatchDisabledComponents);
             cancellationToken.ThrowIfCancellationRequested();
-            return ResolveAppIconPng(context, packageManager, app, packageName, cancellationToken);
+
+            return ResolveAppIconPng(context, packageManager, app, packageName, identity, cancellationToken);
         }
         catch (Exception exception) when (exception is PackageManager.NameNotFoundException
                                               or InvalidOperationException
@@ -91,6 +92,8 @@ public static class AndroidAppInventoryApi
         var isHidden = TryIsApplicationHidden(policyManager, admin, packageName);
         if (!showAll && (isSystem || (!isInstalled && !isHidden))) return null;
 
+        if (!TryGetPackageIdentity(packageManager, packageName, out var identity)) return null;
+
         return new AppServiceModel
         {
             PackageName = packageName,
@@ -101,7 +104,7 @@ public static class AndroidAppInventoryApi
             IsHidden = isHidden,
             CanLaunch = packageManager.GetLaunchIntentForPackage(packageName) is not null,
             IsInstalled = isInstalled,
-            IconPng = TryGetMemoryCachedIcon(packageManager, packageName, out var cachedIcon) ? cachedIcon : null
+            IconPng = TryGetMemoryCachedIcon(context, packageName, identity, out var cachedIcon) ? cachedIcon : null
         };
     }
 
@@ -143,20 +146,30 @@ public static class AndroidAppInventoryApi
         PackageManager packageManager,
         ApplicationInfo app,
         string packageName,
+        PackageIdentity identity,
         CancellationToken cancellationToken)
     {
-        var hasIdentity = TryGetPackageIdentity(packageManager, packageName, out var identity);
-        if (hasIdentity && TryGetCachedIcon(context, packageName, identity, out var cachedIcon)) return cachedIcon;
+        if (TryGetCachedIcon(context, packageName, identity, out var cachedIcon)) return cachedIcon;
 
         cancellationToken.ThrowIfCancellationRequested();
         var iconPng = TryRenderAppIcon(context, packageManager, app, packageName);
-        if (hasIdentity)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            CacheIcon(context, packageName, identity, iconPng);
-        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        CacheIcon(context, packageName, identity, iconPng);
 
         return iconPng;
+    }
+
+    private static Drawable? TryGetApplicationIcon(PackageManager packageManager, ApplicationInfo app)
+    {
+        try
+        {
+            return packageManager.GetApplicationIcon(app);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static byte[]? TryRenderAppIcon(
@@ -167,12 +180,12 @@ public static class AndroidAppInventoryApi
     {
         try
         {
-            using var drawable = ResolveLauncherIcon(context, packageName) ?? packageManager.GetApplicationIcon(app);
+            using var drawable = TryGetApplicationIcon(packageManager, app) ?? ResolveLauncherIcon(context, packageName);
             using var bitmap = RenderAppIcon(drawable);
             using var stream = new MemoryStream();
             bitmap.Compress(
                 Bitmap.CompressFormat.Png ?? throw new InvalidOperationException("PNG compress format is unavailable."),
-                100,
+                85,
                 stream);
             return stream.ToArray();
         }
@@ -192,49 +205,6 @@ public static class AndroidAppInventoryApi
             return activities?.FirstOrDefault()?.GetIcon(0);
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
-        {
-            return null;
-        }
-    }
-
-    private static bool TryGetPackageIdentity(
-        PackageManager packageManager,
-        string packageName,
-        out PackageIdentity identity)
-    {
-        try
-        {
-            var packageInfo =
-                TryGetPackageInfo(packageManager, packageName, AndroidSystemApi.GetInstalledApplicationFlags())
-                ?? packageManager.GetPackageInfo(packageName, 0);
-            if (packageInfo is null)
-            {
-                identity = default;
-                return false;
-            }
-
-            identity = new PackageIdentity(packageInfo.LongVersionCode, packageInfo.LastUpdateTime);
-            return true;
-        }
-        catch (Exception exception) when (exception is PackageManager.NameNotFoundException
-                                          || AndroidRecoverableException.IsMatch(exception))
-        {
-            identity = default;
-            return false;
-        }
-    }
-
-    private static PackageInfo? TryGetPackageInfo(
-        PackageManager packageManager,
-        string packageName,
-        PackageInfoFlags flags)
-    {
-        try
-        {
-            return packageManager.GetPackageInfo(packageName, flags);
-        }
-        catch (Exception exception) when (exception is PackageManager.NameNotFoundException
-                                          || AndroidRecoverableException.IsMatch(exception))
         {
             return null;
         }
@@ -277,12 +247,12 @@ public static class AndroidAppInventoryApi
     }
 
     private static bool TryGetMemoryCachedIcon(
-        PackageManager packageManager,
+        Context context,
         string packageName,
+        PackageIdentity identity,
         out byte[]? iconPng)
     {
         iconPng = null;
-        if (!TryGetPackageIdentity(packageManager, packageName, out var identity)) return false;
 
         lock (IconCacheSync)
         {
@@ -437,14 +407,56 @@ public static class AndroidAppInventoryApi
         }
     }
 
-    private static string GetIconCacheKey(string packageName, PackageIdentity identity)
+    private static bool TryGetPackageIdentity(
+        PackageManager packageManager,
+        string packageName,
+        out PackageIdentity identity)
     {
-        var packageHash = Convert.ToHexString(
-            SHA256.HashData(Encoding.UTF8.GetBytes(packageName)));
-        return $"{packageHash}.{identity.VersionCode}.{identity.LastUpdateTime}";
+        try
+        {
+            var packageInfo =
+                TryGetPackageInfo(packageManager, packageName, AndroidSystemApi.GetInstalledApplicationFlags())
+                ?? packageManager.GetPackageInfo(packageName, 0);
+            if (packageInfo is null)
+            {
+                identity = default;
+                return false;
+            }
+
+            identity = new PackageIdentity(packageInfo.LongVersionCode);
+            return true;
+        }
+        catch (Exception exception) when (exception is PackageManager.NameNotFoundException
+                                          || AndroidRecoverableException.IsMatch(exception))
+        {
+            identity = default;
+            return false;
+        }
     }
 
-    private readonly record struct PackageIdentity(long VersionCode, long LastUpdateTime);
+    private static PackageInfo? TryGetPackageInfo(
+        PackageManager packageManager,
+        string packageName,
+        PackageInfoFlags flags)
+    {
+        try
+        {
+            return packageManager.GetPackageInfo(packageName, flags);
+        }
+        catch (Exception exception) when (exception is PackageManager.NameNotFoundException
+                                          || AndroidRecoverableException.IsMatch(exception))
+        {
+            return null;
+        }
+    }
+
+    private static string GetIconCacheKey(string packageName, PackageIdentity identity)
+    {
+        var packageHash = (uint)packageName.GetHashCode(StringComparison.Ordinal);
+        return $"{packageHash:X8}.{identity.VersionCode}";
+    }
+
+    private readonly record struct PackageIdentity(long VersionCode);
 
     private sealed record AppIconCacheEntry(PackageIdentity Identity, byte[]? IconPng);
 }
