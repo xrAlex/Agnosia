@@ -18,7 +18,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private const int SettingsSaveDelayMs = 350;
     private const int OnboardingMonitorDelayMs = 1500;
     private const int IconBatchDelayMs = 60;
-    private const int WorkIconCacheRefreshDelayMs = 2500;
     private const string StaleApkMessageMarker = "APK изменился";
     private static readonly PermissionKind[] RequiredOnboardingPermissionKinds =
     [
@@ -37,7 +36,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private readonly IAppCommandService _appCommandService;
     private readonly IAppEventLogService _eventLogService;
     private readonly DebouncedAsyncAction _searchRefreshDebouncer;
-    private readonly DebouncedAsyncAction _workIconCacheRefreshDebouncer;
     private readonly DashboardSettingsSaveCoordinator _settingsSaveCoordinator;
     private readonly SemaphoreSlim _iconLoadGate = new(1, 1);
     private readonly Lock _iconBatchSync = new();
@@ -56,6 +54,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private bool _isOperationInProgress;
     private bool _isPreparingOnboardingPermissions;
     private bool _refreshPermissionsOnResume;
+    private bool _inventoryLoadInProgress;
     private int _inventoryLoadGeneration;
     private CancellationTokenSource? _inventoryLoadCancellation;
     private CancellationTokenSource? _onboardingMonitorCancellation;
@@ -598,9 +597,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         _searchRefreshDebouncer = new DebouncedAsyncAction(
             TimeSpan.FromMilliseconds(SearchRefreshDelayMs),
             exception => ReportErrorOnUiThreadAsync(exception, "FilterUpdate"));
-        _workIconCacheRefreshDebouncer = new DebouncedAsyncAction(
-            TimeSpan.FromMilliseconds(WorkIconCacheRefreshDelayMs),
-            exception => ReportErrorOnUiThreadAsync(exception, "LoadAppsFailed"));
         _settingsSaveCoordinator = new DashboardSettingsSaveCoordinator(
             settingsService ?? throw new ArgumentNullException(nameof(settingsService)),
             TimeSpan.FromMilliseconds(SettingsSaveDelayMs),
@@ -632,10 +628,11 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public void HandlePrimaryActivityResumed()
     {
-        if (!_refreshPermissionsOnResume) return;
-
-        _refreshPermissionsOnResume = false;
-        _ = RefreshPermissionsAfterResumeAsync();
+        if (_refreshPermissionsOnResume)
+        {
+            _refreshPermissionsOnResume = false;
+            _ = RefreshPermissionsAfterResumeAsync();
+        }
     }
 
     [RelayCommand]
@@ -669,7 +666,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
             if (IsDashboardVisible)
             {
-                StartInventoryLoad(profileSnapshot);
+                StartInventoryLoad(
+                    profileSnapshot,
+                    showProgress: SelectedSection == DashboardSection.Apps);
             }
             else
             {
@@ -700,24 +699,37 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }
     }
 
-    private void StartInventoryLoad(DashboardSnapshot profileSnapshot)
+    private void StartInventoryLoad(
+        DashboardSnapshot profileSnapshot,
+        bool preserveCurrentWorkAppsOnEmpty = false,
+        bool showProgress = true)
     {
         var generation = BeginInventoryLoad(out var inventoryCancellation);
-        HasLoadedInventory = false;
-        IsInventoryLoading = true;
+        if (showProgress)
+        {
+            HasLoadedInventory = false;
+            IsInventoryLoading = true;
+        }
+
         StatusIsError = false;
-        _ = LoadInventoryForGenerationAsync(profileSnapshot, generation, inventoryCancellation);
+        _ = LoadInventoryForGenerationAsync(
+            profileSnapshot,
+            generation,
+            inventoryCancellation,
+            preserveCurrentWorkAppsOnEmpty);
     }
 
     private void StartInventoryLoadIfNeeded()
     {
         if (!IsDashboardVisible
             || HasLoadedInventory
-            || IsInventoryLoading
+            || _inventoryLoadInProgress
             || _lastProfileSnapshot is null)
             return;
 
-        StartInventoryLoad(_lastProfileSnapshot);
+        StartInventoryLoad(
+            _lastProfileSnapshot,
+            showProgress: SelectedSection == DashboardSection.Apps);
     }
 
     private int BeginInventoryLoad(out CancellationTokenSource inventoryCancellation)
@@ -725,6 +737,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         CancelInventoryLoad(false);
         inventoryCancellation = new CancellationTokenSource();
         _inventoryLoadCancellation = inventoryCancellation;
+        _inventoryLoadInProgress = true;
         return ++_inventoryLoadGeneration;
     }
 
@@ -737,13 +750,15 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }
 
         ++_inventoryLoadGeneration;
+        _inventoryLoadInProgress = false;
         if (updateProgressState) IsInventoryLoading = false;
     }
 
     private async Task LoadInventoryForGenerationAsync(
         DashboardSnapshot profileSnapshot,
         int generation,
-        CancellationTokenSource inventoryCancellation)
+        CancellationTokenSource inventoryCancellation,
+        bool preserveCurrentWorkAppsOnEmpty)
     {
         try
         {
@@ -760,7 +775,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             {
                 if (!IsCurrentInventoryLoad(generation, inventoryCancellation)) return;
 
-                ApplyInventorySnapshot(inventory);
+                ApplyInventorySnapshot(preserveCurrentWorkAppsOnEmpty
+                    ? PreserveCurrentWorkAppsOnEmpty(profileSnapshot, inventory)
+                    : inventory);
                 HasLoadedInventory = true;
                 IsInventoryLoading = false;
             }, DispatcherPriority.Background);
@@ -785,7 +802,11 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (ReferenceEquals(_inventoryLoadCancellation, inventoryCancellation))
+                {
                     _inventoryLoadCancellation = null;
+                    _inventoryLoadInProgress = false;
+                    IsInventoryLoading = false;
+                }
             }, DispatcherPriority.Background);
             inventoryCancellation.Dispose();
         }
@@ -1127,32 +1148,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     {
         if (snapshot.IconPng is { Length: > 0 } existingIcon) return existingIcon;
 
-        var iconPng = await QueueIconLoadAsync(snapshot, cancellationToken).ConfigureAwait(false);
-        if (iconPng is not { Length: > 0 } && snapshot.Profile == ProfileKind.Work)
-            QueueWorkIconCacheRefresh();
-
-        return iconPng;
-    }
-
-    private void QueueWorkIconCacheRefresh()
-    {
-        _workIconCacheRefreshDebouncer.Schedule(RefreshWorkIconCacheInventoryAsync);
-    }
-
-    private async Task RefreshWorkIconCacheInventoryAsync(CancellationToken cancellationToken)
-    {
-        await Dispatcher.UIThread.InvokeAsync(() =>
-        {
-            if (cancellationToken.IsCancellationRequested
-                || !IsDashboardVisible
-                || IsInventoryLoading
-                || IsBusy
-                || _isOperationInProgress
-                || _lastProfileSnapshot is null)
-                return;
-
-            StartInventoryLoad(_lastProfileSnapshot);
-        }, DispatcherPriority.Background);
+        return await QueueIconLoadAsync(snapshot, cancellationToken).ConfigureAwait(false);
     }
 
     private Task<byte[]?> QueueIconLoadAsync(AppSnapshot snapshot, CancellationToken cancellationToken)
@@ -1385,6 +1381,20 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             "ApplyInventory",
             startedAt,
             $"personal={_personalApps.Length}; work={_workApps.Length}; cached={_appItemCache.Count}");
+    }
+
+    private DashboardAppInventorySnapshot PreserveCurrentWorkAppsOnEmpty(
+        DashboardSnapshot profileSnapshot,
+        DashboardAppInventorySnapshot inventory)
+    {
+        if (!profileSnapshot.WorkProfileAvailable
+            || inventory.WorkApps.Count > 0
+            || _workApps.Length == 0)
+            return inventory;
+
+        return new DashboardAppInventorySnapshot(
+            inventory.PersonalApps,
+            _workApps.Select(app => app.Snapshot).ToArray());
     }
 
     private void RefreshVisibleApps()
