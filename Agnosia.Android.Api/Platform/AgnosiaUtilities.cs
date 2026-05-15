@@ -127,8 +127,13 @@ public static class AgnosiaUtilities
 
     private static void DisableMainLauncherActivity(Context context, Type mainActivityType)
     {
-        context.PackageManager?.SetComponentEnabledSetting(
-            new ComponentName(context, Class.FromType(mainActivityType)),
+        if (context.PackageManager is not { } packageManager) return;
+
+        var component = new ComponentName(context, Class.FromType(mainActivityType));
+        if (packageManager.GetComponentEnabledSetting(component) == ComponentEnabledState.Disabled) return;
+
+        packageManager.SetComponentEnabledSetting(
+            component,
             ComponentEnabledState.Disabled,
             ComponentEnableOption.DontKillApp);
     }
