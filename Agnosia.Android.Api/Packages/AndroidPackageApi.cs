@@ -105,7 +105,7 @@ public static class AndroidPackageApi
                 return true;
             }
 
-            StartSessionInstall(activity, installParts, callbackPendingIntent, logTag, onError);
+            StartSessionInstall(activity, packageName, installParts, callbackPendingIntent, logTag, onError);
             return true;
         }
         catch (PackageManager.NameNotFoundException)
@@ -140,6 +140,7 @@ public static class AndroidPackageApi
 
     private static void StartSessionInstall(
         Activity activity,
+        string? packageName,
         IReadOnlyList<string> installParts,
         PendingIntent callbackPendingIntent,
         string logTag,
@@ -149,8 +150,9 @@ public static class AndroidPackageApi
         int sessionId;
         try
         {
-            sessionId = packageInstaller.CreateSession(
-                new PackageInstaller.SessionParams(PackageInstallMode.FullInstall));
+            var sessionParams = new PackageInstaller.SessionParams(PackageInstallMode.FullInstall);
+            if (!string.IsNullOrWhiteSpace(packageName)) sessionParams.SetAppPackageName(packageName);
+            sessionId = packageInstaller.CreateSession(sessionParams);
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {

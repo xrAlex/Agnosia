@@ -125,11 +125,15 @@ public static class AgnosiaUtilities
         storage.Remove(StorageKeys.ManagedProfileUserSerial);
     }
 
-    private static void DisableMainLauncherActivity(Context context, Type mainActivityType)
+    private static void DisableLauncherActivity(Context context, string launcherActivityName)
     {
-        if (context.PackageManager is not { } packageManager) return;
+        var packageName = context.PackageName;
+        if (context.PackageManager is not { } packageManager
+            || string.IsNullOrWhiteSpace(packageName)
+            || string.IsNullOrWhiteSpace(launcherActivityName))
+            return;
 
-        var component = new ComponentName(context, Class.FromType(mainActivityType));
+        var component = new ComponentName(packageName, launcherActivityName);
         if (packageManager.GetComponentEnabledSetting(component) == ComponentEnabledState.Disabled) return;
 
         packageManager.SetComponentEnabledSetting(
@@ -138,10 +142,10 @@ public static class AgnosiaUtilities
             ComponentEnableOption.DontKillApp);
     }
 
-    public static void EnforceWorkProfilePolicies(Context context, Type adminReceiverType, Type mainActivityType,
+    public static void EnforceWorkProfilePolicies(Context context, Type adminReceiverType, string launcherActivityName,
         bool enableProfile = false)
     {
-        DisableMainLauncherActivity(context, mainActivityType);
+        DisableLauncherActivity(context, launcherActivityName);
         EnsureCrossProfileCommandActionsRegistered();
 
         if (AndroidSystemApi.GetDevicePolicyManager(context) is not { } manager) return;

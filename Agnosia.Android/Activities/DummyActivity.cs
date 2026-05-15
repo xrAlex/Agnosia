@@ -62,7 +62,6 @@ public sealed class DummyActivity : Activity
     private static DummyActivity? _activeInstance;
     private static Intent? _pendingPackageInstallerCallback;
     private static readonly Type AdminReceiverType = typeof(AgnosiaDeviceAdminReceiver);
-    private static readonly Type MainActivityType = typeof(MainActivity);
 
     private DevicePolicyManager? _policyManager;
     private readonly CancellationTokenSource _destroyCancellation = new();
@@ -82,7 +81,7 @@ public sealed class DummyActivity : Activity
             AgnosiaUtilities.EnforceWorkProfilePolicies(
                 this,
                 AdminReceiverType,
-                MainActivityType,
+                MainActivity.LauncherActivityName,
                 string.Equals(Intent?.Action, AgnosiaActions.FinalizeProvision, StringComparison.Ordinal));
             AgnosiaUtilities.EnforceUserRestrictions(this, AdminReceiverType);
             WorkProfileLockFreezeService.EnsureRunning(this);
@@ -213,7 +212,7 @@ public sealed class DummyActivity : Activity
                         AgnosiaUtilities.EnforceWorkProfilePolicies(
                             this,
                             AdminReceiverType,
-                            MainActivityType);
+                            MainActivity.LauncherActivityName);
                         AgnosiaUtilities.EnforceUserRestrictions(this, AdminReceiverType);
                         WorkProfileLockFreezeService.EnsureRunning(this);
                     }
@@ -1039,7 +1038,8 @@ public sealed class DummyActivity : Activity
             LocalStorageManager.Instance.SetInt(name, intent.GetIntExtra("int", int.MinValue));
         }
 
-        if (_isProfileOwner) AgnosiaUtilities.EnforceWorkProfilePolicies(this, AdminReceiverType, MainActivityType);
+        if (_isProfileOwner)
+            AgnosiaUtilities.EnforceWorkProfilePolicies(this, AdminReceiverType, MainActivity.LauncherActivityName);
 
         FinishWithResult(Result.Ok);
     }

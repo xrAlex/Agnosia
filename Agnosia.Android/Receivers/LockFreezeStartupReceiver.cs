@@ -31,7 +31,7 @@ public sealed class LockFreezeStartupReceiver : BroadcastReceiver
             AgnosiaUtilities.EnforceWorkProfilePolicies(
                 context,
                 typeof(AgnosiaDeviceAdminReceiver),
-                typeof(MainActivity));
+                MainActivity.LauncherActivityName);
             AgnosiaUtilities.EnforceUserRestrictions(context, typeof(AgnosiaDeviceAdminReceiver));
             Log.Info(LogTag, $"Starting lock-freeze monitor after {intent?.Action ?? "<unknown>"}.");
             WorkProfileLockFreezeService.EnsureRunning(context);

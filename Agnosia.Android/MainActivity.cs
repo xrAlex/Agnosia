@@ -20,14 +20,15 @@ using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 namespace Agnosia.Android;
 
 [Activity(
+    Name = "com.agnosia.app.MainActivity",
     Label = "@string/app_name",
     Theme = "@style/MyTheme.NoActionBar",
     Icon = "@mipmap/ic_launcher",
-    MainLauncher = true,
     Exported = true,
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode)]
 public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
 {
+    public const string LauncherActivityName = "com.agnosia.app.LauncherActivity";
     private const string LogTag = "AgnosiaMainActivity";
     private const int MaxPendingActivityStarts = 8;
     private const int MaxActivityStartsPerDrain = 2;
@@ -123,7 +124,7 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
             AgnosiaUtilities.EnforceWorkProfilePolicies(
                 this,
                 typeof(AgnosiaDeviceAdminReceiver),
-                typeof(MainActivity),
+                LauncherActivityName,
                 true);
             AgnosiaUtilities.EnforceUserRestrictions(this, typeof(AgnosiaDeviceAdminReceiver));
             WorkProfileLockFreezeService.EnsureRunning(this);

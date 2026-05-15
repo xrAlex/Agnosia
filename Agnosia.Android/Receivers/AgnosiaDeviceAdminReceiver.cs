@@ -46,7 +46,7 @@ public sealed class AgnosiaDeviceAdminReceiver : DeviceAdminReceiver
             AgnosiaUtilities.EnforceWorkProfilePolicies(
                 context,
                 typeof(AgnosiaDeviceAdminReceiver),
-                typeof(MainActivity),
+                MainActivity.LauncherActivityName,
                 true);
             AgnosiaUtilities.EnforceUserRestrictions(context, typeof(AgnosiaDeviceAdminReceiver));
             NotifyParentProvisioningFinalized(context);
