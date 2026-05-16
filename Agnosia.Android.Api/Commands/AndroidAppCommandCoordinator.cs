@@ -13,8 +13,7 @@ namespace Agnosia.Android.Api.Commands;
 
 internal sealed class AndroidAppCommandCoordinator(
     AndroidActivityCommandGateway commandRunner,
-    AndroidPermissionCoordinator permissionCoordinator,
-    Func<CancellationToken, Task<DashboardSnapshot>> loadDashboardAsync)
+    AndroidPermissionCoordinator permissionCoordinator)
 {
     private const string LogTag = "AgnosiaTransientVpn";
     private const string ActivityResultLogTag = "AgnosiaActivityResult";
@@ -48,9 +47,8 @@ internal sealed class AndroidAppCommandCoordinator(
                         out sourceDirectory,
                         out splitApks))
                 {
-                    _ = await loadDashboardAsync(cancellationToken);
-                    return OperationResult.Failure(
-                        "APK изменился или приложение было обновлено. Обновите список и повторите.");
+                    sourceDirectory = null;
+                    splitApks = [];
                 }
 
                 intent.PutExtra("apk", sourceDirectory);

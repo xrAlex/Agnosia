@@ -543,6 +543,30 @@ public sealed class DummyActivity : Activity
             return;
         }
 
+        if (_isProfileOwner
+            && _policyManager is not null
+            && !string.IsNullOrWhiteSpace(packageName))
+        {
+            var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
+            if (AndroidPolicyApi.TryInstallExistingPackage(
+                    _policyManager,
+                    admin,
+                    packageName,
+                    LogTag,
+                    out _))
+            {
+                FinishWithResult(Result.Ok);
+                return;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(intent.GetStringExtra("apk")))
+        {
+            FinishWithError(
+                "Android не смог установить приложение в рабочий профиль: пакет не найден в другом профиле, а APK недоступен для копирования.");
+            return;
+        }
+
         var callbackPendingIntent = AndroidPendingIntentApi.CreatePackageInstallerCallbackPendingIntent(
             this,
             typeof(PackageInstallerCallbackReceiver),

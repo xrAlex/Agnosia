@@ -40,8 +40,7 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         _permissionCoordinator = new AndroidPermissionCoordinator(_commandRunner, StartProvisioningAsync);
         _appCommandCoordinator = new AndroidAppCommandCoordinator(
             _commandRunner,
-            _permissionCoordinator,
-            _dashboardReader.LoadDashboardAsync);
+            _permissionCoordinator);
     }
 
     public void AttachActivity(IAndroidActivityHost activityHost)

@@ -50,6 +50,32 @@ public static class AndroidPolicyApi
         }
     }
 
+    public static bool TryInstallExistingPackage(
+        DevicePolicyManager manager,
+        ComponentName admin,
+        string packageName,
+        string logTag,
+        out string? error)
+    {
+        try
+        {
+            if (manager.InstallExistingPackage(admin, packageName))
+            {
+                error = null;
+                return true;
+            }
+
+            error = $"Android не нашел установленный пакет {packageName} в другом профиле.";
+            return false;
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn(logTag, $"Failed to install existing package {packageName}: {exception}");
+            error = $"Android не смог установить существующее приложение {packageName} в этом профиле.";
+            return false;
+        }
+    }
+
     public static bool TrySetApplicationHidden(
         DevicePolicyManager manager,
         ComponentName admin,
