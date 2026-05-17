@@ -9,7 +9,6 @@
     </PropertyGroup>
 
     <PropertyGroup Condition="$([System.String]::Copy('$(MSBuildProjectName)').Contains('Android'))">
-        <ApplicationVersion>$([System.Text.RegularExpressions.Regex]::Replace('$(AppVersion)', '[^0-9]', ''))</ApplicationVersion>
         <ApplicationDisplayVersion>$(AppVersion)</ApplicationDisplayVersion>
         <BaseIntermediateOutputPath>$(LocalAppData)\Agnosia\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
     </PropertyGroup>

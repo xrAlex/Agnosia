@@ -71,7 +71,19 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           $tag = $env:GITHUB_REF_NAME
-          $displayVersion = $tag.TrimStart("v")
+          if ($tag -notmatch '^v(?<major>\d+)\.(?<minor>\d+)(?:\.(?<patch>\d+))?$') {
+            throw "Release tag must use vMAJOR.MINOR or vMAJOR.MINOR.PATCH format, got '$tag'."
+          }
+
+          $major = [int]$Matches.major
+          $minor = [int]$Matches.minor
+          $patch = if ($Matches.patch) { [int]$Matches.patch } else { 0 }
+          if ($minor -gt 999 -or $patch -gt 999) {
+            throw "Android versionCode mapping supports minor and patch values from 0 to 999."
+          }
+
+          $displayVersion = $tag.Substring(1)
+          $androidVersionCode = ($major * 1000000) + ($minor * 1000) + $patch
           New-Item -ItemType Directory -Force -Path $env:RELEASE_DIR | Out-Null
 
           $variants = @(
@@ -101,8 +113,9 @@ jobs:
               "-c", "Release",
               "-p:AppVersion=$displayVersion",
               "-p:Version=$displayVersion",
+              "-p:InformationalVersion=$tag",
               "-p:ApplicationDisplayVersion=$displayVersion",
-              "-p:ApplicationVersion=$env:GITHUB_RUN_NUMBER",
+              "-p:ApplicationVersion=$androidVersionCode",
               "-p:AndroidPackageFormat=apk",
               "-p:AndroidKeyStore=true",
               "-p:AndroidSigningKeyStore=$env:ANDROID_KEYSTORE_PATH",
