@@ -132,9 +132,19 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         if (AndroidSystemApi.GetDevicePolicyManager(activity) is not { } policyManager)
             return OperationResult.Failure("На этом устройстве недоступны API политики устройства.");
 
-
         if (!AndroidProvisioningApi.CanStartManagedProfileProvisioning(policyManager))
-            return OperationResult.Failure("Android сообщает, что создание рабочего профиля сейчас недоступно.");
+        {
+            var diagnostics = AndroidWorkProfileDiagnosticsReader.Read(activity);
+            Log.Warn(LogTag, $"Managed profile provisioning blocked. {diagnostics.ToLogString()}.");
+
+            if (diagnostics.ManagedProfileExists)
+                return OperationResult.Failure(
+                    "На устройстве уже есть рабочий профиль, возможно созданный другим приложением." +
+                    "Удалите старый рабочий профиль в настройках Android и повторите создание профиля Agnosia.");
+
+            return OperationResult.Failure(
+                "Android сейчас не разрешает создать рабочий профиль. Проверьте ограничения устройства и повторите попытку.");
+        }
 
         var authKey = AuthenticationUtility.CreateAndStoreKey();
         AuthenticationUtility.Reset();

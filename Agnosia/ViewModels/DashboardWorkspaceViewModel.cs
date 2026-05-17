@@ -1003,6 +1003,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         await RunOperationAsync(
             () => _onboardingService.StartProvisioningAsync(),
             "ProvisioningStarted",
+            true,
             true);
         StartOnboardingMonitorIfNeeded();
     }
@@ -1459,7 +1460,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private async Task RunOperationAsync(
         Func<Task<OperationResult>> operation,
         string successFallback,
-        bool useBusyIndicator)
+        bool useBusyIndicator,
+        bool refreshOnFailure = false)
     {
         if (!TryBeginOperation()) return;
 
@@ -1473,6 +1475,12 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
             if (result.Succeeded)
                 await RefreshDashboardAsync(true);
+            else if (refreshOnFailure)
+            {
+                await RefreshDashboardAsync(true);
+                StatusIsError = true;
+                StatusMessage = string.IsNullOrWhiteSpace(result.Message) ? successFallback : result.Message;
+            }
             else if (IsStaleInstallSourceMessage(result.Message))
                 await RefreshAfterStaleInstallSourceAsync(StatusMessage);
         }
