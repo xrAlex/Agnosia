@@ -18,6 +18,9 @@
     <SolidColorBrush x:Key="AppAccentBrush" Color="#FF253A" />
     <SolidColorBrush x:Key="AppAccentPressedBrush" Color="#C9001D" />
     <SolidColorBrush x:Key="AppAccentMutedBrush" Color="#361821" />
+    <SolidColorBrush x:Key="AppRiskSafeBrush" Color="#38D37A" />
+    <SolidColorBrush x:Key="AppRiskDangerousBrush" Color="#F7C948" />
+    <SolidColorBrush x:Key="AppRiskCriticalBrush" Color="#FF253A" />
     <SolidColorBrush x:Key="AppButtonSecondaryBrush" Color="#1B1F25" />
     <SolidColorBrush x:Key="AppButtonSecondaryHoverBrush" Color="#252B34" />
     <SolidColorBrush x:Key="AppInputBrush" Color="#11141A" />

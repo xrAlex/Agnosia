@@ -35,7 +35,9 @@ internal static class TestSnapshots
         bool isHidden = false,
         bool canLaunch = true,
         bool isInstalled = true,
-        bool interactionAllowed = false)
+        bool interactionAllowed = false,
+        AppPermissionRiskLevel permissionRiskLevel = AppPermissionRiskLevel.Safe,
+        IReadOnlyList<string>? riskyPermissions = null)
     {
         return new AppSnapshot(
             packageName,
@@ -47,7 +49,9 @@ internal static class TestSnapshots
             isHidden,
             canLaunch,
             isInstalled,
-            interactionAllowed);
+            interactionAllowed,
+            PermissionRiskLevel: permissionRiskLevel,
+            RiskyPermissions: riskyPermissions);
     }
 
     public static PermissionSnapshot GrantedPermission(PermissionKind kind)

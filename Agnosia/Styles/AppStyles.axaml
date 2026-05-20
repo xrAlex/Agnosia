@@ -74,6 +74,14 @@
     <Style Selector="TextBlock.app-monogram.dialog">
         <Setter Property="FontSize" Value="22" />
     </Style>
+    <Style Selector="TextBlock.permission-risk-mark">
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{StaticResource AppOnAccentBrush}" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="TextAlignment" Value="Center" />
+    </Style>
     <Style Selector="TextBlock.app-control-title">
         <Setter Property="FontSize" Value="20" />
         <Setter Property="FontWeight" Value="SemiBold" />
@@ -89,6 +97,12 @@
         <Setter Property="FontSize" Value="12" />
         <Setter Property="Foreground" Value="{StaticResource AppTextSecondaryBrush}" />
         <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.app-dialog-permission-risk-list">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{StaticResource AppTextSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="LineHeight" Value="18" />
     </Style>
     <Style Selector="TextBlock.package-name">
         <Setter Property="FontSize" Value="12" />
@@ -265,6 +279,23 @@
     <Style Selector="Border.app-icon-frame.dialog">
         <Setter Property="Width" Value="54" />
         <Setter Property="Height" Value="54" />
+    </Style>
+    <Style Selector="Border.permission-risk-badge">
+        <Setter Property="Width" Value="24" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Background" Value="{StaticResource AppRiskSafeBrush}" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+    </Style>
+    <Style Selector="Border.permission-risk-badge.safe">
+        <Setter Property="Background" Value="{StaticResource AppRiskSafeBrush}" />
+    </Style>
+    <Style Selector="Border.permission-risk-badge.dangerous">
+        <Setter Property="Background" Value="{StaticResource AppRiskDangerousBrush}" />
+    </Style>
+    <Style Selector="Border.permission-risk-badge.critical">
+        <Setter Property="Background" Value="{StaticResource AppRiskCriticalBrush}" />
     </Style>
     <Style Selector="Border.list-card">
         <Setter Property="Margin" Value="0,0,0,10" />

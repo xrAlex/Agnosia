@@ -11,4 +11,6 @@ public sealed record AppSnapshot(
     bool CanLaunch,
     bool IsInstalled,
     bool InteractionAllowed,
-    byte[]? IconPng = null);
+    byte[]? IconPng = null,
+    AppPermissionRiskLevel PermissionRiskLevel = AppPermissionRiskLevel.Safe,
+    IReadOnlyList<string>? RiskyPermissions = null);

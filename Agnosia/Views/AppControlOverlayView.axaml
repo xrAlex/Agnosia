@@ -187,6 +187,16 @@
                                                           Command="{Binding ToggleInteractionAccessCommand}" />
                                         </Grid>
                                     </StackPanel>
+
+                                    <StackPanel Spacing="8"
+                                                IsVisible="{Binding HasRiskyPermissions}">
+                                        <Border Classes="divider" />
+
+                                        <TextBlock Classes="app-dialog-setting-title"
+                                                   Text="Опасные разрешения" />
+                                        <TextBlock Classes="app-dialog-permission-risk-list"
+                                                   Text="{Binding RiskyPermissionsText}" />
+                                    </StackPanel>
                                 </StackPanel>
                             </ScrollViewer>
                         </Border>

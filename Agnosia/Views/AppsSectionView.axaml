@@ -106,8 +106,11 @@
                             Tapped="OnAppCardTapped"
                             Transitions="{x:Null}">
                         <Grid RowDefinitions="Auto,Auto"
-                              RowSpacing="10">
-                            <Grid ColumnDefinitions="Auto,*"
+                              ColumnDefinitions="*,Auto"
+                              RowSpacing="10"
+                              ColumnSpacing="8">
+                            <Grid Grid.Column="0"
+                                  ColumnDefinitions="Auto,*"
                                   ColumnSpacing="10">
                                 <Border Classes="app-icon-frame">
                                     <Grid>
@@ -135,7 +138,18 @@
                                 </StackPanel>
                             </Grid>
 
+                            <Border Grid.Column="1"
+                                    Classes="permission-risk-badge"
+                                    Classes.safe="{Binding IsPermissionRiskSafe}"
+                                    Classes.dangerous="{Binding IsPermissionRiskDangerous}"
+                                    Classes.critical="{Binding IsPermissionRiskCritical}"
+                                    ToolTip.Tip="{Binding PermissionRiskTooltip}">
+                                <TextBlock Classes="permission-risk-mark"
+                                           Text="!" />
+                            </Border>
+
                             <WrapPanel Grid.Row="1"
+                                       Grid.ColumnSpan="2"
                                        Orientation="Horizontal"
                                        IsVisible="{Binding ShowSecondaryRow}">
                                 <Border Classes="tag-chip dense"

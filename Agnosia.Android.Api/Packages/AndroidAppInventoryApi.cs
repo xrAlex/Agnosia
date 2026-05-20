@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Agnosia.Android.Api.Platform;
+using Agnosia.Models;
 using Android.App.Admin;
 using Android.Content;
 using Android.Content.PM;
@@ -118,7 +119,11 @@ public static class AndroidAppInventoryApi
         var isHidden = TryIsApplicationHidden(policyManager, admin, packageName);
         if (!showAll && (isSystem || (!isInstalled && !isHidden))) return null;
 
-        if (!TryGetPackageIdentity(packageManager, packageName, out var identity)) return null;
+        if (!TryGetPackageInventoryDetails(
+                packageManager,
+                packageName,
+                out var identity,
+                out var permissionRisk)) return null;
 
         return new AppServiceModel
         {
@@ -130,6 +135,8 @@ public static class AndroidAppInventoryApi
             IsHidden = isHidden,
             CanLaunch = packageManager.GetLaunchIntentForPackage(packageName) is not null,
             IsInstalled = isInstalled,
+            PermissionRiskLevel = permissionRisk.Level,
+            RiskyPermissions = permissionRisk.RiskyPermissions.ToArray(),
             IconPng = TryGetCachedIcon(context, packageName, identity, out var cachedIcon)
                 ? cachedIcon
                 : AndroidAppIconWarmupQueue.TryLoadCachedOrQueue(context, packageManager, packageName)
@@ -460,6 +467,40 @@ public static class AndroidAppInventoryApi
                                           || AndroidRecoverableException.IsMatch(exception))
         {
             identity = default;
+            return false;
+        }
+    }
+
+    private static bool TryGetPackageInventoryDetails(
+        PackageManager packageManager,
+        string packageName,
+        out PackageIdentity identity,
+        out AppPermissionRiskAnalysis permissionRisk)
+    {
+        try
+        {
+            var packageInfo =
+                TryGetPackageInfo(
+                    packageManager,
+                    packageName,
+                    AndroidSystemApi.GetInstalledApplicationFlags() | PackageInfoFlags.Permissions)
+                ?? packageManager.GetPackageInfo(packageName, PackageInfoFlags.Permissions);
+            if (packageInfo is null)
+            {
+                identity = default;
+                permissionRisk = AppPermissionRiskAnalysis.Safe;
+                return false;
+            }
+
+            identity = new PackageIdentity(packageInfo.LongVersionCode);
+            permissionRisk = AppPermissionRiskCatalog.Analyze(packageInfo.RequestedPermissions);
+            return true;
+        }
+        catch (Exception exception) when (exception is PackageManager.NameNotFoundException
+                                          || AndroidRecoverableException.IsMatch(exception))
+        {
+            identity = default;
+            permissionRisk = AppPermissionRiskAnalysis.Safe;
             return false;
         }
     }

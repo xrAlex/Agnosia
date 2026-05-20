@@ -1,3 +1,5 @@
+using Agnosia.Models;
+
 namespace Agnosia.Android.Api.Platform;
 
 public sealed class AppServiceModel
@@ -19,4 +21,8 @@ public sealed class AppServiceModel
     public bool CanLaunch { get; init; }
 
     public bool IsInstalled { get; init; }
+
+    public AppPermissionRiskLevel PermissionRiskLevel { get; init; } = AppPermissionRiskLevel.Safe;
+
+    public string[] RiskyPermissions { get; init; } = [];
 }

@@ -18,6 +18,8 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         TimeSpan.FromSeconds(20),
         TimeSpan.FromSeconds(30)
     ];
+    private const string AndroidPermissionPrefix = "android.permission.";
+    private static readonly IReadOnlyList<string> EmptyRiskyPermissions = [];
 
     private readonly DashboardWorkspaceViewModel _owner;
     private bool _iconLoadRequested;
@@ -44,6 +46,27 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
     public bool IsHidden => Snapshot.IsHidden;
 
     public bool InteractionAllowed => Snapshot.InteractionAllowed;
+
+    public AppPermissionRiskLevel PermissionRiskLevel => Snapshot.PermissionRiskLevel;
+
+    public IReadOnlyList<string> RiskyPermissions => Snapshot.RiskyPermissions ?? EmptyRiskyPermissions;
+
+    public bool HasRiskyPermissions => RiskyPermissions.Count > 0;
+
+    public string RiskyPermissionsText => string.Join(", ", RiskyPermissions.Select(FormatPermissionName));
+
+    public bool IsPermissionRiskSafe => PermissionRiskLevel == AppPermissionRiskLevel.Safe;
+
+    public bool IsPermissionRiskDangerous => PermissionRiskLevel == AppPermissionRiskLevel.Dangerous;
+
+    public bool IsPermissionRiskCritical => PermissionRiskLevel == AppPermissionRiskLevel.Critical;
+
+    public string PermissionRiskTooltip => PermissionRiskLevel switch
+    {
+        AppPermissionRiskLevel.Critical => "Есть критические разрешения",
+        AppPermissionRiskLevel.Dangerous => "Есть опасные разрешения",
+        _ => "Разрешения: OK"
+    };
 
     public string Monogram => string.IsNullOrWhiteSpace(Snapshot.Label)
         ? "?"
@@ -228,6 +251,22 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(InteractionLabel));
         }
 
+        if (previous.PermissionRiskLevel != snapshot.PermissionRiskLevel)
+        {
+            OnPropertyChanged(nameof(PermissionRiskLevel));
+            OnPropertyChanged(nameof(IsPermissionRiskSafe));
+            OnPropertyChanged(nameof(IsPermissionRiskDangerous));
+            OnPropertyChanged(nameof(IsPermissionRiskCritical));
+            OnPropertyChanged(nameof(PermissionRiskTooltip));
+        }
+
+        if (!StringListsEqual(previous.RiskyPermissions, snapshot.RiskyPermissions))
+        {
+            OnPropertyChanged(nameof(RiskyPermissions));
+            OnPropertyChanged(nameof(HasRiskyPermissions));
+            OnPropertyChanged(nameof(RiskyPermissionsText));
+        }
+
         if (previous.IsSystem != snapshot.IsSystem)
         {
             OnPropertyChanged(nameof(CanClone));
@@ -406,6 +445,29 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         if (left is null || right is null || left.Length != right.Length) return false;
 
         return left.AsSpan().SequenceEqual(right);
+    }
+
+    private static bool StringListsEqual(IReadOnlyList<string>? left, IReadOnlyList<string>? right)
+    {
+        if (ReferenceEquals(left, right)) return true;
+
+        var leftCount = left?.Count ?? 0;
+        if (leftCount != (right?.Count ?? 0)) return false;
+
+        for (var index = 0; index < leftCount; index++)
+        {
+            if (!string.Equals(left![index], right![index], StringComparison.Ordinal)) return false;
+        }
+
+        return true;
+    }
+
+    private static string FormatPermissionName(string permission)
+    {
+        var trimmed = permission.Trim();
+        return trimmed.StartsWith(AndroidPermissionPrefix, StringComparison.Ordinal)
+            ? trimmed[AndroidPermissionPrefix.Length..]
+            : trimmed;
     }
 
     private static string ResolveStatusTagLabel(AppSnapshot snapshot)

@@ -20,6 +20,12 @@ public sealed class AppItemViewModelTests
         Assert.True(app.CanUninstall);
         Assert.False(app.ShowWorkControls);
         Assert.False(app.HasStatusTag);
+        Assert.True(app.IsPermissionRiskSafe);
+        Assert.False(app.IsPermissionRiskDangerous);
+        Assert.False(app.IsPermissionRiskCritical);
+        Assert.False(app.HasRiskyPermissions);
+        Assert.Empty(app.RiskyPermissionsText);
+        Assert.Equal("Разрешения: OK", app.PermissionRiskTooltip);
         Assert.Equal("Open", app.LaunchLabel);
         Assert.Equal("CopyToWork", app.CloneLabel);
         Assert.Equal("AllowInteraction", app.InteractionLabel);
@@ -60,6 +66,28 @@ public sealed class AppItemViewModelTests
         Assert.Equal("CopyToPersonal", app.CloneLabel);
     }
 
+    // Проверяет отображаемое состояние рейтинга разрешений.
+    [Fact]
+    public void Permission_risk_properties_reflect_snapshot_rating()
+    {
+        var app = CreateApp(TestSnapshots.App(
+            ProfileKind.Personal,
+            permissionRiskLevel: AppPermissionRiskLevel.Critical,
+            riskyPermissions:
+            [
+                "android.permission.CAMERA",
+                "android.permission.RECORD_AUDIO"
+            ]));
+
+        Assert.Equal(AppPermissionRiskLevel.Critical, app.PermissionRiskLevel);
+        Assert.False(app.IsPermissionRiskSafe);
+        Assert.False(app.IsPermissionRiskDangerous);
+        Assert.True(app.IsPermissionRiskCritical);
+        Assert.True(app.HasRiskyPermissions);
+        Assert.Equal("CAMERA, RECORD_AUDIO", app.RiskyPermissionsText);
+        Assert.Equal("Есть критические разрешения", app.PermissionRiskTooltip);
+    }
+
     // Проверяет обновление вычисляемых свойств и PropertyChanged при новом snapshot.
     [Fact]
     public void ApplySnapshot_updates_derived_properties_and_raises_change_notifications()
@@ -74,7 +102,9 @@ public sealed class AppItemViewModelTests
             isSystem: true,
             canLaunch: false,
             isInstalled: false,
-            interactionAllowed: false));
+            interactionAllowed: false,
+            permissionRiskLevel: AppPermissionRiskLevel.Dangerous,
+            riskyPermissions: ["android.permission.INTERNET"]));
 
         Assert.Equal("Beta", app.Label);
         Assert.Equal("B", app.Monogram);
@@ -84,6 +114,10 @@ public sealed class AppItemViewModelTests
         Assert.False(app.ShowLaunch);
         Assert.Equal("NotInstalled", app.StatusTagLabel);
         Assert.Equal("AllowInteraction", app.InteractionLabel);
+        Assert.Equal(AppPermissionRiskLevel.Dangerous, app.PermissionRiskLevel);
+        Assert.True(app.IsPermissionRiskDangerous);
+        Assert.True(app.HasRiskyPermissions);
+        Assert.Equal("INTERNET", app.RiskyPermissionsText);
         Assert.Contains(nameof(AppItemViewModel.Label), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.Monogram), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.CanMoveToWork), changedProperties);
@@ -91,6 +125,11 @@ public sealed class AppItemViewModelTests
         Assert.Contains(nameof(AppItemViewModel.ShowLaunch), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.StatusTagLabel), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.InteractionLabel), changedProperties);
+        Assert.Contains(nameof(AppItemViewModel.PermissionRiskLevel), changedProperties);
+        Assert.Contains(nameof(AppItemViewModel.IsPermissionRiskDangerous), changedProperties);
+        Assert.Contains(nameof(AppItemViewModel.PermissionRiskTooltip), changedProperties);
+        Assert.Contains(nameof(AppItemViewModel.HasRiskyPermissions), changedProperties);
+        Assert.Contains(nameof(AppItemViewModel.RiskyPermissionsText), changedProperties);
     }
 
     // Проверяет запрет смены идентичности app item через ApplySnapshot.

@@ -289,7 +289,9 @@ internal static class TestWorkspaceFactory
         bool isHidden = false,
         bool canLaunch = true,
         bool isInstalled = true,
-        bool interactionAllowed = false)
+        bool interactionAllowed = false,
+        AppPermissionRiskLevel permissionRiskLevel = AppPermissionRiskLevel.Safe,
+        IReadOnlyList<string>? riskyPermissions = null)
     {
         return CreateApp(
             owner,
@@ -301,7 +303,9 @@ internal static class TestWorkspaceFactory
                 isHidden,
                 canLaunch,
                 isInstalled,
-                interactionAllowed));
+                interactionAllowed,
+                permissionRiskLevel,
+                riskyPermissions));
     }
 
     public static AppItemViewModel CreateApp(DashboardWorkspaceViewModel owner, AppSnapshot snapshot)

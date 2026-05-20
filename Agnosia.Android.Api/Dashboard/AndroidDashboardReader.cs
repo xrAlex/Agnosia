@@ -404,7 +404,9 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
                 app.CanLaunch,
                 app.IsInstalled,
                 profile == ProfileKind.Work && interactionPackages.Contains(app.PackageName),
-                app.IconPng);
+                app.IconPng,
+                app.PermissionRiskLevel,
+                app.RiskyPermissions);
         }
 
         return mappedApps;
