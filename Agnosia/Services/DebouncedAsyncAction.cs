@@ -4,15 +4,25 @@ public sealed class DebouncedAsyncAction
 {
     private readonly TimeSpan _delay;
     private readonly Func<Exception, Task>? _onError;
+    private readonly Func<TimeSpan, CancellationToken, Task> _delayAsync;
     private CancellationTokenSource? _pendingCancellation;
 
     public DebouncedAsyncAction(TimeSpan delay, Func<Exception, Task>? onError = null)
+        : this(delay, onError, Task.Delay)
+    {
+    }
+
+    internal DebouncedAsyncAction(
+        TimeSpan delay,
+        Func<Exception, Task>? onError,
+        Func<TimeSpan, CancellationToken, Task> delayAsync)
     {
         if (delay < TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(delay), delay, "Debounce delay cannot be negative.");
 
         _delay = delay;
         _onError = onError;
+        _delayAsync = delayAsync ?? throw new ArgumentNullException(nameof(delayAsync));
     }
 
     public void Schedule(Func<CancellationToken, Task> action)
@@ -36,7 +46,7 @@ public sealed class DebouncedAsyncAction
     {
         try
         {
-            await Task.Delay(_delay, cancellation.Token);
+            await _delayAsync(_delay, cancellation.Token);
             await action(cancellation.Token);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)

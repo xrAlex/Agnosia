@@ -10,6 +10,7 @@ using Agnosia.Android.Api.Permissions;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Api.Storage;
 using Agnosia.Android.Receivers;
+using Agnosia.Services;
 using Android.App.Usage;
 using Android.Content;
 using Android.Content.PM;
@@ -43,7 +44,8 @@ public sealed class HiddenAppSessionMonitorService : Service
     private const string ExtraTaskId = "taskId";
     private const string ExtraStartedAtUnixTimeMilliseconds = "startedAtUnixTimeMilliseconds";
     private const string ScreenLockPersistedReason = "screen_lock_persisted_session";
-    internal const string ScreenNonInteractiveReason = "screen_non_interactive";
+    internal const string ScreenNonInteractiveReason =
+        HiddenAppSessionMonitorStateMachine.ScreenNonInteractiveReason;
     private const string SessionReplacedReason = "session_replaced";
     private const int NotificationId = 0x57C31;
     private const string NotificationChannelId = "agnosia.hidden-app-session";

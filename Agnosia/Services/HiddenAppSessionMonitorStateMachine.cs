@@ -1,7 +1,9 @@
-namespace Agnosia.Android.Services;
+namespace Agnosia.Services;
 
 internal sealed class HiddenAppSessionMonitorStateMachine
 {
+    internal const string ScreenNonInteractiveReason = "screen_non_interactive";
+
     private readonly DateTimeOffset _startedAt;
     private readonly TimeSpan _initialLaunchGracePeriod;
     private readonly TimeSpan _postLaunchTransientUiGracePeriod;
@@ -48,7 +50,7 @@ internal sealed class HiddenAppSessionMonitorStateMachine
             _phase = HiddenAppSessionMonitorPhase.Completed;
             return Complete(
                 HiddenAppSessionCompletionKind.Immediate,
-                HiddenAppSessionMonitorService.ScreenNonInteractiveReason,
+                ScreenNonInteractiveReason,
                 "device_non_interactive",
                 observation,
                 now);

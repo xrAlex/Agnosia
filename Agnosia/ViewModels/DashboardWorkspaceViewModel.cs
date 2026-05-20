@@ -35,6 +35,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private readonly IOnboardingPlatformService _onboardingService;
     private readonly IAppCommandService _appCommandService;
     private readonly IAppEventLogService _eventLogService;
+    private readonly Func<Action, DispatcherPriority, ValueTask> _invokeOnUiThreadAsync;
+    private readonly Func<TimeSpan, CancellationToken, Task> _delayAsync;
     private readonly DebouncedAsyncAction _searchRefreshDebouncer;
     private readonly DashboardSettingsSaveCoordinator _settingsSaveCoordinator;
     private readonly SemaphoreSlim _iconLoadGate = new(1, 1);
@@ -591,7 +593,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         IOnboardingPlatformService onboardingService,
         IAppCommandService appCommandService,
         ISettingsPlatformService settingsService,
-        IAppEventLogService eventLogService)
+        IAppEventLogService eventLogService,
+        Func<Action, DispatcherPriority, ValueTask>? invokeOnUiThreadAsync = null,
+        Func<TimeSpan, CancellationToken, Task>? delayAsync = null)
     {
         _dashboardService = dashboardService ?? throw new ArgumentNullException(nameof(dashboardService));
         _platformEventLogReader =
@@ -600,9 +604,12 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         _onboardingService = onboardingService ?? throw new ArgumentNullException(nameof(onboardingService));
         _appCommandService = appCommandService ?? throw new ArgumentNullException(nameof(appCommandService));
         _eventLogService = eventLogService ?? throw new ArgumentNullException(nameof(eventLogService));
+        _invokeOnUiThreadAsync = invokeOnUiThreadAsync ?? InvokeOnAvaloniaUiThreadAsync;
+        _delayAsync = delayAsync ?? Task.Delay;
         _searchRefreshDebouncer = new DebouncedAsyncAction(
             TimeSpan.FromMilliseconds(SearchRefreshDelayMs),
-            exception => ReportErrorOnUiThreadAsync(exception, "FilterUpdate"));
+            exception => ReportErrorOnUiThreadAsync(exception, "FilterUpdate"),
+            _delayAsync);
         _settingsSaveCoordinator = new DashboardSettingsSaveCoordinator(
             settingsService ?? throw new ArgumentNullException(nameof(settingsService)),
             TimeSpan.FromMilliseconds(SettingsSaveDelayMs),
@@ -613,7 +620,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             RefreshAsync,
             SetSettingsSaveStatus,
             ResolveExceptionMessage,
-            ReportErrorOnUiThreadAsync);
+            ReportErrorOnUiThreadAsync,
+            _delayAsync);
         PermissionItems = new ReadOnlyObservableCollection<PermissionItemViewModel>(_permissionItems);
         SelectedProfile = ProfileKind.Personal;
     }
@@ -777,7 +785,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
                 loadStartedAt,
                 $"personal={inventory.PersonalApps.Count}; work={inventory.WorkApps.Count}");
 
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            await InvokeOnUiThreadActionAsync(() =>
             {
                 if (!IsCurrentInventoryLoad(generation, inventoryCancellation)) return;
 
@@ -793,7 +801,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            await InvokeOnUiThreadActionAsync(() =>
             {
                 if (!IsCurrentInventoryLoad(generation, inventoryCancellation)) return;
 
@@ -805,7 +813,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }
         finally
         {
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            await InvokeOnUiThreadActionAsync(() =>
             {
                 if (ReferenceEquals(_inventoryLoadCancellation, inventoryCancellation))
                 {
@@ -1108,7 +1116,11 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             if (shouldRefresh)
                 try
                 {
+                    var operationStatusIsError = StatusIsError;
+                    var operationStatusMessage = StatusMessage;
                     await RefreshDashboardAsync(true);
+                    StatusIsError = operationStatusIsError;
+                    StatusMessage = operationStatusMessage;
                 }
                 catch (Exception ex) when (!StatusIsError)
                 {
@@ -1194,7 +1206,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     {
         while (true)
         {
-            await Task.Delay(IconBatchDelayMs).ConfigureAwait(false);
+            await _delayAsync(TimeSpan.FromMilliseconds(IconBatchDelayMs), CancellationToken.None)
+                .ConfigureAwait(false);
             PendingIconLoad[] batch;
             lock (_iconBatchSync)
             {
@@ -1442,7 +1455,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             () => AppCatalogFilter.FilterVisibleApps(personalApps, workApps, selectedProfile, searchText),
             cancellationToken);
 
-        await Dispatcher.UIThread.InvokeAsync(() =>
+        await InvokeOnUiThreadActionAsync(() =>
         {
             if (!cancellationToken.IsCancellationRequested
                 && ReferenceEquals(personalApps, _personalApps)
@@ -1553,6 +1566,22 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             or PermissionKind.Overlay;
     }
 
+    private ValueTask InvokeOnUiThreadActionAsync(
+        Action action,
+        DispatcherPriority priority = default)
+    {
+        return _invokeOnUiThreadAsync(
+            action,
+            priority == default ? DispatcherPriority.Background : priority);
+    }
+
+    private static async ValueTask InvokeOnAvaloniaUiThreadAsync(
+        Action action,
+        DispatcherPriority priority)
+    {
+        await Dispatcher.UIThread.InvokeAsync(action, priority);
+    }
+
     private void StartOnboardingMonitorIfNeeded()
     {
         if (OnboardingCompleted
@@ -1582,7 +1611,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             {
                 if (_isOperationInProgress)
                 {
-                    await Task.Delay(OnboardingMonitorDelayMs, cancellationToken);
+                    await _delayAsync(TimeSpan.FromMilliseconds(OnboardingMonitorDelayMs), cancellationToken);
                     continue;
                 }
 
@@ -1594,7 +1623,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
                     || OnboardingStep == OnboardingStep.Final)
                     return;
 
-                await Task.Delay(OnboardingMonitorDelayMs, cancellationToken);
+                await _delayAsync(TimeSpan.FromMilliseconds(OnboardingMonitorDelayMs), cancellationToken);
             }
         }
         catch (OperationCanceledException)
@@ -1765,7 +1794,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     {
         var snapshots = await _permissionService.LoadPermissionsAsync();
 
-        await Dispatcher.UIThread.InvokeAsync(() =>
+        await InvokeOnUiThreadActionAsync(() =>
         {
             _permissionItems.Clear();
             foreach (var snapshot in snapshots) _permissionItems.Add(new PermissionItemViewModel(this, snapshot));
@@ -1801,7 +1830,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private async Task ReportErrorOnUiThreadAsync(Exception exception, string fallbackMessage)
     {
-        await Dispatcher.UIThread.InvokeAsync(() =>
+        await InvokeOnUiThreadActionAsync(() =>
         {
             StatusIsError = true;
             StatusMessage = ResolveExceptionMessage(exception, fallbackMessage);

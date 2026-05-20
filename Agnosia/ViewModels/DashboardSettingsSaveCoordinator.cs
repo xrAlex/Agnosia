@@ -32,7 +32,8 @@ internal sealed class DashboardSettingsSaveCoordinator
         Func<Task> refreshAsync,
         Action<bool, string?> setStatus,
         Func<Exception, string, string> resolveExceptionMessage,
-        Func<Exception, string, Task> reportErrorOnUiThreadAsync)
+        Func<Exception, string, Task> reportErrorOnUiThreadAsync,
+        Func<TimeSpan, CancellationToken, Task>? delayAsync = null)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _canQueue = canQueue ?? throw new ArgumentNullException(nameof(canQueue));
@@ -46,7 +47,8 @@ internal sealed class DashboardSettingsSaveCoordinator
             resolveExceptionMessage ?? throw new ArgumentNullException(nameof(resolveExceptionMessage));
         _saveDebouncer = new DebouncedAsyncAction(
             saveDelay,
-            exception => reportErrorOnUiThreadAsync(exception, "SettingsScheduleFailed"));
+            exception => reportErrorOnUiThreadAsync(exception, "SettingsScheduleFailed"),
+            delayAsync ?? Task.Delay);
     }
 
     public void SetLoadedShowAllApps(bool showAllApps)

@@ -38,6 +38,9 @@ jobs:
       - name: Restore
         run: dotnet restore Agnosia.sln
 
+      - name: Run unit tests
+        run: dotnet test Agnosia.Unit/Agnosia.Unit.csproj --no-restore --configuration Release --verbosity minimal
+
       - name: Validate signing secrets
         shell: pwsh
         run: |

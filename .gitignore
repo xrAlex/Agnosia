@@ -16,3 +16,4 @@ _scratch/
 **/bin-scratch/
 Agnosia.UiDebug/
 .lscache
+*.lscache
