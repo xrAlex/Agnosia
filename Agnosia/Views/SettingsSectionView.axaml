@@ -133,28 +133,6 @@
                                           IsChecked="{Binding ShowAllApps}" />
                         </Grid>
 
-                        <Border Classes="divider" />
-
-                        <Grid ColumnDefinitions="Auto,*,Auto"
-                              ColumnSpacing="14">
-                            <Border Classes="icon-tile">
-                                <PathIcon Classes="section-icon centered"
-                                          Data="{StaticResource IconInteractionGeometry}" />
-                            </Border>
-                            <StackPanel Grid.Column="1"
-                                        MinWidth="0"
-                                        Spacing="4">
-                                <TextBlock Classes="section-title compact"
-                                           Text="Контроль доступа" />
-                                <TextBlock Classes="page-caption"
-                                           Text="Блокировать поиск контактов и доступ к данным между личным и рабочим пространством" />
-                            </StackPanel>
-                            <ToggleSwitch Grid.Column="2"
-                                          VerticalAlignment="Center"
-                                          IsChecked="{Binding BlockContactsSearching}" />
-                        </Grid>
-                        <Border Classes="divider" />
-
                         <Grid ColumnDefinitions="Auto,*,Auto"
                               ColumnSpacing="14">
                             <Border Classes="icon-tile">
@@ -172,28 +150,6 @@
                             <ToggleSwitch Grid.Column="2"
                                           VerticalAlignment="Center"
                                           IsChecked="{Binding LoggingEnabled}" />
-                        </Grid>
-
-                        <Border Classes="divider" />
-
-                        <Grid ColumnDefinitions="Auto,*,Auto"
-                              ColumnSpacing="14">
-                            <Border Classes="icon-tile">
-                                <PathIcon Classes="section-icon centered"
-                                          Data="{StaticResource IconFreezeGeometry}" />
-                            </Border>
-                            <StackPanel Grid.Column="1"
-                                        MinWidth="0"
-                                        Spacing="4">
-                                <TextBlock Classes="section-title compact"
-                                           Text="Изоляция приложений" />
-                                <TextBlock Classes="page-caption"
-                                           Text="Приложения в рабочем профиле изолированы и не работают в фоне, активация приложения выполняется через ярлык" />
-                            </StackPanel>
-                            <ToggleSwitch Grid.Column="2"
-                                          IsEnabled="False"
-                                          VerticalAlignment="Center"
-                                          IsChecked="True" />
                         </Grid>
 
                         <Border Classes="divider" />

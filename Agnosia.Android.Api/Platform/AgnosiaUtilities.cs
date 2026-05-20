@@ -159,8 +159,7 @@ public static class AgnosiaUtilities
 
         foreach (var action in ManagedToParentActions) AddManagedToParentCrossProfileIntent(manager, admin, action);
 
-        AndroidPolicyApi.ApplyCrossProfileContactsPolicy(manager, admin,
-            SettingsManager.Instance.GetBlockContactsSearchingEnabled());
+        AndroidPolicyApi.ApplyCrossProfileContactsPolicy(manager, admin, true);
         AndroidPolicyApi.TryEnsureRequiredCrossProfilePackages(manager, admin, nameof(AgnosiaUtilities));
     }
 
@@ -172,7 +171,7 @@ public static class AgnosiaUtilities
         manager.ClearUserRestriction(admin, UserManager.DisallowInstallApps);
         manager.ClearUserRestriction(admin, UserManager.DisallowInstallUnknownSources);
         manager.ClearUserRestriction(admin, UserManager.DisallowUninstallApps);
-        AndroidPolicyApi.AddParentProfileAppLinking(manager, admin);
+        AndroidPolicyApi.DisableParentProfileAppLinking(manager, admin);
     }
 
     private static void AddCrossProfileIntent(DevicePolicyManager manager, ComponentName admin, string action,

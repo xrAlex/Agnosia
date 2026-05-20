@@ -13,7 +13,6 @@ public static class AndroidSettingsStore
     {
         return new AppSettingsSnapshot(
             storage.GetBoolean(StorageKeys.ShowAllApps),
-            SettingsManager.Instance.GetBlockContactsSearchingEnabled(),
             storage.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch),
             storage.GetBoolean(StorageKeys.LoggingEnabled, true),
             LoadAppTheme(storage),
@@ -31,8 +30,6 @@ public static class AndroidSettingsStore
 
         var storage = LocalStorageManager.Instance;
         var loggingChanged = storage.GetBoolean(StorageKeys.LoggingEnabled, true) != settings.LoggingEnabled;
-        var blockContactsChanged = SettingsManager.Instance.GetBlockContactsSearchingEnabled() !=
-                                   settings.BlockContactsSearching;
         var disableVpnBeforeLaunchChanged = storage.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch) !=
                                             settings.DisableVpnBeforeWorkLaunch;
         var vpnAfterFreezeClientChanged = LoadVpnAfterWorkFreezeClient(storage) != settings.VpnAfterWorkFreezeClient;
@@ -45,17 +42,12 @@ public static class AndroidSettingsStore
         storage.SetString(StorageKeys.TunguskaAutomationToken, tunguskaToken);
         storage.SetBoolean(StorageKeys.LoggingEnabled, settings.LoggingEnabled);
         storage.SetString(StorageKeys.AppTheme, settings.Theme.ToString());
-        SettingsManager.Instance.SetBlockContactsSearchingEnabled(settings.BlockContactsSearching, false);
 
         if (loggingChanged && !settings.LoggingEnabled) AndroidAppLogArchive.Clear(activity);
 
         if (loggingChanged)
             await TrySyncBooleanSettingToWorkProfileAsync(activity, StorageKeys.LoggingEnabled, settings.LoggingEnabled,
                 cancellationToken);
-
-        if (blockContactsChanged)
-            await TrySyncBooleanSettingToWorkProfileAsync(activity, StorageKeys.BlockContactsSearching,
-                settings.BlockContactsSearching, cancellationToken);
 
         if (disableVpnBeforeLaunchChanged || settings.DisableVpnBeforeWorkLaunch)
             await TrySyncBooleanSettingToWorkProfileAsync(activity, StorageKeys.DisableVpnBeforeWorkLaunch,

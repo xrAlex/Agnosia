@@ -22,7 +22,18 @@ public sealed class AppItemViewModelTests
         Assert.False(app.HasStatusTag);
         Assert.Equal("Open", app.LaunchLabel);
         Assert.Equal("CopyToWork", app.CloneLabel);
-        Assert.Equal("DisallowInteraction", app.InteractionLabel);
+        Assert.Equal("AllowInteraction", app.InteractionLabel);
+    }
+
+    // Проверяет, что приложение рабочего профиля не получает межпрофильный обмен по умолчанию.
+    [Fact]
+    public void Work_app_defaults_interaction_access_to_disabled()
+    {
+        var app = CreateApp(TestSnapshots.App(ProfileKind.Work));
+
+        Assert.True(app.ShowWorkControls);
+        Assert.False(app.InteractionAllowed);
+        Assert.Equal("AllowInteraction", app.InteractionLabel);
     }
 
     // Проверяет состояние скрытого системного приложения в рабочем профиле.
@@ -53,7 +64,7 @@ public sealed class AppItemViewModelTests
     [Fact]
     public void ApplySnapshot_updates_derived_properties_and_raises_change_notifications()
     {
-        var app = CreateApp(TestSnapshots.App(ProfileKind.Personal, label: "Alpha"));
+        var app = CreateApp(TestSnapshots.App(ProfileKind.Personal, label: "Alpha", interactionAllowed: true));
         var changedProperties = new List<string?>();
         app.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
 

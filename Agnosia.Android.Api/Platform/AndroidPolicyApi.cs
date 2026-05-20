@@ -20,9 +20,9 @@ public static class AndroidPolicyApi
         SetCrossProfileContactsSearchDisabled(manager, admin, disabled);
     }
 
-    public static void AddParentProfileAppLinking(DevicePolicyManager manager, ComponentName admin)
+    public static void DisableParentProfileAppLinking(DevicePolicyManager manager, ComponentName admin)
     {
-        manager.AddUserRestriction(admin, UserManager.AllowParentProfileAppLinking);
+        manager.ClearUserRestriction(admin, UserManager.AllowParentProfileAppLinking);
     }
 
     public static string[] GetCrossProfilePackages(DevicePolicyManager manager, ComponentName admin)
@@ -133,7 +133,8 @@ public static class AndroidPolicyApi
     {
         try
         {
-            manager.SetCrossProfilePackages(admin,
+            manager.SetCrossProfilePackages(
+                admin,
                 AndroidPackageAccessPolicy.ApplyRequiredCrossProfilePackages(packages));
             return true;
         }

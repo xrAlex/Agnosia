@@ -29,7 +29,7 @@ public sealed class DashboardSettingsSaveCoordinatorTests
     {
         var services = new TestPlatformServices();
         var statuses = new List<(bool IsError, string? Message)>();
-        var settings = AppSettingsSnapshot.Default with { BlockContactsSearching = false };
+        var settings = AppSettingsSnapshot.Default with { LoggingEnabled = false };
         var coordinator = CreateCoordinator(
             services,
             captureSettings: () => settings,
@@ -167,7 +167,7 @@ public sealed class DashboardSettingsSaveCoordinatorTests
             services,
             captureSettings: () => settings);
 
-        settings = AppSettingsSnapshot.Default with { BlockContactsSearching = false };
+        settings = AppSettingsSnapshot.Default with { LoggingEnabled = false };
         coordinator.Queue();
         settings = AppSettingsSnapshot.Default with { DisableVpnBeforeWorkLaunch = true };
         coordinator.Queue();
@@ -195,7 +195,7 @@ public sealed class DashboardSettingsSaveCoordinatorTests
             await releaseSave.Task.WaitAsync(cancellationToken);
             return OperationResult.Success("Ok");
         };
-        var settings = AppSettingsSnapshot.Default with { BlockContactsSearching = false };
+        var settings = AppSettingsSnapshot.Default with { LoggingEnabled = false };
         var coordinator = CreateCoordinator(
             services,
             captureSettings: () => settings);
@@ -213,7 +213,7 @@ public sealed class DashboardSettingsSaveCoordinatorTests
             "Queueing during processing should produce a second save pass.");
 
         Assert.Equal(
-            AppSettingsSnapshot.Default with { BlockContactsSearching = false },
+            AppSettingsSnapshot.Default with { LoggingEnabled = false },
             services.SavedSettings[0]);
         Assert.Equal(settings, services.SavedSettings[1]);
     }

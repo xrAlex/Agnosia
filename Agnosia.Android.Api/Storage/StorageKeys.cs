@@ -9,7 +9,6 @@ public static class StorageKeys
     public const string ManagedProfileUserHandle = "managed_profile_user_handle";
     public const string ManagedProfileUserSerial = "managed_profile_user_serial";
     public const string AuthKey = "auth_key";
-    public const string BlockContactsSearching = "block_contacts_searching";
     public const string ShowAllApps = "show_all_apps";
     public const string DisableVpnBeforeWorkLaunch = "disable_vpn_before_work_launch";
     public const string EnableVpnAfterWorkFreeze = "enable_vpn_after_work_freeze";

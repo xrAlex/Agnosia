@@ -289,7 +289,7 @@ internal static class TestWorkspaceFactory
         bool isHidden = false,
         bool canLaunch = true,
         bool isInstalled = true,
-        bool interactionAllowed = true)
+        bool interactionAllowed = false)
     {
         return CreateApp(
             owner,

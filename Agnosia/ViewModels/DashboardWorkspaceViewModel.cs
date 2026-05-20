@@ -176,9 +176,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     public partial bool ShowAllApps { get; set; }
 
     [ObservableProperty]
-    public partial bool BlockContactsSearching { get; set; }
-
-    [ObservableProperty]
     public partial bool DisableVpnBeforeWorkLaunch { get; set; }
 
     [ObservableProperty]
@@ -527,11 +524,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     }
 
     partial void OnShowAllAppsChanged(bool value)
-    {
-        QueueSettingsSave();
-    }
-
-    partial void OnBlockContactsSearchingChanged(bool value)
     {
         QueueSettingsSave();
     }
@@ -1377,7 +1369,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             OnPropertyChanged(nameof(CanContinueOnboardingFromWorkProfile));
 
             ShowAllApps = snapshot.Settings.ShowAllApps;
-            BlockContactsSearching = snapshot.Settings.BlockContactsSearching;
             DisableVpnBeforeWorkLaunch = snapshot.Settings.DisableVpnBeforeWorkLaunch;
             EnableVpnAfterWorkFreeze = snapshot.Settings.EnableVpnAfterWorkFreeze;
             VpnAfterWorkFreezeClient = snapshot.Settings.VpnAfterWorkFreezeClient;
@@ -1742,7 +1733,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     {
         return new AppSettingsSnapshot(
             ShowAllApps,
-            BlockContactsSearching,
             DisableVpnBeforeWorkLaunch,
             LoggingEnabled,
             SelectedTheme,

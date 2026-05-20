@@ -35,7 +35,7 @@ internal static class TestSnapshots
         bool isHidden = false,
         bool canLaunch = true,
         bool isInstalled = true,
-        bool interactionAllowed = true)
+        bool interactionAllowed = false)
     {
         return new AppSnapshot(
             packageName,
