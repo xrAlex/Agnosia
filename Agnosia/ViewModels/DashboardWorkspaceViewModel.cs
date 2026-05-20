@@ -209,6 +209,12 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     public partial bool IsPermissionsWindowOpen { get; set; }
 
     [ObservableProperty]
+    public partial bool IsAppControlWindowOpen { get; set; }
+
+    [ObservableProperty]
+    public partial AppItemViewModel? SelectedApp { get; set; }
+
+    [ObservableProperty]
     public partial bool LoggingEnabled { get; set; } = true;
 
     [ObservableProperty]
@@ -887,6 +893,24 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private void ClosePermissions()
     {
         IsPermissionsWindowOpen = false;
+    }
+
+    [RelayCommand]
+    private void CloseAppControlWindow()
+    {
+        CloseAppControl();
+    }
+
+    internal void OpenAppControl(AppItemViewModel app)
+    {
+        SelectedApp = app;
+        IsAppControlWindowOpen = true;
+    }
+
+    internal void CloseAppControl()
+    {
+        IsAppControlWindowOpen = false;
+        SelectedApp = null;
     }
 
     [RelayCommand]
@@ -1840,7 +1864,10 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     {
         foreach (var staleKey in _appItemCache.Keys.Where(key => !retainedKeys.Contains(key)).ToArray())
         {
-            _appItemCache[staleKey].Dispose();
+            var staleApp = _appItemCache[staleKey];
+            if (ReferenceEquals(SelectedApp, staleApp)) CloseAppControl();
+
+            staleApp.Dispose();
             _appItemCache.Remove(staleKey);
         }
     }

@@ -43,6 +43,8 @@
 
         <views:PermissionsOverlayView Grid.Row="0" Grid.RowSpan="3" />
 
+        <views:AppControlOverlayView Grid.Row="0" Grid.RowSpan="3" />
+
         <views:OnboardingOverlayView Grid.Row="0" Grid.RowSpan="3" />
 
         <Grid Grid.Row="0"

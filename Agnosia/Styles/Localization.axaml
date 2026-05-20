@@ -91,6 +91,7 @@
     <system:String x:Key="String.App.Action.MoveToWork">Переместить в рабочий</system:String>
     <system:String x:Key="String.App.Action.Freeze">Заморозить</system:String>
     <system:String x:Key="String.App.Action.Unfreeze">Разморозить</system:String>
+    <system:String x:Key="String.App.Action.AgnosiaIsolation">Изоляция Agnosia</system:String>
     <system:String x:Key="String.App.Action.ForceFreeze">Заморозить принудительно</system:String>
     <system:String x:Key="String.App.Action.CreateShortcut">Создать ярлык</system:String>
     <system:String x:Key="String.App.Action.Uninstall">Удалить</system:String>

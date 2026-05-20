@@ -1,0 +1,198 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Agnosia.ViewModels"
+             mc:Ignorable="d"
+             x:Class="Agnosia.Views.AppControlOverlayView"
+             x:DataType="vm:DashboardWorkspaceViewModel"
+             Classes="overlay-view"
+             IsVisible="{Binding IsAppControlWindowOpen}">
+    <Design.DataContext>
+        <vm:DashboardWorkspaceViewModel />
+    </Design.DataContext>
+
+    <Border Background="{StaticResource AppOverlayScrimBrush}">
+        <Grid Margin="12">
+            <ContentControl Content="{Binding SelectedApp}"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                <ContentControl.DataTemplates>
+                    <DataTemplate x:DataType="vm:AppItemViewModel">
+                        <Border Classes="surface-card app-control-dialog">
+                            <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Auto">
+                                <StackPanel Spacing="12">
+                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto"
+                                          ColumnSpacing="12">
+                                        <Border Classes="app-icon-frame dialog">
+                                            <Grid>
+                                                <Image Classes="app-icon dialog"
+                                                       Source="{Binding Icon}"
+                                                       IsVisible="{Binding HasIcon}" />
+                                                <Border Background="{StaticResource AppAccentBrush}"
+                                                        IsVisible="{Binding ShowMonogram}">
+                                                    <TextBlock HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center"
+                                                               Classes="app-monogram dialog"
+                                                               Text="{Binding Monogram}" />
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+
+                                        <StackPanel Grid.Column="1"
+                                                    MinWidth="0"
+                                                    Spacing="3"
+                                                    VerticalAlignment="Center">
+                                            <TextBlock Classes="app-control-title"
+                                                       Text="{Binding Label}" />
+                                            <TextBlock Classes="package-name"
+                                                       Text="{Binding PackageName}" />
+                                            <WrapPanel>
+                                                <Border Classes="tag-chip dense">
+                                                    <TextBlock Classes="tag-label"
+                                                               Text="{Binding ProfileLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Profile.'}" />
+                                                </Border>
+                                                <Border Classes="tag-chip dense"
+                                                        Margin="8,0,0,0"
+                                                        IsVisible="{Binding HasStatusTag}">
+                                                    <TextBlock Classes="tag-label"
+                                                               Text="{Binding StatusTagLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Status.'}" />
+                                                </Border>
+                                            </WrapPanel>
+                                        </StackPanel>
+
+                                        <Button Grid.Column="2"
+                                                Classes="icon-button app-dialog-close"
+                                                ToolTip.Tip="{Binding LaunchLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}"
+                                                Command="{Binding LaunchCommand}"
+                                                IsVisible="{Binding ShowLaunch}"
+                                                IsEnabled="{Binding ShowLaunch}">
+                                            <PathIcon Classes="action-icon"
+                                                      Data="{StaticResource IconLaunchGeometry}" />
+                                        </Button>
+
+                                        <Button Grid.Column="3"
+                                                Classes="icon-button app-dialog-close"
+                                                ToolTip.Tip="Закрыть"
+                                                Command="{Binding CloseControlsCommand}">
+                                            <PathIcon Classes="action-icon"
+                                                      Data="{StaticResource IconCloseGeometry}" />
+                                        </Button>
+                                    </Grid>
+
+                                    <Border Classes="divider" />
+
+                                    <StackPanel Spacing="8">
+                                        <Button Classes="compact-action app-dialog-action"
+                                                Command="{Binding CloneCommand}"
+                                                IsEnabled="{Binding CanClone}">
+                                            <Grid ColumnDefinitions="Auto,*"
+                                                  ColumnSpacing="7">
+                                                <PathIcon Classes="button-icon"
+                                                          Data="{StaticResource IconCloneGeometry}" />
+                                                <TextBlock Grid.Column="1"
+                                                           Classes="button-label"
+                                                           Text="{Binding CloneLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}" />
+                                            </Grid>
+                                        </Button>
+
+                                        <Button Classes="compact-action app-dialog-action"
+                                                Command="{Binding MoveToWorkCommand}"
+                                                IsVisible="{Binding CanMoveToWork}"
+                                                IsEnabled="{Binding CanMoveToWork}">
+                                            <Grid ColumnDefinitions="Auto,*"
+                                                  ColumnSpacing="7">
+                                                <PathIcon Classes="button-icon"
+                                                          Data="{StaticResource IconWorkGeometry}" />
+                                                <TextBlock Grid.Column="1"
+                                                           Classes="button-label"
+                                                           Text="{Binding MoveToWorkLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}" />
+                                            </Grid>
+                                        </Button>
+
+                                        <Button Classes="compact-action app-dialog-action"
+                                                Command="{Binding CreateShortcutCommand}"
+                                                IsVisible="{Binding IsAgnosiaManaged}">
+                                            <Grid ColumnDefinitions="Auto,*"
+                                                  ColumnSpacing="7">
+                                                <PathIcon Classes="button-icon"
+                                                          Data="{StaticResource IconLaunchGeometry}" />
+                                                <TextBlock Grid.Column="1"
+                                                           Classes="button-label"
+                                                           Text="{Binding CreateShortcutLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}" />
+                                            </Grid>
+                                        </Button>
+
+                                        <Button Classes="compact-action app-dialog-action"
+                                                Command="{Binding ForceFreezeCommand}"
+                                                IsVisible="{Binding IsAgnosiaManaged}"
+                                                IsEnabled="{Binding CanFreeze}">
+                                            <Grid ColumnDefinitions="Auto,*"
+                                                  ColumnSpacing="7">
+                                                <PathIcon Classes="button-icon"
+                                                          Data="{StaticResource IconFreezeGeometry}" />
+                                                <TextBlock Grid.Column="1"
+                                                           Classes="button-label"
+                                                           Text="{Binding ForceFreezeLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}" />
+                                            </Grid>
+                                        </Button>
+
+                                        <Button Classes="compact-action app-dialog-action"
+                                                Command="{Binding UninstallCommand}"
+                                                IsEnabled="{Binding CanUninstall}">
+                                            <Grid ColumnDefinitions="Auto,*"
+                                                  ColumnSpacing="7">
+                                                <PathIcon Classes="button-icon"
+                                                          Data="{StaticResource IconDeleteGeometry}" />
+                                                <TextBlock Grid.Column="1"
+                                                           Classes="button-label"
+                                                           Text="{Binding UninstallLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}" />
+                                            </Grid>
+                                        </Button>
+                                    </StackPanel>
+
+                                    <StackPanel Spacing="10"
+                                                IsVisible="{Binding ShowWorkControls}">
+                                        <Border Classes="divider" />
+
+                                        <Grid ColumnDefinitions="*,Auto"
+                                              ColumnSpacing="12">
+                                            <StackPanel MinWidth="0"
+                                                Spacing="2">
+                                                <TextBlock Classes="app-dialog-setting-title"
+                                                           Text="{Binding AgnosiaIsolationLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}" />
+                                                <TextBlock Classes="app-dialog-setting-caption"
+                                                           Text="Управляется Agnosia и работает через ярлык" />
+                                            </StackPanel>
+                                            <ToggleSwitch Grid.Column="1"
+                                                          VerticalAlignment="Center"
+                                                          IsChecked="{Binding IsHidden, Mode=OneWay}"
+                                                          IsEnabled="{Binding CanFreeze}"
+                                                          Command="{Binding ToggleFrozenCommand}" />
+                                        </Grid>
+
+                                        <Grid ColumnDefinitions="*,Auto"
+                                              ColumnSpacing="12">
+                                            <StackPanel MinWidth="0"
+                                                        Spacing="2">
+                                                <TextBlock Classes="app-dialog-setting-title"
+                                                           Text="{Binding InteractionLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}" />
+                                                <TextBlock Classes="app-dialog-setting-caption"
+                                                           Text="Межпрофильное взаимодействие" />
+                                            </StackPanel>
+                                            <ToggleSwitch Grid.Column="1"
+                                                          VerticalAlignment="Center"
+                                                          IsChecked="{Binding InteractionAllowed, Mode=OneWay}"
+                                                          Command="{Binding ToggleInteractionAccessCommand}" />
+                                        </Grid>
+                                    </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Border>
+                    </DataTemplate>
+                </ContentControl.DataTemplates>
+            </ContentControl>
+        </Grid>
+    </Border>
+</UserControl>

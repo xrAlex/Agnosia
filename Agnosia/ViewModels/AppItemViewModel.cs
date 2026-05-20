@@ -94,6 +94,8 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     public bool ShowWorkControls => Profile == ProfileKind.Work;
 
+    public bool IsAgnosiaManaged => ShowWorkControls && IsHidden;
+
     public bool CanClone => Profile == ProfileKind.Personal || !Snapshot.IsSystem;
 
     public bool CanMoveToWork => Profile == ProfileKind.Personal && CanClone && CanUninstall;
@@ -110,7 +112,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     public static string MoveToWorkLabel => "MoveToWork";
 
-    public string FreezeLabel => IsHidden ? "Unfreeze" : "Freeze";
+    public static string AgnosiaIsolationLabel => "AgnosiaIsolation";
 
     public static string ForceFreezeLabel => "ForceFreeze";
 
@@ -168,6 +170,18 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         return _owner.ToggleInteractionAccessAsync(this);
     }
 
+    [RelayCommand]
+    private void OpenControls()
+    {
+        _owner.OpenAppControl(this);
+    }
+
+    [RelayCommand]
+    private void CloseControls()
+    {
+        _owner.CloseAppControl();
+    }
+
     public void Dispose()
     {
         if (_disposed) return;
@@ -201,11 +215,11 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         if (previous.IsHidden != snapshot.IsHidden)
         {
             OnPropertyChanged(nameof(IsHidden));
+            OnPropertyChanged(nameof(IsAgnosiaManaged));
             OnPropertyChanged(nameof(StatusTagLabel));
             OnPropertyChanged(nameof(HasStatusTag));
             OnPropertyChanged(nameof(ShowSecondaryRow));
             OnPropertyChanged(nameof(LaunchLabel));
-            OnPropertyChanged(nameof(FreezeLabel));
         }
 
         if (previous.InteractionAllowed != snapshot.InteractionAllowed)
