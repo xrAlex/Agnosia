@@ -20,8 +20,8 @@ public static class AndroidAppLogArchive
         PropertyNameCaseInsensitive = true
     };
 
-    private static Context? FlushContext;
-    private static bool FlushScheduled;
+    private static Context? _flushContext;
+    private static bool _flushScheduled;
 
     public static void Append(Context context, AppLogLevel level, string tag, string message)
     {
@@ -62,10 +62,10 @@ public static class AndroidAppLogArchive
 
     private static void EnsureFlushScheduledLocked(Context context)
     {
-        FlushContext = context;
-        if (FlushScheduled) return;
+        _flushContext = context;
+        if (_flushScheduled) return;
 
-        FlushScheduled = true;
+        _flushScheduled = true;
         _ = FlushAfterDelayAsync();
     }
 
@@ -76,8 +76,8 @@ public static class AndroidAppLogArchive
             await Task.Delay(FlushDelay).ConfigureAwait(false);
             lock (Sync)
             {
-                FlushPendingLocked(FlushContext);
-                FlushScheduled = false;
+                FlushPendingLocked(_flushContext);
+                _flushScheduled = false;
             }
         }
         catch (Exception exception)
@@ -85,7 +85,7 @@ public static class AndroidAppLogArchive
             global::Android.Util.Log.Warn(PerfLogTag, $"LogAppend flush failed: {exception.Message}");
             lock (Sync)
             {
-                FlushScheduled = false;
+                _flushScheduled = false;
             }
         }
     }

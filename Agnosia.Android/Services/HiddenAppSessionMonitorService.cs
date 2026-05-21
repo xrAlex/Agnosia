@@ -44,8 +44,7 @@ public sealed class HiddenAppSessionMonitorService : Service
     private const string ExtraTaskId = "taskId";
     private const string ExtraStartedAtUnixTimeMilliseconds = "startedAtUnixTimeMilliseconds";
     private const string ScreenLockPersistedReason = "screen_lock_persisted_session";
-    internal const string ScreenNonInteractiveReason =
-        HiddenAppSessionMonitorStateMachine.ScreenNonInteractiveReason;
+    private const string ScreenNonInteractiveReason = HiddenAppSessionMonitorStateMachine.ScreenNonInteractiveReason;
     private const string SessionReplacedReason = "session_replaced";
     private const int NotificationId = 0x57C31;
     private const string NotificationChannelId = "agnosia.hidden-app-session";
@@ -332,7 +331,7 @@ public sealed class HiddenAppSessionMonitorService : Service
             if (transition.Action == HiddenAppSessionTransitionAction.Complete)
             {
                 if (transition.CompletionKind == HiddenAppSessionCompletionKind.AfterTargetTaskRecheck
-                    && HasTargetTaskAtCompletion(session, observation, transition, now))
+                    && HasTargetTaskAtCompletion(session, observation, transition))
                 {
                     stateMachine.PostponeCompletionBecauseTargetTaskStillPresent(now);
                     continue;
@@ -359,8 +358,7 @@ public sealed class HiddenAppSessionMonitorService : Service
     private bool HasTargetTaskAtCompletion(
         HiddenAppSessionState session,
         SessionObservation observation,
-        HiddenAppSessionTransition transition,
-        DateTimeOffset now)
+        HiddenAppSessionTransition transition)
     {
         var finalTaskObservation = ObserveTask(session);
         if (finalTaskObservation is null || !TaskBelongsToTarget(finalTaskObservation, session.PackageName))
@@ -435,9 +433,7 @@ public sealed class HiddenAppSessionMonitorService : Service
 
             foreach (var appTask in appTasks)
             {
-#pragma warning disable CA1422
-                if (appTask?.TaskInfo is not { } taskInfo || taskInfo.Id != session.TaskId)
-#pragma warning restore CA1422
+                if (appTask.TaskInfo is not { } taskInfo || taskInfo.Id != session.TaskId)
                     continue;
 
                 var baseActivity = taskInfo.BaseActivity;
@@ -539,7 +535,6 @@ public sealed class HiddenAppSessionMonitorService : Service
             {
                 Log.Warn(LogTag,
                     $"Could not notify parent profile about frozen app {session.PackageName}: {result.Message}");
-                return;
             }
         }
         catch (Exception exception)
@@ -734,7 +729,6 @@ public sealed class HiddenAppSessionMonitorService : Service
                         latestForegroundPackage,
                         latestForegroundAt,
                         packageName,
-                        now,
                         out observation,
                         out reason))
                 {
@@ -857,7 +851,6 @@ public sealed class HiddenAppSessionMonitorService : Service
         string? latestForegroundPackage,
         long latestForegroundAt,
         string packageName,
-        DateTimeOffset now,
         out UsageSessionObservation observation,
         out string reason)
     {

@@ -1,17 +1,9 @@
-using Android.App.Admin;
 using Android.Content.PM;
 
 namespace Agnosia.Android.Api.Platform;
 
 public static class AndroidWorkProfilePackageClassifier
 {
-    private static readonly HashSet<string> RequiredWorkProfileInfrastructurePackages = new(StringComparer.Ordinal)
-    {
-        "com.android.managedprovisioning",
-        "com.google.android.apps.enterprise.dmagent",
-        "com.google.android.apps.work.clouddpc"
-    };
-
     private static readonly string[] SystemPathPrefixes =
     [
         "/apex/",
@@ -29,35 +21,6 @@ public static class AndroidWorkProfilePackageClassifier
                || (app.Flags & ApplicationInfoFlags.UpdatedSystemApp) != 0
                || IsSystemPath(app.SourceDir)
                || IsSystemPath(app.PublicSourceDir);
-    }
-
-    private static bool IsInstalled(ApplicationInfo app)
-    {
-        return (app.Flags & ApplicationInfoFlags.Installed) != 0;
-    }
-
-    private static bool IsActiveDeviceAdmin(DevicePolicyManager policyManager, string packageName)
-    {
-        var activeAdmins = policyManager.ActiveAdmins;
-        if (activeAdmins is null) return false;
-
-        foreach (var admin in activeAdmins)
-            if (string.Equals(admin.PackageName, packageName, StringComparison.Ordinal))
-                return true;
-
-        return false;
-    }
-
-    private static bool HasLaunchIntent(PackageManager packageManager, string packageName)
-    {
-        try
-        {
-            return packageManager.GetLaunchIntentForPackage(packageName) is not null;
-        }
-        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
-        {
-            return false;
-        }
     }
 
     private static bool IsSystemPath(string? path)

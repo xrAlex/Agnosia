@@ -226,11 +226,11 @@ public static class AuthenticationUtility
         return value switch
         {
             null => "null:",
-            String javaStringValue => "string:" + EncodeString(javaStringValue.ToString() ?? string.Empty),
+            String javaStringValue => "string:" + EncodeString(javaStringValue.ToString()),
             Boolean booleanValue => "bool:" + booleanValue.BooleanValue().ToString(CultureInfo.InvariantCulture),
             Integer integerValue => "int:" + integerValue.IntValue().ToString(CultureInfo.InvariantCulture),
             Long longValue => "long:" + longValue.LongValue().ToString(CultureInfo.InvariantCulture),
-            _ => value.GetType().FullName + ":" + EncodeString(value.ToString() ?? string.Empty)
+            _ => value.GetType().FullName + ":" + EncodeString(value.ToString())
         };
     }
 

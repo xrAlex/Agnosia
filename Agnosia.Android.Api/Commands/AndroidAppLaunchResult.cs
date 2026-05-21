@@ -74,7 +74,7 @@ public sealed record AndroidAppLaunchResult(
             : message;
         return this with
         {
-            Succeeded = fatal ? false : Succeeded,
+            Succeeded = !fatal && Succeeded,
             Issue = issue,
             Message = resolvedMessage,
             Events = AppendEvent(Stage, issue, resolvedMessage, detail)
@@ -254,8 +254,6 @@ public sealed record AndroidAppLaunchResult(
                 "Android не предоставил сервис пакетов.",
             AndroidAppLaunchIssueKind.InvalidRequest =>
                 "Команда запуска не содержит корректный пакет приложения.",
-            AndroidAppLaunchIssueKind.StartActivityException =>
-                $"Android не смог открыть {displayName}.",
             _ => $"Android не смог открыть {displayName}."
         };
     }

@@ -1,5 +1,4 @@
 using Agnosia.Android.Api.Commands;
-using Android.App;
 using Android.Content;
 using Java.Lang;
 

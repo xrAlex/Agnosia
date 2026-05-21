@@ -117,7 +117,6 @@ public sealed class WorkProfileLockFreezeService : Service
         if (HiddenAppSessionMonitorService.CompletePersistedSessionForScreenLock(context))
         {
             Log.Info(LogTag, $"Screen lock freeze completed from active hidden session. trigger={trigger}.");
-            return;
         }
     }
 

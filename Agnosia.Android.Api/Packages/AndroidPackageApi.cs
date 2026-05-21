@@ -210,7 +210,7 @@ public static class AndroidPackageApi
         });
     }
 
-    private static IReadOnlyList<string>? ResolveFreshInstallParts(
+    private static List<string>? ResolveFreshInstallParts(
         PackageManager packageManager,
         string? packageName,
         string? apkPath,
@@ -287,8 +287,8 @@ public static class AndroidPackageApi
         return exception is StaleInstallSourceException
                    or JavaFileNotFoundException
                    or FileNotFoundException
-               || (exception is JavaIOException javaIOException
-                   && javaIOException.Message?.Contains("ENOENT", StringComparison.OrdinalIgnoreCase) == true)
+               || (exception is JavaIOException javaIoException
+                   && javaIoException.Message?.Contains("ENOENT", StringComparison.OrdinalIgnoreCase) == true)
                || (exception.InnerException is not null && IsStaleInstallSourceException(exception.InnerException));
     }
 

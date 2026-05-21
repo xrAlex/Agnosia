@@ -1,6 +1,5 @@
 using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Infrastructure;
-using Agnosia.Infrastructure;
 using Android.Runtime;
 using Avalonia;
 using Avalonia.Android;

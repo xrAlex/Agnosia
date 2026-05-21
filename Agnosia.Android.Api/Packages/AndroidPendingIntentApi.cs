@@ -89,11 +89,8 @@ public static class AndroidPendingIntentApi
     {
         unchecked
         {
-            var hash = 17;
-            foreach (var symbol in action) hash = hash * 31 + symbol;
-
-            foreach (var symbol in packageName) hash = hash * 31 + symbol;
-
+            var hash = action.Aggregate(17, (current, symbol) => current * 31 + symbol);
+            hash = packageName.Aggregate(hash, (current, symbol) => current * 31 + symbol);
             return hash & int.MaxValue;
         }
     }

@@ -649,9 +649,8 @@ public sealed class DummyActivity : Activity
 
             Log.Debug(LogTag, $"Starting hidden shortcut preparation for {packageName}.");
             var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
-            var restoreHiddenState = false;
 
-            if (!TryMakePackageVisibleForShortcutPreparation(admin, packageName, out restoreHiddenState, out var visibilityError))
+            if (!TryMakePackageVisibleForShortcutPreparation(admin, packageName, out var restoreHiddenState, out var visibilityError))
             {
                 FinishWithError(visibilityError ?? $"Android не смог восстановить {packageName} для подготовки ярлыка.");
                 return;

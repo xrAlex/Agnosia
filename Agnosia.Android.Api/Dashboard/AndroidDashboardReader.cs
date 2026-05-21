@@ -42,7 +42,6 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
 
         var storage = LocalStorageManager.Instance;
         var settings = AndroidSettingsStore.LoadSnapshot(storage);
-        var showAllApps = settings.ShowAllApps;
         var profileDiagnostics = AndroidWorkProfileDiagnosticsReader.Read(activity);
         var hasAssociatedProfile = profileDiagnostics.ManagedProfileExists;
         var hasWorkProfileTarget = profileDiagnostics.CommandTargetResolvable;
@@ -197,10 +196,8 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             profile,
             showAll,
             cancellationToken).ConfigureAwait(false);
-        if (payload is null)
-            return AppQueryResult.Empty;
-
-        return new AppQueryResult(payload.Apps, payload.InteractionPackages);
+        
+        return payload is null ? AppQueryResult.Empty : new AppQueryResult(payload.Apps, payload.InteractionPackages);
     }
 
     private async Task<WorkProfileOwnerCheckResult> ReadWorkProfileOwnerCheckAsync(

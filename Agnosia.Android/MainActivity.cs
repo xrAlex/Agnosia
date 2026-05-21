@@ -46,7 +46,7 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
 
     static MainActivity()
     {
-        AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
         {
             global::Android.Util.Log.Error(LogTag, $"Unhandled exception: {args.ExceptionObject}");
         };
@@ -87,7 +87,7 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
             {
                 await Task.Delay(100);
 
-                RunOnUiThread(() => ApplyPreferredDisplayMode());
+                RunOnUiThread(ApplyPreferredDisplayMode);
                 WorkProfileLockFreezeService.EnsureRunning(this);
 
                 if (!AgnosiaUtilities.IsProfileOwner(this)) return;
@@ -311,6 +311,15 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
     {
         var request = new ActivityStartRequest(intent, requestCode, completionSource);
 
+        if (Looper.MainLooper?.IsCurrentThread == true)
+        {
+            ScheduleStart();
+            return;
+        }
+
+        RunOnUiThread(ScheduleStart);
+        return;
+
         void ScheduleStart()
         {
             if (!_isResumed)
@@ -321,14 +330,6 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
 
             StartActivityForResultRequest(request);
         }
-
-        if (Looper.MainLooper?.IsCurrentThread == true)
-        {
-            ScheduleStart();
-            return;
-        }
-
-        RunOnUiThread(ScheduleStart);
     }
 
     private void DrainPendingActivityStarts()
@@ -400,7 +401,7 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         }
     }
 
-    private bool HasPendingActivityStarts()
+    private static bool HasPendingActivityStarts()
     {
         lock (RequestSync)
         {
