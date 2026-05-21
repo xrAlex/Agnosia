@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Agnosia.Android.Api.Permissions;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Models;
 using Android.App.Admin;

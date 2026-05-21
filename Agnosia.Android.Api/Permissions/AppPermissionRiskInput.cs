@@ -1,4 +1,4 @@
-namespace Agnosia.Models;
+namespace Agnosia.Android.Api.Permissions;
 
 public sealed record AppPermissionRiskInput(
     IEnumerable<string>? RequestedPermissions,

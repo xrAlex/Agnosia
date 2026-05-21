@@ -1,7 +1,8 @@
+using Agnosia.Android.Api.Permissions;
 using Agnosia.Models;
 using Xunit;
 
-namespace Agnosia.Unit.Models;
+namespace Agnosia.Unit.AndroidApi.Permissions;
 
 public sealed class AppPermissionRiskCatalogTests
 {
@@ -157,6 +158,28 @@ public sealed class AppPermissionRiskCatalogTests
                 "android.permission.INTERNET",
                 "android.permission.SYSTEM_ALERT_WINDOW",
                 "android.permission.BIND_ACCESSIBILITY_SERVICE"
+            ],
+            result.RiskyPermissions);
+    }
+
+    [Fact]
+    public void Analyze_stops_after_first_critical_rule()
+    {
+        var result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
+            [
+                "android.permission.ACCESS_FINE_LOCATION",
+                "android.permission.ACCESS_BACKGROUND_LOCATION",
+                "android.permission.READ_MEDIA_IMAGES",
+                "android.permission.INTERNET"
+            ],
+            DeviceSdkVersion: 33));
+
+        Assert.Equal(AppPermissionRiskLevel.Critical, result.Level);
+        Assert.Equal(
+            [
+                "android.permission.ACCESS_FINE_LOCATION",
+                "android.permission.ACCESS_BACKGROUND_LOCATION",
+                "android.permission.INTERNET"
             ],
             result.RiskyPermissions);
     }
