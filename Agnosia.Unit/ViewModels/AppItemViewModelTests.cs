@@ -23,6 +23,7 @@ public sealed class AppItemViewModelTests
         Assert.True(app.IsPermissionRiskSafe);
         Assert.False(app.IsPermissionRiskDangerous);
         Assert.False(app.IsPermissionRiskCritical);
+        Assert.True(app.ShowPermissionRiskIndicator);
         Assert.False(app.HasRiskyPermissions);
         Assert.Empty(app.RiskyPermissionsText);
         Assert.Equal("Разрешения: OK", app.PermissionRiskTooltip);
@@ -60,6 +61,7 @@ public sealed class AppItemViewModelTests
         Assert.True(app.ShowSecondaryRow);
         Assert.False(app.CanClone);
         Assert.False(app.CanUninstall);
+        Assert.False(app.ShowPermissionRiskIndicator);
         Assert.True(app.ShowLaunch);
         Assert.Equal("Isolated", app.StatusTagLabel);
         Assert.Equal("UnfreezeAndOpen", app.LaunchLabel);
@@ -122,6 +124,7 @@ public sealed class AppItemViewModelTests
         Assert.Contains(nameof(AppItemViewModel.Monogram), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.CanMoveToWork), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.CanUninstall), changedProperties);
+        Assert.Contains(nameof(AppItemViewModel.ShowPermissionRiskIndicator), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.ShowLaunch), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.StatusTagLabel), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.InteractionLabel), changedProperties);

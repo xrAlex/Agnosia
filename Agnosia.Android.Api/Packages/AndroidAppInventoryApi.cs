@@ -119,11 +119,34 @@ public static class AndroidAppInventoryApi
         var isHidden = TryIsApplicationHidden(policyManager, admin, packageName);
         if (!showAll && (isSystem || (!isInstalled && !isHidden))) return null;
 
+        var permissionRisk = AppPermissionRiskAnalysis.Safe;
+        if (isSystem)
+        {
+            if (!TryGetPackageIdentity(packageManager, packageName, out var identity)) return null;
+
+            return new AppServiceModel
+            {
+                PackageName = packageName,
+                Label = packageManager.GetApplicationLabel(app),
+                SourceDirectory = app.SourceDir,
+                SplitApks = app.SplitSourceDirs?.ToArray() ?? [],
+                IsSystem = true,
+                IsHidden = isHidden,
+                CanLaunch = packageManager.GetLaunchIntentForPackage(packageName) is not null,
+                IsInstalled = isInstalled,
+                PermissionRiskLevel = permissionRisk.Level,
+                RiskyPermissions = permissionRisk.RiskyPermissions.ToArray(),
+                IconPng = TryGetCachedIcon(context, packageName, identity, out var systemCachedIcon)
+                    ? systemCachedIcon
+                    : AndroidAppIconWarmupQueue.TryLoadCachedOrQueue(context, packageManager, packageName)
+            };
+        }
+
         if (!TryGetPackageInventoryDetails(
                 packageManager,
                 packageName,
-                out var identity,
-                out var permissionRisk)) return null;
+                out var packageIdentity,
+                out permissionRisk)) return null;
 
         return new AppServiceModel
         {
@@ -137,8 +160,8 @@ public static class AndroidAppInventoryApi
             IsInstalled = isInstalled,
             PermissionRiskLevel = permissionRisk.Level,
             RiskyPermissions = permissionRisk.RiskyPermissions.ToArray(),
-            IconPng = TryGetCachedIcon(context, packageName, identity, out var cachedIcon)
-                ? cachedIcon
+            IconPng = TryGetCachedIcon(context, packageName, packageIdentity, out var appCachedIcon)
+                ? appCachedIcon
                 : AndroidAppIconWarmupQueue.TryLoadCachedOrQueue(context, packageManager, packageName)
         };
     }

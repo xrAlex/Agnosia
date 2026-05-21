@@ -61,6 +61,8 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     public bool IsPermissionRiskCritical => PermissionRiskLevel == AppPermissionRiskLevel.Critical;
 
+    public bool ShowPermissionRiskIndicator => !Snapshot.IsSystem;
+
     public string PermissionRiskTooltip => PermissionRiskLevel switch
     {
         AppPermissionRiskLevel.Critical => "Есть критические разрешения",
@@ -257,6 +259,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(IsPermissionRiskSafe));
             OnPropertyChanged(nameof(IsPermissionRiskDangerous));
             OnPropertyChanged(nameof(IsPermissionRiskCritical));
+            OnPropertyChanged(nameof(ShowPermissionRiskIndicator));
             OnPropertyChanged(nameof(PermissionRiskTooltip));
         }
 
@@ -272,6 +275,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(CanClone));
             OnPropertyChanged(nameof(CanMoveToWork));
             OnPropertyChanged(nameof(CanUninstall));
+            OnPropertyChanged(nameof(ShowPermissionRiskIndicator));
         }
 
         if (previous.CanLaunch != snapshot.CanLaunch) OnPropertyChanged(nameof(ShowLaunch));

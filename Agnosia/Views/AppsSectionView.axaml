@@ -143,6 +143,7 @@
                                     Classes.safe="{Binding IsPermissionRiskSafe}"
                                     Classes.dangerous="{Binding IsPermissionRiskDangerous}"
                                     Classes.critical="{Binding IsPermissionRiskCritical}"
+                                    IsVisible="{Binding ShowPermissionRiskIndicator}"
                                     ToolTip.Tip="{Binding PermissionRiskTooltip}">
                                 <TextBlock Classes="permission-risk-mark"
                                            Text="!" />
