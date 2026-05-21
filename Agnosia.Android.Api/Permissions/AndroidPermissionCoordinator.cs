@@ -156,10 +156,8 @@ internal sealed class AndroidPermissionCoordinator(
 
     private async Task<OperationResult> RequestUsageStatsAccessAsync(CancellationToken cancellationToken)
     {
-        var intent = new Intent(AgnosiaActions.RequestUsageStatsAccess);
-        var result = await commandRunner.RunVoidOperationAsync(
-            intent,
-            true,
+        var result = await RunWorkProfilePermissionRequestAsync(
+            AgnosiaActions.RequestUsageStatsAccess,
             cancellationToken,
             "Откройте Agnosia в списке и включите доступ к истории использования.");
         if (result.Succeeded) LocalStorageManager.Instance.SetBoolean(StorageKeys.UsageStatsAccessPrompted, true);
@@ -169,12 +167,22 @@ internal sealed class AndroidPermissionCoordinator(
 
     private Task<OperationResult> RequestPackageInstallAccessAsync(CancellationToken cancellationToken)
     {
-        var intent = new Intent(AgnosiaActions.RequestPackageInstallAccess);
-        return commandRunner.RunVoidOperationAsync(
-            intent,
-            true,
+        return RunWorkProfilePermissionRequestAsync(
+            AgnosiaActions.RequestPackageInstallAccess,
             cancellationToken,
             "Включите установку APK из Agnosia в рабочем профиле.");
+    }
+
+    private Task<OperationResult> RunWorkProfilePermissionRequestAsync(
+        string action,
+        CancellationToken cancellationToken,
+        string successMessage)
+    {
+        return commandRunner.RunVoidOperationAsync(
+            new Intent(action),
+            true,
+            cancellationToken,
+            successMessage);
     }
 
     public OperationResult OpenAppDetailsSettings()

@@ -87,9 +87,7 @@ public static class AgnosiaUtilities
         storage.SetBoolean(StorageKeys.IsSettingUp, true);
         storage.SetBoolean(StorageKeys.HasSetup, false);
         storage.SetLong(StorageKeys.SetupStartedAtUtc, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-        storage.Remove(StorageKeys.ManagedProfileProvisionedAtUtc);
-        storage.Remove(StorageKeys.ManagedProfileUserHandle);
-        storage.Remove(StorageKeys.ManagedProfileUserSerial);
+        ClearManagedProfileTracking(storage);
     }
 
     public static void MarkManagedProfileProvisioned(Context context, Intent? intent)
@@ -120,6 +118,11 @@ public static class AgnosiaUtilities
         storage.SetBoolean(StorageKeys.HasSetup, false);
         storage.SetBoolean(StorageKeys.OnboardingCompleted, false);
         storage.Remove(StorageKeys.SetupStartedAtUtc);
+        ClearManagedProfileTracking(storage);
+    }
+
+    private static void ClearManagedProfileTracking(LocalStorageManager storage)
+    {
         storage.Remove(StorageKeys.ManagedProfileProvisionedAtUtc);
         storage.Remove(StorageKeys.ManagedProfileUserHandle);
         storage.Remove(StorageKeys.ManagedProfileUserSerial);

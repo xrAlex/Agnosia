@@ -65,13 +65,10 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             hasManagedProfileProvisionedSignal = false;
         }
 
-        var ownerCheck = hasWorkProfileTarget
-                         && profileDiagnostics.AvailableToCrossProfileApps
-                         && profileDiagnostics.QuietModeEnabled != true
-            ? await TryCheckWorkProfileOwnerWithRetryAsync(cancellationToken).ConfigureAwait(false)
-            : new WorkProfileOwnerCheckResult(
-                WorkProfileOwnerCheckKind.TargetUnavailable,
-                "crossProfileTarget=missing");
+        var ownerCheck = await ReadWorkProfileOwnerCheckAsync(
+                profileDiagnostics,
+                cancellationToken)
+            .ConfigureAwait(false);
         var workProfileAvailable = ownerCheck.Kind == WorkProfileOwnerCheckKind.AppIsProfileOwner;
         Log.Info(
             LogTag,
@@ -204,6 +201,24 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             return AppQueryResult.Empty;
 
         return new AppQueryResult(payload.Apps, payload.InteractionPackages);
+    }
+
+    private async Task<WorkProfileOwnerCheckResult> ReadWorkProfileOwnerCheckAsync(
+        WorkProfileDiagnostics profileDiagnostics,
+        CancellationToken cancellationToken)
+    {
+        return CanAttemptWorkProfileOwnerCheck(profileDiagnostics)
+            ? await TryCheckWorkProfileOwnerWithRetryAsync(cancellationToken).ConfigureAwait(false)
+            : new WorkProfileOwnerCheckResult(
+                WorkProfileOwnerCheckKind.TargetUnavailable,
+                "crossProfileTarget=missing");
+    }
+
+    private static bool CanAttemptWorkProfileOwnerCheck(WorkProfileDiagnostics profileDiagnostics)
+    {
+        return profileDiagnostics.CommandTargetResolvable
+               && profileDiagnostics.AvailableToCrossProfileApps
+               && profileDiagnostics.QuietModeEnabled != true;
     }
 
     private async Task<WorkProfileOwnerCheckResult> TryCheckWorkProfileOwnerWithRetryAsync(

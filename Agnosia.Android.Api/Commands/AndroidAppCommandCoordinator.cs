@@ -18,6 +18,14 @@ internal sealed class AndroidAppCommandCoordinator(
     private const string LogTag = "AgnosiaTransientVpn";
     private const string ActivityResultLogTag = "AgnosiaActivityResult";
     private static readonly TimeSpan ClonedPackageSettleDelay = TimeSpan.FromSeconds(2);
+    private static readonly string[] HiddenShortcutPayloadExtras =
+    [
+        AndroidCommandContract.ExtraLaunchPackageName,
+        AndroidCommandContract.ExtraShortcutTargetActivity,
+        AndroidCommandContract.ExtraShortcutLabel,
+        AndroidCommandContract.ExtraShortcutIconBase64,
+        AndroidCommandContract.ExtraShortcutToken
+    ];
 
     public async Task<OperationResult> CloneAsync(AppSnapshot app, CancellationToken cancellationToken)
     {
@@ -32,9 +40,7 @@ internal sealed class AndroidAppCommandCoordinator(
         }
         else
         {
-            var intent = new Intent(AgnosiaActions.InstallPackage);
-            intent.PutExtra("package", app.PackageName);
-            intent.PutExtra("is_system", app.IsSystem);
+            var intent = CreatePackageIntent(AgnosiaActions.InstallPackage, app);
 
             if (!app.IsSystem)
             {
@@ -51,8 +57,8 @@ internal sealed class AndroidAppCommandCoordinator(
                     splitApks = [];
                 }
 
-                intent.PutExtra("apk", sourceDirectory);
-                intent.PutExtra("split_apks", splitApks);
+                intent.PutExtra(AndroidCommandContract.ExtraApk, sourceDirectory);
+                intent.PutExtra(AndroidCommandContract.ExtraSplitApks, splitApks);
             }
 
             result = await (app.Profile == ProfileKind.Personal
@@ -92,9 +98,7 @@ internal sealed class AndroidAppCommandCoordinator(
         }
         else
         {
-            var intent = new Intent(AgnosiaActions.UninstallPackage);
-            intent.PutExtra("package", app.PackageName);
-            intent.PutExtra("is_system", app.IsSystem);
+            var intent = CreatePackageIntent(AgnosiaActions.UninstallPackage, app);
 
             result = await (app.Profile == ProfileKind.Work
                 ? commandRunner.RunPackageOperationAsync(intent, true, cancellationToken,
@@ -218,8 +222,8 @@ internal sealed class AndroidAppCommandCoordinator(
         if (!vpnPreparationResult.Succeeded) return vpnPreparationResult;
 
         var intent = new Intent(AgnosiaActions.UnfreezeAndLaunch);
-        intent.PutExtra("packageName", app.PackageName);
-        intent.PutExtra("displayName", app.Label);
+        intent.PutExtra(AndroidCommandContract.ExtraLaunchPackageName, app.PackageName);
+        intent.PutExtra(AndroidCommandContract.ExtraLaunchDisplayName, app.Label);
         intent.PutExtra(
             AndroidCommandContract.ExtraParentFrozenCallback,
             commandRunner.CreateWorkAppFrozenCallbackPendingIntent(app.PackageName));
@@ -295,7 +299,7 @@ internal sealed class AndroidAppCommandCoordinator(
         CancellationToken cancellationToken)
     {
         var prepareIntent = new Intent(AgnosiaActions.PrepareHiddenShortcut);
-        prepareIntent.PutExtra("package", packageName);
+        prepareIntent.PutExtra(AndroidCommandContract.ExtraPackage, packageName);
 
         var prepareResult = await commandRunner.StartActivityForResultAsync(prepareIntent, true, cancellationToken);
         if (prepareResult.ResultCode != Result.Ok || prepareResult.Data is null)
@@ -312,11 +316,8 @@ internal sealed class AndroidAppCommandCoordinator(
         var preHideError = prepareResult.Data.GetStringExtra(AndroidCommandContract.ResultError);
 
         var createIntent = new Intent(AgnosiaActions.CreateHiddenShortcut);
-        CopyExtraIfPresent(prepareResult.Data, createIntent, "packageName");
-        CopyExtraIfPresent(prepareResult.Data, createIntent, "targetActivity");
-        CopyExtraIfPresent(prepareResult.Data, createIntent, "label");
-        CopyExtraIfPresent(prepareResult.Data, createIntent, "iconBase64");
-        CopyExtraIfPresent(prepareResult.Data, createIntent, "shortcutToken");
+        foreach (var extraName in HiddenShortcutPayloadExtras)
+            CopyExtraIfPresent(prepareResult.Data, createIntent, extraName);
 
         var createResult = await commandRunner.StartActivityForResultAsync(createIntent, false, cancellationToken);
         if (createResult.ResultCode != Result.Ok)
@@ -333,6 +334,14 @@ internal sealed class AndroidAppCommandCoordinator(
             createResult.Data?.GetStringExtra(AndroidCommandContract.ResultMessage)
             ?? "Подготовка ярлыка завершена.",
             preHideSucceeded ? null : preHideError);
+    }
+
+    private static Intent CreatePackageIntent(string action, AppSnapshot app)
+    {
+        var intent = new Intent(action);
+        intent.PutExtra(AndroidCommandContract.ExtraPackage, app.PackageName);
+        intent.PutExtra(AndroidCommandContract.ExtraIsSystem, app.IsSystem);
+        return intent;
     }
 
     private static void CopyExtraIfPresent(Intent source, Intent target, string extraName)

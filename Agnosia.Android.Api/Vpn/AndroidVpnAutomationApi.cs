@@ -103,27 +103,7 @@ public static class AndroidVpnAutomationApi
 
         try
         {
-            OperationResult result;
-            switch (definition.Kind)
-            {
-                case VpnAutomationClientKind.Happ:
-                    SendToggleBroadcast(context, definition);
-                    Log.Warn(LogTag,
-                        "Happ command is toggle-only; it can disable VPN if the client is already connected.");
-                    result = OperationResult.Success($"Команда запуска VPN отправлена в {definition.DisplayName}.");
-                    break;
-                case VpnAutomationClientKind.Tunguska:
-                    result = StartTunguska(context, definition, storage);
-                    break;
-                case VpnAutomationClientKind.Incy:
-                    SendStartBroadcast(context, definition);
-                    result = OperationResult.Success($"Команда запуска VPN отправлена в {definition.DisplayName}.");
-                    break;
-                default:
-                    result = StartActivityClient(context, definition);
-                    break;
-            }
-
+            var result = StartClient(context, definition, storage);
             if (result.Succeeded) storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
 
             return Task.FromResult(result);
@@ -142,6 +122,29 @@ public static class AndroidVpnAutomationApi
         }
     }
 
+    private static OperationResult StartClient(
+        Context context,
+        VpnClientDefinition definition,
+        LocalStorageManager storage)
+    {
+        switch (definition.Kind)
+        {
+            case VpnAutomationClientKind.Happ:
+                SendToggleBroadcast(context, definition);
+                Log.Warn(
+                    LogTag,
+                    "Happ command is toggle-only; it can disable VPN if the client is already connected.");
+                return CreateStartCommandSuccess(definition);
+            case VpnAutomationClientKind.Tunguska:
+                return StartTunguska(context, definition, storage);
+            case VpnAutomationClientKind.Incy:
+                SendStartBroadcast(context, definition);
+                return CreateStartCommandSuccess(definition);
+            default:
+                return StartActivityClient(context, definition);
+        }
+    }
+
     private static OperationResult StartActivityClient(Context context, VpnClientDefinition definition)
     {
         var intent = CreateStartActivityIntent(definition, definition.RequireExplicitActivity);
@@ -156,7 +159,7 @@ public static class AndroidVpnAutomationApi
         {
             Log.Info(LogTag,
                 $"StartActivity command sent. client={definition.DisplayName}, action={definition.StartAction}.");
-            return OperationResult.Success($"Команда запуска VPN отправлена в {definition.DisplayName}.");
+            return CreateStartCommandSuccess(definition);
         }
 
         if (definition.RequireExplicitActivity || string.IsNullOrWhiteSpace(definition.ActivityClassName))
@@ -175,7 +178,7 @@ public static class AndroidVpnAutomationApi
         {
             Log.Info(LogTag,
                 $"StartActivity fallback command sent. client={definition.DisplayName}, component={definition.ActivityClassName}.");
-            return OperationResult.Success($"Команда запуска VPN отправлена в {definition.DisplayName}.");
+            return CreateStartCommandSuccess(definition);
         }
 
         return OperationResult.Failure(error ??
@@ -253,6 +256,11 @@ public static class AndroidVpnAutomationApi
                                            $"Не удалось отправить команду запуска VPN для {definition.DisplayName}.");
 
         Log.Info(LogTag, "Tunguska automation start command sent.");
+        return CreateStartCommandSuccess(definition);
+    }
+
+    private static OperationResult CreateStartCommandSuccess(VpnClientDefinition definition)
+    {
         return OperationResult.Success($"Команда запуска VPN отправлена в {definition.DisplayName}.");
     }
 

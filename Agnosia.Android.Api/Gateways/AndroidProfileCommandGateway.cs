@@ -12,13 +12,7 @@ namespace Agnosia.Android.Api.Gateways;
 public static class AndroidProfileCommandGateway
 {
     private const string LogTag = "AgnosiaProfileCommand";
-    private const string ExtraPackage = "package";
-    private const string ExtraIsSystem = "is_system";
-    private const string ExtraPackages = "packages";
-    private const string ExtraShowAll = "show_all";
-    private const string ExtraName = "name";
-    private const string ExtraBoolean = "boolean";
-    public const string ExtraTrigger = "trigger";
+    public const string ExtraTrigger = AndroidCommandContract.ExtraTrigger;
     private static readonly TimeSpan ProfilePingTimeout = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan BooleanQueryCacheTtl = TimeSpan.FromSeconds(5);
     private static readonly Lock BooleanQueryCacheSync = new();
@@ -78,22 +72,22 @@ public static class AndroidProfileCommandGateway
                 .ConfigureAwait(false);
 
         var intent = new Intent(AgnosiaActions.QueryApps);
-        intent.PutExtra(ExtraShowAll, showAll);
+        intent.PutExtra(AndroidCommandContract.ExtraShowAll, showAll);
         var result = await commandRunner.StartActivityForResultAsync(
             intent,
             true,
             cancellationToken).ConfigureAwait(false);
-        if (result.ResultCode != Result.Ok || result.Data is null)
+        if (!TryGetResultData(result, out var data))
         {
             Log.Warn(LogTag, "Failed to query work apps through the profile activity command.");
             return null;
         }
 
         var apps = DeserializeResult<IReadOnlyList<AppServiceModel>>(
-            result.Data.GetStringExtra(AndroidCommandContract.ResultAppsJson),
+            data.GetStringExtra(AndroidCommandContract.ResultAppsJson),
             "work apps") ?? [];
         var interactionPackages =
-            result.Data.GetStringArrayExtra(AndroidCommandContract.ResultInteractionPackages) ?? [];
+            data.GetStringArrayExtra(AndroidCommandContract.ResultInteractionPackages) ?? [];
         return new ProfileAppsQueryResult(apps, interactionPackages);
     }
 
@@ -111,19 +105,19 @@ public static class AndroidProfileCommandGateway
                 .ConfigureAwait(false);
 
         var intent = new Intent(AgnosiaActions.QueryAppIcon);
-        intent.PutExtra(ExtraPackage, app.PackageName);
+        intent.PutExtra(AndroidCommandContract.ExtraPackage, app.PackageName);
         var result = await commandRunner.StartActivityForResultAsync(
                 intent,
                 true,
                 cancellationToken)
             .ConfigureAwait(false);
-        if (result.ResultCode != Result.Ok || result.Data is null)
+        if (!TryGetResultData(result, out var data))
         {
             Log.Warn(LogTag, $"Failed to query work app icon for {app.PackageName}.");
             return null;
         }
 
-        return result.Data.GetByteArrayExtra(AndroidCommandContract.ResultIconPng);
+        return data.GetByteArrayExtra(AndroidCommandContract.ResultIconPng);
     }
 
     internal static async Task<IReadOnlyDictionary<string, byte[]?>> LoadAppIconsAsync(
@@ -165,13 +159,13 @@ public static class AndroidProfileCommandGateway
             new Intent(AgnosiaActions.QueryCrossProfilePackages),
             true,
             cancellationToken);
-        if (result.ResultCode != Result.Ok || result.Data is null)
+        if (!TryGetResultData(result, out var data))
         {
             Log.Warn(LogTag, "Failed to query work cross-profile packages through the profile activity command.");
             return [];
         }
 
-        return result.Data.GetStringArrayExtra(AndroidCommandContract.ResultInteractionPackages) ?? [];
+        return data.GetStringArrayExtra(AndroidCommandContract.ResultInteractionPackages) ?? [];
     }
 
     internal static async Task<IReadOnlyList<AppLogEntry>> QueryWorkLogsAsync(
@@ -182,14 +176,14 @@ public static class AndroidProfileCommandGateway
             new Intent(AgnosiaActions.QueryLogs),
             true,
             cancellationToken);
-        if (result.ResultCode != Result.Ok || result.Data is null)
+        if (!TryGetResultData(result, out var data))
         {
             Log.Warn(LogTag, "Failed to query work logs through the profile activity command.");
             return [];
         }
 
         return DeserializeResult<IReadOnlyList<AppLogEntry>>(
-            result.Data.GetStringExtra(AndroidCommandContract.ResultLogsJson),
+            data.GetStringExtra(AndroidCommandContract.ResultLogsJson),
             "work logs") ?? [];
     }
 
@@ -243,7 +237,7 @@ public static class AndroidProfileCommandGateway
         CancellationToken cancellationToken)
     {
         var intent = new Intent(hidden ? AgnosiaActions.FreezePackage : AgnosiaActions.UnfreezePackage);
-        intent.PutExtra(ExtraPackage, packageName);
+        intent.PutExtra(AndroidCommandContract.ExtraPackage, packageName);
         return RunWorkPackageOperationAsync(commandRunner, intent, successMessage, cancellationToken);
     }
 
@@ -254,7 +248,7 @@ public static class AndroidProfileCommandGateway
         CancellationToken cancellationToken)
     {
         var intent = new Intent(AgnosiaActions.SetCrossProfileInteraction);
-        intent.PutExtra(ExtraPackages, packages);
+        intent.PutExtra(AndroidCommandContract.ExtraPackages, packages);
         var result = await commandRunner.StartActivityForResultAsync(
             intent,
             true,
@@ -278,8 +272,8 @@ public static class AndroidProfileCommandGateway
         if (cancellationToken.IsCancellationRequested) return Task.FromCanceled<OperationResult>(cancellationToken);
 
         var intent = new Intent(AgnosiaActions.SynchronizePreference);
-        intent.PutExtra(ExtraName, name);
-        intent.PutExtra(ExtraBoolean, value);
+        intent.PutExtra(AndroidCommandContract.ExtraPreferenceName, name);
+        intent.PutExtra(AndroidCommandContract.ExtraPreferenceBoolean, value);
         return Task.FromResult(StartOtherProfileActivity(
             context,
             intent,
@@ -293,7 +287,7 @@ public static class AndroidProfileCommandGateway
         string successMessage)
     {
         var intent = new Intent(AgnosiaActions.FreezePackage);
-        intent.PutExtra(ExtraPackage, packageName);
+        intent.PutExtra(AndroidCommandContract.ExtraPackage, packageName);
         return StartOtherProfileActivity(
             context,
             intent,
@@ -304,7 +298,7 @@ public static class AndroidProfileCommandGateway
     public static OperationResult NotifyParentWorkAppFrozen(Context context, string trigger)
     {
         var intent = new Intent(AgnosiaActions.WorkAppFrozen);
-        intent.PutExtra(ExtraTrigger, trigger);
+        intent.PutExtra(AndroidCommandContract.ExtraTrigger, trigger);
         return StartOtherProfileActivity(
             context,
             intent,
@@ -414,9 +408,21 @@ public static class AndroidProfileCommandGateway
     private static Intent CreateSystemPackageIntent(string action, string packageName)
     {
         var intent = new Intent(action);
-        intent.PutExtra(ExtraPackage, packageName);
-        intent.PutExtra(ExtraIsSystem, true);
+        intent.PutExtra(AndroidCommandContract.ExtraPackage, packageName);
+        intent.PutExtra(AndroidCommandContract.ExtraIsSystem, true);
         return intent;
+    }
+
+    private static bool TryGetResultData(AndroidActivityResult result, out Intent data)
+    {
+        if (result.ResultCode == Result.Ok && result.Data is { } resultData)
+        {
+            data = resultData;
+            return true;
+        }
+
+        data = null!;
+        return false;
     }
 
     private static OperationResult StartOtherProfileActivity(

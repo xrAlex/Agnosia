@@ -19,47 +19,47 @@ public static class AndroidSystemApi
 
     public static ActivityManager? GetActivityManager(Context context)
     {
-        return context.GetSystemService(ActivityServiceName) as ActivityManager;
+        return GetSystemService<ActivityManager>(context, ActivityServiceName);
     }
 
     public static AppOpsManager? GetAppOpsManager(Context context)
     {
-        return context.GetSystemService(AppOpsServiceName) as AppOpsManager;
+        return GetSystemService<AppOpsManager>(context, AppOpsServiceName);
     }
 
     public static UsageStatsManager? GetUsageStatsManager(Context context)
     {
-        return context.GetSystemService(UsageStatsServiceName) as UsageStatsManager;
+        return GetSystemService<UsageStatsManager>(context, UsageStatsServiceName);
     }
 
     public static DevicePolicyManager? GetDevicePolicyManager(Context context)
     {
-        return context.GetSystemService(DevicePolicyServiceName) as DevicePolicyManager;
+        return GetSystemService<DevicePolicyManager>(context, DevicePolicyServiceName);
     }
 
     public static ConnectivityManager? GetConnectivityManager(Context context)
     {
-        return context.GetSystemService(ConnectivityServiceName) as ConnectivityManager;
+        return GetSystemService<ConnectivityManager>(context, ConnectivityServiceName);
     }
 
     public static NotificationManager? GetNotificationManager(Context context)
     {
-        return context.GetSystemService(NotificationServiceName) as NotificationManager;
+        return GetSystemService<NotificationManager>(context, NotificationServiceName);
     }
 
     public static PowerManager? GetPowerManager(Context context)
     {
-        return context.GetSystemService(Context.PowerService) as PowerManager;
+        return GetSystemService<PowerManager>(context, Context.PowerService);
     }
 
     public static UserManager? GetUserManager(Context context)
     {
-        return context.GetSystemService(UserServiceName) as UserManager;
+        return GetSystemService<UserManager>(context, UserServiceName);
     }
 
     public static CrossProfileApps? GetCrossProfileApps(Context context)
     {
-        return context.GetSystemService(Context.CrossProfileAppsService) as CrossProfileApps;
+        return GetSystemService<CrossProfileApps>(context, Context.CrossProfileAppsService);
     }
 
     public static PackageInfoFlags GetQueryIntentActivityFlags()
@@ -76,5 +76,11 @@ public static class AndroidSystemApi
     {
         return resolveInfo.ActivityInfo is not null
                && resolveInfo.IsCrossProfileIntentForwarderActivity;
+    }
+
+    private static T? GetSystemService<T>(Context context, string serviceName)
+        where T : class
+    {
+        return context.GetSystemService(serviceName) as T;
     }
 }

@@ -48,21 +48,23 @@ public static class AndroidAppIconWarmupQueue
 
     private static async Task ProcessQueueAsync()
     {
-        while (true)
-        {
-            WarmupRequest request;
-            lock (Sync)
-            {
-                if (Pending.Count == 0)
-                {
-                    _processorRunning = false;
-                    return;
-                }
+        while (TryDequeue(out var request))
+            await WarmupAsync(request).ConfigureAwait(false);
+    }
 
+    private static bool TryDequeue(out WarmupRequest request)
+    {
+        lock (Sync)
+        {
+            if (Pending.Count > 0)
+            {
                 request = Pending.Dequeue();
+                return true;
             }
 
-            await WarmupAsync(request).ConfigureAwait(false);
+            _processorRunning = false;
+            request = null!;
+            return false;
         }
     }
 

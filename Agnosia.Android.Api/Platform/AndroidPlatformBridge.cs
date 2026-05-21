@@ -111,14 +111,13 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
 
     public async Task<bool> LoadOnboardingCompletedAsync(CancellationToken cancellationToken = default)
     {
-        var activity = GetActivityHost().CurrentActivity;
-        AgnosiaRuntime.Initialize(activity);
+        _ = GetInitializedActivity();
         return await Task.FromResult(LocalStorageManager.Instance.GetBoolean(StorageKeys.OnboardingCompleted));
     }
 
     public Task<OperationResult> CompleteOnboardingAsync(CancellationToken cancellationToken = default)
     {
-        AgnosiaRuntime.Initialize(GetActivityHost().CurrentActivity);
+        _ = GetInitializedActivity();
         LocalStorageManager.Instance.SetBoolean(StorageKeys.OnboardingCompleted, true);
         return Task.FromResult(OperationResult.Success("Первичная настройка завершена."));
     }
@@ -133,31 +132,55 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
             return OperationResult.Failure("На этом устройстве недоступны API политики устройства.");
 
         if (!AndroidProvisioningApi.CanStartManagedProfileProvisioning(policyManager))
-        {
-            var diagnostics = AndroidWorkProfileDiagnosticsReader.Read(activity);
-            Log.Warn(LogTag, $"Managed profile provisioning blocked. {diagnostics.ToLogString()}.");
+            return CreateProvisioningBlockedResult(activity);
 
-            if (diagnostics.ManagedProfileExists)
-                return OperationResult.Failure(
-                    "На устройстве уже есть рабочий профиль, возможно созданный другим приложением." +
-                    "Удалите старый рабочий профиль в настройках Android и повторите создание профиля Agnosia.");
+        var authKey = PrepareProvisioningAuthentication();
+        var intent = CreateManagedProfileProvisioningIntent(activity, host.AdminReceiverType, authKey);
+        var result = await _commandRunner.StartExternalActivityForResultAsync(intent, cancellationToken);
+        return await CompleteProvisioningAsync(activity, result, cancellationToken);
+    }
 
+    private static OperationResult CreateProvisioningBlockedResult(Activity activity)
+    {
+        var diagnostics = AndroidWorkProfileDiagnosticsReader.Read(activity);
+        Log.Warn(LogTag, $"Managed profile provisioning blocked. {diagnostics.ToLogString()}.");
+
+        if (diagnostics.ManagedProfileExists)
             return OperationResult.Failure(
-                "Android сейчас не разрешает создать рабочий профиль. Проверьте ограничения устройства и повторите попытку.");
-        }
+                "На устройстве уже есть рабочий профиль, возможно созданный другим приложением." +
+                "Удалите старый рабочий профиль в настройках Android и повторите создание профиля Agnosia.");
 
+        return OperationResult.Failure(
+            "Android сейчас не разрешает создать рабочий профиль. Проверьте ограничения устройства и повторите попытку.");
+    }
+
+    private static string PrepareProvisioningAuthentication()
+    {
         var authKey = AuthenticationUtility.CreateAndStoreKey();
         AuthenticationUtility.Reset();
         AgnosiaUtilities.MarkWorkProfileSetupStarted();
         AuthenticationUtility.TryStoreProvisioningKey(authKey);
+        return authKey;
+    }
 
+    private static Intent CreateManagedProfileProvisioningIntent(
+        Activity activity,
+        Type adminReceiverType,
+        string authKey)
+    {
         var intent = new Intent(DevicePolicyManager.ActionProvisionManagedProfile);
         AndroidProvisioningApi.ConfigureManagedProfileProvisioningIntent(
             intent,
-            AgnosiaUtilities.GetAdminComponent(activity, host.AdminReceiverType),
+            AgnosiaUtilities.GetAdminComponent(activity, adminReceiverType),
             authKey);
+        return intent;
+    }
 
-        var result = await _commandRunner.StartExternalActivityForResultAsync(intent, cancellationToken);
+    private async Task<OperationResult> CompleteProvisioningAsync(
+        Activity activity,
+        AndroidActivityResult result,
+        CancellationToken cancellationToken)
+    {
         if (result.ResultCode != Result.Ok)
         {
             if (AgnosiaUtilities.HasAssociatedProfile(activity))
@@ -191,19 +214,16 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
 
     public async Task<OperationResult> OpenWorkProfileSettingsAsync(CancellationToken cancellationToken = default)
     {
-        var activity = GetActivityHost().CurrentActivity;
-        AgnosiaRuntime.Initialize(activity);
+        _ = GetInitializedActivity();
 
         var intent = new Intent(Settings.ActionSyncSettings);
         var result = await _commandRunner.StartExternalActivityForResultAsync(intent, cancellationToken);
-        if (result.ResultCode == Result.Canceled
-            && !string.IsNullOrWhiteSpace(AndroidActivityResultApi.ExtractError(result)))
+        if (WasCanceledWithError(result))
         {
             var fallbackIntent = new Intent(Settings.ActionSettings);
             var fallbackResult =
                 await _commandRunner.StartExternalActivityForResultAsync(fallbackIntent, cancellationToken);
-            if (fallbackResult.ResultCode == Result.Canceled
-                && !string.IsNullOrWhiteSpace(AndroidActivityResultApi.ExtractError(fallbackResult)))
+            if (WasCanceledWithError(fallbackResult))
                 return OperationResult.Failure("Android не смог открыть настройки устройства.");
         }
 
@@ -250,7 +270,7 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
     public Task<OperationResult> SaveSettingsAsync(AppSettingsSnapshot settings,
         CancellationToken cancellationToken = default)
     {
-        var activity = GetActivityHost().CurrentActivity;
+        var activity = GetInitializedActivity();
         return AndroidSettingsStore.SaveAsync(activity, settings, cancellationToken);
     }
 
@@ -302,6 +322,19 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         }
 
         return false;
+    }
+
+    private Activity GetInitializedActivity()
+    {
+        var activity = GetActivityHost().CurrentActivity;
+        AgnosiaRuntime.Initialize(activity);
+        return activity;
+    }
+
+    private static bool WasCanceledWithError(AndroidActivityResult result)
+    {
+        return result.ResultCode == Result.Canceled
+               && !string.IsNullOrWhiteSpace(AndroidActivityResultApi.ExtractError(result));
     }
 
     private void TryStartPendingProvisioningReadinessPolling(string trigger)

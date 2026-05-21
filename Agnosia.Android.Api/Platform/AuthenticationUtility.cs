@@ -40,13 +40,7 @@ public static class AuthenticationUtility
 
     public static string? GetExistingKey()
     {
-        var key = LocalStorageManager.Instance.GetString(StorageKeys.AuthKey);
-        if (string.IsNullOrWhiteSpace(key)) return null;
-
-        if (IsValidKey(key)) return key;
-
-        LocalStorageManager.Instance.Remove(StorageKeys.AuthKey);
-        return null;
+        return TryGetValidStoredKey(false, out var key) ? key : null;
     }
 
     public static string CreateAndStoreKey()
@@ -106,13 +100,7 @@ public static class AuthenticationUtility
     {
         if (intent is null) return false;
 
-        var storage = LocalStorageManager.Instance;
-        var key = storage.GetString(StorageKeys.AuthKey);
-        if (string.IsNullOrWhiteSpace(key) || !IsValidKey(key))
-        {
-            storage.Remove(StorageKeys.AuthKey);
-            return false;
-        }
+        if (!TryGetValidStoredKey(true, out var key)) return false;
 
         var intentTimestamp = intent.GetLongExtra(ExtraTimestamp, 0);
         if (!IsFreshTimestamp(intentTimestamp)) return false;
@@ -159,6 +147,29 @@ public static class AuthenticationUtility
     private static string CreateKey()
     {
         return Convert.ToHexString(RandomNumberGenerator.GetBytes(AuthKeyByteLength));
+    }
+
+    private static bool TryGetValidStoredKey(bool removeMissingKey, out string key)
+    {
+        var storage = LocalStorageManager.Instance;
+        var storedKey = storage.GetString(StorageKeys.AuthKey);
+        if (string.IsNullOrWhiteSpace(storedKey))
+        {
+            if (removeMissingKey) storage.Remove(StorageKeys.AuthKey);
+
+            key = null!;
+            return false;
+        }
+
+        if (IsValidKey(storedKey))
+        {
+            key = storedKey;
+            return true;
+        }
+
+        storage.Remove(StorageKeys.AuthKey);
+        key = null!;
+        return false;
     }
 
     private static string CreateIntentSignaturePayload(Intent intent, long timestamp)

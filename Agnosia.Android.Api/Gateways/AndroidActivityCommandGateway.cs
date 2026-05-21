@@ -95,59 +95,16 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
             if (useWorkProfile)
             {
                 AgnosiaUtilities.TransferIntentToProfile(activity, intent);
-            }
-            else
-            {
-                intent.SetComponent(new ComponentName(activity, Class.FromType(host.CommandActivityType)));
-                AuthenticationUtility.SignIntent(intent);
-            }
-
-            if (!useWorkProfile)
-            {
-                Log.Debug(ActivityResultLogTag,
-                    $"Starting local activity command. action={intent.Action ?? "<none>"}.");
-                var localStartedAt = Stopwatch.GetTimestamp();
-                var localResult = await host.StartForResultAsync(intent, cancellationToken);
-                Log.Debug(
-                    ActivityResultLogTag,
-                    $"Local activity command completed. action={intent.Action ?? "<none>"}, result={localResult.ResultCode}, elapsedMs={Stopwatch.GetElapsedTime(localStartedAt).TotalMilliseconds:0}, error={AndroidActivityResultApi.ExtractError(localResult) ?? "<none>"}, message={AndroidActivityResultApi.ExtractMessage(localResult) ?? "<none>"}.");
-                return localResult;
+                return await RunWorkProfileActivityCommandAsync(
+                    host,
+                    intent,
+                    isLaunchCommand,
+                    cancellationToken);
             }
 
-            var profileCommandTimeout = GetProfileCommandTimeout(intent);
-            using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCancellation.CancelAfter(profileCommandTimeout);
-            try
-            {
-                Log.Debug(
-                    ActivityResultLogTag,
-                    $"Starting work-profile activity command. action={intent.Action ?? "<none>"}, timeoutMs={profileCommandTimeout.TotalMilliseconds:0}.");
-                var workStartedAt = Stopwatch.GetTimestamp();
-                var workResult = await host.StartForResultAsync(intent, timeoutCancellation.Token);
-                Log.Debug(
-                    ActivityResultLogTag,
-                    $"Work-profile activity command completed. action={intent.Action ?? "<none>"}, result={workResult.ResultCode}, elapsedMs={Stopwatch.GetElapsedTime(workStartedAt).TotalMilliseconds:0}, error={AndroidActivityResultApi.ExtractError(workResult) ?? "<none>"}, message={AndroidActivityResultApi.ExtractMessage(workResult) ?? "<none>"}.");
-                return workResult;
-            }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-                Log.Warn(
-                    ActivityResultLogTag,
-                    $"Timed out waiting for work-profile activity result. action={intent.Action ?? "<none>"}, timeoutMs={profileCommandTimeout.TotalMilliseconds:0}.");
-                if (isLaunchCommand)
-                {
-                    var launchResult = CreateLaunchResult(intent)
-                        .Fail(
-                            AndroidAppLaunchStage.CommandReceived,
-                            AndroidAppLaunchIssueKind.WorkProfileUnavailable,
-                            $"timeoutMs={profileCommandTimeout.TotalMilliseconds:0}");
-                    launchResult.Log(ActivityResultLogTag);
-                    return launchResult.ToActivityResult();
-                }
-
-                return AndroidActivityResultApi.CreateCanceledResult(
-                    "Рабочий профиль не ответил на системную команду вовремя.");
-            }
+            intent.SetComponent(new ComponentName(activity, Class.FromType(host.CommandActivityType)));
+            AuthenticationUtility.SignIntent(intent);
+            return await RunLocalActivityCommandAsync(host, intent, cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -175,6 +132,84 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
         }
     }
 
+    private static async Task<AndroidActivityResult> RunLocalActivityCommandAsync(
+        IAndroidActivityHost host,
+        Intent intent,
+        CancellationToken cancellationToken)
+    {
+        Log.Debug(
+            ActivityResultLogTag,
+            $"Starting local activity command. action={GetActionForLog(intent)}.");
+        var startedAt = Stopwatch.GetTimestamp();
+        var result = await host.StartForResultAsync(intent, cancellationToken);
+        Log.Debug(
+            ActivityResultLogTag,
+            FormatActivityCommandCompleted("Local", intent, result, startedAt));
+        return result;
+    }
+
+    private static async Task<AndroidActivityResult> RunWorkProfileActivityCommandAsync(
+        IAndroidActivityHost host,
+        Intent intent,
+        bool isLaunchCommand,
+        CancellationToken cancellationToken)
+    {
+        var profileCommandTimeout = GetProfileCommandTimeout(intent);
+        using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCancellation.CancelAfter(profileCommandTimeout);
+        try
+        {
+            Log.Debug(
+                ActivityResultLogTag,
+                $"Starting work-profile activity command. action={GetActionForLog(intent)}, timeoutMs={profileCommandTimeout.TotalMilliseconds:0}.");
+            var startedAt = Stopwatch.GetTimestamp();
+            var result = await host.StartForResultAsync(intent, timeoutCancellation.Token);
+            Log.Debug(
+                ActivityResultLogTag,
+                FormatActivityCommandCompleted("Work-profile", intent, result, startedAt));
+            return result;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            Log.Warn(
+                ActivityResultLogTag,
+                $"Timed out waiting for work-profile activity result. action={GetActionForLog(intent)}, timeoutMs={profileCommandTimeout.TotalMilliseconds:0}.");
+            return CreateWorkProfileTimeoutResult(intent, isLaunchCommand, profileCommandTimeout);
+        }
+    }
+
+    private static AndroidActivityResult CreateWorkProfileTimeoutResult(
+        Intent intent,
+        bool isLaunchCommand,
+        TimeSpan profileCommandTimeout)
+    {
+        if (!isLaunchCommand)
+            return AndroidActivityResultApi.CreateCanceledResult(
+                "Рабочий профиль не ответил на системную команду вовремя.");
+
+        var launchResult = CreateLaunchResult(intent)
+            .Fail(
+                AndroidAppLaunchStage.CommandReceived,
+                AndroidAppLaunchIssueKind.WorkProfileUnavailable,
+                $"timeoutMs={profileCommandTimeout.TotalMilliseconds:0}");
+        launchResult.Log(ActivityResultLogTag);
+        return launchResult.ToActivityResult();
+    }
+
+    private static string FormatActivityCommandCompleted(
+        string commandScope,
+        Intent intent,
+        AndroidActivityResult result,
+        long startedAt)
+    {
+        return $"{commandScope} activity command completed. action={GetActionForLog(intent)}, result={result.ResultCode}, elapsedMs={Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds:0}, error={AndroidActivityResultApi.ExtractError(result) ?? "<none>"}, message={AndroidActivityResultApi.ExtractMessage(result) ?? "<none>"}.";
+    }
+
+    private static string GetActionForLog(Intent intent)
+    {
+        return intent.Action ?? "<none>";
+    }
+
     private static bool IsLaunchCommand(Intent intent)
     {
         return string.Equals(intent.Action, AgnosiaActions.UnfreezeAndLaunch, StringComparison.Ordinal);
@@ -190,8 +225,8 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
     private static AndroidAppLaunchResult CreateLaunchResult(Intent intent)
     {
         return AndroidAppLaunchResult.CommandReceived(
-            intent.GetStringExtra("packageName"),
-            intent.GetStringExtra("displayName"));
+            intent.GetStringExtra(AndroidCommandContract.ExtraLaunchPackageName),
+            intent.GetStringExtra(AndroidCommandContract.ExtraLaunchDisplayName));
     }
 
     private static AndroidActivityResult? TryCreatePreflightLaunchFailure(Activity activity, Intent intent)

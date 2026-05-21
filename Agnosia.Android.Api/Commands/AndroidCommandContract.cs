@@ -2,6 +2,21 @@ namespace Agnosia.Android.Api.Commands;
 
 public static class AndroidCommandContract
 {
+    public const string ExtraPackage = "package";
+    public const string ExtraPackages = "packages";
+    public const string ExtraIsSystem = "is_system";
+    public const string ExtraApk = "apk";
+    public const string ExtraSplitApks = "split_apks";
+    public const string ExtraShowAll = "show_all";
+    public const string ExtraPreferenceName = "name";
+    public const string ExtraPreferenceBoolean = "boolean";
+    public const string ExtraLaunchPackageName = "packageName";
+    public const string ExtraLaunchDisplayName = "displayName";
+    public const string ExtraShortcutTargetActivity = "targetActivity";
+    public const string ExtraShortcutLabel = "label";
+    public const string ExtraShortcutIconBase64 = "iconBase64";
+    public const string ExtraShortcutToken = "shortcutToken";
+    public const string ExtraTrigger = "trigger";
     public const string ResultAppsJson = "apps_json";
     public const string ResultIconPng = "icon_png";
     public const string ResultIconsBundle = "icons_bundle";

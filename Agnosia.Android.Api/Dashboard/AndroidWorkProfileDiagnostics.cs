@@ -220,17 +220,12 @@ internal static class AndroidWorkProfileDiagnosticsReader
         UserHandle managedProfile,
         List<string> notes)
     {
-        if (userManager is null) return null;
-
-        try
-        {
-            return userManager.IsQuietModeEnabled(managedProfile);
-        }
-        catch (Exception exception)
-        {
-            notes.Add($"quietMode=error:{exception.GetType().Name}");
-            return null;
-        }
+        return TryReadManagedProfileFlag(
+            userManager,
+            managedProfile,
+            notes,
+            "quietMode",
+            static (manager, profile) => manager.IsQuietModeEnabled(profile));
     }
 
     private static bool? TryReadUserRunning(
@@ -238,15 +233,30 @@ internal static class AndroidWorkProfileDiagnosticsReader
         UserHandle managedProfile,
         List<string> notes)
     {
+        return TryReadManagedProfileFlag(
+            userManager,
+            managedProfile,
+            notes,
+            "userRunning",
+            static (manager, profile) => manager.IsUserRunning(profile));
+    }
+
+    private static bool? TryReadManagedProfileFlag(
+        UserManager? userManager,
+        UserHandle managedProfile,
+        List<string> notes,
+        string noteName,
+        Func<UserManager, UserHandle, bool> readFlag)
+    {
         if (userManager is null) return null;
 
         try
         {
-            return userManager.IsUserRunning(managedProfile);
+            return readFlag(userManager, managedProfile);
         }
         catch (Exception exception)
         {
-            notes.Add($"userRunning=error:{exception.GetType().Name}");
+            notes.Add($"{noteName}=error:{exception.GetType().Name}");
             return null;
         }
     }

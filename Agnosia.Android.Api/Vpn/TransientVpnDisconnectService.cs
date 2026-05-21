@@ -28,6 +28,8 @@ public sealed class TransientVpnDisconnectService : VpnService
     private const string NotificationChannelDescription =
         "Временное отключение стороннего VPN перед запуском рабочего приложения";
 
+    private const string StartServiceFailureMessage = "Agnosia не смог запустить временную VPN-службу.";
+
     private static readonly TimeSpan EstablishHoldTime = TimeSpan.FromMilliseconds(350);
     private static readonly TimeSpan PostCloseDelay = TimeSpan.FromMilliseconds(120);
     private static readonly Lock Sync = new();
@@ -95,9 +97,10 @@ public sealed class TransientVpnDisconnectService : VpnService
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
-            CompletePending(OperationResult.Failure("Agnosia не смог запустить временную VPN-службу."));
+            var failure = OperationResult.Failure(StartServiceFailureMessage);
+            CompletePending(failure);
             Log.Error(LogTag, $"Failed to request transient VPN service start: {exception}");
-            return OperationResult.Failure("Agnosia не смог запустить временную VPN-службу.");
+            return failure;
         }
 
         await using var registration = cancellationToken.Register(static _ => CancelPending(), null);
@@ -126,7 +129,7 @@ public sealed class TransientVpnDisconnectService : VpnService
         catch (Exception exception)
         {
             Log.Error(LogTag, $"Failed to start transient VPN service: {exception}");
-            Complete(OperationResult.Failure("Agnosia не смог запустить временную VPN-службу."));
+            Complete(OperationResult.Failure(StartServiceFailureMessage));
             StopSelf(startId);
         }
 
@@ -144,9 +147,7 @@ public sealed class TransientVpnDisconnectService : VpnService
     {
         try
         {
-            _vpnInterface?.Close();
-            _vpnInterface?.Dispose();
-            _vpnInterface = null;
+            CloseVpnInterface();
         }
         catch (IOException exception)
         {
@@ -177,9 +178,7 @@ public sealed class TransientVpnDisconnectService : VpnService
 
             await Task.Delay(EstablishHoldTime);
 
-            _vpnInterface.Close();
-            _vpnInterface.Dispose();
-            _vpnInterface = null;
+            CloseVpnInterface();
 
             await Task.Delay(PostCloseDelay);
             Complete(OperationResult.Success("VPN отключен."));
@@ -203,6 +202,13 @@ public sealed class TransientVpnDisconnectService : VpnService
             .AddAddress("10.73.0.1", 32);
 
         return builder.Establish();
+    }
+
+    private void CloseVpnInterface()
+    {
+        _vpnInterface?.Close();
+        _vpnInterface?.Dispose();
+        _vpnInterface = null;
     }
 
     private void StartForegroundServiceNotification()

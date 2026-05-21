@@ -1,6 +1,5 @@
 using System.Runtime.Versioning;
 using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Gateways;
 using Agnosia.Android.Api.Internal;
 using Agnosia.Android.Api.Platform;
 using Android.Content;
@@ -17,7 +16,7 @@ public static class AndroidPendingIntentApi
     {
         var intent = new Intent(context, receiverType);
         intent.SetAction(AgnosiaActions.WorkAppFrozen);
-        intent.PutExtra(AndroidProfileCommandGateway.ExtraTrigger, $"pending_intent_callback:{packageName}");
+        intent.PutExtra(AndroidCommandContract.ExtraTrigger, $"pending_intent_callback:{packageName}");
         AuthenticationUtility.SignWorkAppFrozenCallback(intent, packageName);
 
         Log.Debug(

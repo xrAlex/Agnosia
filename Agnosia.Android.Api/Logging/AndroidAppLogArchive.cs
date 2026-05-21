@@ -28,18 +28,12 @@ public static class AndroidAppLogArchive
         if (string.IsNullOrWhiteSpace(message)) return;
 
         AgnosiaRuntime.Initialize(context);
-        var appContext = context.ApplicationContext ?? context;
+        var appContext = GetApplicationContext(context);
         lock (Sync)
         {
             if (!LocalStorageManager.Instance.GetBoolean(StorageKeys.LoggingEnabled, true)) return;
 
-            PendingEntries.Add(new AppLogEntry(
-                Guid.NewGuid().ToString("N"),
-                DateTimeOffset.Now,
-                ResolveProfile(appContext),
-                level,
-                tag,
-                message));
+            PendingEntries.Add(CreateEntry(appContext, level, tag, message));
 
             Trim(PendingEntries);
             EnsureFlushScheduledLocked(appContext);
@@ -51,7 +45,7 @@ public static class AndroidAppLogArchive
         AgnosiaRuntime.Initialize(context);
         lock (Sync)
         {
-            FlushPendingLocked(context.ApplicationContext ?? context);
+            FlushPendingLocked(GetApplicationContext(context));
             return LoadCore();
         }
     }
@@ -94,6 +88,21 @@ public static class AndroidAppLogArchive
                 FlushScheduled = false;
             }
         }
+    }
+
+    private static AppLogEntry CreateEntry(
+        Context context,
+        AppLogLevel level,
+        string tag,
+        string message)
+    {
+        return new AppLogEntry(
+            Guid.NewGuid().ToString("N"),
+            DateTimeOffset.Now,
+            ResolveProfile(context),
+            level,
+            tag,
+            message);
     }
 
     private static void FlushPendingLocked(Context? context)
@@ -145,6 +154,11 @@ public static class AndroidAppLogArchive
     private static void Trim(List<AppLogEntry> entries)
     {
         while (entries.Count > MaxEntries) entries.RemoveAt(0);
+    }
+
+    private static Context GetApplicationContext(Context context)
+    {
+        return context.ApplicationContext ?? context;
     }
 
     private static ProfileKind ResolveProfile(Context context)

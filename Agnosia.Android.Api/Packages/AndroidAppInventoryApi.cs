@@ -54,9 +54,7 @@ public static class AndroidAppInventoryApi
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (string.IsNullOrWhiteSpace(packageName)
-            || string.Equals(packageName, context.PackageName, StringComparison.Ordinal))
-            return null;
+        if (IsCurrentOrInvalidPackage(context, packageName)) return null;
 
         try
         {
@@ -82,9 +80,7 @@ public static class AndroidAppInventoryApi
         PackageManager packageManager,
         string packageName)
     {
-        if (string.IsNullOrWhiteSpace(packageName)
-            || string.Equals(packageName, context.PackageName, StringComparison.Ordinal))
-            return null;
+        if (IsCurrentOrInvalidPackage(context, packageName)) return null;
 
         try
         {
@@ -109,10 +105,7 @@ public static class AndroidAppInventoryApi
         ApplicationInfo app,
         bool showAll)
     {
-        var packageName = app.PackageName;
-        if (string.IsNullOrWhiteSpace(packageName)
-            || string.Equals(packageName, context.PackageName, StringComparison.Ordinal))
-            return null;
+        if (!TryGetPackageName(context, app, out var packageName)) return null;
 
         var isSystem = AndroidWorkProfilePackageClassifier.IsSystemApp(app);
         var isInstalled = (app.Flags & ApplicationInfoFlags.Installed) != 0;
@@ -124,22 +117,16 @@ public static class AndroidAppInventoryApi
         {
             if (!TryGetPackageIdentity(packageManager, packageName, out var identity)) return null;
 
-            return new AppServiceModel
-            {
-                PackageName = packageName,
-                Label = packageManager.GetApplicationLabel(app),
-                SourceDirectory = app.SourceDir,
-                SplitApks = app.SplitSourceDirs?.ToArray() ?? [],
-                IsSystem = true,
-                IsHidden = isHidden,
-                CanLaunch = packageManager.GetLaunchIntentForPackage(packageName) is not null,
-                IsInstalled = isInstalled,
-                PermissionRiskLevel = permissionRisk.Level,
-                RiskyPermissions = permissionRisk.RiskyPermissions.ToArray(),
-                IconPng = TryGetCachedIcon(context, packageName, identity, out var systemCachedIcon)
-                    ? systemCachedIcon
-                    : AndroidAppIconWarmupQueue.TryLoadCachedOrQueue(context, packageManager, packageName)
-            };
+            return CreateModel(
+                context,
+                packageManager,
+                app,
+                packageName,
+                true,
+                isHidden,
+                isInstalled,
+                identity,
+                permissionRisk);
         }
 
         if (!TryGetPackageInventoryDetails(
@@ -148,6 +135,29 @@ public static class AndroidAppInventoryApi
                 out var packageIdentity,
                 out permissionRisk)) return null;
 
+        return CreateModel(
+            context,
+            packageManager,
+            app,
+            packageName,
+            isSystem,
+            isHidden,
+            isInstalled,
+            packageIdentity,
+            permissionRisk);
+    }
+
+    private static AppServiceModel CreateModel(
+        Context context,
+        PackageManager packageManager,
+        ApplicationInfo app,
+        string packageName,
+        bool isSystem,
+        bool isHidden,
+        bool isInstalled,
+        PackageIdentity packageIdentity,
+        AppPermissionRiskAnalysis permissionRisk)
+    {
         return new AppServiceModel
         {
             PackageName = packageName,
@@ -160,10 +170,29 @@ public static class AndroidAppInventoryApi
             IsInstalled = isInstalled,
             PermissionRiskLevel = permissionRisk.Level,
             RiskyPermissions = permissionRisk.RiskyPermissions.ToArray(),
-            IconPng = TryGetCachedIcon(context, packageName, packageIdentity, out var appCachedIcon)
-                ? appCachedIcon
+            IconPng = TryGetCachedIcon(context, packageName, packageIdentity, out var cachedIcon)
+                ? cachedIcon
                 : AndroidAppIconWarmupQueue.TryLoadCachedOrQueue(context, packageManager, packageName)
         };
+    }
+
+    private static bool IsCurrentOrInvalidPackage(Context context, string? packageName)
+    {
+        return string.IsNullOrWhiteSpace(packageName)
+               || string.Equals(packageName, context.PackageName, StringComparison.Ordinal);
+    }
+
+    private static bool TryGetPackageName(Context context, ApplicationInfo app, out string packageName)
+    {
+        var candidate = app.PackageName;
+        if (IsCurrentOrInvalidPackage(context, candidate))
+        {
+            packageName = null!;
+            return false;
+        }
+
+        packageName = candidate!;
+        return true;
     }
 
     private static bool TryIsApplicationHidden(
@@ -301,32 +330,6 @@ public static class AndroidAppInventoryApi
             }
 
             return true;
-        }
-
-        return false;
-    }
-
-    private static bool TryGetMemoryCachedIcon(
-        Context context,
-        string packageName,
-        PackageIdentity identity,
-        out byte[]? iconPng)
-    {
-        iconPng = null;
-
-        lock (IconCacheSync)
-        {
-            if (IconCache.TryGetValue(packageName, out var entry) && entry.Identity == identity)
-            {
-                if (entry.IconPng is { Length: > 0 })
-                {
-                    iconPng = entry.IconPng;
-                    return true;
-                }
-
-                IconCache.Remove(packageName);
-                return false;
-            }
         }
 
         return false;

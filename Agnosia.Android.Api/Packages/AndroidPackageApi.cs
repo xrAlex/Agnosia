@@ -62,10 +62,7 @@ public static class AndroidPackageApi
                 return false;
 
             var parts = new List<string>();
-            AddPart(parts, app.SourceDir);
-            if (app.SplitSourceDirs is not null)
-                foreach (var splitSourceDir in app.SplitSourceDirs)
-                    AddPart(parts, splitSourceDir);
+            AddInstallParts(parts, app.SourceDir, app.SplitSourceDirs);
 
             if (!AreInstallPartsAvailable(parts)) return false;
 
@@ -233,25 +230,16 @@ public static class AndroidPackageApi
                     return null;
                 }
 
-                AddPart(parts, app.SourceDir);
-                if (app.SplitSourceDirs is not null)
-                    foreach (var splitSourceDir in app.SplitSourceDirs)
-                        AddPart(parts, splitSourceDir);
+                AddInstallParts(parts, app.SourceDir, app.SplitSourceDirs);
             }
             catch (PackageManager.NameNotFoundException) when (!string.IsNullOrWhiteSpace(apkPath))
             {
-                AddPart(parts, apkPath);
-                if (splitApks is not null)
-                    foreach (var splitApk in splitApks)
-                        AddPart(parts, splitApk);
+                AddInstallParts(parts, apkPath, splitApks);
             }
         }
         else
         {
-            AddPart(parts, apkPath);
-            if (splitApks is not null)
-                foreach (var splitApk in splitApks)
-                    AddPart(parts, splitApk);
+            AddInstallParts(parts, apkPath, splitApks);
         }
 
         if (parts.Count == 0)
@@ -269,7 +257,16 @@ public static class AndroidPackageApi
         return parts;
     }
 
-    private static void AddPart(List<string> parts, string? path)
+    private static void AddInstallParts(List<string> parts, string? sourcePath, IEnumerable<string>? splitPaths)
+    {
+        AddInstallPart(parts, sourcePath);
+        if (splitPaths is null) return;
+
+        foreach (var splitPath in splitPaths)
+            AddInstallPart(parts, splitPath);
+    }
+
+    private static void AddInstallPart(List<string> parts, string? path)
     {
         if (!string.IsNullOrWhiteSpace(path)) parts.Add(path);
     }
