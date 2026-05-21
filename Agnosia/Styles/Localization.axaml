@@ -40,7 +40,6 @@
     <system:String x:Key="String.Dashboard.WP.Pending">Настраивается</system:String>
     <system:String x:Key="String.Dashboard.WP.QuietMode">Пауза</system:String>
     <system:String x:Key="String.Dashboard.WP.Disabled">Выключен</system:String>
-    <system:String x:Key="String.Dashboard.WP.CommandIssue">Нет связи</system:String>
 
     <system:String x:Key="String.Dashboard.State.Loading">Загрузка состояния профиля</system:String>
     <system:String x:Key="String.Dashboard.State.NotSupported">Рабочие профили не поддерживаются на этом устройстве</system:String>
@@ -50,7 +49,6 @@
     <system:String x:Key="String.Dashboard.State.WPUnavailable">Рабочий профиль временно недоступен</system:String>
     <system:String x:Key="String.Dashboard.State.WPQuietMode">Рабочий профиль на паузе</system:String>
     <system:String x:Key="String.Dashboard.State.WPDisabled">Рабочий профиль выключен или заблокирован</system:String>
-    <system:String x:Key="String.Dashboard.State.WPCommandIssue">Нет подтвержденной связи с рабочим профилем</system:String>
 
     <system:String x:Key="String.Dashboard.Health.Error">Ошибка</system:String>
     <system:String x:Key="String.Dashboard.Health.Updating">Обновление</system:String>
@@ -65,7 +63,6 @@
     <system:String x:Key="String.Dashboard.Detail.WPUnavailable">Рабочий профиль создан, но сейчас недоступен.</system:String>
     <system:String x:Key="String.Dashboard.Detail.WPQuietMode">Включите рабочий профиль в Android, затем обновите состояние.</system:String>
     <system:String x:Key="String.Dashboard.Detail.WPDisabled">Android видит профиль, но не разрешает межпрофильные операции.</system:String>
-    <system:String x:Key="String.Dashboard.Detail.WPCommandIssue">Профиль найден, но Agnosia пока не подтвердила управление им.</system:String>
     <system:String x:Key="String.Dashboard.Detail.Ok">Рабочий профиль доступен, каталог обновлен, ошибок нет.</system:String>
 
     <!-- Permissions -->

@@ -91,6 +91,29 @@ public sealed class DashboardWorkspaceSnapshotTests
 
         Assert.False(viewModel.WorkProfileRecoveryDismissed);
         Assert.True(viewModel.IsWorkProfileRecoveryVisible);
-        Assert.Equal("Рабочий профиль недоступен", viewModel.WorkProfileRecoveryTitle);
+        Assert.Equal("Рабочий профиль временно недоступен", viewModel.WorkProfileRecoveryTitle);
+    }
+
+    // Проверяет, что recovery показывает простое действие без диагностического дампа Android.
+    [Fact]
+    public async Task Dashboard_snapshot_shows_simplified_recovery_message_without_diagnostics()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(
+                workProfileAvailable: false,
+                workProfileState: WorkProfileStateKind.WorkProfileCommandChannelUnavailable,
+                workProfileRecovery: WorkProfileRecoveryKind.WorkProfileCommandChannelUnavailable,
+                workProfileDiagnosticReason: "state=WorkProfileCommandChannelUnavailable; ownerCheck=Unreachable")
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+
+        await viewModel.EnsureInitializedAsync();
+
+        Assert.True(viewModel.IsWorkProfileRecoveryVisible);
+        Assert.Equal("Agnosia не может управлять рабочим профилем", viewModel.WorkProfileRecoveryTitle);
+        Assert.Equal(
+            "Удалите рабочий профиль в настройках Android, затем создайте его заново через Agnosia.",
+            viewModel.WorkProfileRecoveryMessage);
     }
 }

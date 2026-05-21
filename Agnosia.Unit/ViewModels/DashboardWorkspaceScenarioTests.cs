@@ -163,8 +163,10 @@ public sealed class DashboardWorkspaceScenarioTests
         Assert.False(viewModel.WorkProfileAvailable);
         Assert.Equal("QuietMode", viewModel.WorkProfileStatusText);
         Assert.True(viewModel.IsWorkProfileRecoveryVisible);
-        Assert.Equal("Рабочий профиль выключен", viewModel.WorkProfileRecoveryTitle);
-        Assert.Contains("quiet mode is active", viewModel.WorkProfileRecoveryMessage, StringComparison.Ordinal);
+        Assert.Equal("Рабочий профиль временно недоступен", viewModel.WorkProfileRecoveryTitle);
+        Assert.Equal(
+            "Подождите несколько секунд, включите или разблокируйте рабочий профиль в Android, затем обновите экран.",
+            viewModel.WorkProfileRecoveryMessage);
         Assert.False(viewModel.CanContinueOnboardingFromWorkProfile);
     }
 

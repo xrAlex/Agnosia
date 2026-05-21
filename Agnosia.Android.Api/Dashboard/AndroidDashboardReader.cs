@@ -322,9 +322,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
                 storedHasSetup,
                 onboardingCompleted))
         {
-            return profileDiagnostics.ManagedProfileExists
-                ? WorkProfileStateKind.ForeignProfileOwner
-                : WorkProfileStateKind.NoWorkProfile;
+            return WorkProfileStateKind.NoWorkProfile;
         }
 
         if (profileDiagnostics.QuietModeEnabled == true) return WorkProfileStateKind.WorkProfileQuietMode;

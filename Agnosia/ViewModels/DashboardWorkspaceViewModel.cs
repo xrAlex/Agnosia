@@ -322,43 +322,31 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public string WorkProfileRecoveryTitle => WorkProfileRecovery switch
     {
-        WorkProfileRecoveryKind.WorkProfileQuietMode => "Рабочий профиль выключен",
-        WorkProfileRecoveryKind.WorkProfileUnavailable => "Рабочий профиль недоступен",
-        WorkProfileRecoveryKind.WorkProfileCommandTargetUnavailable => "Agnosia не видна в рабочем профиле",
-        WorkProfileRecoveryKind.WorkProfileCommandChannelUnavailable => "Рабочий профиль не отвечает",
-        WorkProfileRecoveryKind.WorkProfileCreatedButAppNotReady => "Рабочий профиль еще не готов",
-        WorkProfileRecoveryKind.AppInstalledInWorkProfileButNotOwner => "Agnosia не владелец профиля",
+        WorkProfileRecoveryKind.WorkProfileQuietMode
+            or WorkProfileRecoveryKind.WorkProfileUnavailable
+            or WorkProfileRecoveryKind.WorkProfileCreatedButAppNotReady => "Рабочий профиль временно недоступен",
+        WorkProfileRecoveryKind.WorkProfileCommandTargetUnavailable
+            or WorkProfileRecoveryKind.WorkProfileCommandChannelUnavailable
+            or WorkProfileRecoveryKind.AppInstalledInWorkProfileButNotOwner => "Agnosia не может управлять рабочим профилем",
         WorkProfileRecoveryKind.ForeignProfileOwner => "Рабочим профилем управляет другое приложение",
-        WorkProfileRecoveryKind.ErrorUnknownWithDiagnostics => "Состояние профиля неясно",
+        WorkProfileRecoveryKind.ErrorUnknownWithDiagnostics => "Рабочий профиль требует повторной настройки",
         _ => "Проблема с рабочим профилем"
     };
 
     public string WorkProfileRecoveryMessage => WorkProfileRecovery switch
     {
-        WorkProfileRecoveryKind.WorkProfileQuietMode =>
-            WithDiagnosticReason(
-                "Android сообщает, что рабочий профиль находится в режиме паузы. Включите рабочий профиль в быстрых настройках или настройках Android, затем обновите экран."),
-        WorkProfileRecoveryKind.WorkProfileUnavailable =>
-            WithDiagnosticReason(
-                "Android видит профиль в группе пользователя, но не предоставляет его для межпрофильных операций. Включите или разблокируйте рабочий профиль в настройках Android, затем обновите экран."),
-        WorkProfileRecoveryKind.WorkProfileCommandTargetUnavailable =>
-            WithDiagnosticReason(
-                "Рабочий профиль доступен Android, но командная активность Agnosia в нем не находится. Подождите завершения установки/запуска профиля, проверьте что Agnosia установлена в рабочем профиле, затем обновите экран."),
-        WorkProfileRecoveryKind.WorkProfileCommandChannelUnavailable =>
-            WithDiagnosticReason(
-                "Командная активность Agnosia найдена в рабочем профиле, но подтвержденный ping не прошел. Разблокируйте или включите рабочий профиль и обновите экран."),
-        WorkProfileRecoveryKind.WorkProfileCreatedButAppNotReady =>
-            WithDiagnosticReason(
-                "Android видит рабочий профиль, но Agnosia в нем пока не отвечает. Подождите, разблокируйте или включите рабочий профиль и обновите экран."),
-        WorkProfileRecoveryKind.AppInstalledInWorkProfileButNotOwner =>
-            WithDiagnosticReason(
-                "Agnosia ответила из рабочего профиля, но Android сообщил, что она не владелец профиля. Чтобы Agnosia управляла этим профилем, удалите старый рабочий профиль в настройках Android и создайте его заново."),
+        WorkProfileRecoveryKind.WorkProfileQuietMode
+            or WorkProfileRecoveryKind.WorkProfileUnavailable
+            or WorkProfileRecoveryKind.WorkProfileCreatedButAppNotReady =>
+            "Подождите несколько секунд, включите или разблокируйте рабочий профиль в Android, затем обновите экран.",
+        WorkProfileRecoveryKind.WorkProfileCommandTargetUnavailable
+            or WorkProfileRecoveryKind.WorkProfileCommandChannelUnavailable
+            or WorkProfileRecoveryKind.AppInstalledInWorkProfileButNotOwner =>
+            "Удалите рабочий профиль в настройках Android, затем создайте его заново через Agnosia.",
         WorkProfileRecoveryKind.ForeignProfileOwner =>
-            WithDiagnosticReason(
-                "Диагностика Android указывает на другого владельца рабочего профиля. Удалите этот рабочий профиль в настройках Android, затем создайте профиль Agnosia заново."),
+            "Удалите существующий рабочий профиль в настройках Android, затем создайте профиль заново через Agnosia.",
         WorkProfileRecoveryKind.ErrorUnknownWithDiagnostics =>
-            WithDiagnosticReason(
-                "Agnosia не смогла надежно определить состояние рабочего профиля. Обновите экран или проверьте рабочий профиль в настройках Android."),
+            "Обновите экран. Если состояние не изменится, удалите рабочий профиль в настройках Android и создайте его заново через Agnosia.",
         _ => string.Empty
     };
 
@@ -1835,13 +1823,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private static string ResolveExceptionMessage(Exception _, string fallback)
     {
         return fallback;
-    }
-
-    private string WithDiagnosticReason(string message)
-    {
-        return string.IsNullOrWhiteSpace(WorkProfileDiagnosticReason)
-            ? message
-            : $"{message} Причина: {WorkProfileDiagnosticReason}.";
     }
 
     private static string GetAppVersion()

@@ -12,8 +12,8 @@ public sealed class DashboardStatusTextFormatterTests
     [InlineData(WorkProfileStateKind.ProvisioningInProgress, false, false, "Pending")]
     [InlineData(WorkProfileStateKind.WorkProfileQuietMode, false, true, "QuietMode")]
     [InlineData(WorkProfileStateKind.WorkProfileUnavailable, false, true, "Disabled")]
-    [InlineData(WorkProfileStateKind.WorkProfileCommandTargetUnavailable, false, true, "CommandIssue")]
-    [InlineData(WorkProfileStateKind.WorkProfileCommandChannelUnavailable, false, true, "CommandIssue")]
+    [InlineData(WorkProfileStateKind.WorkProfileCommandTargetUnavailable, false, true, "Unavailable")]
+    [InlineData(WorkProfileStateKind.WorkProfileCommandChannelUnavailable, false, true, "Unavailable")]
     [InlineData(WorkProfileStateKind.NoWorkProfile, false, false, "NotCreated")]
     [InlineData(WorkProfileStateKind.NoWorkProfile, false, true, "Unavailable")]
     public void GetWorkProfileStatus_returns_expected_status_key(
@@ -39,7 +39,7 @@ public sealed class DashboardStatusTextFormatterTests
     [InlineData(true, true, true, false, true, WorkProfileStateKind.AppIsProfileOwner, "Active")]
     [InlineData(true, true, true, false, false, WorkProfileStateKind.WorkProfileQuietMode, "WPQuietMode")]
     [InlineData(true, true, true, false, false, WorkProfileStateKind.WorkProfileUnavailable, "WPDisabled")]
-    [InlineData(true, true, true, false, false, WorkProfileStateKind.WorkProfileCommandTargetUnavailable, "WPCommandIssue")]
+    [InlineData(true, true, true, false, false, WorkProfileStateKind.WorkProfileCommandTargetUnavailable, "WPUnavailable")]
     [InlineData(true, true, true, false, false, WorkProfileStateKind.NoWorkProfile, "WPUnavailable")]
     public void GetOverviewHeadline_respects_status_priority(
         bool hasLoadedSnapshot,
@@ -99,7 +99,7 @@ public sealed class DashboardStatusTextFormatterTests
     [InlineData(false, true, false, true, false, true, WorkProfileStateKind.AppIsProfileOwner, "NotSetup")]
     [InlineData(false, true, false, true, true, false, WorkProfileStateKind.WorkProfileQuietMode, "WPQuietMode")]
     [InlineData(false, true, false, true, true, false, WorkProfileStateKind.WorkProfileUnavailable, "WPDisabled")]
-    [InlineData(false, true, false, true, true, false, WorkProfileStateKind.WorkProfileCommandChannelUnavailable, "WPCommandIssue")]
+    [InlineData(false, true, false, true, true, false, WorkProfileStateKind.WorkProfileCommandChannelUnavailable, "WPUnavailable")]
     [InlineData(false, true, false, true, true, false, WorkProfileStateKind.NoWorkProfile, "WPUnavailable")]
     [InlineData(false, true, false, true, true, true, WorkProfileStateKind.AppIsProfileOwner, "Ok")]
     public void GetOverallStatusCaption_returns_expected_key(

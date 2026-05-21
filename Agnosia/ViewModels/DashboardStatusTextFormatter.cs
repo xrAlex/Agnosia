@@ -16,8 +16,6 @@ internal static class DashboardStatusTextFormatter
                 WorkProfileStateKind.ProvisioningInProgress => "Pending",
                 WorkProfileStateKind.WorkProfileQuietMode => "QuietMode",
                 WorkProfileStateKind.WorkProfileUnavailable => "Disabled",
-                WorkProfileStateKind.WorkProfileCommandTargetUnavailable
-                    or WorkProfileStateKind.WorkProfileCommandChannelUnavailable => "CommandIssue",
                 _ => hasSetup ? "Unavailable" : "NotCreated"
             };
     }
@@ -90,8 +88,6 @@ internal static class DashboardStatusTextFormatter
         {
             WorkProfileStateKind.WorkProfileQuietMode => "WPQuietMode",
             WorkProfileStateKind.WorkProfileUnavailable => "WPDisabled",
-            WorkProfileStateKind.WorkProfileCommandTargetUnavailable
-                or WorkProfileStateKind.WorkProfileCommandChannelUnavailable => "WPCommandIssue",
             _ => "WPUnavailable"
         };
     }
@@ -102,8 +98,6 @@ internal static class DashboardStatusTextFormatter
         {
             WorkProfileStateKind.WorkProfileQuietMode => "WPQuietMode",
             WorkProfileStateKind.WorkProfileUnavailable => "WPDisabled",
-            WorkProfileStateKind.WorkProfileCommandTargetUnavailable
-                or WorkProfileStateKind.WorkProfileCommandChannelUnavailable => "WPCommandIssue",
             _ => "WPUnavailable"
         };
     }
