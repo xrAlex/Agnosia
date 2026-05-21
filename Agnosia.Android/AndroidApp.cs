@@ -1,5 +1,5 @@
 using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Api.Storage;
+using Agnosia.Android.Infrastructure;
 using Agnosia.Infrastructure;
 using Android.Runtime;
 using Avalonia;
@@ -31,26 +31,17 @@ public class AndroidApp : AvaloniaAndroidApplication<App>
     {
         AgnosiaRuntime.Initialize(this);
 
-        var suppressPrimaryUiStartup = false;
-        try
-        {
-            suppressPrimaryUiStartup = AgnosiaUtilities.IsProfileOwner(this);
-        }
-        catch (Exception exception)
-        {
-            global::Android.Util.Log.Warn(
-                nameof(AndroidApp),
-                $"Profile-owner application startup check failed: {exception.Message}");
-        }
+        var suppressPrimaryUiStartup = AndroidStartup.TryIsProfileOwner(
+            this,
+            nameof(AndroidApp),
+            "Profile-owner application startup check failed");
 
         if (suppressPrimaryUiStartup)
         {
-            ServiceRegistry.SuppressPrimaryUiStartup = true;
+            AndroidStartup.SuppressPrimaryUiStartup();
             return;
         }
 
-        ServiceRegistry.SuppressPrimaryUiStartup = false;
-        ServiceRegistry.PlatformBridge = AndroidPlatformBridge.Instance;
-        ServiceRegistry.InitialTheme = AndroidSettingsStore.LoadAppTheme(LocalStorageManager.Instance);
+        AndroidStartup.ConfigurePrimaryProfileServices();
     }
 }

@@ -6,14 +6,13 @@ using Agnosia.Android.Api.Packages;
 using Agnosia.Android.Api.Permissions;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Api.Storage;
-using Agnosia.Android.Api.Vpn;
+using Agnosia.Android.Infrastructure;
 using Agnosia.Android.Receivers;
 using Agnosia.Android.Services;
 using Agnosia.Android.Shortcuts;
 using Android.App.Admin;
 using Android.Content;
 using Android.Content.PM;
-using Java.Lang;
 using Exception = System.Exception;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
@@ -58,9 +57,6 @@ public sealed class DummyActivity : Activity
     private static readonly TimeSpan PackageAvailabilityRetryDelay = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan HideAfterInstallRetryTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan HideAfterInstallRetryDelay = TimeSpan.FromMilliseconds(500);
-    private static readonly Lock PackageInstallerCallbackSync = new();
-    private static DummyActivity? _activeInstance;
-    private static Intent? _pendingPackageInstallerCallback;
     private static readonly Type AdminReceiverType = typeof(AgnosiaDeviceAdminReceiver);
 
     private DevicePolicyManager? _policyManager;
@@ -78,13 +74,9 @@ public sealed class DummyActivity : Activity
         _isProfileOwner = _policyManager?.IsProfileOwnerApp(PackageName) == true;
         if (_isProfileOwner)
         {
-            AgnosiaUtilities.EnforceWorkProfilePolicies(
+            AndroidStartup.EnforceWorkProfilePoliciesAndStartLockFreezeMonitor(
                 this,
-                AdminReceiverType,
-                MainActivity.LauncherActivityName,
                 string.Equals(Intent?.Action, AgnosiaActions.FinalizeProvision, StringComparison.Ordinal));
-            AgnosiaUtilities.EnforceUserRestrictions(this, AdminReceiverType);
-            WorkProfileLockFreezeService.EnsureRunning(this);
         }
 
         HandleAction();
@@ -94,32 +86,20 @@ public sealed class DummyActivity : Activity
     {
         base.OnResume();
 
-        lock (PackageInstallerCallbackSync)
-        {
-            _activeInstance = this;
-        }
-
+        PackageInstallerCallbackCoordinator.RegisterActive(this);
         DeliverPendingPackageInstallerCallback();
     }
 
     protected override void OnPause()
     {
-        lock (PackageInstallerCallbackSync)
-        {
-            if (ReferenceEquals(_activeInstance, this)) _activeInstance = null;
-        }
-
+        PackageInstallerCallbackCoordinator.UnregisterActive(this);
         base.OnPause();
     }
 
     protected override void OnDestroy()
     {
         _destroyCancellation.Cancel();
-        lock (PackageInstallerCallbackSync)
-        {
-            if (ReferenceEquals(_activeInstance, this)) _activeInstance = null;
-        }
-
+        PackageInstallerCallbackCoordinator.UnregisterActive(this);
         _destroyCancellation.Dispose();
         base.OnDestroy();
     }
@@ -209,12 +189,7 @@ public sealed class DummyActivity : Activity
 
                     if (_isProfileOwner)
                     {
-                        AgnosiaUtilities.EnforceWorkProfilePolicies(
-                            this,
-                            AdminReceiverType,
-                            MainActivity.LauncherActivityName);
-                        AgnosiaUtilities.EnforceUserRestrictions(this, AdminReceiverType);
-                        WorkProfileLockFreezeService.EnsureRunning(this);
+                        AndroidStartup.EnforceWorkProfilePoliciesAndStartLockFreezeMonitor(this);
                     }
 
                     AuthenticationUtility.SignIntent(pingResult);
@@ -995,7 +970,7 @@ public sealed class DummyActivity : Activity
         try
         {
             var proxyIntent = HiddenAppShortcutManager.CreateInternalLaunchIntent(packageName, label: displayName);
-            if (ReadParentFrozenCallback(Intent) is { } parentFrozenCallback)
+            if (AndroidIntentExtras.ReadParentFrozenCallback(Intent) is { } parentFrozenCallback)
                 proxyIntent.PutExtra(AndroidCommandContract.ExtraParentFrozenCallback, parentFrozenCallback);
 
             launchResult.WriteToIntent(proxyIntent);
@@ -1014,20 +989,6 @@ public sealed class DummyActivity : Activity
             failedResult.Log(LogTag);
             FinishWithResult(Result.Canceled, failedResult.ToIntent());
         }
-    }
-
-    private static PendingIntent? ReadParentFrozenCallback(Intent? intent)
-    {
-        if (intent is null) return null;
-
-        if (OperatingSystem.IsAndroidVersionAtLeast(33))
-            return intent.GetParcelableExtra(
-                AndroidCommandContract.ExtraParentFrozenCallback,
-                Class.FromType(typeof(PendingIntent))) as PendingIntent;
-
-#pragma warning disable CA1422
-        return intent.GetParcelableExtra(AndroidCommandContract.ExtraParentFrozenCallback) as PendingIntent;
-#pragma warning restore CA1422
     }
 
     private void ActionSetCrossProfileInteraction()
@@ -1069,7 +1030,7 @@ public sealed class DummyActivity : Activity
         }
 
         if (_isProfileOwner)
-            AgnosiaUtilities.EnforceWorkProfilePolicies(this, AdminReceiverType, MainActivity.LauncherActivityName);
+            AndroidStartup.EnforceWorkProfilePolicies(this);
 
         FinishWithResult(Result.Ok);
     }
@@ -1087,10 +1048,11 @@ public sealed class DummyActivity : Activity
             cancellationToken.ThrowIfCancellationRequested();
             var trigger = Intent?.GetStringExtra(AndroidProfileCommandGateway.ExtraTrigger) ?? "work_app_frozen";
 
-            // The overlay is already visible from the work-app launch; VPN TempActivity
-            // will start without BAL_BLOCK because Android sees a visible non-app window.
-            var result = await AndroidVpnAutomationApi.EnableConfiguredVpnAfterWorkFreezeAsync(this, trigger);
-            cancellationToken.ThrowIfCancellationRequested();
+            var result = await WorkAppFrozenHandler.RestoreParentVpnAndHideOverlayAsync(
+                this,
+                trigger,
+                LogTag,
+                cancellationToken);
             if (result.Succeeded)
             {
                 FinishWithSuccessMessage(result.Message);
@@ -1108,18 +1070,6 @@ public sealed class DummyActivity : Activity
         {
             Log.Error(LogTag, $"Failed to handle work-app frozen event: {exception}");
             FinishWithError("Android не смог обработать событие заморозки приложения.");
-        }
-        finally
-        {
-            // Hide overlay regardless of VPN start success/failure.
-            try
-            {
-                OverlayVpnService.HideOverlay(this);
-            }
-            catch (Exception hideException)
-            {
-                Log.Warn(LogTag, $"Failed to hide overlay after work-app frozen: {hideException.Message}");
-            }
         }
     }
 
@@ -1195,7 +1145,7 @@ public sealed class DummyActivity : Activity
         Finish();
     }
 
-    private void HandlePackageInstallerCallback(Intent? intent)
+    internal void HandlePackageInstallerCallback(Intent? intent)
     {
         RunAction(
             cancellationToken => HandlePackageInstallerCallbackAsync(intent, cancellationToken),
@@ -1258,32 +1208,7 @@ public sealed class DummyActivity : Activity
 
     private void DeliverPendingPackageInstallerCallback()
     {
-        Intent? pendingIntent = null;
-        lock (PackageInstallerCallbackSync)
-        {
-            if (_pendingPackageInstallerCallback is not null)
-            {
-                pendingIntent = new Intent(_pendingPackageInstallerCallback);
-                _pendingPackageInstallerCallback = null;
-            }
-        }
-
-        if (pendingIntent is not null) HandlePackageInstallerCallback(pendingIntent);
-    }
-
-    internal static void DispatchPackageInstallerCallback(Intent intent)
-    {
-        DummyActivity? activity;
-        lock (PackageInstallerCallbackSync)
-        {
-            activity = _activeInstance;
-            if (activity is null)
-            {
-                _pendingPackageInstallerCallback = new Intent(intent);
-                return;
-            }
-        }
-
-        activity.RunOnUiThread(() => activity.HandlePackageInstallerCallback(new Intent(intent)));
+        if (PackageInstallerCallbackCoordinator.TakePendingCallback() is { } pendingCallback)
+            HandlePackageInstallerCallback(pendingCallback);
     }
 }

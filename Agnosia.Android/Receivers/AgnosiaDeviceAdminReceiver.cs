@@ -1,5 +1,6 @@
 using Agnosia.Android.Api.Commands;
 using Agnosia.Android.Api.Platform;
+using Agnosia.Android.Infrastructure;
 using Android;
 using Android.App.Admin;
 using Android.Content;
@@ -43,12 +44,7 @@ public sealed class AgnosiaDeviceAdminReceiver : DeviceAdminReceiver
                 return;
             }
 
-            AgnosiaUtilities.EnforceWorkProfilePolicies(
-                context,
-                typeof(AgnosiaDeviceAdminReceiver),
-                MainActivity.LauncherActivityName,
-                true);
-            AgnosiaUtilities.EnforceUserRestrictions(context, typeof(AgnosiaDeviceAdminReceiver));
+            AndroidStartup.EnforceWorkProfilePolicies(context, true);
             NotifyParentProvisioningFinalized(context);
             Log.Info(LogTag,
                 "Work profile provisioning finalized and profile enabled; lock-freeze monitor startup deferred to profile activity bootstrap.");

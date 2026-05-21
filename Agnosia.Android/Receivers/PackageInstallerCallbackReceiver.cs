@@ -29,6 +29,6 @@ public sealed class PackageInstallerCallbackReceiver : BroadcastReceiver
                                             (int)PackageInstallStatus.Failure);
         Log.Info(LogTag, $"Broadcast callback status={status}.");
 
-        DummyActivity.DispatchPackageInstallerCallback(intent);
+        PackageInstallerCallbackCoordinator.Dispatch(intent);
     }
 }

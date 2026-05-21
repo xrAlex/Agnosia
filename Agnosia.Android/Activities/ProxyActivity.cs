@@ -5,6 +5,7 @@ using Agnosia.Android.Api.Permissions;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Api.Storage;
 using Agnosia.Android.Api.Vpn;
+using Agnosia.Android.Infrastructure;
 using Agnosia.Android.Receivers;
 using Agnosia.Android.Services;
 using Agnosia.Android.Shortcuts;
@@ -13,7 +14,6 @@ using Android.Content;
 using Android.Content.PM;
 using Android.Net;
 using Android.OS;
-using Java.Lang;
 using Exception = System.Exception;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
@@ -251,7 +251,7 @@ public sealed class ProxyActivity : Activity
                         request.DisplayName,
                         TaskId,
                         startedResult,
-                        ReadParentFrozenCallback(Intent));
+                        AndroidIntentExtras.ReadParentFrozenCallback(Intent));
                     Log.Debug(LogTag, $"Monitor service request sent for {request.PackageName}.");
                     FinishWithLaunchResult(startedResult, false);
                 }
@@ -480,20 +480,6 @@ public sealed class ProxyActivity : Activity
         }
 
         return launchResult;
-    }
-
-    private static PendingIntent? ReadParentFrozenCallback(Intent? intent)
-    {
-        if (intent is null) return null;
-
-        if (OperatingSystem.IsAndroidVersionAtLeast(33))
-            return intent.GetParcelableExtra(
-                AndroidCommandContract.ExtraParentFrozenCallback,
-                Class.FromType(typeof(PendingIntent))) as PendingIntent;
-
-#pragma warning disable CA1422
-        return intent.GetParcelableExtra(AndroidCommandContract.ExtraParentFrozenCallback) as PendingIntent;
-#pragma warning restore CA1422
     }
 
     private void ShowErrorAndFinish(string message)

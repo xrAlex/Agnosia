@@ -1,4 +1,5 @@
 using Agnosia.Android.Api.Platform;
+using Agnosia.Android.Infrastructure;
 using Agnosia.Android.Services;
 using Android.Content;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
@@ -28,11 +29,7 @@ public sealed class LockFreezeStartupReceiver : BroadcastReceiver
             AgnosiaRuntime.Initialize(context);
             if (!AgnosiaUtilities.IsProfileOwner(context)) return;
 
-            AgnosiaUtilities.EnforceWorkProfilePolicies(
-                context,
-                typeof(AgnosiaDeviceAdminReceiver),
-                MainActivity.LauncherActivityName);
-            AgnosiaUtilities.EnforceUserRestrictions(context, typeof(AgnosiaDeviceAdminReceiver));
+            AndroidStartup.EnforceWorkProfilePolicies(context);
             Log.Info(LogTag, $"Starting lock-freeze monitor after {intent?.Action ?? "<unknown>"}.");
             WorkProfileLockFreezeService.EnsureRunning(context);
         }

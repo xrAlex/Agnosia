@@ -3,7 +3,7 @@ using Agnosia.Android.Activities;
 using Agnosia.Android.Api.Commands;
 using Agnosia.Android.Api.Gateways;
 using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Api.Storage;
+using Agnosia.Android.Infrastructure;
 using Agnosia.Android.Receivers;
 using Agnosia.Android.Services;
 using Agnosia.Infrastructure;
@@ -74,9 +74,7 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
     private void InitializePrimaryProfileStartup()
     {
         AgnosiaRuntime.Initialize(this);
-        ServiceRegistry.SuppressPrimaryUiStartup = false;
-        ServiceRegistry.PlatformBridge = AndroidPlatformBridge.Instance;
-        ServiceRegistry.InitialTheme = AndroidSettingsStore.LoadAppTheme(LocalStorageManager.Instance);
+        AndroidStartup.ConfigurePrimaryProfileServices();
         AndroidPlatformBridge.Instance.AttachActivity(this);
         Current = this;
     }
@@ -105,15 +103,7 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
 
     private bool IsProfileOwnerStartup()
     {
-        try
-        {
-            return AgnosiaUtilities.IsProfileOwner(this);
-        }
-        catch (Exception exception)
-        {
-            global::Android.Util.Log.Warn(LogTag, $"Profile-owner startup check failed: {exception.Message}");
-            return false;
-        }
+        return AndroidStartup.TryIsProfileOwner(this, LogTag, "Profile-owner startup check failed");
     }
 
     private void BootstrapWorkProfileAndFinish()
@@ -121,13 +111,7 @@ public class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         try
         {
             AgnosiaRuntime.Initialize(this);
-            AgnosiaUtilities.EnforceWorkProfilePolicies(
-                this,
-                typeof(AgnosiaDeviceAdminReceiver),
-                LauncherActivityName,
-                true);
-            AgnosiaUtilities.EnforceUserRestrictions(this, typeof(AgnosiaDeviceAdminReceiver));
-            WorkProfileLockFreezeService.EnsureRunning(this);
+            AndroidStartup.EnforceWorkProfilePoliciesAndStartLockFreezeMonitor(this, true);
             Log.Info(LogTag, "Work-profile MainActivity bootstrap completed; finishing without primary UI.");
         }
         catch (Exception exception)

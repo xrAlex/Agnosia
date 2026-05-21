@@ -9,13 +9,13 @@ using Agnosia.Android.Api.Packages;
 using Agnosia.Android.Api.Permissions;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Api.Storage;
+using Agnosia.Android.Infrastructure;
 using Agnosia.Android.Receivers;
 using Agnosia.Services;
 using Android.App.Usage;
 using Android.Content;
 using Android.Content.PM;
 using Android.OS;
-using Java.Lang;
 using Exception = System.Exception;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 using Math = System.Math;
@@ -625,23 +625,9 @@ public sealed class HiddenAppSessionMonitorService : Service
             startedAt > 0 ? startedAt : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             launchResult)
         {
-            ParentFrozenCallback = ReadParentFrozenCallback(intent)
+            ParentFrozenCallback = AndroidIntentExtras.ReadParentFrozenCallback(intent)
         };
         return true;
-    }
-
-    private static PendingIntent? ReadParentFrozenCallback(Intent? intent)
-    {
-        if (intent is null) return null;
-
-        if (OperatingSystem.IsAndroidVersionAtLeast(33))
-            return intent.GetParcelableExtra(
-                AndroidCommandContract.ExtraParentFrozenCallback,
-                Class.FromType(typeof(PendingIntent))) as PendingIntent;
-
-#pragma warning disable CA1422
-        return intent.GetParcelableExtra(AndroidCommandContract.ExtraParentFrozenCallback) as PendingIntent;
-#pragma warning restore CA1422
     }
 
     private static bool Matches(HiddenAppSessionState left, HiddenAppSessionState right)

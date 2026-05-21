@@ -1,7 +1,6 @@
 using Agnosia.Android.Api.Commands;
 using Agnosia.Android.Api.Gateways;
 using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Api.Vpn;
 using Agnosia.Android.Services;
 using Android.Content;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
@@ -46,9 +45,10 @@ public sealed class WorkAppFrozenReceiver : BroadcastReceiver
             {
                 Log.Info(LogTag, $"Work-app frozen broadcast received in parent profile. trigger={trigger}");
 
-                // The overlay is already visible from the work-app launch; VPN TempActivity
-                // will start without BAL_BLOCK because Android sees a visible non-app window.
-                var result = await AndroidVpnAutomationApi.EnableConfiguredVpnAfterWorkFreezeAsync(appContext, trigger);
+                var result = await WorkAppFrozenHandler.RestoreParentVpnAndHideOverlayAsync(
+                    appContext,
+                    trigger,
+                    LogTag);
                 if (result.Succeeded)
                 {
                     Log.Info(LogTag,
@@ -65,16 +65,6 @@ public sealed class WorkAppFrozenReceiver : BroadcastReceiver
             }
             finally
             {
-                // Hide overlay regardless of VPN start success/failure.
-                try
-                {
-                    OverlayVpnService.HideOverlay(appContext);
-                }
-                catch (Exception hideException)
-                {
-                    Log.Warn(LogTag, $"Failed to hide overlay after work-app frozen: {hideException.Message}");
-                }
-
                 pendingResult?.Finish();
             }
         });
