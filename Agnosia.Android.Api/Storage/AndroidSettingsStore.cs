@@ -33,7 +33,7 @@ public static class AndroidSettingsStore
         var disableVpnBeforeLaunchChanged = storage.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch) !=
                                             settings.DisableVpnBeforeWorkLaunch;
         var vpnAfterFreezeClientChanged = LoadVpnAfterWorkFreezeClient(storage) != settings.VpnAfterWorkFreezeClient;
-        var tunguskaToken = settings.TunguskaAutomationToken.Trim();
+        var tunguskaToken = AndroidSettingsContract.NormalizeTunguskaAutomationToken(settings.TunguskaAutomationToken);
 
         storage.SetBoolean(StorageKeys.ShowAllApps, settings.ShowAllApps);
         storage.SetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch, settings.DisableVpnBeforeWorkLaunch);
@@ -61,19 +61,13 @@ public static class AndroidSettingsStore
 
     public static AppThemeKind LoadAppTheme(LocalStorageManager storage)
     {
-        return Enum.TryParse<AppThemeKind>(storage.GetString(StorageKeys.AppTheme), true, out var theme)
-            ? theme
-            : AppThemeKind.Agnosia;
+        return AndroidSettingsContract.ParseAppTheme(storage.GetString(StorageKeys.AppTheme));
     }
 
     public static VpnAutomationClientKind LoadVpnAfterWorkFreezeClient(LocalStorageManager storage)
     {
-        return Enum.TryParse<VpnAutomationClientKind>(
-            storage.GetString(StorageKeys.VpnAfterWorkFreezeClient),
-            true,
-            out var client)
-            ? client
-            : VpnAutomationClientKind.FlClash;
+        return AndroidSettingsContract.ParseVpnAfterWorkFreezeClient(
+            storage.GetString(StorageKeys.VpnAfterWorkFreezeClient));
     }
 
     private static async Task TrySyncBooleanSettingToWorkProfileAsync(

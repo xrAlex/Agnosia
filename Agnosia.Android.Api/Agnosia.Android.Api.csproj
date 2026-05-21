@@ -1,15 +1,30 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>net10.0-android</TargetFramework>
-        <SupportedOSPlatformVersion>31</SupportedOSPlatformVersion>
+        <TargetFrameworks>net10.0;net10.0-android</TargetFrameworks>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <LangVersion>14.0</LangVersion>
         <RootNamespace>Agnosia.Android.Api</RootNamespace>
     </PropertyGroup>
 
-    <ItemGroup>
+    <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-android'">
+        <SupportedOSPlatformVersion>31</SupportedOSPlatformVersion>
+        <DefineConstants>$(DefineConstants);AGNOSIA_ANDROID</DefineConstants>
+    </PropertyGroup>
+
+    <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-android'">
         <PackageReference Include="Xamarin.AndroidX.Core"/>
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+        <Compile Remove="**\*.cs"/>
+        <Compile Include="Commands\AgnosiaActions.cs"/>
+        <Compile Include="Commands\AndroidCommandContract.cs"/>
+        <Compile Include="Commands\AndroidAppLaunchResult.cs"/>
+        <Compile Include="Platform\AndroidPackageAccessPolicy.cs"/>
+        <Compile Include="Platform\AppServiceModel.cs"/>
+        <Compile Include="Storage\AndroidSettingsContract.cs"/>
+        <Compile Include="Storage\StorageKeys.cs"/>
     </ItemGroup>
 
     <ItemGroup>

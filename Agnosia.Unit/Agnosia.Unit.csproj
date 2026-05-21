@@ -21,6 +21,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Agnosia\Agnosia.csproj" />
+        <ProjectReference Include="..\Agnosia.Android.Api\Agnosia.Android.Api.csproj" />
     </ItemGroup>
 
 </Project>

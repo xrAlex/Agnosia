@@ -1,10 +1,14 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+#if AGNOSIA_ANDROID
 using Agnosia.Android.Api.Gateways;
 using Agnosia.Android.Api.Logging;
-using Agnosia.Models;
 using Android.Content;
+using Agnosia.Models;
 using ActivityNotFoundException = Android.Content.ActivityNotFoundException;
+#else
+using Agnosia.Models;
+#endif
 using Exception = System.Exception;
 
 namespace Agnosia.Android.Api.Commands;
@@ -103,6 +107,7 @@ public sealed record AndroidAppLaunchResult(
             : OperationResult.Failure(Message);
     }
 
+#if AGNOSIA_ANDROID
     public Intent ToIntent()
     {
         var intent = new Intent();
@@ -126,12 +131,14 @@ public sealed record AndroidAppLaunchResult(
 
         intent.PutExtra(AndroidCommandContract.ResultError, Message);
     }
+#endif
 
     public string ToJson()
     {
         return JsonSerializer.Serialize(this, JsonOptions);
     }
 
+#if AGNOSIA_ANDROID
     public void Log(string tag)
     {
         AgnosiaLog.Info(
@@ -142,6 +149,12 @@ public sealed record AndroidAppLaunchResult(
     public static bool TryRead(Intent? intent, out AndroidAppLaunchResult result)
     {
         var raw = intent?.GetStringExtra(AndroidCommandContract.ResultLaunchJson);
+        return TryReadJson(raw, out result);
+    }
+#endif
+
+    public static bool TryReadJson(string? raw, out AndroidAppLaunchResult result)
+    {
         if (string.IsNullOrWhiteSpace(raw))
         {
             result = CommandReceived(null, null);
@@ -163,7 +176,9 @@ public sealed record AndroidAppLaunchResult(
 
     public static AndroidAppLaunchIssueKind ClassifyStartActivityException(Exception exception)
     {
+#if AGNOSIA_ANDROID
         if (exception is ActivityNotFoundException) return AndroidAppLaunchIssueKind.MissingLauncherActivity;
+#endif
 
         return HasBackgroundActivityLaunchSignal(exception)
             ? AndroidAppLaunchIssueKind.BackgroundActivityLaunchBlocked
