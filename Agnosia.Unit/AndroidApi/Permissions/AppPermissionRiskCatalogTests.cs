@@ -18,14 +18,14 @@ public sealed class AppPermissionRiskCatalogTests
     }
 
     [Fact]
-    public void Classify_returns_dangerous_for_suspicious_location_network_combination()
+    public void Classify_returns_safe_for_requested_only_location_network_combination()
     {
         var result = AppPermissionRiskCatalog.Classify([
             "android.permission.ACCESS_FINE_LOCATION",
             "android.permission.INTERNET"
         ]);
 
-        Assert.Equal(AppPermissionRiskLevel.Dangerous, result);
+        Assert.Equal(AppPermissionRiskLevel.Safe, result);
     }
 
     [Fact]
@@ -62,7 +62,7 @@ public sealed class AppPermissionRiskCatalogTests
     }
 
     [Fact]
-    public void Analyze_uses_read_external_storage_only_for_android_12_family()
+    public void Analyze_treats_requested_only_read_external_storage_as_low_signal()
     {
         var android12Result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
             [
@@ -77,12 +77,12 @@ public sealed class AppPermissionRiskCatalogTests
             ],
             DeviceSdkVersion: 33));
 
-        Assert.Equal(AppPermissionRiskLevel.Dangerous, android12Result.Level);
+        Assert.Equal(AppPermissionRiskLevel.Safe, android12Result.Level);
         Assert.Equal(AppPermissionRiskLevel.Safe, android13Result.Level);
     }
 
     [Fact]
-    public void Analyze_uses_granular_media_permissions_for_android_13_plus()
+    public void Analyze_treats_requested_only_granular_media_permissions_as_low_signal()
     {
         var result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
             [
@@ -90,6 +90,25 @@ public sealed class AppPermissionRiskCatalogTests
                 "android.permission.INTERNET"
             ],
             DeviceSdkVersion: 33));
+
+        Assert.Equal(AppPermissionRiskLevel.Safe, result.Level);
+    }
+
+    [Fact]
+    public void Analyze_flags_media_with_location_metadata_as_dangerous()
+    {
+        var result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
+            [
+                "android.permission.READ_MEDIA_IMAGES",
+                "android.permission.ACCESS_MEDIA_LOCATION",
+                "android.permission.INTERNET"
+            ],
+            DeviceSdkVersion: 33,
+            GrantedPermissions:
+            [
+                "android.permission.READ_MEDIA_IMAGES",
+                "android.permission.ACCESS_MEDIA_LOCATION"
+            ]));
 
         Assert.Equal(AppPermissionRiskLevel.Dangerous, result.Level);
     }
@@ -143,6 +162,22 @@ public sealed class AppPermissionRiskCatalogTests
     }
 
     [Fact]
+    public void Analyze_does_not_treat_appop_blocked_runtime_permission_as_critical()
+    {
+        var result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
+            [
+                "android.permission.RECORD_AUDIO",
+                "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+                "android.permission.INTERNET"
+            ],
+            DeviceSdkVersion: 34,
+            GrantedPermissions: ["android.permission.RECORD_AUDIO"],
+            IsMicrophoneAppOpAllowed: false));
+
+        Assert.Equal(AppPermissionRiskLevel.Safe, result.Level);
+    }
+
+    [Fact]
     public void Analyze_uses_service_permission_control_surfaces()
     {
         var result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
@@ -150,7 +185,9 @@ public sealed class AppPermissionRiskCatalogTests
                 "android.permission.INTERNET",
                 "android.permission.SYSTEM_ALERT_WINDOW"
             ],
-            ServicePermissions: ["android.permission.BIND_ACCESSIBILITY_SERVICE"]));
+            ServicePermissions: ["android.permission.BIND_ACCESSIBILITY_SERVICE"],
+            IsAccessibilityServiceEnabled: true,
+            CanDrawOverlays: true));
 
         Assert.Equal(AppPermissionRiskLevel.Critical, result.Level);
         Assert.Equal(
@@ -185,7 +222,7 @@ public sealed class AppPermissionRiskCatalogTests
     }
 
     [Fact]
-    public void Analyze_downgrades_legacy_write_external_storage_by_target_sdk()
+    public void Analyze_treats_requested_only_legacy_write_external_storage_as_low_signal()
     {
         var legacyTargetResult = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
             [
@@ -202,7 +239,7 @@ public sealed class AppPermissionRiskCatalogTests
             DeviceSdkVersion: 32,
             TargetSdkVersion: 30));
 
-        Assert.Equal(AppPermissionRiskLevel.Dangerous, legacyTargetResult.Level);
+        Assert.Equal(AppPermissionRiskLevel.Safe, legacyTargetResult.Level);
         Assert.Equal(AppPermissionRiskLevel.Safe, modernTargetResult.Level);
     }
 

@@ -4,7 +4,6 @@ namespace Agnosia.Android.Api.Permissions;
 
 public static class AppPermissionRiskCatalog
 {
-    private const int Android10Api = 29;
     private const int Android12Api = 31;
     private const int Android12LApi = 32;
     private const int Android13Api = 33;
@@ -12,6 +11,9 @@ public static class AppPermissionRiskCatalog
     private const int Android15Api = 35;
     private const int Android16Api = 36;
     private const int Android17Api = 37;
+    private const int BaseDangerousScoreThreshold = 4;
+    private const int CriticalScoreThreshold = 8;
+    private const int LegacyExternalStorageMaxTargetSdk = 29;
 
     private const string AccessBackgroundLocation = "android.permission.ACCESS_BACKGROUND_LOCATION";
     private const string AccessCoarseLocation = "android.permission.ACCESS_COARSE_LOCATION";
@@ -111,42 +113,42 @@ public static class AppPermissionRiskCatalog
 
     private static readonly PermissionCombinationRule[] DangerousRules =
     [
-        Rule("SU-LOC-01", AppPermissionRiskLevel.Dangerous, [AccessFineLocation, Internet], excludedPermissions: [AccessBackgroundLocation]),
-        Rule("SU-LOC-02", AppPermissionRiskLevel.Dangerous, [AccessCoarseLocation, Internet], excludedPermissions: [AccessBackgroundLocation]),
-        Rule("SU-LOC-FGS-PERSIST-01", AppPermissionRiskLevel.Dangerous, [AccessFineLocation, BootCompleted, Internet], foregroundServiceType: FgsLocation),
-        Rule("SU-LOC-FGS-PERSIST-02", AppPermissionRiskLevel.Dangerous, [AccessCoarseLocation, BootCompleted, Internet], foregroundServiceType: FgsLocation),
-        Rule("SU-LOC-FGS-PERSIST-03", AppPermissionRiskLevel.Dangerous, [AccessFineLocation, IgnoreBatteryOptimizations, Internet], foregroundServiceType: FgsLocation),
-        Rule("SU-LOC-FGS-PERSIST-04", AppPermissionRiskLevel.Dangerous, [AccessCoarseLocation, IgnoreBatteryOptimizations, Internet], foregroundServiceType: FgsLocation),
-        Rule("SU-MIC-01", AppPermissionRiskLevel.Dangerous, [RecordAudio, Internet]),
-        Rule("SU-MIC-PERSIST-01", AppPermissionRiskLevel.Dangerous, [RecordAudio, BootCompleted, Internet]),
-        Rule("SU-MIC-PERSIST-02", AppPermissionRiskLevel.Dangerous, [RecordAudio, IgnoreBatteryOptimizations, Internet]),
-        Rule("SU-CAM-01", AppPermissionRiskLevel.Dangerous, [Camera, Internet]),
-        Rule("SU-CAM-PERSIST-01", AppPermissionRiskLevel.Dangerous, [Camera, BootCompleted, Internet]),
-        Rule("SU-CAM-PERSIST-02", AppPermissionRiskLevel.Dangerous, [Camera, IgnoreBatteryOptimizations, Internet]),
-        Rule("SU-CALL-ID-01", AppPermissionRiskLevel.Dangerous, [ReadPhoneNumbers, Internet]),
-        Rule("SU-CALL-STATE-PROF-01", AppPermissionRiskLevel.Dangerous, [ReadPhoneState, QueryAllPackages, Internet]),
-        Rule("SU-GRAPH-CONTACTS-01", AppPermissionRiskLevel.Dangerous, [ReadContacts, Internet]),
-        Rule("SU-GRAPH-ACCOUNTS-01", AppPermissionRiskLevel.Dangerous, [ReadContacts, GetAccounts, ReadPhoneNumbers, Internet]),
-        Rule("SU-NOTIF-01", AppPermissionRiskLevel.Dangerous, [BindNotificationListenerService, Internet]),
-        Rule("SU-VPN-01", AppPermissionRiskLevel.Dangerous, [BindVpnService, Internet]),
-        Rule("SU-UI-OVERLAY-01", AppPermissionRiskLevel.Dangerous, [SystemAlertWindow, Internet]),
-        Rule("SU-PROF-USAGE-01", AppPermissionRiskLevel.Dangerous, [PackageUsageStats, Internet]),
-        Rule("SU-PROF-INVENTORY-01", AppPermissionRiskLevel.Dangerous, [QueryAllPackages, Internet]),
-        Rule("SU-FILE-ALL-01", AppPermissionRiskLevel.Dangerous, [ManageExternalStorage, Internet]),
-        Rule("SU-MEDIA-LEGACY-01", AppPermissionRiskLevel.Dangerous, [ReadExternalStorage, Internet], maxDeviceSdkVersion: Android12LApi),
-        Rule("SU-FILE-WRITE-LEGACY-01", AppPermissionRiskLevel.Dangerous, [WriteExternalStorage, Internet], maxDeviceSdkVersion: Android12LApi, maxTargetSdkVersion: Android10Api),
-        Rule("SU-MEDIA-IMG-01", AppPermissionRiskLevel.Dangerous, [ReadMediaImages, Internet], minDeviceSdkVersion: Android13Api),
-        Rule("SU-MEDIA-VID-01", AppPermissionRiskLevel.Dangerous, [ReadMediaVideo, Internet], minDeviceSdkVersion: Android13Api),
-        Rule("SU-MEDIA-AUD-01", AppPermissionRiskLevel.Dangerous, [ReadMediaAudio, Internet], minDeviceSdkVersion: Android13Api),
-        Rule("SU-MEDIA-LOC-LEGACY-01", AppPermissionRiskLevel.Dangerous, [ReadExternalStorage, AccessMediaLocation, Internet], maxDeviceSdkVersion: Android12LApi),
-        Rule("SU-MEDIA-LOC-IMG-01", AppPermissionRiskLevel.Dangerous, [ReadMediaImages, AccessMediaLocation, Internet], minDeviceSdkVersion: Android13Api),
-        Rule("SU-MEDIA-LOC-VID-01", AppPermissionRiskLevel.Dangerous, [ReadMediaVideo, AccessMediaLocation, Internet], minDeviceSdkVersion: Android13Api),
-        Rule("SU-NEARBY-BLUETOOTH-01", AppPermissionRiskLevel.Dangerous, [NearbyWifiDevices, BluetoothScan, Internet], minDeviceSdkVersion: Android13Api),
-        Rule("SU-HEALTH-LEGACY-01", AppPermissionRiskLevel.Dangerous, [BodySensors, Internet], maxTargetSdkVersion: Android15Api),
-        Rule("SU-HEALTH-16-01", AppPermissionRiskLevel.Dangerous, [Internet], minDeviceSdkVersion: Android16Api, minTargetSdkVersion: Android16Api, requiredPermissionPrefixes: [HealthReadPermissionPrefix]),
-        Rule("SU-PROX-RANGING-01", AppPermissionRiskLevel.Dangerous, [Ranging, Internet], minDeviceSdkVersion: Android16Api),
-        Rule("SU-LAN-16-01", AppPermissionRiskLevel.Dangerous, [NearbyWifiDevices, Internet], minDeviceSdkVersion: Android16Api, maxDeviceSdkVersion: Android16Api, minTargetSdkVersion: Android16Api),
-        Rule("SU-LAN-17-01", AppPermissionRiskLevel.Dangerous, [AccessLocalNetwork, Internet], minDeviceSdkVersion: Android17Api, minTargetSdkVersion: Android17Api)
+        Rule("SU-LOC-01", AppPermissionRiskLevel.Dangerous, [AccessFineLocation, Internet], score: 2, excludedPermissions: [AccessBackgroundLocation]),
+        Rule("SU-LOC-02", AppPermissionRiskLevel.Dangerous, [AccessCoarseLocation, Internet], score: 2, excludedPermissions: [AccessBackgroundLocation]),
+        Rule("SU-LOC-FGS-PERSIST-01", AppPermissionRiskLevel.Dangerous, [AccessFineLocation, BootCompleted, Internet], score: 4, foregroundServiceType: FgsLocation),
+        Rule("SU-LOC-FGS-PERSIST-02", AppPermissionRiskLevel.Dangerous, [AccessCoarseLocation, BootCompleted, Internet], score: 4, foregroundServiceType: FgsLocation),
+        Rule("SU-LOC-FGS-PERSIST-03", AppPermissionRiskLevel.Dangerous, [AccessFineLocation, IgnoreBatteryOptimizations, Internet], score: 4, foregroundServiceType: FgsLocation),
+        Rule("SU-LOC-FGS-PERSIST-04", AppPermissionRiskLevel.Dangerous, [AccessCoarseLocation, IgnoreBatteryOptimizations, Internet], score: 4, foregroundServiceType: FgsLocation),
+        Rule("SU-MIC-01", AppPermissionRiskLevel.Dangerous, [RecordAudio, Internet], score: 2),
+        Rule("SU-MIC-PERSIST-01", AppPermissionRiskLevel.Dangerous, [RecordAudio, BootCompleted, Internet], score: 4),
+        Rule("SU-MIC-PERSIST-02", AppPermissionRiskLevel.Dangerous, [RecordAudio, IgnoreBatteryOptimizations, Internet], score: 4),
+        Rule("SU-CAM-01", AppPermissionRiskLevel.Dangerous, [Camera, Internet], score: 2),
+        Rule("SU-CAM-PERSIST-01", AppPermissionRiskLevel.Dangerous, [Camera, BootCompleted, Internet], score: 4),
+        Rule("SU-CAM-PERSIST-02", AppPermissionRiskLevel.Dangerous, [Camera, IgnoreBatteryOptimizations, Internet], score: 4),
+        Rule("SU-CALL-ID-01", AppPermissionRiskLevel.Dangerous, [ReadPhoneNumbers, Internet], score: 4),
+        Rule("SU-CALL-STATE-PROF-01", AppPermissionRiskLevel.Dangerous, [ReadPhoneState, QueryAllPackages, Internet], score: 4),
+        Rule("SU-GRAPH-CONTACTS-01", AppPermissionRiskLevel.Dangerous, [ReadContacts, Internet], score: 3),
+        Rule("SU-GRAPH-ACCOUNTS-01", AppPermissionRiskLevel.Dangerous, [ReadContacts, GetAccounts, ReadPhoneNumbers, Internet], score: 4),
+        Rule("SU-NOTIF-01", AppPermissionRiskLevel.Dangerous, [BindNotificationListenerService, Internet], score: 4),
+        Rule("SU-VPN-01", AppPermissionRiskLevel.Dangerous, [BindVpnService, Internet], score: 4),
+        Rule("SU-UI-OVERLAY-01", AppPermissionRiskLevel.Dangerous, [SystemAlertWindow, Internet], score: 4),
+        Rule("SU-PROF-USAGE-01", AppPermissionRiskLevel.Dangerous, [PackageUsageStats, Internet], score: 5),
+        Rule("SU-PROF-INVENTORY-01", AppPermissionRiskLevel.Dangerous, [QueryAllPackages, Internet], score: 4),
+        Rule("SU-FILE-ALL-01", AppPermissionRiskLevel.Dangerous, [ManageExternalStorage, Internet], score: 5),
+        Rule("SU-MEDIA-LEGACY-01", AppPermissionRiskLevel.Dangerous, [ReadExternalStorage, Internet], score: 2, maxDeviceSdkVersion: Android12LApi),
+        Rule("SU-FILE-WRITE-LEGACY-01", AppPermissionRiskLevel.Dangerous, [WriteExternalStorage, Internet], score: 2, maxDeviceSdkVersion: Android12LApi, maxTargetSdkVersion: LegacyExternalStorageMaxTargetSdk),
+        Rule("SU-MEDIA-IMG-01", AppPermissionRiskLevel.Dangerous, [ReadMediaImages, Internet], score: 2, minDeviceSdkVersion: Android13Api),
+        Rule("SU-MEDIA-VID-01", AppPermissionRiskLevel.Dangerous, [ReadMediaVideo, Internet], score: 2, minDeviceSdkVersion: Android13Api),
+        Rule("SU-MEDIA-AUD-01", AppPermissionRiskLevel.Dangerous, [ReadMediaAudio, Internet], score: 2, minDeviceSdkVersion: Android13Api),
+        Rule("SU-MEDIA-LOC-LEGACY-01", AppPermissionRiskLevel.Dangerous, [ReadExternalStorage, AccessMediaLocation, Internet], score: 4, maxDeviceSdkVersion: Android12LApi),
+        Rule("SU-MEDIA-LOC-IMG-01", AppPermissionRiskLevel.Dangerous, [ReadMediaImages, AccessMediaLocation, Internet], score: 4, minDeviceSdkVersion: Android13Api),
+        Rule("SU-MEDIA-LOC-VID-01", AppPermissionRiskLevel.Dangerous, [ReadMediaVideo, AccessMediaLocation, Internet], score: 4, minDeviceSdkVersion: Android13Api),
+        Rule("SU-NEARBY-BLUETOOTH-01", AppPermissionRiskLevel.Dangerous, [NearbyWifiDevices, BluetoothScan, Internet], score: 3, minDeviceSdkVersion: Android13Api),
+        Rule("SU-HEALTH-LEGACY-01", AppPermissionRiskLevel.Dangerous, [BodySensors, Internet], score: 4, maxTargetSdkVersion: Android15Api),
+        Rule("SU-HEALTH-16-01", AppPermissionRiskLevel.Dangerous, [Internet], score: 4, minDeviceSdkVersion: Android16Api, minTargetSdkVersion: Android16Api, requiredPermissionPrefixes: [HealthReadPermissionPrefix]),
+        Rule("SU-PROX-RANGING-01", AppPermissionRiskLevel.Dangerous, [Ranging, Internet], score: 4, minDeviceSdkVersion: Android16Api),
+        Rule("SU-LAN-16-01", AppPermissionRiskLevel.Dangerous, [NearbyWifiDevices, Internet], score: 4, minDeviceSdkVersion: Android16Api, maxDeviceSdkVersion: Android16Api, minTargetSdkVersion: Android16Api),
+        Rule("SU-LAN-17-01", AppPermissionRiskLevel.Dangerous, [AccessLocalNetwork, Internet], score: 4, minDeviceSdkVersion: Android17Api, minTargetSdkVersion: Android17Api)
     ];
 
     public static AppPermissionRiskLevel Classify(IEnumerable<string>? requestedPermissions)
@@ -173,7 +175,7 @@ public static class AppPermissionRiskCatalog
 
         foreach (var rule in CriticalRules)
         {
-            if (!rule.IsMatch(context)) continue;
+            if (!rule.IsCriticalMatch(context)) continue;
 
             return new AppPermissionRiskAnalysis(
                 AppPermissionRiskLevel.Critical,
@@ -181,12 +183,22 @@ public static class AppPermissionRiskCatalog
         }
 
         var matchedRules = new List<PermissionCombinationRule>();
+        var score = 0;
         foreach (var rule in DangerousRules)
         {
-            if (rule.IsMatch(context)) matchedRules.Add(rule);
+            if (!rule.IsMatch(context)) continue;
+
+            matchedRules.Add(rule);
+            score += rule.GetScore(context);
         }
 
-        if (matchedRules.Count == 0) return AppPermissionRiskAnalysis.Safe;
+        if (matchedRules.Count == 0 || score < context.DangerousScoreThreshold)
+            return AppPermissionRiskAnalysis.Safe;
+
+        if (score >= CriticalScoreThreshold && context.HasHighConfidenceSignals)
+            return new AppPermissionRiskAnalysis(
+                AppPermissionRiskLevel.Critical,
+                context.GetRiskyPermissions(matchedRules));
 
         return new AppPermissionRiskAnalysis(
             AppPermissionRiskLevel.Dangerous,
@@ -204,6 +216,7 @@ public static class AppPermissionRiskCatalog
         string? foregroundServiceType = null,
         string[]? excludedPermissions = null,
         string[]? requiredPermissionPrefixes = null,
+        int score = BaseDangerousScoreThreshold,
         Func<AnalysisContext, bool>? extraCondition = null)
     {
         return new PermissionCombinationRule(
@@ -217,6 +230,7 @@ public static class AppPermissionRiskCatalog
             excludedPermissions ?? [],
             requiredPermissionPrefixes ?? [],
             foregroundServiceType,
+            score,
             extraCondition);
     }
 
@@ -231,6 +245,7 @@ public static class AppPermissionRiskCatalog
         IReadOnlyList<string> ExcludedPermissions,
         IReadOnlyList<string> RequiredPermissionPrefixes,
         string? ForegroundServiceType,
+        int Score,
         Func<AnalysisContext, bool>? ExtraCondition)
     {
         public bool IsMatch(AnalysisContext context)
@@ -249,25 +264,72 @@ public static class AppPermissionRiskCatalog
 
             return ExtraCondition?.Invoke(context) != false;
         }
+
+        public bool IsCriticalMatch(AnalysisContext context)
+        {
+            return IsMatch(context)
+                   && RequiredPermissions.All(context.HasEffectivePermission)
+                   && RequiredPermissionPrefixes.All(context.HasEffectivePermissionPrefix);
+        }
+
+        public int GetScore(AnalysisContext context)
+        {
+            var score = Score;
+            if (context.HasPermissionGrantState
+                && RequiredPermissions.Any(context.IsRuntimeSensitivePermission)
+                && RequiredPermissions.Any(permission =>
+                    context.IsRuntimeSensitivePermission(permission) && !context.HasGrantedPermission(permission)))
+            {
+                score -= 2;
+            }
+
+            if (RequiredPermissions.Any(context.IsBlockedByAppOp)) score -= 2;
+
+            if (RequiredPermissions.Any(context.HasEnabledControlSurface)) score += 1;
+
+            return Math.Max(0, score);
+        }
     }
 
     private sealed class AnalysisContext
     {
         private readonly HashSet<string> _permissions;
+        private readonly HashSet<string> _grantedPermissions;
+        private readonly HashSet<string> _deniedPermissions;
         private readonly HashSet<string> _foregroundServiceTypes;
         private readonly IReadOnlyList<string> _orderedPermissions;
 
         private AnalysisContext(
             int deviceSdkVersion,
             int targetSdkVersion,
+            bool isAccessibilityServiceEnabled,
+            bool isNotificationListenerEnabled,
+            bool canDrawOverlays,
+            bool hasUsageStatsAccess,
+            bool? isCameraAppOpAllowed,
+            bool? isMicrophoneAppOpAllowed,
+            bool? isFineLocationAppOpAllowed,
+            bool? isCoarseLocationAppOpAllowed,
             IReadOnlyList<string> orderedPermissions,
             HashSet<string> permissions,
+            HashSet<string> grantedPermissions,
+            HashSet<string> deniedPermissions,
             HashSet<string> foregroundServiceTypes)
         {
             DeviceSdkVersion = deviceSdkVersion;
             TargetSdkVersion = targetSdkVersion;
+            IsAccessibilityServiceEnabled = isAccessibilityServiceEnabled;
+            IsNotificationListenerEnabled = isNotificationListenerEnabled;
+            CanDrawOverlays = canDrawOverlays;
+            HasUsageStatsAccess = hasUsageStatsAccess;
+            IsCameraAppOpAllowed = isCameraAppOpAllowed;
+            IsMicrophoneAppOpAllowed = isMicrophoneAppOpAllowed;
+            IsFineLocationAppOpAllowed = isFineLocationAppOpAllowed;
+            IsCoarseLocationAppOpAllowed = isCoarseLocationAppOpAllowed;
             _orderedPermissions = orderedPermissions;
             _permissions = permissions;
+            _grantedPermissions = grantedPermissions;
+            _deniedPermissions = deniedPermissions;
             _foregroundServiceTypes = foregroundServiceTypes;
         }
 
@@ -275,12 +337,41 @@ public static class AppPermissionRiskCatalog
 
         public int TargetSdkVersion { get; }
 
+        public bool IsAccessibilityServiceEnabled { get; }
+
+        public bool IsNotificationListenerEnabled { get; }
+
+        public bool CanDrawOverlays { get; }
+
+        public bool HasUsageStatsAccess { get; }
+
+        public bool? IsCameraAppOpAllowed { get; }
+
+        public bool? IsMicrophoneAppOpAllowed { get; }
+
+        public bool? IsFineLocationAppOpAllowed { get; }
+
+        public bool? IsCoarseLocationAppOpAllowed { get; }
+
         public bool HasAnySignal => _orderedPermissions.Count > 0 || _foregroundServiceTypes.Count > 0;
+
+        public bool HasPermissionGrantState => _grantedPermissions.Count > 0 || _deniedPermissions.Count > 0;
+
+        public bool HasHighConfidenceSignals =>
+            HasPermissionGrantState
+            || IsAccessibilityServiceEnabled
+            || IsNotificationListenerEnabled
+            || CanDrawOverlays
+            || HasUsageStatsAccess;
+
+        public int DangerousScoreThreshold => BaseDangerousScoreThreshold;
 
         public static AnalysisContext Create(AppPermissionRiskInput input)
         {
             var requestedPermissions = NormalizeDistinct(input.RequestedPermissions);
             var servicePermissions = NormalizeDistinct(input.ServicePermissions);
+            var grantedPermissions = NormalizeDistinct(input.GrantedPermissions).ToHashSet(StringComparer.Ordinal);
+            var deniedPermissions = NormalizeDistinct(input.DeniedPermissions).ToHashSet(StringComparer.Ordinal);
             var orderedPermissions = new List<string>(requestedPermissions.Count + servicePermissions.Count);
             var permissions = new HashSet<string>(StringComparer.Ordinal);
             AddDistinct(orderedPermissions, permissions, requestedPermissions);
@@ -289,8 +380,18 @@ public static class AppPermissionRiskCatalog
             return new AnalysisContext(
                 NormalizeDeviceSdkVersion(input.DeviceSdkVersion),
                 input.TargetSdkVersion,
+                input.IsAccessibilityServiceEnabled,
+                input.IsNotificationListenerEnabled,
+                input.CanDrawOverlays,
+                input.HasUsageStatsAccess,
+                input.IsCameraAppOpAllowed,
+                input.IsMicrophoneAppOpAllowed,
+                input.IsFineLocationAppOpAllowed,
+                input.IsCoarseLocationAppOpAllowed,
                 orderedPermissions,
                 permissions,
+                grantedPermissions,
+                deniedPermissions,
                 NormalizeDistinct(input.ForegroundServiceTypes).ToHashSet(StringComparer.Ordinal));
         }
 
@@ -302,6 +403,90 @@ public static class AppPermissionRiskCatalog
         public bool HasPermissionPrefix(string prefix)
         {
             return _orderedPermissions.Any(permission => permission.StartsWith(prefix, StringComparison.Ordinal));
+        }
+
+        public bool HasEffectivePermission(string permission)
+        {
+            return permission switch
+            {
+                BindAccessibilityService => HasPermission(permission) && IsAccessibilityServiceEnabled,
+                BindNotificationListenerService => HasPermission(permission) && IsNotificationListenerEnabled,
+                SystemAlertWindow => HasPermission(permission) && CanDrawOverlays,
+                PackageUsageStats => HasPermission(permission) && HasUsageStatsAccess,
+                Camera when IsCameraAppOpAllowed == false => false,
+                RecordAudio when IsMicrophoneAppOpAllowed == false => false,
+                AccessFineLocation when IsFineLocationAppOpAllowed == false => false,
+                AccessCoarseLocation when IsCoarseLocationAppOpAllowed == false => false,
+                _ when !HasPermission(permission) => false,
+                _ when IsRuntimeSensitivePermission(permission) && HasPermissionGrantState =>
+                    HasGrantedPermission(permission),
+                _ => true
+            };
+        }
+
+        public bool HasEffectivePermissionPrefix(string prefix)
+        {
+            return _orderedPermissions.Any(permission =>
+                permission.StartsWith(prefix, StringComparison.Ordinal)
+                && HasEffectivePermission(permission));
+        }
+
+        public bool HasGrantedPermission(string permission)
+        {
+            return _grantedPermissions.Contains(permission);
+        }
+
+        public bool IsRuntimeSensitivePermission(string permission)
+        {
+            return permission is AccessBackgroundLocation
+                       or AccessCoarseLocation
+                       or AccessFineLocation
+                       or AccessMediaLocation
+                       or AnswerPhoneCalls
+                       or BluetoothScan
+                       or BodySensors
+                       or BodySensorsBackground
+                       or Camera
+                       or NearbyWifiDevices
+                       or ReadCallLog
+                       or ReadContacts
+                       or ReadExternalStorage
+                       or ReadMediaAudio
+                       or ReadMediaImages
+                       or ReadMediaVideo
+                       or ReadPhoneNumbers
+                       or ReadPhoneState
+                       or ReadSms
+                       or ReceiveSms
+                       or RecordAudio
+                       or SendSms
+                       or WriteCallLog
+                       or WriteExternalStorage
+                   || permission.StartsWith(HealthReadPermissionPrefix, StringComparison.Ordinal);
+        }
+
+        public bool HasEnabledControlSurface(string permission)
+        {
+            return permission switch
+            {
+                BindAccessibilityService => IsAccessibilityServiceEnabled,
+                BindNotificationListenerService => IsNotificationListenerEnabled,
+                SystemAlertWindow => CanDrawOverlays,
+                PackageUsageStats => HasUsageStatsAccess,
+                _ => false
+            };
+        }
+
+        public bool IsBlockedByAppOp(string permission)
+        {
+            return permission switch
+            {
+                Camera => IsCameraAppOpAllowed == false,
+                RecordAudio => IsMicrophoneAppOpAllowed == false,
+                AccessFineLocation => IsFineLocationAppOpAllowed == false,
+                AccessCoarseLocation => IsCoarseLocationAppOpAllowed == false,
+                _ => false
+            };
         }
 
         public bool HasForegroundServiceType(string type)

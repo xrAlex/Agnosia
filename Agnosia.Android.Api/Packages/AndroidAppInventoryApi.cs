@@ -3,23 +3,34 @@ using System.Text;
 using Agnosia.Android.Api.Permissions;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Models;
+using Android.App;
 using Android.App.Admin;
 using Android.Content;
 using Android.Content.PM;
 using Android.Graphics;
 using Android.Graphics.Drawables;
 using Android.OS;
+using Android.Provider;
 using Path = System.IO.Path;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Api.Packages;
 
 public static class AndroidAppInventoryApi
 {
+    private const string LogTag = "AndroidAppInventory";
     private const int AppIconSizePixels = 48;
     private const int MaxIconCacheEntries = 512;
     private const string IconCacheDirectoryName = "app-icons";
     private const string IconCacheFileExtension = ".png";
     private const string MissingIconCacheFileExtension = ".missing";
+    private const int RequestedPermissionGrantedFlag = 2;
+    private const string CameraOp = "android:camera";
+    private const string FineLocationOp = "android:fine_location";
+    private const string CoarseLocationOp = "android:coarse_location";
+    private const string MicrophoneOp = "android:record_audio";
+    private const string UsageStatsOp = "android:get_usage_stats";
+    private const string SystemAlertWindowOp = "android:system_alert_window";
     private static readonly Lock IconCacheSync = new();
     private static readonly Dictionary<string, AppIconCacheEntry> IconCache = new(StringComparer.Ordinal);
 
@@ -131,6 +142,7 @@ public static class AndroidAppInventoryApi
         }
 
         if (!TryGetPackageInventoryDetails(
+                context,
                 packageManager,
                 packageName,
                 out var packageIdentity,
@@ -499,6 +511,7 @@ public static class AndroidAppInventoryApi
     }
 
     private static bool TryGetPackageInventoryDetails(
+        Context context,
         PackageManager packageManager,
         string packageName,
         out PackageIdentity identity,
@@ -516,23 +529,38 @@ public static class AndroidAppInventoryApi
                 ?? packageManager.GetPackageInfo(packageName, PackageInfoFlags.Permissions | PackageInfoFlags.Services);
             if (packageInfo is null)
             {
+                Log.Debug(LogTag, $"Package inventory details unavailable. package={packageName}, reason=PackageInfoNull.");
                 identity = default;
                 permissionRisk = AppPermissionRiskAnalysis.Safe;
                 return false;
             }
 
             identity = new PackageIdentity(packageInfo.LongVersionCode);
+            var appInfo = packageInfo.ApplicationInfo;
             permissionRisk = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
                 packageInfo.RequestedPermissions,
                 (int)Build.VERSION.SdkInt,
-                packageInfo.ApplicationInfo is { } appInfo ? (int)appInfo.TargetSdkVersion : 0,
+                appInfo is { } ? (int)appInfo.TargetSdkVersion : 0,
                 GetForegroundServiceTypes(packageInfo),
-                GetServicePermissions(packageInfo)));
+                GetServicePermissions(packageInfo),
+                GetGrantedPermissions(packageInfo, packageName),
+                GetDeniedPermissions(packageInfo, packageName),
+                IsAccessibilityServiceEnabled(context, packageName),
+                IsNotificationListenerEnabled(context, packageName),
+                IsAppOpAllowed(context, appInfo, SystemAlertWindowOp),
+                IsAppOpAllowed(context, appInfo, UsageStatsOp),
+                IsAppOpAllowedOrUnknown(context, appInfo, CameraOp),
+                IsAppOpAllowedOrUnknown(context, appInfo, MicrophoneOp),
+                IsAppOpAllowedOrUnknown(context, appInfo, FineLocationOp),
+                IsAppOpAllowedOrUnknown(context, appInfo, CoarseLocationOp)));
             return true;
         }
         catch (Exception exception) when (exception is PackageManager.NameNotFoundException
                                           || AndroidRecoverableException.IsMatch(exception))
         {
+            Log.Debug(
+                LogTag,
+                $"Package inventory details unavailable. package={packageName}, error={exception.GetType().Name}.");
             identity = default;
             permissionRisk = AppPermissionRiskAnalysis.Safe;
             return false;
@@ -581,6 +609,117 @@ public static class AndroidAppInventoryApi
             .Where(permission => !string.IsNullOrWhiteSpace(permission))
             .Distinct(StringComparer.Ordinal)
             .ToArray()!;
+    }
+
+    private static string[] GetGrantedPermissions(PackageInfo packageInfo, string packageName)
+    {
+        return GetPermissionsByGrantState(packageInfo, packageName, true);
+    }
+
+    private static string[] GetDeniedPermissions(PackageInfo packageInfo, string packageName)
+    {
+        return GetPermissionsByGrantState(packageInfo, packageName, false);
+    }
+
+    private static string[] GetPermissionsByGrantState(PackageInfo packageInfo, string packageName, bool granted)
+    {
+        if (packageInfo.RequestedPermissions is not { Count: > 0 } permissions)
+        {
+            return [];
+        }
+
+        if (packageInfo.RequestedPermissionsFlags is not { Count: > 0 } flags)
+        {
+            Log.Debug(LogTag, $"Runtime permission grant flags unavailable. package={packageName}.");
+            return [];
+        }
+
+        var count = Math.Min(permissions.Count, flags.Count);
+        if (permissions.Count != flags.Count)
+            Log.Debug(
+                LogTag,
+                $"Runtime permission flag count mismatch. package={packageName}, permissions={permissions.Count}, flags={flags.Count}.");
+
+        var result = new List<string>(count);
+        for (var index = 0; index < count; index++)
+        {
+            var permission = permissions[index];
+            if (string.IsNullOrWhiteSpace(permission)) continue;
+
+            var isGranted = ((int)flags[index] & RequestedPermissionGrantedFlag) != 0;
+            if (isGranted == granted) result.Add(permission);
+        }
+
+        return result.ToArray();
+    }
+
+    private static bool IsAccessibilityServiceEnabled(Context context, string packageName)
+    {
+        return SecureSettingContainsPackage(context, Settings.Secure.EnabledAccessibilityServices, packageName);
+    }
+
+    private static bool IsNotificationListenerEnabled(Context context, string packageName)
+    {
+        return SecureSettingContainsPackage(context, "enabled_notification_listeners", packageName);
+    }
+
+    private static bool SecureSettingContainsPackage(Context context, string settingName, string packageName)
+    {
+        try
+        {
+            var value = Settings.Secure.GetString(context.ContentResolver, settingName);
+            return !string.IsNullOrWhiteSpace(value)
+                   && value.Split(':', StringSplitOptions.RemoveEmptyEntries)
+                       .Any(component => component.StartsWith(packageName + "/", StringComparison.Ordinal));
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            return false;
+        }
+    }
+
+    private static bool IsAppOpAllowed(Context context, ApplicationInfo? appInfo, string op)
+    {
+        return IsAppOpAllowedOrUnknown(context, appInfo, op) == true;
+    }
+
+    private static bool? IsAppOpAllowedOrUnknown(Context context, ApplicationInfo? appInfo, string op)
+    {
+        if (appInfo is null)
+        {
+            Log.Debug(LogTag, $"AppOps check skipped because ApplicationInfo is unavailable. op={op}.");
+            return null;
+        }
+
+        try
+        {
+            if (context.GetSystemService(Context.AppOpsService) is not AppOpsManager appOpsManager)
+            {
+                Log.Debug(LogTag, $"AppOps service unavailable. op={op}.");
+                return null;
+            }
+
+            if (appInfo.PackageName is not { Length: > 0 } packageName)
+            {
+                Log.Debug(LogTag, $"AppOps check skipped because package name is unavailable. op={op}.");
+                return null;
+            }
+
+            var mode = appOpsManager.CheckOpNoThrow(op, appInfo.Uid, packageName);
+            return mode == AppOpsManagerMode.Allowed
+                ? true
+                : mode is AppOpsManagerMode.Ignored or AppOpsManagerMode.Errored
+                    ? false
+                    : null;
+        }
+        catch (Exception exception) when (exception is Java.Lang.SecurityException
+                                          || AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Debug(
+                LogTag,
+                $"AppOps check failed. package={appInfo.PackageName ?? "<null>"}, op={op}, error={exception.GetType().Name}.");
+            return null;
+        }
     }
 
     private static PackageInfo? TryGetPackageInfo(
