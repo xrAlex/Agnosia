@@ -483,8 +483,10 @@ public static class AndroidAppInventoryApi
                 TryGetPackageInfo(
                     packageManager,
                     packageName,
-                    AndroidSystemApi.GetInstalledApplicationFlags() | PackageInfoFlags.Permissions)
-                ?? packageManager.GetPackageInfo(packageName, PackageInfoFlags.Permissions);
+                    AndroidSystemApi.GetInstalledApplicationFlags()
+                    | PackageInfoFlags.Permissions
+                    | PackageInfoFlags.Services)
+                ?? packageManager.GetPackageInfo(packageName, PackageInfoFlags.Permissions | PackageInfoFlags.Services);
             if (packageInfo is null)
             {
                 identity = default;
@@ -493,7 +495,12 @@ public static class AndroidAppInventoryApi
             }
 
             identity = new PackageIdentity(packageInfo.LongVersionCode);
-            permissionRisk = AppPermissionRiskCatalog.Analyze(packageInfo.RequestedPermissions);
+            permissionRisk = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
+                packageInfo.RequestedPermissions,
+                (int)Build.VERSION.SdkInt,
+                packageInfo.ApplicationInfo is { } appInfo ? (int)appInfo.TargetSdkVersion : 0,
+                GetForegroundServiceTypes(packageInfo),
+                GetServicePermissions(packageInfo)));
             return true;
         }
         catch (Exception exception) when (exception is PackageManager.NameNotFoundException
@@ -503,6 +510,50 @@ public static class AndroidAppInventoryApi
             permissionRisk = AppPermissionRiskAnalysis.Safe;
             return false;
         }
+    }
+
+    private static string[] GetForegroundServiceTypes(PackageInfo packageInfo)
+    {
+        if (packageInfo.Services is not { Count: > 0 } services) return [];
+
+        var types = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var service in services)
+        {
+            AddForegroundServiceType(types, service.ForegroundServiceType, ForegroundService.TypeCamera, "camera");
+            AddForegroundServiceType(types, service.ForegroundServiceType, ForegroundService.TypeLocation, "location");
+            AddForegroundServiceType(
+                types,
+                service.ForegroundServiceType,
+                ForegroundService.TypeMediaProjection,
+                "mediaProjection");
+            AddForegroundServiceType(
+                types,
+                service.ForegroundServiceType,
+                ForegroundService.TypeMicrophone,
+                "microphone");
+        }
+
+        return types.ToArray();
+    }
+
+    private static void AddForegroundServiceType(
+        HashSet<string> types,
+        ForegroundService serviceTypes,
+        ForegroundService type,
+        string name)
+    {
+        if ((serviceTypes & type) != 0) types.Add(name);
+    }
+
+    private static string[] GetServicePermissions(PackageInfo packageInfo)
+    {
+        if (packageInfo.Services is not { Count: > 0 } services) return [];
+
+        return services
+            .Select(service => service.Permission)
+            .Where(permission => !string.IsNullOrWhiteSpace(permission))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray()!;
     }
 
     private static PackageInfo? TryGetPackageInfo(
