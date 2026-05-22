@@ -183,6 +183,13 @@ public static class AndroidAppInventoryApi
             IsInstalled = isInstalled,
             PermissionRiskLevel = permissionRisk.Level,
             RiskyPermissions = permissionRisk.RiskyPermissions.ToArray(),
+            MatchedPermissionRiskRuleIds = permissionRisk.MatchedRuleIds.ToArray(),
+            PermissionRiskScore = permissionRisk.Score,
+            PermissionRiskRawScore = permissionRisk.RawScore,
+            PermissionRiskConfidence = permissionRisk.Confidence,
+            PermissionRiskScoreBreakdown = permissionRisk.ScoreBreakdown,
+            ManifestPermissions = permissionRisk.ManifestPermissions.ToArray(),
+            RuntimePermissions = permissionRisk.RuntimePermissions.ToArray(),
             IconPng = TryGetCachedIcon(context, packageName, packageIdentity, out var cachedIcon)
                 ? cachedIcon
                 : AndroidAppIconWarmupQueue.TryLoadCachedOrQueue(context, packageManager, packageName)

@@ -52,6 +52,8 @@ public sealed class TestPlatformServices :
 
     public Func<AppSnapshot, CancellationToken, Task<OperationResult>>? LaunchHandler { get; set; }
 
+    public Func<AppSnapshot, CancellationToken, Task<OperationResult>>? RevokeRuntimePermissionsHandler { get; set; }
+
     public int DashboardProfileLoadCount { get; private set; }
 
     public int AppInventoryLoadCount { get; private set; }
@@ -75,6 +77,8 @@ public sealed class TestPlatformServices :
     public List<AppSnapshot> CreateShortcutRequests { get; } = [];
 
     public List<AppSnapshot> LaunchRequests { get; } = [];
+
+    public List<AppSnapshot> RevokeRuntimePermissionsRequests { get; } = [];
 
     public List<(AppSnapshot App, bool Enabled)> SetInteractionAccessRequests { get; } = [];
 
@@ -246,6 +250,17 @@ public sealed class TestPlatformServices :
         SetInteractionAccessRequests.Add((app, enabled));
 
         return Task.FromResult(DefaultOperationResult);
+    }
+
+    public Task<OperationResult> RevokeRuntimePermissionsAsync(
+        AppSnapshot app,
+        CancellationToken cancellationToken = default)
+    {
+        RevokeRuntimePermissionsRequests.Add(app);
+
+        return RevokeRuntimePermissionsHandler is null
+            ? Task.FromResult(DefaultOperationResult)
+            : RevokeRuntimePermissionsHandler(app, cancellationToken);
     }
 
     public Task<OperationResult> SaveSettingsAsync(

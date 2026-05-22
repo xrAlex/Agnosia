@@ -416,7 +416,14 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
                 profile == ProfileKind.Work && interactionPackages.Contains(app.PackageName),
                 app.IconPng,
                 app.PermissionRiskLevel,
-                app.RiskyPermissions);
+                app.RiskyPermissions,
+                app.MatchedPermissionRiskRuleIds,
+                app.PermissionRiskScore,
+                app.PermissionRiskRawScore,
+                app.PermissionRiskConfidence,
+                app.PermissionRiskScoreBreakdown,
+                app.ManifestPermissions,
+                app.RuntimePermissions);
         }
 
         return mappedApps;

@@ -189,13 +189,82 @@
                                     </StackPanel>
 
                                     <StackPanel Spacing="8"
-                                                IsVisible="{Binding HasRiskyPermissions}">
+                                                IsVisible="{Binding HasPermissionDetails}">
                                         <Border Classes="divider" />
 
-                                        <TextBlock Classes="app-dialog-setting-title"
-                                                   Text="Опасные разрешения" />
-                                        <TextBlock Classes="app-dialog-permission-risk-list"
-                                                   Text="{Binding RiskyPermissionsText}" />
+                                        <ToggleButton Classes="app-dialog-section-toggle"
+                                                      IsChecked="{Binding IsPermissionDetailsExpanded}">
+                                            <Grid ColumnDefinitions="*,Auto"
+                                                  ColumnSpacing="8">
+                                                <TextBlock Classes="app-dialog-setting-title"
+                                                           Padding="3"
+                                                           VerticalAlignment="Center"
+                                                           Text="Разрешения приложения" />
+                                                <PathIcon Grid.Column="1"
+                                                          Width="16"
+                                                          Height="16"
+                                                          VerticalAlignment="Center"
+                                                          Foreground="{StaticResource AppTextSecondaryBrush}"
+                                                          Data="{StaticResource IconChevronDownGeometry}" />
+                                            </Grid>
+                                        </ToggleButton>
+
+                                        <StackPanel Spacing="8"
+                                                    IsVisible="{Binding IsPermissionDetailsExpanded}">
+                                            <ItemsControl ItemsSource="{Binding PermissionRiskReasons}"
+                                                          IsVisible="{Binding HasPermissionRiskReasons}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid ColumnDefinitions="Auto,*"
+                                                              ColumnSpacing="8"
+                                                              Margin="0,0,0,4">
+                                                            <TextBlock Classes="app-dialog-setting-caption"
+                                                                       Text="-" />
+                                                            <TextBlock Grid.Column="1"
+                                                                       Classes="app-dialog-setting-caption"
+                                                                       TextWrapping="Wrap"
+                                                                       Text="{Binding}" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                            <StackPanel Spacing="4"
+                                                        IsVisible="{Binding HasRiskyPermissions}">
+                                                <TextBlock Classes="app-dialog-setting-caption"
+                                                           FontWeight="SemiBold"
+                                                           Text="Рискованные permissions" />
+                                                <TextBlock Classes="app-dialog-permission-risk-list"
+                                                           Text="{Binding RiskyPermissionsText}" />
+                                            </StackPanel>
+
+                                            <StackPanel Spacing="4"
+                                                        IsVisible="{Binding HasManifestPermissions}">
+                                                <TextBlock Classes="app-dialog-setting-caption"
+                                                           FontWeight="SemiBold"
+                                                           Text="Manifest permissions" />
+                                                <TextBlock Classes="app-dialog-permission-risk-list"
+                                                           Text="{Binding ManifestPermissionsText}" />
+                                            </StackPanel>
+
+                                            <StackPanel Spacing="4"
+                                                        IsVisible="{Binding HasRuntimePermissions}">
+                                                <TextBlock Classes="app-dialog-setting-caption"
+                                                           FontWeight="SemiBold"
+                                                           Text="Runtime permissions" />
+                                                <TextBlock Classes="app-dialog-permission-risk-list"
+                                                           Text="{Binding RuntimePermissionsText}" />
+                                                <Button Classes="compact-action"
+                                                        Margin="0,6,0,0"
+                                                        HorizontalAlignment="Left"
+                                                        IsVisible="{Binding CanRevokeRuntimePermissions}"
+                                                        IsEnabled="{Binding CanRevokeRuntimePermissions}"
+                                                        Command="{Binding RevokeRuntimePermissionsCommand}">
+                                                    <TextBlock Classes="button-label"
+                                                               Text="Отозвать runtime-разрешения" />
+                                                </Button>
+                                            </StackPanel>
+                                        </StackPanel>
                                     </StackPanel>
                                 </StackPanel>
                             </ScrollViewer>

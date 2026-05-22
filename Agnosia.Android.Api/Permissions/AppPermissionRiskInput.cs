@@ -15,4 +15,5 @@ public sealed record AppPermissionRiskInput(
     bool? IsCameraAppOpAllowed = null,
     bool? IsMicrophoneAppOpAllowed = null,
     bool? IsFineLocationAppOpAllowed = null,
-    bool? IsCoarseLocationAppOpAllowed = null);
+    bool? IsCoarseLocationAppOpAllowed = null,
+    IEnumerable<string>? ObservedSignals = null);

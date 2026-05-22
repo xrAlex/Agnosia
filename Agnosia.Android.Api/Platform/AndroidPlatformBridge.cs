@@ -109,6 +109,42 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         return Task.FromResult(result);
     }
 
+    public Task<OperationResult> RevokeRuntimePermissionsAsync(
+        AppSnapshot app,
+        CancellationToken cancellationToken = default)
+    {
+        var host = GetActivityHost();
+        var activity = host.CurrentActivity;
+        AgnosiaRuntime.Initialize(activity);
+        if (app.RuntimePermissions is not { Count: > 0 } runtimePermissions)
+            return Task.FromResult(OperationResult.Success("У приложения нет runtime-разрешений для отзыва."));
+
+        if (AndroidSystemApi.GetDevicePolicyManager(activity) is not { } policyManager)
+            return Task.FromResult(OperationResult.Failure("На этом устройстве недоступны API политики устройства."));
+
+        var admin = AgnosiaUtilities.GetAdminComponent(activity, host.AdminReceiverType);
+
+        var failedPermissions = new List<string>();
+        foreach (var permission in runtimePermissions)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!AndroidPolicyApi.TryDenyRuntimePermission(
+                    policyManager,
+                    admin,
+                    app.PackageName,
+                    permission,
+                    LogTag,
+                    out _))
+                failedPermissions.Add(permission);
+        }
+
+        return Task.FromResult(failedPermissions.Count == 0
+            ? OperationResult.Success($"Runtime-разрешения отозваны: {runtimePermissions.Count}.")
+            : OperationResult.Failure(
+                $"Не удалось отозвать runtime-разрешения: {string.Join(", ", failedPermissions.Select(FormatPermissionName))}."));
+    }
+
     public async Task<bool> LoadOnboardingCompletedAsync(CancellationToken cancellationToken = default)
     {
         _ = GetInitializedActivity();
@@ -153,6 +189,14 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
 
         return OperationResult.Failure(
             "Android сейчас не разрешает создать рабочий профиль. Проверьте ограничения устройства и повторите попытку.");
+    }
+
+    private static string FormatPermissionName(string permission)
+    {
+        const string androidPermissionPrefix = "android.permission.";
+        return permission.StartsWith(androidPermissionPrefix, StringComparison.Ordinal)
+            ? permission[androidPermissionPrefix.Length..]
+            : permission;
     }
 
     private static string PrepareProvisioningAuthentication()

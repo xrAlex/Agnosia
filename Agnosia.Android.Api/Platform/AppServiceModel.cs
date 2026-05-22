@@ -25,4 +25,19 @@ public sealed class AppServiceModel
     public AppPermissionRiskLevel PermissionRiskLevel { get; init; } = AppPermissionRiskLevel.Safe;
 
     public string[] RiskyPermissions { get; init; } = [];
+
+    public string[] MatchedPermissionRiskRuleIds { get; init; } = [];
+
+    public int PermissionRiskScore { get; init; }
+
+    public int PermissionRiskRawScore { get; init; }
+
+    public AppPermissionRiskConfidence PermissionRiskConfidence { get; init; } = AppPermissionRiskConfidence.None;
+
+    public AppPermissionRiskScoreBreakdown PermissionRiskScoreBreakdown { get; init; } =
+        AppPermissionRiskScoreBreakdown.Empty;
+
+    public string[] ManifestPermissions { get; init; } = [];
+
+    public string[] RuntimePermissions { get; init; } = [];
 }

@@ -18,4 +18,6 @@ public interface IAppCommandService
 
     Task<OperationResult> SetInteractionAccessAsync(AppSnapshot app, bool enabled,
         CancellationToken cancellationToken = default);
+
+    Task<OperationResult> RevokeRuntimePermissionsAsync(AppSnapshot app, CancellationToken cancellationToken = default);
 }

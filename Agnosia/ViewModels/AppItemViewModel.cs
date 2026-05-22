@@ -19,7 +19,10 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         TimeSpan.FromSeconds(30)
     ];
     private const string AndroidPermissionPrefix = "android.permission.";
+    private const string AndroidHealthPermissionPrefix = "android.permission.health.";
     private static readonly IReadOnlyList<string> EmptyRiskyPermissions = [];
+    private static readonly AppPermissionRiskScoreBreakdown EmptyRiskScoreBreakdown =
+        AppPermissionRiskScoreBreakdown.Empty;
 
     private readonly DashboardWorkspaceViewModel _owner;
     private bool _iconLoadRequested;
@@ -28,6 +31,9 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
     private Bitmap? _icon;
     private CancellationTokenSource? _iconLoadCancellation;
     private CancellationTokenSource? _iconRetryCancellation;
+
+    [ObservableProperty]
+    private bool _isPermissionDetailsExpanded;
 
     public AppItemViewModel(DashboardWorkspaceViewModel owner, AppSnapshot snapshot)
     {
@@ -55,6 +61,34 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     public string RiskyPermissionsText => string.Join(", ", RiskyPermissions.Select(FormatPermissionName));
 
+    public IReadOnlyList<string> ManifestPermissions => Snapshot.ManifestPermissions ?? EmptyRiskyPermissions;
+
+    public IReadOnlyList<string> RuntimePermissions => Snapshot.RuntimePermissions ?? EmptyRiskyPermissions;
+
+    public IReadOnlyList<string> MatchedPermissionRiskRuleIds =>
+        Snapshot.MatchedPermissionRiskRuleIds ?? EmptyRiskyPermissions;
+
+    public AppPermissionRiskScoreBreakdown PermissionRiskScoreBreakdown =>
+        Snapshot.PermissionRiskScoreBreakdown ?? EmptyRiskScoreBreakdown;
+
+    public bool HasManifestPermissions => ManifestPermissions.Count > 0;
+
+    public bool HasRuntimePermissions => RuntimePermissions.Count > 0;
+
+    public bool HasPermissionDetails => HasManifestPermissions || HasRuntimePermissions;
+
+    public bool CanRevokeRuntimePermissions => HasRuntimePermissions && !Snapshot.IsSystem && Profile == ProfileKind.Work;
+
+    public string ManifestPermissionsText => FormatPermissionList(ManifestPermissions);
+
+    public string RuntimePermissionsText => FormatPermissionList(RuntimePermissions);
+
+    public string PermissionRiskSummaryText => BuildPermissionRiskSummary();
+
+    public IReadOnlyList<string> PermissionRiskReasons => BuildRiskReasons().ToArray();
+
+    public bool HasPermissionRiskReasons => PermissionRiskReasons.Count > 0;
+
     public bool IsPermissionRiskSafe => PermissionRiskLevel == AppPermissionRiskLevel.Safe;
 
     public bool IsPermissionRiskDangerous => PermissionRiskLevel == AppPermissionRiskLevel.Dangerous;
@@ -65,8 +99,8 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     public string PermissionRiskTooltip => PermissionRiskLevel switch
     {
-        AppPermissionRiskLevel.Critical => "Есть критические разрешения",
-        AppPermissionRiskLevel.Dangerous => "Есть опасные разрешения",
+        AppPermissionRiskLevel.Critical => PermissionRiskSummaryText,
+        AppPermissionRiskLevel.Dangerous => PermissionRiskSummaryText,
         _ => "Разрешения: OK"
     };
 
@@ -195,6 +229,12 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         return _owner.ToggleInteractionAccessAsync(this);
     }
 
+    [RelayCommand(CanExecute = nameof(CanRevokeRuntimePermissions))]
+    private Task RevokeRuntimePermissionsAsync()
+    {
+        return _owner.RevokeRuntimePermissionsAsync(this);
+    }
+
     [RelayCommand]
     private void OpenControls()
     {
@@ -261,6 +301,9 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(IsPermissionRiskCritical));
             OnPropertyChanged(nameof(ShowPermissionRiskIndicator));
             OnPropertyChanged(nameof(PermissionRiskTooltip));
+            OnPropertyChanged(nameof(PermissionRiskSummaryText));
+            OnPropertyChanged(nameof(PermissionRiskReasons));
+            OnPropertyChanged(nameof(HasPermissionRiskReasons));
         }
 
         if (!StringListsEqual(previous.RiskyPermissions, snapshot.RiskyPermissions))
@@ -268,6 +311,41 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(RiskyPermissions));
             OnPropertyChanged(nameof(HasRiskyPermissions));
             OnPropertyChanged(nameof(RiskyPermissionsText));
+            OnPropertyChanged(nameof(PermissionRiskTooltip));
+            OnPropertyChanged(nameof(PermissionRiskSummaryText));
+            OnPropertyChanged(nameof(PermissionRiskReasons));
+            OnPropertyChanged(nameof(HasPermissionRiskReasons));
+        }
+
+        if (!StringListsEqual(previous.MatchedPermissionRiskRuleIds, snapshot.MatchedPermissionRiskRuleIds)
+            || previous.PermissionRiskScore != snapshot.PermissionRiskScore
+            || previous.PermissionRiskRawScore != snapshot.PermissionRiskRawScore
+            || previous.PermissionRiskConfidence != snapshot.PermissionRiskConfidence
+            || previous.PermissionRiskScoreBreakdown != snapshot.PermissionRiskScoreBreakdown)
+        {
+            OnPropertyChanged(nameof(MatchedPermissionRiskRuleIds));
+            OnPropertyChanged(nameof(PermissionRiskScoreBreakdown));
+            OnPropertyChanged(nameof(PermissionRiskTooltip));
+            OnPropertyChanged(nameof(PermissionRiskSummaryText));
+            OnPropertyChanged(nameof(PermissionRiskReasons));
+            OnPropertyChanged(nameof(HasPermissionRiskReasons));
+        }
+
+        if (!StringListsEqual(previous.ManifestPermissions, snapshot.ManifestPermissions))
+        {
+            OnPropertyChanged(nameof(ManifestPermissions));
+            OnPropertyChanged(nameof(HasManifestPermissions));
+            OnPropertyChanged(nameof(HasPermissionDetails));
+            OnPropertyChanged(nameof(ManifestPermissionsText));
+        }
+
+        if (!StringListsEqual(previous.RuntimePermissions, snapshot.RuntimePermissions))
+        {
+            OnPropertyChanged(nameof(RuntimePermissions));
+            OnPropertyChanged(nameof(HasRuntimePermissions));
+            OnPropertyChanged(nameof(HasPermissionDetails));
+            OnPropertyChanged(nameof(CanRevokeRuntimePermissions));
+            OnPropertyChanged(nameof(RuntimePermissionsText));
         }
 
         if (previous.IsSystem != snapshot.IsSystem)
@@ -276,6 +354,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(CanMoveToWork));
             OnPropertyChanged(nameof(CanUninstall));
             OnPropertyChanged(nameof(ShowPermissionRiskIndicator));
+            OnPropertyChanged(nameof(CanRevokeRuntimePermissions));
         }
 
         if (previous.CanLaunch != snapshot.CanLaunch) OnPropertyChanged(nameof(ShowLaunch));
@@ -434,6 +513,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         CreateShortcutCommand.NotifyCanExecuteChanged();
         LaunchCommand.NotifyCanExecuteChanged();
         ToggleInteractionAccessCommand.NotifyCanExecuteChanged();
+        RevokeRuntimePermissionsCommand.NotifyCanExecuteChanged();
     }
 
     private static void TracePerf(string operation, long startedAt, string detail)
@@ -469,9 +549,138 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
     private static string FormatPermissionName(string permission)
     {
         var trimmed = permission.Trim();
-        return trimmed.StartsWith(AndroidPermissionPrefix, StringComparison.Ordinal)
-            ? trimmed[AndroidPermissionPrefix.Length..]
-            : trimmed;
+        if (trimmed.StartsWith(AndroidHealthPermissionPrefix, StringComparison.Ordinal))
+            return trimmed[AndroidHealthPermissionPrefix.Length..];
+
+        if (trimmed.StartsWith(AndroidPermissionPrefix, StringComparison.Ordinal))
+            return trimmed[AndroidPermissionPrefix.Length..];
+
+        return trimmed;
+    }
+
+    private static string FormatPermissionList(IReadOnlyList<string> permissions)
+    {
+        return permissions.Count == 0
+            ? "Нет"
+            : string.Join(Environment.NewLine, permissions.Select(FormatPermissionName));
+    }
+
+    private string BuildPermissionRiskSummary()
+    {
+        return PermissionRiskLevel switch
+        {
+            AppPermissionRiskLevel.Critical => "Имеет опасные разрешения",
+            AppPermissionRiskLevel.Dangerous => "Повышенный риск по разрешениям",
+            _ => "Разрешения: OK"
+        };
+    }
+
+    private IEnumerable<string> BuildRiskReasons()
+    {
+        if (PermissionRiskLevel == AppPermissionRiskLevel.Safe) yield break;
+
+        var permissions = RiskyPermissions;
+        var breakdown = PermissionRiskScoreBreakdown;
+
+        foreach (var reason in BuildSpecificPermissionReasons(permissions))
+        {
+            yield return reason;
+        }
+
+        if (breakdown.PersistenceScore > 0)
+            yield return "может запускаться или продолжать работу в фоне";
+
+        if (breakdown.ExfiltrationScore > 0)
+            yield return "имеет канал для передачи данных наружу";
+
+        if (breakdown.ControlSurfaceScore > 0)
+            yield return "получило доступ к чувствительной системной поверхности";
+
+        if (breakdown.StealthScore > 0)
+            yield return "может обходить ограничения фоновой работы";
+
+        if (MatchedPermissionRiskRuleIds.Count > 1)
+            yield return $"совпало несколько рискованных правил ({MatchedPermissionRiskRuleIds.Count})";
+    }
+
+    private static IEnumerable<string> BuildSpecificPermissionReasons(IReadOnlyList<string> permissions)
+    {
+        if (ContainsAny(permissions, "READ_SMS", "RECEIVE_SMS", "SEND_SMS"))
+            yield return "Может читать или отправлять SMS";
+        if (ContainsAny(permissions, "ANSWER_PHONE_CALLS"))
+            yield return "Может отвечать на телефонные звонки";
+        if (ContainsAny(permissions, "READ_CALL_LOG", "WRITE_CALL_LOG", "READ_PHONE_NUMBERS", "READ_PHONE_STATE"))
+            yield return "Имеет доступ к звонкам или телефонным данным";
+        if (ContainsAny(permissions, "READ_CONTACTS", "GET_ACCOUNTS"))
+            yield return "Может читать контакты или аккаунты";
+        if (ContainsAny(permissions, "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "ACCESS_BACKGROUND_LOCATION"))
+            yield return "Имеет доступ к геолокации";
+        if (ContainsAny(permissions, "ACCESS_MEDIA_LOCATION"))
+            yield return "Может читать геометки внутри фото и видео";
+        if (ContainsAny(permissions, "FOREGROUND_SERVICE_CAMERA"))
+            yield return "Может держать камеру активной через foreground service";
+        if (ContainsAny(permissions, "RECORD_AUDIO"))
+            yield return "Может использовать микрофон";
+        if (ContainsAny(permissions, "FOREGROUND_SERVICE_MICROPHONE"))
+            yield return "Может держать микрофон активным через foreground service";
+        if (ContainsAny(permissions, "READ_MEDIA_IMAGES", "READ_MEDIA_VIDEO", "READ_MEDIA_AUDIO", "READ_MEDIA_VISUAL_USER_SELECTED", "READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE", "MANAGE_EXTERNAL_STORAGE"))
+            yield return "Имеет доступ к файлам";
+        if (ContainsAny(permissions, "READ_MEDIA_VISUAL_USER_SELECTED"))
+            yield return "Имеет доступ к выбранным фото или видео";
+        if (ContainsAny(permissions, "READ_HEALTH", "READ_HEART", "READ_MEDICAL", "READ_SYMPTOM"))
+            yield return "Может читать медицинские или фитнес-данные";
+        if (ContainsAny(permissions, "BODY_SENSORS"))
+            yield return "Может читать данные датчиков тела";
+        if (ContainsAny(permissions, "BODY_SENSORS_BACKGROUND", "READ_HEALTH_DATA_IN_BACKGROUND"))
+            yield return "Может читать health-данные в фоне";
+        if (ContainsAny(permissions, "READ_HEALTH_DATA_HISTORY"))
+            yield return "Может читать исторические health-данные";
+        if (ContainsAny(permissions, "BIND_ACCESSIBILITY_SERVICE", "SYSTEM_ALERT_WINDOW", "BIND_NOTIFICATION_LISTENER_SERVICE"))
+            yield return "Может читать данные с экрана, уведомления или показывать окна поверх других приложений";
+        if (ContainsAny(permissions, "BIND_ACCESSIBILITY_SERVICE"))
+            yield return "Может управлять интерфейсом";
+        if (ContainsAny(permissions, "BIND_NOTIFICATION_LISTENER_SERVICE"))
+            yield return "Может читать уведомления";
+        if (ContainsAny(permissions, "SYSTEM_ALERT_WINDOW"))
+            yield return "Может показывать окна поверх других приложений";
+        if (ContainsAny(permissions, "BIND_VPN_SERVICE"))
+            yield return "Может направлять трафик через VPN-сервис";
+        if (ContainsAny(permissions, "PACKAGE_USAGE_STATS"))
+            yield return "Может видеть статистику использования приложений";
+        if (ContainsAny(permissions, "QUERY_ALL_PACKAGES"))
+            yield return "Может видеть список установленных приложений";
+        if (ContainsAny(permissions, "FOREGROUND_SERVICE_MEDIA_PROJECTION"))
+            yield return "Может записывать экран";
+        if (ContainsAny(permissions, "READ_ASSIST_STRUCTURE_SCREEN_CONTENT"))
+            yield return "Может получать содержимое экрана";
+        if (ContainsAny(permissions, "REQUEST_INSTALL_PACKAGES"))
+            yield return "Может устанавливать APK из внешних источников";
+        if (ContainsAny(permissions, "RECEIVE_BOOT_COMPLETED"))
+            yield return "Может запускаться после перезагрузки устройства";
+        if (ContainsAny(permissions, "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"))
+            yield return "Может обходить ограничения энергосбережения";
+        if (ContainsAny(permissions, "SCHEDULE_EXACT_ALARM", "USE_EXACT_ALARM"))
+            yield return "Может точно будить приложение по расписанию";
+        if (ContainsAny(permissions, "FOREGROUND_SERVICE"))
+            yield return "Может длительно работать в фоне";
+        if (ContainsAny(permissions, "ACCESS_NETWORK_STATE"))
+            yield return "Может отслеживать состояние сети";
+        if (ContainsAny(permissions, "ACCESS_LOCAL_NETWORK"))
+            yield return "Может обращаться к устройствам в локальной сети";
+        if (ContainsAny(permissions, "NEARBY_WIFI_DEVICES"))
+            yield return "Может видеть окружающие Wi-Fi сети и подключаться к ним";
+        if (ContainsAny(permissions, "BLUETOOTH_CONNECT", "BLUETOOTH_SCAN"))
+            yield return "Может использовать Bluetooth для поиска или обмена с устройствами рядом";
+        if (ContainsAny(permissions, "NFC"))
+            yield return "Может использовать NFC модуль";
+        if (ContainsAny(permissions, "RANGING"))
+            yield return "Может оценивать расстояние до устройств рядом";
+    }
+
+    private static bool ContainsAny(IReadOnlyList<string> permissions, params string[] tokens)
+    {
+        return permissions.Any(permission =>
+            tokens.Any(token => permission.Contains(token, StringComparison.Ordinal)));
     }
 
     private static string ResolveStatusTagLabel(AppSnapshot snapshot)

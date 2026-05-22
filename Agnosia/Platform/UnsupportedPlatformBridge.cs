@@ -149,6 +149,13 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
         return AndroidOnlyFailureTask;
     }
 
+    public Task<OperationResult> RevokeRuntimePermissionsAsync(
+        AppSnapshot app,
+        CancellationToken cancellationToken = default)
+    {
+        return AndroidOnlyFailureTask;
+    }
+
     public Task<OperationResult> SaveSettingsAsync(AppSettingsSnapshot settings,
         CancellationToken cancellationToken = default)
     {

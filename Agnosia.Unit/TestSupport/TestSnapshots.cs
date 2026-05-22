@@ -37,7 +37,11 @@ internal static class TestSnapshots
         bool isInstalled = true,
         bool interactionAllowed = false,
         AppPermissionRiskLevel permissionRiskLevel = AppPermissionRiskLevel.Safe,
-        IReadOnlyList<string>? riskyPermissions = null)
+        IReadOnlyList<string>? riskyPermissions = null,
+        IReadOnlyList<string>? matchedPermissionRiskRuleIds = null,
+        AppPermissionRiskScoreBreakdown? permissionRiskScoreBreakdown = null,
+        IReadOnlyList<string>? manifestPermissions = null,
+        IReadOnlyList<string>? runtimePermissions = null)
     {
         return new AppSnapshot(
             packageName,
@@ -51,7 +55,11 @@ internal static class TestSnapshots
             isInstalled,
             interactionAllowed,
             PermissionRiskLevel: permissionRiskLevel,
-            RiskyPermissions: riskyPermissions);
+            RiskyPermissions: riskyPermissions,
+            MatchedPermissionRiskRuleIds: matchedPermissionRiskRuleIds,
+            PermissionRiskScoreBreakdown: permissionRiskScoreBreakdown,
+            ManifestPermissions: manifestPermissions,
+            RuntimePermissions: runtimePermissions);
     }
 
     public static PermissionSnapshot GrantedPermission(PermissionKind kind)

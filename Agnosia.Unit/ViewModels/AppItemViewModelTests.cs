@@ -32,6 +32,43 @@ public sealed class AppItemViewModelTests
         Assert.Equal("AllowInteraction", app.InteractionLabel);
     }
 
+    [Fact]
+    public void Permission_lists_are_available_without_risk_reason()
+    {
+        var app = CreateApp(TestSnapshots.App(
+            ProfileKind.Personal,
+            manifestPermissions:
+            [
+                "android.permission.VIBRATE",
+                "android.permission.INTERNET"
+            ]));
+
+        Assert.True(app.IsPermissionRiskSafe);
+        Assert.False(app.HasRiskyPermissions);
+        Assert.True(app.HasPermissionDetails);
+        Assert.Equal($"VIBRATE{Environment.NewLine}INTERNET", app.ManifestPermissionsText);
+        Assert.False(app.HasRuntimePermissions);
+    }
+
+    [Fact]
+    public void Revoke_runtime_permissions_is_available_only_for_work_apps_with_runtime_permissions()
+    {
+        var personal = CreateApp(TestSnapshots.App(
+            ProfileKind.Personal,
+            runtimePermissions: ["android.permission.CAMERA"]));
+        var work = CreateApp(TestSnapshots.App(
+            ProfileKind.Work,
+            runtimePermissions: ["android.permission.CAMERA"]));
+        var workSystem = CreateApp(TestSnapshots.App(
+            ProfileKind.Work,
+            isSystem: true,
+            runtimePermissions: ["android.permission.CAMERA"]));
+
+        Assert.False(personal.CanRevokeRuntimePermissions);
+        Assert.True(work.CanRevokeRuntimePermissions);
+        Assert.False(workSystem.CanRevokeRuntimePermissions);
+    }
+
     // Проверяет, что приложение рабочего профиля не получает межпрофильный обмен по умолчанию.
     [Fact]
     public void Work_app_defaults_interaction_access_to_disabled()
@@ -87,7 +124,89 @@ public sealed class AppItemViewModelTests
         Assert.True(app.IsPermissionRiskCritical);
         Assert.True(app.HasRiskyPermissions);
         Assert.Equal("CAMERA, RECORD_AUDIO", app.RiskyPermissionsText);
-        Assert.Equal("Есть критические разрешения", app.PermissionRiskTooltip);
+        Assert.Equal("Имеет опасные разрешения", app.PermissionRiskTooltip);
+        Assert.Equal("Имеет опасные разрешения", app.PermissionRiskSummaryText);
+        Assert.Contains("может использовать камеру", app.PermissionRiskReasons);
+        Assert.Contains("может использовать микрофон", app.PermissionRiskReasons);
+    }
+
+    [Fact]
+    public void Permission_risk_details_are_composed_from_snapshot_evidence()
+    {
+        var app = CreateApp(TestSnapshots.App(
+            ProfileKind.Personal,
+            permissionRiskLevel: AppPermissionRiskLevel.Dangerous,
+            riskyPermissions:
+            [
+                "android.permission.READ_SMS",
+                "android.permission.INTERNET"
+            ],
+            matchedPermissionRiskRuleIds:
+            [
+                "SU-SMS-READ-01",
+                "SU-SMS-READ-NET-01"
+            ],
+            permissionRiskScoreBreakdown: new AppPermissionRiskScoreBreakdown(
+                DataSensitivityScore: 4,
+                PersistenceScore: 0,
+                ExfiltrationScore: 2,
+                ControlSurfaceScore: 0,
+                StealthScore: 0,
+                LegitimacyPenalty: 0,
+                ConfidenceScore: 1),
+            manifestPermissions:
+            [
+                "android.permission.READ_SMS",
+                "android.permission.INTERNET"
+            ],
+            runtimePermissions:
+            [
+                "android.permission.READ_SMS"
+            ]));
+
+        Assert.Equal("Повышенный риск по разрешениям", app.PermissionRiskSummaryText);
+        Assert.Contains("может читать или отправлять SMS", app.PermissionRiskReasons);
+        Assert.Contains("имеет канал для передачи данных наружу", app.PermissionRiskReasons);
+        Assert.Contains("совпало несколько рискованных правил (2)", app.PermissionRiskReasons);
+        Assert.True(app.HasPermissionDetails);
+        Assert.True(app.HasManifestPermissions);
+        Assert.True(app.HasRuntimePermissions);
+        Assert.Equal($"READ_SMS{Environment.NewLine}INTERNET", app.ManifestPermissionsText);
+        Assert.Equal("READ_SMS", app.RuntimePermissionsText);
+    }
+
+    [Fact]
+    public void Permission_risk_reasons_cover_catalog_permission_groups()
+    {
+        var app = CreateApp(TestSnapshots.App(
+            ProfileKind.Work,
+            permissionRiskLevel: AppPermissionRiskLevel.Critical,
+            riskyPermissions:
+            [
+                "android.permission.PACKAGE_USAGE_STATS",
+                "android.permission.QUERY_ALL_PACKAGES",
+                "android.permission.REQUEST_INSTALL_PACKAGES",
+                "android.permission.RECEIVE_BOOT_COMPLETED",
+                "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+                "android.permission.ACCESS_LOCAL_NETWORK",
+                "android.permission.BLUETOOTH_SCAN",
+                "android.permission.RANGING",
+                "android.permission.READ_ASSIST_STRUCTURE_SCREEN_CONTENT",
+                "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION",
+                "android.permission.POST_NOTIFICATIONS"
+            ]));
+
+        Assert.Contains("может видеть, какие приложения используются", app.PermissionRiskReasons);
+        Assert.Contains("может видеть список установленных приложений", app.PermissionRiskReasons);
+        Assert.Contains("может устанавливать APK из внешних источников", app.PermissionRiskReasons);
+        Assert.Contains("может запускаться после перезагрузки устройства", app.PermissionRiskReasons);
+        Assert.Contains("может обходить ограничения энергосбережения", app.PermissionRiskReasons);
+        Assert.Contains("может обращаться к устройствам в локальной сети", app.PermissionRiskReasons);
+        Assert.Contains("может использовать Bluetooth для поиска или обмена с устройствами рядом", app.PermissionRiskReasons);
+        Assert.Contains("может оценивать расстояние до nearby-устройств", app.PermissionRiskReasons);
+        Assert.Contains("может получать содержимое экрана через assistant API", app.PermissionRiskReasons);
+        Assert.Contains("может быть связано с записью экрана", app.PermissionRiskReasons);
+        Assert.Contains("может активно показывать уведомления", app.PermissionRiskReasons);
     }
 
     // Проверяет обновление вычисляемых свойств и PropertyChanged при новом snapshot.
@@ -131,6 +250,9 @@ public sealed class AppItemViewModelTests
         Assert.Contains(nameof(AppItemViewModel.PermissionRiskLevel), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.IsPermissionRiskDangerous), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.PermissionRiskTooltip), changedProperties);
+        Assert.Contains(nameof(AppItemViewModel.PermissionRiskSummaryText), changedProperties);
+        Assert.Contains(nameof(AppItemViewModel.PermissionRiskReasons), changedProperties);
+        Assert.Contains(nameof(AppItemViewModel.HasPermissionRiskReasons), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.HasRiskyPermissions), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.RiskyPermissionsText), changedProperties);
     }

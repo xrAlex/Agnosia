@@ -1161,6 +1161,16 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             app.InteractionAllowed ? "InteractionDisabled" : "InteractionEnabled");
     }
 
+    internal Task RevokeRuntimePermissionsAsync(AppItemViewModel app)
+    {
+        if (!app.CanRevokeRuntimePermissions) return Task.CompletedTask;
+
+        return RunAppOperationAsync(
+            app,
+            snapshot => _appCommandService.RevokeRuntimePermissionsAsync(snapshot),
+            "RuntimePermissionsRevoked");
+    }
+
     internal async Task<byte[]?> LoadAppIconPngAsync(AppSnapshot snapshot, CancellationToken cancellationToken)
     {
         if (snapshot.IconPng is { Length: > 0 } existingIcon) return existingIcon;

@@ -158,6 +158,45 @@ public static class AndroidPolicyApi
         }
     }
 
+    public static bool TryDenyRuntimePermission(
+        DevicePolicyManager manager,
+        ComponentName admin,
+        string packageName,
+        string permission,
+        string logTag,
+        out string? error)
+    {
+        try
+        {
+            manager.SetPermissionGrantState(
+                admin,
+                packageName,
+                permission,
+                PermissionGrantState.Denied);
+
+            var currentState = manager.GetPermissionGrantState(admin, packageName, permission);
+            if (currentState != PermissionGrantState.Denied)
+            {
+                error = $"Android не подтвердил отзыв {permission} у {packageName}.";
+                Log.Warn(
+                    logTag,
+                    $"Permission revoke was not confirmed. package={packageName}, permission={permission}, state={currentState}.");
+                return false;
+            }
+
+            error = null;
+            return true;
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            error = $"Android не смог отозвать {permission} у {packageName}.";
+            Log.Warn(
+                logTag,
+                $"Failed to deny runtime permission. package={packageName}, permission={permission}, exception={exception.GetType().FullName}: {exception}");
+            return false;
+        }
+    }
+
     public static bool TryEnsureRequiredCrossProfilePackages(
         DevicePolicyManager manager,
         ComponentName admin,
