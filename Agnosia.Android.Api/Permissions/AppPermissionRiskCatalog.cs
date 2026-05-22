@@ -720,6 +720,11 @@ public static class AppPermissionRiskCatalog
 
         public IReadOnlyList<string> GetRuntimePermissions()
         {
+            if (HasPermissionGrantState)
+                return _manifestPermissions
+                    .Where(permission => IsRuntimeSensitivePermission(permission) && HasGrantedPermission(permission))
+                    .ToArray();
+
             return _manifestPermissions
                 .Where(IsRuntimeSensitivePermission)
                 .ToArray();

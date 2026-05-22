@@ -371,6 +371,39 @@ public sealed class AppPermissionRiskCatalogTests
     }
 
     [Fact]
+    public void Analyze_reports_only_granted_runtime_permissions_when_grant_state_is_known()
+    {
+        var result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
+            [
+                "android.permission.RECORD_AUDIO",
+                "android.permission.CAMERA",
+                "android.permission.INTERNET"
+            ],
+            GrantedPermissions: ["android.permission.CAMERA"],
+            DeniedPermissions: ["android.permission.RECORD_AUDIO"]));
+
+        Assert.Equal(["android.permission.CAMERA"], result.RuntimePermissions);
+    }
+
+    [Fact]
+    public void Analyze_keeps_declared_runtime_permissions_when_grant_state_is_unknown()
+    {
+        var result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
+            [
+                "android.permission.RECORD_AUDIO",
+                "android.permission.CAMERA",
+                "android.permission.INTERNET"
+            ]));
+
+        Assert.Equal(
+            [
+                "android.permission.RECORD_AUDIO",
+                "android.permission.CAMERA"
+            ],
+            result.RuntimePermissions);
+    }
+
+    [Fact]
     public void Analyze_flags_requested_only_legacy_write_external_storage_on_legacy_targets()
     {
         var legacyTargetResult = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(

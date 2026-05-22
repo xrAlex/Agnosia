@@ -2,6 +2,7 @@ using System.Runtime.Versioning;
 using Agnosia.Android.Api.Internal;
 using Android.App.Admin;
 using Android.Content;
+using Android.Content.PM;
 using Android.OS;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
@@ -46,32 +47,6 @@ public static class AndroidPolicyApi
         {
             Log.Warn(logTag, $"Failed to enable system app {packageName}: {exception}");
             error = $"Android не смог включить системное приложение {packageName}.";
-            return false;
-        }
-    }
-
-    public static bool TryInstallExistingPackage(
-        DevicePolicyManager manager,
-        ComponentName admin,
-        string packageName,
-        string logTag,
-        out string? error)
-    {
-        try
-        {
-            if (manager.InstallExistingPackage(admin, packageName))
-            {
-                error = null;
-                return true;
-            }
-
-            error = $"Android не нашел установленный пакет {packageName} в другом профиле.";
-            return false;
-        }
-        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
-        {
-            Log.Warn(logTag, $"Failed to install existing package {packageName}: {exception}");
-            error = $"Android не смог установить существующее приложение {packageName} в этом профиле.";
             return false;
         }
     }
@@ -160,6 +135,7 @@ public static class AndroidPolicyApi
 
     public static bool TryDenyRuntimePermission(
         DevicePolicyManager manager,
+        PackageManager? packageManager,
         ComponentName admin,
         string packageName,
         string permission,
@@ -175,17 +151,26 @@ public static class AndroidPolicyApi
                 PermissionGrantState.Denied);
 
             var currentState = manager.GetPermissionGrantState(admin, packageName, permission);
-            if (currentState != PermissionGrantState.Denied)
+            if (currentState == PermissionGrantState.Denied)
             {
-                error = $"Android не подтвердил отзыв {permission} у {packageName}.";
-                Log.Warn(
-                    logTag,
-                    $"Permission revoke was not confirmed. package={packageName}, permission={permission}, state={currentState}.");
-                return false;
+                error = null;
+                return true;
             }
 
-            error = null;
-            return true;
+            if (IsPermissionCurrentlyDenied(packageManager, packageName, permission, logTag))
+            {
+                Log.Debug(
+                    logTag,
+                    $"Permission is already denied by package state. package={packageName}, permission={permission}, policyState={currentState}.");
+                error = null;
+                return true;
+            }
+
+            error = $"Android не подтвердил отзыв {permission} у {packageName}.";
+            Log.Warn(
+                logTag,
+                $"Permission revoke was not confirmed. package={packageName}, permission={permission}, state={currentState}.");
+            return false;
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
@@ -197,6 +182,27 @@ public static class AndroidPolicyApi
         }
     }
 
+    private static bool IsPermissionCurrentlyDenied(
+        PackageManager? packageManager,
+        string packageName,
+        string permission,
+        string logTag)
+    {
+        if (packageManager is null) return false;
+
+        try
+        {
+            return packageManager.CheckPermission(permission, packageName) != Permission.Granted;
+        }
+        catch (Exception exception) when (exception is PackageManager.NameNotFoundException
+                                          || AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Debug(
+                logTag,
+                $"Could not check current permission grant. package={packageName}, permission={permission}, exception={exception.GetType().FullName}: {exception.Message}");
+            return false;
+        }
+    }
     public static bool TryEnsureRequiredCrossProfilePackages(
         DevicePolicyManager manager,
         ComponentName admin,

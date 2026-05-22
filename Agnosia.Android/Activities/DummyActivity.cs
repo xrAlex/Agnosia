@@ -41,6 +41,7 @@ namespace Agnosia.Android.Activities;
     AgnosiaActions.UninstallPackage,
     AgnosiaActions.FreezePackage,
     AgnosiaActions.UnfreezePackage,
+    AgnosiaActions.RevokeRuntimePermissions,
     AgnosiaActions.PrepareHiddenShortcut,
     AgnosiaActions.CreateHiddenShortcut,
     AgnosiaActions.UnfreezeAndLaunch,
@@ -240,6 +241,9 @@ public sealed class DummyActivity : Activity
                     break;
                 case AgnosiaActions.UnfreezePackage:
                     ActionFreezePackage(false);
+                    break;
+                case AgnosiaActions.RevokeRuntimePermissions:
+                    ActionRevokeRuntimePermissions();
                     break;
                 case AgnosiaActions.UnfreezeAndLaunch:
                     ActionUnfreezeAndLaunch();
@@ -518,27 +522,10 @@ public sealed class DummyActivity : Activity
             return;
         }
 
-        if (_isProfileOwner
-            && _policyManager is not null
-            && !string.IsNullOrWhiteSpace(packageName))
-        {
-            var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
-            if (AndroidPolicyApi.TryInstallExistingPackage(
-                    _policyManager,
-                    admin,
-                    packageName,
-                    LogTag,
-                    out _))
-            {
-                FinishWithResult(Result.Ok);
-                return;
-            }
-        }
-
         if (string.IsNullOrWhiteSpace(intent.GetStringExtra("apk")))
         {
             FinishWithError(
-                "Android не смог установить приложение в рабочий профиль: пакет не найден в другом профиле, а APK недоступен для копирования.");
+                "Android не смог установить приложение в рабочий профиль: APK недоступен для копирования.");
             return;
         }
 
@@ -630,6 +617,67 @@ public sealed class DummyActivity : Activity
             : "Приложение снова доступно в рабочем профиле.");
     }
 
+    private void ActionRevokeRuntimePermissions()
+    {
+        var packageName = Intent?.GetStringExtra(AndroidCommandContract.ExtraPackage);
+        var permissions = Intent?.GetStringArrayExtra(AndroidCommandContract.ExtraPermissions) ?? [];
+        if (!_isProfileOwner || _policyManager is null || string.IsNullOrWhiteSpace(packageName))
+        {
+            Log.Warn(LogTag,
+                $"Runtime permission revoke rejected. package={packageName ?? "<none>"}, isProfileOwner={_isProfileOwner}, hasPolicyManager={_policyManager is not null}.");
+            FinishWithError("Android не смог отозвать runtime-разрешения в рабочем профиле.");
+            return;
+        }
+
+        if (permissions.Length == 0)
+        {
+            FinishWithSuccessMessage("У приложения нет runtime-разрешений для отзыва.");
+            return;
+        }
+
+        var failedPermissions = new List<string>();
+        var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
+        if (!TryMakePackageVisibleForPolicyOperation(
+                admin,
+                packageName,
+                "runtime permission revoke",
+                out var restoreHiddenState,
+                out var visibilityError))
+        {
+            FinishWithError(visibilityError ?? $"Android не смог восстановить {packageName} для отзыва разрешений.");
+            return;
+        }
+
+        var attemptedPermissions = 0;
+        foreach (var permission in permissions.Distinct(StringComparer.Ordinal))
+        {
+            if (string.IsNullOrWhiteSpace(permission)) continue;
+
+            attemptedPermissions++;
+            if (!AndroidPolicyApi.TryDenyRuntimePermission(
+                    _policyManager,
+                    PackageManager,
+                    admin,
+                    packageName,
+                    permission,
+                    LogTag,
+                    out _))
+                failedPermissions.Add(permission);
+        }
+
+        if (restoreHiddenState)
+            RestoreHiddenStateAfterPolicyOperation(admin, packageName, "runtime permission revoke");
+
+        if (failedPermissions.Count == 0)
+        {
+            FinishWithSuccessMessage($"Runtime-разрешения отозваны: {attemptedPermissions}.");
+            return;
+        }
+
+        FinishWithError(
+            $"Не удалось отозвать runtime-разрешения: {string.Join(", ", failedPermissions.Select(FormatPermissionName))}.");
+    }
+
     private async Task ActionPrepareHiddenShortcutAsync(CancellationToken cancellationToken)
     {
         try
@@ -650,7 +698,12 @@ public sealed class DummyActivity : Activity
             Log.Debug(LogTag, $"Starting hidden shortcut preparation for {packageName}.");
             var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
 
-            if (!TryMakePackageVisibleForShortcutPreparation(admin, packageName, out var restoreHiddenState, out var visibilityError))
+            if (!TryMakePackageVisibleForPolicyOperation(
+                    admin,
+                    packageName,
+                    "hidden shortcut preparation",
+                    out var restoreHiddenState,
+                    out var visibilityError))
             {
                 FinishWithError(visibilityError ?? $"Android не смог восстановить {packageName} для подготовки ярлыка.");
                 return;
@@ -717,7 +770,7 @@ public sealed class DummyActivity : Activity
             finally
             {
                 if (restoreHiddenState)
-                    RestoreHiddenStateAfterShortcutPreparation(admin, packageName);
+                    RestoreHiddenStateAfterPolicyOperation(admin, packageName, "incomplete hidden shortcut preparation");
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -731,9 +784,10 @@ public sealed class DummyActivity : Activity
         }
     }
 
-    private bool TryMakePackageVisibleForShortcutPreparation(
+    private bool TryMakePackageVisibleForPolicyOperation(
         ComponentName admin,
         string packageName,
+        string operation,
         out bool restoreHiddenState,
         out string? error)
     {
@@ -754,33 +808,33 @@ public sealed class DummyActivity : Activity
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
             Log.Warn(LogTag,
-                $"Could not read hidden state before hidden shortcut preparation. package={packageName}, exception={exception.GetType().FullName}: {exception.Message}");
+                $"Could not read hidden state before {operation}. package={packageName}, exception={exception.GetType().FullName}: {exception.Message}");
             return true;
         }
 
         if (!isHidden) return true;
 
         Log.Info(LogTag,
-            $"Package {packageName} is hidden before shortcut preparation; temporarily unhiding it to resolve metadata.");
+            $"Package {packageName} is hidden before {operation}; temporarily unhiding it.");
         if (AndroidPolicyApi.TrySetApplicationHidden(_policyManager, admin, packageName, false, LogTag, out error))
         {
             restoreHiddenState = true;
             return true;
         }
 
-        error ??= $"Android не смог восстановить {packageName} для подготовки ярлыка.";
+        error ??= $"Android не смог восстановить {packageName} для операции {operation}.";
         return false;
     }
 
-    private void RestoreHiddenStateAfterShortcutPreparation(ComponentName admin, string packageName)
+    private void RestoreHiddenStateAfterPolicyOperation(ComponentName admin, string packageName, string operation)
     {
         if (_policyManager is null) return;
 
         Log.Info(LogTag,
-            $"Restoring hidden state after incomplete shortcut preparation. package={packageName}.");
+            $"Restoring hidden state after {operation}. package={packageName}.");
         if (!AndroidPolicyApi.TrySetApplicationHidden(_policyManager, admin, packageName, true, LogTag, out var error))
             Log.Warn(LogTag,
-                $"Failed to restore hidden state after incomplete shortcut preparation. package={packageName}, error={error ?? "<none>"}.");
+                $"Failed to restore hidden state after {operation}. package={packageName}, error={error ?? "<none>"}.");
     }
 
     private async Task<bool> WaitForPackageAvailableAsync(
@@ -1126,6 +1180,14 @@ public sealed class DummyActivity : Activity
         var result = new Intent();
         result.PutExtra(AndroidCommandContract.ResultToggleSuccess, success);
         FinishWithResult(success ? Result.Ok : Result.Canceled, result);
+    }
+
+    private static string FormatPermissionName(string permission)
+    {
+        const string androidPermissionPrefix = "android.permission.";
+        return permission.StartsWith(androidPermissionPrefix, StringComparison.Ordinal)
+            ? permission[androidPermissionPrefix.Length..]
+            : permission;
     }
 
     private void FinishWithResult(Result resultCode, Intent? data = null)

@@ -246,6 +246,25 @@ public static class AndroidProfileCommandGateway
         return RunWorkPackageOperationAsync(commandRunner, intent, successMessage, cancellationToken);
     }
 
+    internal static async Task<OperationResult> RevokeRuntimePermissionsInWorkProfileAsync(
+        AndroidActivityCommandGateway commandRunner,
+        string packageName,
+        IReadOnlyList<string> permissions,
+        CancellationToken cancellationToken)
+    {
+        var intent = new Intent(AgnosiaActions.RevokeRuntimePermissions);
+        intent.PutExtra(AndroidCommandContract.ExtraPackage, packageName);
+        intent.PutExtra(AndroidCommandContract.ExtraPermissions, permissions.ToArray());
+
+        var result = await commandRunner.StartActivityForResultAsync(
+            intent,
+            true,
+            cancellationToken);
+        return AndroidActivityResultApi.ToVoidOperationResult(
+            result,
+            $"Runtime-разрешения отозваны: {permissions.Count}.");
+    }
+
     internal static async Task<OperationResult> SetCrossProfileInteractionAsync(
         AndroidActivityCommandGateway commandRunner,
         string[] packages,
