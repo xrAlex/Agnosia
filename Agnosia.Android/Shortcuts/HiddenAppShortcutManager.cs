@@ -69,8 +69,19 @@ internal static class HiddenAppShortcutManager
         var shortcutInfo = BuildShortcutInfo(context, metadata);
         if (IsPinned(shortcutManager, metadata.ShortcutId))
         {
-            Log.Info(LogTag, $"Updating existing pinned shortcut {metadata.ShortcutId}.");
-            shortcutManager.UpdateShortcuts([shortcutInfo]);
+            try
+            {
+                Log.Info(LogTag, $"Updating existing pinned shortcut {metadata.ShortcutId}.");
+                shortcutManager.UpdateShortcuts([shortcutInfo]);
+                shortcutManager.EnableShortcuts([metadata.ShortcutId]);
+            }
+            catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+            {
+                Log.Warn(LogTag, $"Failed to update existing pinned shortcut {metadata.ShortcutId}: {exception}");
+                return ShortcutFreezePreparationResult.Failure(
+                    "Android не смог обновить ярлык скрытого приложения.");
+            }
+
             return ShortcutFreezePreparationResult.Immediate("Приложение скрыто, ярлык обновлен.");
         }
 

@@ -566,9 +566,16 @@ public sealed class DummyActivity : Activity
 
         if (isSystem && _isProfileOwner && _policyManager is not null)
         {
+            var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
+            if (!TryClearHiddenStateBeforePackageRemoval(admin, packageName, out var unhideError))
+            {
+                FinishWithError(unhideError ?? $"Android не смог восстановить {packageName} перед удалением.");
+                return;
+            }
+
             if (!AndroidPolicyApi.TrySetApplicationHidden(
                     _policyManager,
-                    AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType),
+                    admin,
                     packageName,
                     true,
                     LogTag,
@@ -582,6 +589,16 @@ public sealed class DummyActivity : Activity
             return;
         }
 
+        if (_isProfileOwner && _policyManager is not null)
+        {
+            var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
+            if (!TryClearHiddenStateBeforePackageRemoval(admin, packageName, out var unhideError))
+            {
+                FinishWithError(unhideError ?? $"Android не смог восстановить {packageName} перед удалением.");
+                return;
+            }
+        }
+
         var pendingIntent = AndroidPendingIntentApi.CreatePackageInstallerCallbackPendingIntent(
             this,
             typeof(PackageInstallerCallbackReceiver),
@@ -589,6 +606,43 @@ public sealed class DummyActivity : Activity
             packageName,
             AndroidCommandContract.PackageInstallerOperationUninstall);
         if (!AndroidPackageApi.TryStartUninstall(this, packageName, pendingIntent)) FinishWithResult(Result.Canceled);
+    }
+
+    private bool TryClearHiddenStateBeforePackageRemoval(
+        ComponentName admin,
+        string packageName,
+        out string? error)
+    {
+        error = null;
+        if (_policyManager is null)
+        {
+            error = $"Android не смог проверить состояние {packageName} перед удалением.";
+            return false;
+        }
+
+        bool isHidden;
+        try
+        {
+            isHidden = _policyManager.IsApplicationHidden(admin, packageName);
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            return true;
+        }
+
+        if (!isHidden) return true;
+
+        if (AndroidPolicyApi.TrySetApplicationHidden(
+                _policyManager,
+                admin,
+                packageName,
+                false,
+                LogTag,
+                out error))
+            return true;
+
+        error ??= $"Android не смог восстановить {packageName} перед удалением.";
+        return false;
     }
 
     private void ActionFreezePackage(bool hidden)
@@ -757,7 +811,9 @@ public sealed class DummyActivity : Activity
                 else
                 {
                     Log.Warn(LogTag,
-                        $"Continuing hidden shortcut creation after pre-hide failure. package={packageName}, error={hideError}");
+                        $"Stopping hidden shortcut creation after pre-hide failure. package={packageName}, error={hideError}");
+                    FinishWithError(hideError ?? $"Android не смог скрыть {packageName}.");
+                    return;
                 }
 
                 var result = new Intent();
@@ -904,7 +960,6 @@ public sealed class DummyActivity : Activity
         var attempt = 1;
         while (true)
         {
-            LogTechnicalHidePreflight(admin, packageName, attempt);
             if (AndroidPolicyApi.TrySetApplicationHidden(_policyManager, admin, packageName, true, LogTag,
                     out var hideError))
             {
@@ -923,33 +978,6 @@ public sealed class DummyActivity : Activity
 
             await Task.Delay(HideAfterInstallRetryDelay, cancellationToken);
             attempt++;
-        }
-    }
-
-    private void LogTechnicalHidePreflight(ComponentName admin, string packageName, int attempt)
-    {
-        try
-        {
-            var isInstalled = IsPackageAvailable(packageName);
-            bool? isHiddenBefore = null;
-            try
-            {
-                isHiddenBefore = _policyManager?.IsApplicationHidden(admin, packageName);
-            }
-            catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
-            {
-                Log.Warn(LogTag,
-                    $"PREPARE_HIDDEN_SHORTCUT hidden-state preflight failed. package={packageName}, attempt={attempt}, exception={exception.GetType().FullName}: {exception.Message}");
-            }
-
-            Log.Info(
-                LogTag,
-                $"PREPARE_HIDDEN_SHORTCUT hide preflight. package={packageName}, operation=hidePackage, attempt={attempt}, isInstalled={isInstalled}, isHiddenBefore={isHiddenBefore?.ToString() ?? "<unknown>"}, isProfileOwner={_isProfileOwner}.");
-        }
-        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
-        {
-            Log.Warn(LogTag,
-                $"PREPARE_HIDDEN_SHORTCUT hide preflight failed. package={packageName}, attempt={attempt}, exception={exception.GetType().FullName}: {exception}");
         }
     }
 
