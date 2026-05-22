@@ -10,6 +10,9 @@ namespace Agnosia.Android.Api.Platform;
 
 public static class AndroidPolicyApi
 {
+    private const int RuntimePermissionRevokeConfirmationAttempts = 20;
+    private const int RuntimePermissionRevokeConfirmationDelayMilliseconds = 50;
+
     public static void ApplyCrossProfileContactsPolicy(DevicePolicyManager manager, ComponentName admin, bool disabled)
     {
         if (AndroidApiLevel.IsAtLeastUpsideDownCake())
@@ -150,18 +153,20 @@ public static class AndroidPolicyApi
                 permission,
                 PermissionGrantState.Denied);
 
-            var currentState = manager.GetPermissionGrantState(admin, packageName, permission);
-            if (currentState == PermissionGrantState.Denied)
+            var confirmation = WaitForRuntimePermissionRevokeConfirmation(
+                manager,
+                packageManager,
+                admin,
+                packageName,
+                permission,
+                logTag);
+            if (confirmation.Confirmed)
             {
-                error = null;
-                return true;
-            }
+                if (confirmation.PolicyState != PermissionGrantState.Denied)
+                    Log.Debug(
+                        logTag,
+                        $"Permission is already denied by package state. package={packageName}, permission={permission}, policyState={confirmation.PolicyState}.");
 
-            if (IsPermissionCurrentlyDenied(packageManager, packageName, permission, logTag))
-            {
-                Log.Debug(
-                    logTag,
-                    $"Permission is already denied by package state. package={packageName}, permission={permission}, policyState={currentState}.");
                 error = null;
                 return true;
             }
@@ -169,7 +174,7 @@ public static class AndroidPolicyApi
             error = $"Android не подтвердил отзыв {permission} у {packageName}.";
             Log.Warn(
                 logTag,
-                $"Permission revoke was not confirmed. package={packageName}, permission={permission}, state={currentState}.");
+                $"Permission revoke was not confirmed. package={packageName}, permission={permission}, state={confirmation.PolicyState}.");
             return false;
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
@@ -180,6 +185,36 @@ public static class AndroidPolicyApi
                 $"Failed to deny runtime permission. package={packageName}, permission={permission}, exception={exception.GetType().FullName}: {exception}");
             return false;
         }
+    }
+
+    private static RuntimePermissionRevokeConfirmation WaitForRuntimePermissionRevokeConfirmation(
+        DevicePolicyManager manager,
+        PackageManager? packageManager,
+        ComponentName admin,
+        string packageName,
+        string permission,
+        string logTag)
+    {
+        var currentState = PermissionGrantState.Default;
+        for (var attempt = 1; attempt <= RuntimePermissionRevokeConfirmationAttempts; attempt++)
+        {
+            currentState = manager.GetPermissionGrantState(admin, packageName, permission);
+            if (currentState == PermissionGrantState.Denied
+                || IsPermissionCurrentlyDenied(packageManager, packageName, permission, logTag))
+            {
+                if (attempt > 1)
+                    Log.Debug(
+                        logTag,
+                        $"Permission revoke confirmed after retry. package={packageName}, permission={permission}, attempt={attempt}, state={currentState}.");
+
+                return new RuntimePermissionRevokeConfirmation(true, currentState);
+            }
+
+            if (attempt < RuntimePermissionRevokeConfirmationAttempts)
+                Thread.Sleep(RuntimePermissionRevokeConfirmationDelayMilliseconds);
+        }
+
+        return new RuntimePermissionRevokeConfirmation(false, currentState);
     }
 
     private static bool IsPermissionCurrentlyDenied(
@@ -203,6 +238,11 @@ public static class AndroidPolicyApi
             return false;
         }
     }
+
+    private readonly record struct RuntimePermissionRevokeConfirmation(
+        bool Confirmed,
+        PermissionGrantState PolicyState);
+
     public static bool TryEnsureRequiredCrossProfilePackages(
         DevicePolicyManager manager,
         ComponentName admin,
