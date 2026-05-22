@@ -190,22 +190,25 @@ public static class AppPermissionRiskCatalog
         var context = AnalysisContext.Create(input);
         if (!context.HasAnySignal) return AppPermissionRiskAnalysis.Safe;
 
-        var criticalMatches = CriticalRules
-            .Where(rule => rule.IsCriticalMatch(context))
-            .ToArray();
+        var matchedRules = new List<PermissionCombinationRule>(CriticalRules.Length + DangerousRules.Length);
+        var hasCriticalMatch = false;
+        foreach (var rule in CriticalRules)
+        {
+            if (!rule.IsCriticalMatch(context)) continue;
 
-        var dangerousMatches = DangerousRules
-            .Where(rule => rule.IsMatch(context))
-            .ToArray();
+            matchedRules.Add(rule);
+            hasCriticalMatch = true;
+        }
 
-        var matchedRules = criticalMatches
-            .Concat(dangerousMatches)
-            .ToArray();
+        foreach (var rule in DangerousRules)
+        {
+            if (rule.IsMatch(context)) matchedRules.Add(rule);
+        }
 
         var rawScore = CalculateRawScore(context, matchedRules);
         var score = CalculateGroupedScore(context, matchedRules);
 
-        if (criticalMatches.Length > 0)
+        if (hasCriticalMatch)
             return CreateAnalysis(
                 AppPermissionRiskLevel.Critical,
                 context,
@@ -213,7 +216,7 @@ public static class AppPermissionRiskCatalog
                 score,
                 rawScore);
 
-        if (matchedRules.Length == 0 || score < context.DangerousScoreThreshold)
+        if (matchedRules.Count == 0 || score < context.DangerousScoreThreshold)
             return CreateSafeAnalysis(context);
 
         if (score >= CriticalScoreThreshold && context.HasHighConfidenceSignals)
@@ -315,13 +318,24 @@ public static class AppPermissionRiskCatalog
         return new AppPermissionRiskAnalysis(
             level,
             context.GetRiskyPermissions(matchedRules),
-            matchedRules.Select(rule => rule.Id).ToArray(),
+            GetMatchedRuleIds(matchedRules),
             score,
             rawScore,
             context.GetConfidence(),
             CalculateGroupedScoreBreakdown(context, matchedRules),
             context.GetManifestPermissions(),
             context.GetRuntimePermissions());
+    }
+
+    private static string[] GetMatchedRuleIds(IReadOnlyList<PermissionCombinationRule> matchedRules)
+    {
+        var ruleIds = new string[matchedRules.Count];
+        for (var index = 0; index < matchedRules.Count; index++)
+        {
+            ruleIds[index] = matchedRules[index].Id;
+        }
+
+        return ruleIds;
     }
 
     private static AppPermissionRiskAnalysis CreateSafeAnalysis(AnalysisContext context)
@@ -340,33 +354,51 @@ public static class AppPermissionRiskCatalog
 
     private static int CalculateRawScore(
         AnalysisContext context,
-        IEnumerable<PermissionCombinationRule> matchedRules)
+        IReadOnlyList<PermissionCombinationRule> matchedRules)
     {
-        return matchedRules.Sum(rule => rule.GetScore(context));
+        var score = 0;
+        for (var index = 0; index < matchedRules.Count; index++)
+        {
+            score += matchedRules[index].GetScore(context);
+        }
+
+        return score;
     }
 
     private static int CalculateGroupedScore(
         AnalysisContext context,
-        IEnumerable<PermissionCombinationRule> matchedRules)
+        IReadOnlyList<PermissionCombinationRule> matchedRules)
     {
-        return matchedRules
-            .GroupBy(rule => rule.GroupId)
-            .Sum(group => group.Max(rule => rule.GetScore(context)));
+        var scoreByGroup = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var index = 0; index < matchedRules.Count; index++)
+        {
+            var rule = matchedRules[index];
+            var score = rule.GetScore(context);
+            if (!scoreByGroup.TryGetValue(rule.GroupId, out var currentScore) || score > currentScore)
+                scoreByGroup[rule.GroupId] = score;
+        }
+
+        var total = 0;
+        foreach (var score in scoreByGroup.Values) total += score;
+
+        return total;
     }
 
     private static AppPermissionRiskScoreBreakdown CalculateGroupedScoreBreakdown(
         AnalysisContext context,
-        IEnumerable<PermissionCombinationRule> matchedRules)
+        IReadOnlyList<PermissionCombinationRule> matchedRules)
     {
-        var breakdowns = matchedRules
-            .GroupBy(rule => rule.GroupId)
-            .Select(group => group
-                .Select(rule => rule.GetScoreBreakdown(context))
-                .MaxBy(breakdown => breakdown.Total))
-            .Where(breakdown => breakdown is not null)
-            .Cast<AppPermissionRiskScoreBreakdown>();
+        var breakdownByGroup = new Dictionary<string, AppPermissionRiskScoreBreakdown>(StringComparer.Ordinal);
+        for (var index = 0; index < matchedRules.Count; index++)
+        {
+            var rule = matchedRules[index];
+            var breakdown = rule.GetScoreBreakdown(context);
+            if (!breakdownByGroup.TryGetValue(rule.GroupId, out var currentBreakdown)
+                || breakdown.Total > currentBreakdown.Total)
+                breakdownByGroup[rule.GroupId] = breakdown;
+        }
 
-        return SumBreakdowns(breakdowns);
+        return SumBreakdowns(breakdownByGroup.Values);
     }
 
     private static AppPermissionRiskScoreBreakdown SumBreakdowns(
@@ -447,18 +479,34 @@ public static class AppPermissionRiskCatalog
         {
             var score = Score;
             var legitimacyPenalty = 0;
+            var hasRuntimeSensitivePermission = false;
+            var hasDeniedRuntimeSensitivePermission = false;
+            var isBlockedByAppOp = false;
+            var controlSurfaceScore = 0;
+            for (var index = 0; index < RequiredPermissions.Count; index++)
+            {
+                var permission = RequiredPermissions[index];
+                if (context.IsRuntimeSensitivePermission(permission))
+                {
+                    hasRuntimeSensitivePermission = true;
+                    if (context.HasPermissionGrantState
+                        && context.GetGrantStatus(permission) == PermissionGrantStatus.Denied)
+                        hasDeniedRuntimeSensitivePermission = true;
+                }
+
+                if (context.IsBlockedByAppOp(permission)) isBlockedByAppOp = true;
+                if (controlSurfaceScore == 0 && context.HasEnabledControlSurface(permission))
+                    controlSurfaceScore = 1;
+            }
+
             if (context.HasPermissionGrantState
-                && RequiredPermissions.Any(context.IsRuntimeSensitivePermission)
-                && RequiredPermissions.Any(permission =>
-                    context.IsRuntimeSensitivePermission(permission)
-                    && context.GetGrantStatus(permission) == PermissionGrantStatus.Denied))
+                && hasRuntimeSensitivePermission
+                && hasDeniedRuntimeSensitivePermission)
             {
                 legitimacyPenalty += 2;
             }
 
-            if (RequiredPermissions.Any(context.IsBlockedByAppOp)) legitimacyPenalty += 2;
-
-            var controlSurfaceScore = RequiredPermissions.Any(context.HasEnabledControlSurface) ? 1 : 0;
+            if (isBlockedByAppOp) legitimacyPenalty += 2;
 
             return new AppPermissionRiskScoreBreakdown(
                 score,
@@ -626,8 +674,8 @@ public static class AppPermissionRiskCatalog
         {
             var requestedPermissions = NormalizeDistinct(input.RequestedPermissions);
             var servicePermissions = NormalizeDistinct(input.ServicePermissions);
-            var grantedPermissions = NormalizeDistinct(input.GrantedPermissions).ToHashSet(StringComparer.Ordinal);
-            var deniedPermissions = NormalizeDistinct(input.DeniedPermissions).ToHashSet(StringComparer.Ordinal);
+            var grantedPermissions = NormalizeDistinctSet(input.GrantedPermissions);
+            var deniedPermissions = NormalizeDistinctSet(input.DeniedPermissions);
             var orderedPermissions = new List<string>(requestedPermissions.Count + servicePermissions.Count);
             var permissions = new HashSet<string>(StringComparer.Ordinal);
             AddDistinct(orderedPermissions, permissions, requestedPermissions);
@@ -650,8 +698,8 @@ public static class AppPermissionRiskCatalog
                 permissions,
                 grantedPermissions,
                 deniedPermissions,
-                NormalizeDistinct(input.ForegroundServiceTypes).ToHashSet(StringComparer.Ordinal),
-                NormalizeDistinct(input.ObservedSignals).ToHashSet(StringComparer.Ordinal),
+                NormalizeDistinctSet(input.ForegroundServiceTypes),
+                NormalizeDistinctSet(input.ObservedSignals),
                 manifestPermissions);
         }
 
@@ -824,16 +872,17 @@ public static class AppPermissionRiskCatalog
         public int GetPersistenceScore(IReadOnlyList<string> permissions)
         {
             var score = 0;
-            if (permissions.Contains(BootCompleted)) score += 2;
-            if (permissions.Contains(ScheduleExactAlarm) || permissions.Contains(UseExactAlarm)) score += 1;
-            if (permissions.Contains(ForegroundService) || _foregroundServiceTypes.Count > 0) score += 1;
+            if (ContainsPermission(permissions, BootCompleted)) score += 2;
+            if (ContainsPermission(permissions, ScheduleExactAlarm) || ContainsPermission(permissions, UseExactAlarm))
+                score += 1;
+            if (ContainsPermission(permissions, ForegroundService) || _foregroundServiceTypes.Count > 0) score += 1;
 
             return score;
         }
 
         public int GetStealthScore(IReadOnlyList<string> permissions)
         {
-            return permissions.Contains(IgnoreBatteryOptimizations) ? 2 : 0;
+            return ContainsPermission(permissions, IgnoreBatteryOptimizations) ? 2 : 0;
         }
 
         public int GetConfidenceScore()
@@ -887,6 +936,16 @@ public static class AppPermissionRiskCatalog
             if (HasPermission(ManageExternalStorage)) yield return ManageExternalStorage;
         }
 
+        private static bool ContainsPermission(IReadOnlyList<string> permissions, string expected)
+        {
+            for (var index = 0; index < permissions.Count; index++)
+            {
+                if (string.Equals(permissions[index], expected, StringComparison.Ordinal)) return true;
+            }
+
+            return false;
+        }
+
         private static int NormalizeDeviceSdkVersion(int value)
         {
             return value > 0 ? value : Android12Api;
@@ -896,7 +955,9 @@ public static class AppPermissionRiskCatalog
         {
             if (values is null) return [];
 
-            var result = new List<string>();
+            var result = values is IReadOnlyCollection<string> collection
+                ? new List<string>(collection.Count)
+                : new List<string>();
             var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (var value in values)
             {
@@ -904,6 +965,21 @@ public static class AppPermissionRiskCatalog
 
                 var trimmed = value.Trim();
                 if (seen.Add(trimmed)) result.Add(trimmed);
+            }
+
+            return result;
+        }
+
+        private static HashSet<string> NormalizeDistinctSet(IEnumerable<string>? values)
+        {
+            var result = new HashSet<string>(StringComparer.Ordinal);
+            if (values is null) return result;
+
+            foreach (var value in values)
+            {
+                if (string.IsNullOrWhiteSpace(value)) continue;
+
+                result.Add(value.Trim());
             }
 
             return result;
@@ -920,19 +996,27 @@ public static class AppPermissionRiskCatalog
             }
         }
 
+        private static void AddDistinct(
+            List<string> target,
+            HashSet<string> seen,
+            string value)
+        {
+            if (seen.Add(value)) target.Add(value);
+        }
+
         private static void AddInferredSpecialAccessPermissions(
             AppPermissionRiskInput input,
             List<string> orderedPermissions,
             HashSet<string> permissions)
         {
             if (input.IsAccessibilityServiceEnabled)
-                AddDistinct(orderedPermissions, permissions, [BindAccessibilityService]);
+                AddDistinct(orderedPermissions, permissions, BindAccessibilityService);
             if (input.IsNotificationListenerEnabled)
-                AddDistinct(orderedPermissions, permissions, [BindNotificationListenerService]);
+                AddDistinct(orderedPermissions, permissions, BindNotificationListenerService);
             if (input.CanDrawOverlays)
-                AddDistinct(orderedPermissions, permissions, [SystemAlertWindow]);
+                AddDistinct(orderedPermissions, permissions, SystemAlertWindow);
             if (input.HasUsageStatsAccess)
-                AddDistinct(orderedPermissions, permissions, [PackageUsageStats]);
+                AddDistinct(orderedPermissions, permissions, PackageUsageStats);
         }
     }
 }

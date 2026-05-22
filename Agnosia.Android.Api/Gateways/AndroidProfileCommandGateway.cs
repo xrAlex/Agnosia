@@ -129,14 +129,20 @@ public static class AndroidProfileCommandGateway
         if (apps.Count == 0) return new Dictionary<string, byte[]?>(StringComparer.Ordinal);
 
         var icons = new Dictionary<string, byte[]?>(StringComparer.Ordinal);
-        var personalApps = apps.Where(app => app.Profile == ProfileKind.Personal).ToArray();
-        var workApps = apps.Where(app => app.Profile == ProfileKind.Work).ToArray();
+        var personalPackageNames = apps
+            .Where(app => app.Profile == ProfileKind.Personal)
+            .Select(app => app.PackageName)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var workApps = apps
+            .Where(app => app.Profile == ProfileKind.Work)
+            .ToArray();
 
-        if (personalApps.Length > 0)
+        if (personalPackageNames.Length > 0)
         {
             var personalIcons = await LoadLocalAppIconsAsync(
                     commandRunner.CurrentActivity,
-                    personalApps.Select(app => app.PackageName).Distinct(StringComparer.Ordinal).ToArray(),
+                    personalPackageNames,
                     cancellationToken)
                 .ConfigureAwait(false);
             foreach (var (packageName, iconPng) in personalIcons) icons[packageName] = iconPng;
@@ -144,8 +150,7 @@ public static class AndroidProfileCommandGateway
 
         if (workApps.Length > 0)
         {
-            foreach (var app in workApps)
-                icons[app.PackageName] = app.IconPng;
+            foreach (var app in workApps) icons[app.PackageName] = app.IconPng;
         }
 
         return icons;

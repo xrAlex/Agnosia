@@ -45,12 +45,13 @@ public static class AndroidAppInventoryApi
         var apps = packageManager.GetInstalledApplications(AndroidSystemApi.GetInstalledApplicationFlags());
         var models = new List<AppServiceModel>(apps.Count);
         var installedPackageNames = new HashSet<string>(StringComparer.Ordinal);
+        var specialAccess = ReadSpecialAccessSnapshot(context);
         foreach (var app in apps)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!string.IsNullOrWhiteSpace(app.PackageName)) installedPackageNames.Add(app.PackageName);
 
-            if (TryCreateModel(context, packageManager, policyManager, admin, app, showAll) is
+            if (TryCreateModel(context, packageManager, policyManager, admin, app, showAll, specialAccess) is
                 { } model) models.Add(model);
         }
 
@@ -115,7 +116,8 @@ public static class AndroidAppInventoryApi
         DevicePolicyManager? policyManager,
         ComponentName? admin,
         ApplicationInfo app,
-        bool showAll)
+        bool showAll,
+        SpecialAccessSnapshot specialAccess)
     {
         if (!TryGetPackageName(context, app, out var packageName)) return null;
 
@@ -145,6 +147,7 @@ public static class AndroidAppInventoryApi
                 context,
                 packageManager,
                 packageName,
+                specialAccess,
                 out var packageIdentity,
                 out permissionRisk)) return null;
 
@@ -439,12 +442,31 @@ public static class AndroidAppInventoryApi
     {
         lock (IconCacheSync)
         {
-            foreach (var packageName in IconCache.Keys
-                         .Where(packageName => !installedPackageNames.Contains(packageName))
-                         .ToArray()) IconCache.Remove(packageName);
+            List<string>? stalePackages = null;
+            foreach (var packageName in IconCache.Keys)
+            {
+                if (installedPackageNames.Contains(packageName)) continue;
 
-            foreach (var packageName in IconCache.Keys.Take(Math.Max(0, IconCache.Count - MaxIconCacheEntries))
-                         .ToArray()) IconCache.Remove(packageName);
+                stalePackages ??= [];
+                stalePackages.Add(packageName);
+            }
+
+            if (stalePackages is not null)
+            {
+                foreach (var packageName in stalePackages) IconCache.Remove(packageName);
+            }
+
+            var overflowCount = IconCache.Count - MaxIconCacheEntries;
+            if (overflowCount <= 0) return;
+
+            var overflowPackages = new List<string>(overflowCount);
+            foreach (var packageName in IconCache.Keys)
+            {
+                overflowPackages.Add(packageName);
+                if (overflowPackages.Count >= overflowCount) break;
+            }
+
+            foreach (var packageName in overflowPackages) IconCache.Remove(packageName);
         }
     }
 
@@ -521,6 +543,7 @@ public static class AndroidAppInventoryApi
         Context context,
         PackageManager packageManager,
         string packageName,
+        SpecialAccessSnapshot specialAccess,
         out PackageIdentity identity,
         out AppPermissionRiskAnalysis permissionRisk)
     {
@@ -552,8 +575,8 @@ public static class AndroidAppInventoryApi
                 GetServicePermissions(packageInfo),
                 GetGrantedPermissions(packageInfo, packageName),
                 GetDeniedPermissions(packageInfo, packageName),
-                IsAccessibilityServiceEnabled(context, packageName),
-                IsNotificationListenerEnabled(context, packageName),
+                specialAccess.HasAccessibilityService(packageName),
+                specialAccess.HasNotificationListener(packageName),
                 IsAppOpAllowed(context, appInfo, SystemAlertWindowOp),
                 IsAppOpAllowed(context, appInfo, UsageStatsOp),
                 IsAppOpAllowedOrUnknown(context, appInfo, CameraOp),
@@ -611,11 +634,17 @@ public static class AndroidAppInventoryApi
     {
         if (packageInfo.Services is not { Count: > 0 } services) return [];
 
-        return services
-            .Select(service => service.Permission)
-            .Where(permission => !string.IsNullOrWhiteSpace(permission))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray()!;
+        var result = new List<string>(services.Count);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var service in services)
+        {
+            var permission = service.Permission;
+            if (string.IsNullOrWhiteSpace(permission) || !seen.Add(permission)) continue;
+
+            result.Add(permission);
+        }
+
+        return result.Count == 0 ? [] : result.ToArray();
     }
 
     private static string[] GetGrantedPermissions(PackageInfo packageInfo, string packageName)
@@ -660,29 +689,43 @@ public static class AndroidAppInventoryApi
         return result.ToArray();
     }
 
-    private static bool IsAccessibilityServiceEnabled(Context context, string packageName)
+    private static SpecialAccessSnapshot ReadSpecialAccessSnapshot(Context context)
     {
-        return SecureSettingContainsPackage(context, Settings.Secure.EnabledAccessibilityServices, packageName);
+        return new SpecialAccessSnapshot(
+            ReadSecureComponentPackages(context, Settings.Secure.EnabledAccessibilityServices),
+            ReadSecureComponentPackages(context, "enabled_notification_listeners"));
     }
 
-    private static bool IsNotificationListenerEnabled(Context context, string packageName)
-    {
-        return SecureSettingContainsPackage(context, "enabled_notification_listeners", packageName);
-    }
-
-    private static bool SecureSettingContainsPackage(Context context, string settingName, string packageName)
+    private static HashSet<string> ReadSecureComponentPackages(Context context, string settingName)
     {
         try
         {
-            var value = Settings.Secure.GetString(context.ContentResolver, settingName);
-            return !string.IsNullOrWhiteSpace(value)
-                   && value.Split(':', StringSplitOptions.RemoveEmptyEntries)
-                       .Any(component => component.StartsWith(packageName + "/", StringComparison.Ordinal));
+            return ParseSecureComponentPackages(Settings.Secure.GetString(context.ContentResolver, settingName));
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
-            return false;
+            return new HashSet<string>(StringComparer.Ordinal);
         }
+    }
+
+    private static HashSet<string> ParseSecureComponentPackages(string? value)
+    {
+        var packages = new HashSet<string>(StringComparer.Ordinal);
+        if (string.IsNullOrWhiteSpace(value)) return packages;
+
+        var start = 0;
+        while (start < value.Length)
+        {
+            var end = value.IndexOf(':', start);
+            if (end < 0) end = value.Length;
+
+            var slash = value.IndexOf('/', start, end - start);
+            if (slash > start) packages.Add(value[start..slash]);
+
+            start = end + 1;
+        }
+
+        return packages;
     }
 
     private static bool IsAppOpAllowed(Context context, ApplicationInfo? appInfo, string op)
@@ -754,4 +797,19 @@ public static class AndroidAppInventoryApi
     private readonly record struct PackageIdentity(long VersionCode);
 
     private sealed record AppIconCacheEntry(PackageIdentity Identity, byte[]? IconPng);
+
+    private sealed record SpecialAccessSnapshot(
+        HashSet<string> AccessibilityServicePackages,
+        HashSet<string> NotificationListenerPackages)
+    {
+        public bool HasAccessibilityService(string packageName)
+        {
+            return AccessibilityServicePackages.Contains(packageName);
+        }
+
+        public bool HasNotificationListener(string packageName)
+        {
+            return NotificationListenerPackages.Contains(packageName);
+        }
+    }
 }

@@ -257,6 +257,13 @@ public partial class WatcherEye : UserControl
 
     private void SetPupilTarget(double x, double y)
     {
+        if (!_pupilMotionTimer.IsEnabled
+            && Math.Abs(_targetPupilX - x) <= PupilStopThreshold
+            && Math.Abs(_targetPupilY - y) <= PupilStopThreshold
+            && Math.Abs(_pupilTransform.X - x) <= PupilStopThreshold
+            && Math.Abs(_pupilTransform.Y - y) <= PupilStopThreshold)
+            return;
+
         _targetPupilX = x;
         _targetPupilY = y;
 

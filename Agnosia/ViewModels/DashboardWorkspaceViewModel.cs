@@ -1198,7 +1198,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         {
             await _delayAsync(TimeSpan.FromMilliseconds(IconBatchDelayMs), CancellationToken.None)
                 .ConfigureAwait(false);
-            PendingIconLoad[] batch;
+            PendingIconLoad[] pendingRequests;
             lock (_iconBatchSync)
             {
                 if (_pendingIconLoads.Count == 0)
@@ -1207,26 +1207,32 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
                     return;
                 }
 
-                batch = _pendingIconLoads.ToArray();
+                pendingRequests = _pendingIconLoads.ToArray();
                 _pendingIconLoads.Clear();
             }
 
-            foreach (var completedRequest in batch.Where(request => request.IsCompleted)) completedRequest.Dispose();
+            List<PendingIconLoad>? batch = null;
+            foreach (var request in pendingRequests)
+            {
+                if (request.IsCompleted)
+                {
+                    request.Dispose();
+                    continue;
+                }
 
-            batch = batch.Where(request => !request.IsCompleted).ToArray();
-            if (batch.Length == 0) continue;
+                batch ??= new List<PendingIconLoad>(pendingRequests.Length);
+                batch.Add(request);
+            }
+
+            if (batch is null) continue;
 
             await LoadIconBatchAsync(batch).ConfigureAwait(false);
         }
     }
 
-    private async Task LoadIconBatchAsync(PendingIconLoad[] batch)
+    private async Task LoadIconBatchAsync(IReadOnlyList<PendingIconLoad> batch)
     {
-        var snapshots = batch
-            .Select(request => request.Snapshot)
-            .GroupBy(snapshot => (snapshot.Profile, snapshot.PackageName))
-            .Select(group => group.First())
-            .ToArray();
+        var snapshots = GetDistinctIconSnapshots(batch);
         var startedAt = Stopwatch.GetTimestamp();
 
         IReadOnlyDictionary<string, byte[]?> icons;
@@ -1252,6 +1258,20 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             icons.TryGetValue(request.Snapshot.PackageName, out var iconPng);
             request.TrySetResult(iconPng);
         }
+    }
+
+    private static AppSnapshot[] GetDistinctIconSnapshots(IReadOnlyList<PendingIconLoad> batch)
+    {
+        var snapshots = new List<AppSnapshot>(batch.Count);
+        var seen = new HashSet<AppItemKey>();
+        for (var index = 0; index < batch.Count; index++)
+        {
+            var snapshot = batch[index].Snapshot;
+            if (seen.Add(new AppItemKey(snapshot.Profile, snapshot.PackageName)))
+                snapshots.Add(snapshot);
+        }
+
+        return snapshots.Count == 0 ? [] : snapshots.ToArray();
     }
 
     internal async Task RequestPermissionAsync(PermissionItemViewModel permission)
@@ -1419,9 +1439,13 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             || _workApps.Length == 0)
             return inventory;
 
-        return new DashboardAppInventorySnapshot(
-            inventory.PersonalApps,
-            _workApps.Select(app => app.Snapshot).ToArray());
+        var preservedWorkApps = new AppSnapshot[_workApps.Length];
+        for (var index = 0; index < _workApps.Length; index++)
+        {
+            preservedWorkApps[index] = _workApps[index].Snapshot;
+        }
+
+        return new DashboardAppInventorySnapshot(inventory.PersonalApps, preservedWorkApps);
     }
 
     private void RefreshVisibleApps()
@@ -1872,7 +1896,18 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private void DisposeStaleAppItems(HashSet<AppItemKey> retainedKeys)
     {
-        foreach (var staleKey in _appItemCache.Keys.Where(key => !retainedKeys.Contains(key)).ToArray())
+        List<AppItemKey>? staleKeys = null;
+        foreach (var key in _appItemCache.Keys)
+        {
+            if (retainedKeys.Contains(key)) continue;
+
+            staleKeys ??= [];
+            staleKeys.Add(key);
+        }
+
+        if (staleKeys is null) return;
+
+        foreach (var staleKey in staleKeys)
         {
             var staleApp = _appItemCache[staleKey];
             if (ReferenceEquals(SelectedApp, staleApp)) CloseAppControl();

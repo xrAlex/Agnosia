@@ -150,6 +150,7 @@ public sealed class PlexusBackground : Control
         if (change.Property == BoundsProperty)
         {
             ResizeNodes(Bounds.Size);
+            UpdateTimerState();
             return;
         }
 
@@ -247,7 +248,7 @@ public sealed class PlexusBackground : Control
 
     private void OnAnimationFrame(object? sender, EventArgs e)
     {
-        if (!IsVisible)
+        if (!CanAnimate())
         {
             _animationTimer.Stop();
             return;
@@ -289,7 +290,7 @@ public sealed class PlexusBackground : Control
 
     private void UpdateTimerState()
     {
-        if (!_isAttached || !IsVisible)
+        if (!CanAnimate())
         {
             _animationTimer.Stop();
             return;
@@ -300,6 +301,11 @@ public sealed class PlexusBackground : Control
             _lastFrameUtc = DateTime.UtcNow;
             _animationTimer.Start();
         }
+    }
+
+    private bool CanAnimate()
+    {
+        return _isAttached && IsVisible && Bounds.Width > 1 && Bounds.Height > 1;
     }
 
     private void EnsureRenderBrushes(

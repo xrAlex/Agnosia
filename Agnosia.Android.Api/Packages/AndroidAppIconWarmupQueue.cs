@@ -77,11 +77,14 @@ public static class AndroidAppIconWarmupQueue
                 request.PackageManager,
                 request.PackageName,
                 CancellationToken.None));
-            var delayTask = Task.Delay(HungIconLogDelay);
+            using var delayCancellation = new CancellationTokenSource();
+            var delayTask = Task.Delay(HungIconLogDelay, delayCancellation.Token);
             if (await Task.WhenAny(loadTask, delayTask).ConfigureAwait(false) == delayTask)
                 Log.Debug(
                     LogTag,
                     $"Icon load is still running after {HungIconLogDelay.TotalMilliseconds:0}ms. package={request.PackageName}.");
+            else
+                delayCancellation.Cancel();
 
             await loadTask.ConfigureAwait(false);
         }

@@ -31,6 +31,10 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
     private Bitmap? _icon;
     private CancellationTokenSource? _iconLoadCancellation;
     private CancellationTokenSource? _iconRetryCancellation;
+    private string? _riskyPermissionsText;
+    private string? _manifestPermissionsText;
+    private string? _runtimePermissionsText;
+    private string[]? _permissionRiskReasons;
 
     [ObservableProperty]
     private bool _isPermissionDetailsExpanded;
@@ -59,7 +63,8 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     public bool HasRiskyPermissions => RiskyPermissions.Count > 0;
 
-    public string RiskyPermissionsText => string.Join(", ", RiskyPermissions.Select(FormatPermissionName));
+    public string RiskyPermissionsText =>
+        _riskyPermissionsText ??= string.Join(", ", RiskyPermissions.Select(FormatPermissionName));
 
     public IReadOnlyList<string> ManifestPermissions => Snapshot.ManifestPermissions ?? EmptyRiskyPermissions;
 
@@ -79,15 +84,17 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     public bool CanRevokeRuntimePermissions => HasRuntimePermissions && !Snapshot.IsSystem && Profile == ProfileKind.Work;
 
-    public string ManifestPermissionsText => FormatPermissionList(ManifestPermissions);
+    public string ManifestPermissionsText =>
+        _manifestPermissionsText ??= FormatPermissionList(ManifestPermissions);
 
-    public string RuntimePermissionsText => FormatPermissionList(RuntimePermissions);
+    public string RuntimePermissionsText =>
+        _runtimePermissionsText ??= FormatPermissionList(RuntimePermissions);
 
     public string PermissionRiskSummaryText => BuildPermissionRiskSummary();
 
-    public IReadOnlyList<string> PermissionRiskReasons => BuildRiskReasons().ToArray();
+    public IReadOnlyList<string> PermissionRiskReasons => GetPermissionRiskReasons();
 
-    public bool HasPermissionRiskReasons => PermissionRiskReasons.Count > 0;
+    public bool HasPermissionRiskReasons => GetPermissionRiskReasons().Length > 0;
 
     public bool IsPermissionRiskSafe => PermissionRiskLevel == AppPermissionRiskLevel.Safe;
 
@@ -295,6 +302,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
         if (previous.PermissionRiskLevel != snapshot.PermissionRiskLevel)
         {
+            _permissionRiskReasons = null;
             OnPropertyChanged(nameof(PermissionRiskLevel));
             OnPropertyChanged(nameof(IsPermissionRiskSafe));
             OnPropertyChanged(nameof(IsPermissionRiskDangerous));
@@ -308,6 +316,8 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
         if (!StringListsEqual(previous.RiskyPermissions, snapshot.RiskyPermissions))
         {
+            _riskyPermissionsText = null;
+            _permissionRiskReasons = null;
             OnPropertyChanged(nameof(RiskyPermissions));
             OnPropertyChanged(nameof(HasRiskyPermissions));
             OnPropertyChanged(nameof(RiskyPermissionsText));
@@ -323,6 +333,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
             || previous.PermissionRiskConfidence != snapshot.PermissionRiskConfidence
             || previous.PermissionRiskScoreBreakdown != snapshot.PermissionRiskScoreBreakdown)
         {
+            _permissionRiskReasons = null;
             OnPropertyChanged(nameof(MatchedPermissionRiskRuleIds));
             OnPropertyChanged(nameof(PermissionRiskScoreBreakdown));
             OnPropertyChanged(nameof(PermissionRiskTooltip));
@@ -333,6 +344,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
         if (!StringListsEqual(previous.ManifestPermissions, snapshot.ManifestPermissions))
         {
+            _manifestPermissionsText = null;
             OnPropertyChanged(nameof(ManifestPermissions));
             OnPropertyChanged(nameof(HasManifestPermissions));
             OnPropertyChanged(nameof(HasPermissionDetails));
@@ -341,6 +353,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
         if (!StringListsEqual(previous.RuntimePermissions, snapshot.RuntimePermissions))
         {
+            _runtimePermissionsText = null;
             OnPropertyChanged(nameof(RuntimePermissions));
             OnPropertyChanged(nameof(HasRuntimePermissions));
             OnPropertyChanged(nameof(HasPermissionDetails));
@@ -575,112 +588,129 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         };
     }
 
-    private IEnumerable<string> BuildRiskReasons()
+    private string[] GetPermissionRiskReasons()
     {
-        if (PermissionRiskLevel == AppPermissionRiskLevel.Safe) yield break;
+        return _permissionRiskReasons ??= BuildRiskReasons();
+    }
+
+    private string[] BuildRiskReasons()
+    {
+        if (PermissionRiskLevel == AppPermissionRiskLevel.Safe) return [];
 
         var permissions = RiskyPermissions;
         var breakdown = PermissionRiskScoreBreakdown;
+        var reasons = new List<string>();
 
-        foreach (var reason in BuildSpecificPermissionReasons(permissions))
-        {
-            yield return reason;
-        }
+        AddSpecificPermissionReasons(permissions, reasons);
 
         if (breakdown.PersistenceScore > 0)
-            yield return "может запускаться или продолжать работу в фоне";
+            reasons.Add("может запускаться или продолжать работу в фоне");
 
         if (breakdown.ExfiltrationScore > 0)
-            yield return "имеет канал для передачи данных наружу";
+            reasons.Add("имеет канал для передачи данных наружу");
 
         if (breakdown.ControlSurfaceScore > 0)
-            yield return "получило доступ к чувствительной системной поверхности";
+            reasons.Add("получило доступ к чувствительной системной поверхности");
 
         if (breakdown.StealthScore > 0)
-            yield return "может обходить ограничения фоновой работы";
+            reasons.Add("может обходить ограничения фоновой работы");
 
         if (MatchedPermissionRiskRuleIds.Count > 1)
-            yield return $"совпало несколько рискованных правил ({MatchedPermissionRiskRuleIds.Count})";
+            reasons.Add($"совпало несколько рискованных правил ({MatchedPermissionRiskRuleIds.Count})");
+
+        return reasons.Count == 0 ? [] : reasons.ToArray();
     }
 
-    private static IEnumerable<string> BuildSpecificPermissionReasons(IReadOnlyList<string> permissions)
+    private static void AddSpecificPermissionReasons(IReadOnlyList<string> permissions, List<string> reasons)
     {
         if (ContainsAny(permissions, "READ_SMS", "RECEIVE_SMS", "SEND_SMS"))
-            yield return "Может читать или отправлять SMS";
+            reasons.Add("может читать или отправлять SMS");
         if (ContainsAny(permissions, "ANSWER_PHONE_CALLS"))
-            yield return "Может отвечать на телефонные звонки";
+            reasons.Add("может отвечать на телефонные звонки");
         if (ContainsAny(permissions, "READ_CALL_LOG", "WRITE_CALL_LOG", "READ_PHONE_NUMBERS", "READ_PHONE_STATE"))
-            yield return "Имеет доступ к звонкам или телефонным данным";
+            reasons.Add("имеет доступ к звонкам или телефонным данным");
         if (ContainsAny(permissions, "READ_CONTACTS", "GET_ACCOUNTS"))
-            yield return "Может читать контакты или аккаунты";
+            reasons.Add("может читать контакты или аккаунты");
         if (ContainsAny(permissions, "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "ACCESS_BACKGROUND_LOCATION"))
-            yield return "Имеет доступ к геолокации";
+            reasons.Add("имеет доступ к геолокации");
         if (ContainsAny(permissions, "ACCESS_MEDIA_LOCATION"))
-            yield return "Может читать геометки внутри фото и видео";
+            reasons.Add("может читать геометки внутри фото и видео");
+        if (ContainsAny(permissions, "CAMERA"))
+            reasons.Add("может использовать камеру");
         if (ContainsAny(permissions, "FOREGROUND_SERVICE_CAMERA"))
-            yield return "Может держать камеру активной через foreground service";
+            reasons.Add("может держать камеру активной через foreground service");
         if (ContainsAny(permissions, "RECORD_AUDIO"))
-            yield return "Может использовать микрофон";
+            reasons.Add("может использовать микрофон");
         if (ContainsAny(permissions, "FOREGROUND_SERVICE_MICROPHONE"))
-            yield return "Может держать микрофон активным через foreground service";
+            reasons.Add("может держать микрофон активным через foreground service");
         if (ContainsAny(permissions, "READ_MEDIA_IMAGES", "READ_MEDIA_VIDEO", "READ_MEDIA_AUDIO", "READ_MEDIA_VISUAL_USER_SELECTED", "READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE", "MANAGE_EXTERNAL_STORAGE"))
-            yield return "Имеет доступ к файлам";
+            reasons.Add("имеет доступ к файлам");
         if (ContainsAny(permissions, "READ_MEDIA_VISUAL_USER_SELECTED"))
-            yield return "Имеет доступ к выбранным фото или видео";
+            reasons.Add("имеет доступ к выбранным фото или видео");
         if (ContainsAny(permissions, "READ_HEALTH", "READ_HEART", "READ_MEDICAL", "READ_SYMPTOM"))
-            yield return "Может читать медицинские или фитнес-данные";
+            reasons.Add("может читать медицинские или фитнес-данные");
         if (ContainsAny(permissions, "BODY_SENSORS"))
-            yield return "Может читать данные датчиков тела";
+            reasons.Add("может читать данные датчиков тела");
         if (ContainsAny(permissions, "BODY_SENSORS_BACKGROUND", "READ_HEALTH_DATA_IN_BACKGROUND"))
-            yield return "Может читать health-данные в фоне";
+            reasons.Add("может читать health-данные в фоне");
         if (ContainsAny(permissions, "READ_HEALTH_DATA_HISTORY"))
-            yield return "Может читать исторические health-данные";
+            reasons.Add("может читать исторические health-данные");
         if (ContainsAny(permissions, "BIND_ACCESSIBILITY_SERVICE", "SYSTEM_ALERT_WINDOW", "BIND_NOTIFICATION_LISTENER_SERVICE"))
-            yield return "Может читать данные с экрана, уведомления или показывать окна поверх других приложений";
+            reasons.Add("может читать данные с экрана, уведомления или показывать окна поверх других приложений");
         if (ContainsAny(permissions, "BIND_ACCESSIBILITY_SERVICE"))
-            yield return "Может управлять интерфейсом";
+            reasons.Add("может управлять интерфейсом");
         if (ContainsAny(permissions, "BIND_NOTIFICATION_LISTENER_SERVICE"))
-            yield return "Может читать уведомления";
+            reasons.Add("может читать уведомления");
         if (ContainsAny(permissions, "SYSTEM_ALERT_WINDOW"))
-            yield return "Может показывать окна поверх других приложений";
+            reasons.Add("может показывать окна поверх других приложений");
         if (ContainsAny(permissions, "BIND_VPN_SERVICE"))
-            yield return "Может направлять трафик через VPN-сервис";
+            reasons.Add("может направлять трафик через VPN-сервис");
         if (ContainsAny(permissions, "PACKAGE_USAGE_STATS"))
-            yield return "Может видеть статистику использования приложений";
+            reasons.Add("может видеть, какие приложения используются");
         if (ContainsAny(permissions, "QUERY_ALL_PACKAGES"))
-            yield return "Может видеть список установленных приложений";
+            reasons.Add("может видеть список установленных приложений");
         if (ContainsAny(permissions, "FOREGROUND_SERVICE_MEDIA_PROJECTION"))
-            yield return "Может записывать экран";
+            reasons.Add("может быть связано с записью экрана");
         if (ContainsAny(permissions, "READ_ASSIST_STRUCTURE_SCREEN_CONTENT"))
-            yield return "Может получать содержимое экрана";
+            reasons.Add("может получать содержимое экрана через assistant API");
         if (ContainsAny(permissions, "REQUEST_INSTALL_PACKAGES"))
-            yield return "Может устанавливать APK из внешних источников";
+            reasons.Add("может устанавливать APK из внешних источников");
         if (ContainsAny(permissions, "RECEIVE_BOOT_COMPLETED"))
-            yield return "Может запускаться после перезагрузки устройства";
+            reasons.Add("может запускаться после перезагрузки устройства");
         if (ContainsAny(permissions, "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"))
-            yield return "Может обходить ограничения энергосбережения";
+            reasons.Add("может обходить ограничения энергосбережения");
         if (ContainsAny(permissions, "SCHEDULE_EXACT_ALARM", "USE_EXACT_ALARM"))
-            yield return "Может точно будить приложение по расписанию";
+            reasons.Add("может точно будить приложение по расписанию");
         if (ContainsAny(permissions, "FOREGROUND_SERVICE"))
-            yield return "Может длительно работать в фоне";
+            reasons.Add("может длительно работать в фоне");
+        if (ContainsAny(permissions, "POST_NOTIFICATIONS"))
+            reasons.Add("может активно показывать уведомления");
         if (ContainsAny(permissions, "ACCESS_NETWORK_STATE"))
-            yield return "Может отслеживать состояние сети";
+            reasons.Add("может отслеживать состояние сети");
         if (ContainsAny(permissions, "ACCESS_LOCAL_NETWORK"))
-            yield return "Может обращаться к устройствам в локальной сети";
+            reasons.Add("может обращаться к устройствам в локальной сети");
         if (ContainsAny(permissions, "NEARBY_WIFI_DEVICES"))
-            yield return "Может видеть окружающие Wi-Fi сети и подключаться к ним";
+            reasons.Add("может видеть окружающие Wi-Fi сети и подключаться к ним");
         if (ContainsAny(permissions, "BLUETOOTH_CONNECT", "BLUETOOTH_SCAN"))
-            yield return "Может использовать Bluetooth для поиска или обмена с устройствами рядом";
+            reasons.Add("может использовать Bluetooth для поиска или обмена с устройствами рядом");
         if (ContainsAny(permissions, "NFC"))
-            yield return "Может использовать NFC модуль";
+            reasons.Add("может использовать NFC модуль");
         if (ContainsAny(permissions, "RANGING"))
-            yield return "Может оценивать расстояние до устройств рядом";
+            reasons.Add("может оценивать расстояние до nearby-устройств");
     }
 
     private static bool ContainsAny(IReadOnlyList<string> permissions, params string[] tokens)
     {
-        return permissions.Any(permission =>
-            tokens.Any(token => permission.Contains(token, StringComparison.Ordinal)));
+        for (var permissionIndex = 0; permissionIndex < permissions.Count; permissionIndex++)
+        {
+            var permission = permissions[permissionIndex];
+            for (var tokenIndex = 0; tokenIndex < tokens.Length; tokenIndex++)
+            {
+                if (permission.Contains(tokens[tokenIndex], StringComparison.Ordinal)) return true;
+            }
+        }
+
+        return false;
     }
 
     private static string ResolveStatusTagLabel(AppSnapshot snapshot)
