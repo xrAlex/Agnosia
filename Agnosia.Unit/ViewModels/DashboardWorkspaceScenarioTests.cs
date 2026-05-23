@@ -142,32 +142,56 @@ public sealed class DashboardWorkspaceScenarioTests
         Assert.False(viewModel.IsTunguskaAutomationTokenVisible);
     }
 
-    // Проверяет применение quiet mode recovery при загрузке состояния рабочего профиля.
+    // Проверяет уведомление при недоступном ранее настроенном рабочем профиле.
     [Fact]
-    public async Task EnsureInitializedAsync_applies_work_profile_quiet_mode_recovery_state()
+    public async Task EnsureInitializedAsync_shows_recovery_for_unavailable_work_profile()
     {
         var services = new TestPlatformServices
         {
             DashboardProfile = TestSnapshots.Dashboard(
-                hasSetup: false,
+                hasSetup: true,
                 workProfileAvailable: false,
-                workProfileState: WorkProfileStateKind.WorkProfileQuietMode,
-                workProfileRecovery: WorkProfileRecoveryKind.WorkProfileQuietMode,
-                workProfileDiagnosticReason: "quiet mode is active")
+                workProfileState: WorkProfileStateKind.Unavailable,
+                workProfileRecovery: WorkProfileRecoveryKind.DeleteWorkProfile,
+                workProfileDiagnosticReason: "profile is unavailable")
         };
         var viewModel = TestWorkspaceFactory.Create(services);
 
         await viewModel.EnsureInitializedAsync();
 
-        Assert.False(viewModel.HasSetup);
+        Assert.True(viewModel.HasSetup);
         Assert.False(viewModel.WorkProfileAvailable);
-        Assert.Equal("QuietMode", viewModel.WorkProfileStatusText);
+        Assert.Equal("Unavailable", viewModel.WorkProfileStatusText);
         Assert.True(viewModel.IsWorkProfileRecoveryVisible);
-        Assert.Equal("Рабочий профиль временно недоступен", viewModel.WorkProfileRecoveryTitle);
+        Assert.False(viewModel.IsOnboardingVisible);
+        Assert.Equal("Удалите рабочий профиль", viewModel.WorkProfileRecoveryTitle);
         Assert.Equal(
-            "Подождите несколько секунд, включите или разблокируйте рабочий профиль в Android, затем обновите экран.",
+            "Этот профиль недоступен или не управляется Agnosia. Удалите его в настройках Android, затем вернитесь в Agnosia и создайте рабочий профиль заново.",
             viewModel.WorkProfileRecoveryMessage);
         Assert.False(viewModel.CanContinueOnboardingFromWorkProfile);
+    }
+
+    // Проверяет уведомление на первом запуске, если Android уже содержит чужой рабочий профиль.
+    [Fact]
+    public async Task EnsureInitializedAsync_shows_recovery_for_foreign_work_profile_on_first_launch()
+    {
+        var services = new TestPlatformServices
+        {
+            OnboardingCompleted = false,
+            DashboardProfile = TestSnapshots.Dashboard(
+                hasSetup: true,
+                workProfileAvailable: false,
+                workProfileState: WorkProfileStateKind.Unavailable,
+                workProfileRecovery: WorkProfileRecoveryKind.DeleteWorkProfile,
+                workProfileDiagnosticReason: "foreign profile")
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+
+        await viewModel.EnsureInitializedAsync();
+
+        Assert.True(viewModel.IsOnboardingVisible);
+        Assert.True(viewModel.IsWorkProfileRecoveryVisible);
+        Assert.Equal("Удалите рабочий профиль", viewModel.WorkProfileRecoveryTitle);
     }
 
     // Проверяет старт онбординга на поддержанном устройстве без рабочего профиля.
@@ -187,8 +211,9 @@ public sealed class DashboardWorkspaceScenarioTests
         await viewModel.EnsureInitializedAsync();
 
         Assert.True(viewModel.IsOnboardingVisible);
-        Assert.True(viewModel.IsOnboardingWelcomeStep);
-        Assert.Equal("1", viewModel.OnboardingStepLabel);
+        Assert.True(viewModel.IsOnboardingWorkProfileStep);
+        Assert.Equal("2", viewModel.OnboardingStepLabel);
+        Assert.False(viewModel.IsWorkProfileRecoveryVisible);
         Assert.True(viewModel.CanStartProvisioning);
     }
 
@@ -213,6 +238,63 @@ public sealed class DashboardWorkspaceScenarioTests
         Assert.Equal(1, services.StartProvisioningCallCount);
         Assert.False(viewModel.StatusIsError);
         Assert.True(viewModel.IsOnboardingVisible);
+    }
+
+    // Проверяет, что действие recovery возвращает пользователя в начало онбординга.
+    [Fact]
+    public async Task RestartOnboardingFromWorkProfileRecoveryCommand_moves_unavailable_work_profile_to_onboarding_start()
+    {
+        var services = new TestPlatformServices
+        {
+            OnboardingCompleted = true,
+            DashboardProfile = TestSnapshots.Dashboard(
+                hasSetup: true,
+                workProfileAvailable: false,
+                workProfileState: WorkProfileStateKind.Unavailable,
+                workProfileRecovery: WorkProfileRecoveryKind.DeleteWorkProfile),
+            DefaultOperationResult = OperationResult.Failure("Android blocked provisioning")
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+
+        await viewModel.EnsureInitializedAsync();
+
+        Assert.True(viewModel.IsWorkProfileRecoveryVisible);
+
+        viewModel.RestartOnboardingFromWorkProfileRecoveryCommand.Execute(null);
+
+        Assert.True(viewModel.IsOnboardingVisible);
+        Assert.True(viewModel.IsOnboardingWelcomeStep);
+        Assert.Equal("1", viewModel.OnboardingStepLabel);
+        Assert.False(viewModel.IsWorkProfileRecoveryVisible);
+        Assert.Equal(0, services.StartProvisioningCallCount);
+    }
+
+    // Проверяет, что на шаге рабочего профиля Agnosia не блокирует Android provisioning своим статусом.
+    [Fact]
+    public async Task StartProvisioningCommand_calls_android_from_onboarding_when_work_profile_is_unavailable()
+    {
+        var services = new TestPlatformServices
+        {
+            OnboardingCompleted = true,
+            DashboardProfile = TestSnapshots.Dashboard(
+                hasSetup: true,
+                workProfileAvailable: false,
+                workProfileState: WorkProfileStateKind.Unavailable,
+                workProfileRecovery: WorkProfileRecoveryKind.DeleteWorkProfile),
+            DefaultOperationResult = OperationResult.Failure("Android blocked provisioning")
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+        await viewModel.EnsureInitializedAsync();
+        viewModel.RestartOnboardingFromWorkProfileRecoveryCommand.Execute(null);
+        viewModel.StartOnboardingCommand.Execute(null);
+
+        Assert.True(viewModel.CanStartProvisioning);
+
+        await viewModel.StartProvisioningCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, services.StartProvisioningCallCount);
+        Assert.True(viewModel.StatusIsError);
+        Assert.Equal("Android blocked provisioning", viewModel.StatusMessage);
     }
 
     // Проверяет переход онбординга с welcome на шаг рабочего профиля.

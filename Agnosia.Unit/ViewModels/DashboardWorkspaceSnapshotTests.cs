@@ -48,7 +48,7 @@ public sealed class DashboardWorkspaceSnapshotTests
 
         services.DashboardProfile = TestSnapshots.Dashboard(
             workProfileAvailable: false,
-            workProfileState: WorkProfileStateKind.WorkProfileUnavailable);
+            workProfileState: WorkProfileStateKind.Unavailable);
 
         await viewModel.RefreshCommand.ExecuteAsync(null);
 
@@ -56,25 +56,25 @@ public sealed class DashboardWorkspaceSnapshotTests
         Assert.False(viewModel.IsWorkProfileSelected);
     }
 
-    // Проверяет сохранение dismissed recovery до смены типа recovery.
+    // Проверяет уведомление при повторном появлении недоступного рабочего профиля.
     [Fact]
-    public async Task Dashboard_snapshot_keeps_dismissed_recovery_until_recovery_kind_changes()
+    public async Task Dashboard_snapshot_shows_recovery_when_unavailable_profile_reappears()
     {
         var services = new TestPlatformServices
         {
             DashboardProfile = TestSnapshots.Dashboard(
                 workProfileAvailable: false,
-                workProfileState: WorkProfileStateKind.WorkProfileQuietMode,
-                workProfileRecovery: WorkProfileRecoveryKind.WorkProfileQuietMode,
-                workProfileDiagnosticReason: "quiet")
+                workProfileState: WorkProfileStateKind.Unavailable,
+                workProfileRecovery: WorkProfileRecoveryKind.DeleteWorkProfile,
+                workProfileDiagnosticReason: "unavailable")
         };
         var viewModel = TestWorkspaceFactory.Create(services);
         await viewModel.EnsureInitializedAsync();
+        Assert.False(viewModel.WorkProfileRecoveryDismissed);
         Assert.True(viewModel.IsWorkProfileRecoveryVisible);
+        Assert.False(viewModel.IsOnboardingVisible);
 
         viewModel.DismissWorkProfileRecoveryCommand.Execute(null);
-        Assert.True(viewModel.WorkProfileRecoveryDismissed);
-        Assert.False(viewModel.IsWorkProfileRecoveryVisible);
 
         await viewModel.RefreshCommand.ExecuteAsync(null);
 
@@ -82,16 +82,27 @@ public sealed class DashboardWorkspaceSnapshotTests
         Assert.False(viewModel.IsWorkProfileRecoveryVisible);
 
         services.DashboardProfile = TestSnapshots.Dashboard(
+            workProfileAvailable: true,
+            workProfileState: WorkProfileStateKind.Available);
+
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.WorkProfileRecoveryDismissed);
+        Assert.False(viewModel.IsWorkProfileRecoveryVisible);
+        Assert.False(viewModel.IsOnboardingVisible);
+
+        services.DashboardProfile = TestSnapshots.Dashboard(
             workProfileAvailable: false,
-            workProfileState: WorkProfileStateKind.WorkProfileUnavailable,
-            workProfileRecovery: WorkProfileRecoveryKind.WorkProfileUnavailable,
-            workProfileDiagnosticReason: "unavailable");
+            workProfileState: WorkProfileStateKind.Unavailable,
+            workProfileRecovery: WorkProfileRecoveryKind.DeleteWorkProfile,
+            workProfileDiagnosticReason: "unavailable-again");
 
         await viewModel.RefreshCommand.ExecuteAsync(null);
 
         Assert.False(viewModel.WorkProfileRecoveryDismissed);
         Assert.True(viewModel.IsWorkProfileRecoveryVisible);
-        Assert.Equal("Рабочий профиль временно недоступен", viewModel.WorkProfileRecoveryTitle);
+        Assert.False(viewModel.IsOnboardingVisible);
+        Assert.Equal("Удалите рабочий профиль", viewModel.WorkProfileRecoveryTitle);
     }
 
     // Проверяет, что recovery показывает простое действие без диагностического дампа Android.
@@ -102,18 +113,18 @@ public sealed class DashboardWorkspaceSnapshotTests
         {
             DashboardProfile = TestSnapshots.Dashboard(
                 workProfileAvailable: false,
-                workProfileState: WorkProfileStateKind.WorkProfileCommandChannelUnavailable,
-                workProfileRecovery: WorkProfileRecoveryKind.WorkProfileCommandChannelUnavailable,
-                workProfileDiagnosticReason: "state=WorkProfileCommandChannelUnavailable; ownerCheck=Unreachable")
+                workProfileState: WorkProfileStateKind.Unavailable,
+                workProfileRecovery: WorkProfileRecoveryKind.DeleteWorkProfile,
+                workProfileDiagnosticReason: "state=Unavailable; ownerCheck=Unreachable")
         };
         var viewModel = TestWorkspaceFactory.Create(services);
 
         await viewModel.EnsureInitializedAsync();
 
         Assert.True(viewModel.IsWorkProfileRecoveryVisible);
-        Assert.Equal("Agnosia не может управлять рабочим профилем", viewModel.WorkProfileRecoveryTitle);
+        Assert.Equal("Удалите рабочий профиль", viewModel.WorkProfileRecoveryTitle);
         Assert.Equal(
-            "Удалите рабочий профиль в настройках Android, затем создайте его заново через Agnosia.",
+            "Этот профиль недоступен или не управляется Agnosia. Удалите его в настройках Android, затем вернитесь в Agnosia и создайте рабочий профиль заново.",
             viewModel.WorkProfileRecoveryMessage);
     }
 }

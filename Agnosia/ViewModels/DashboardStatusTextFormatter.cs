@@ -13,9 +13,7 @@ internal static class DashboardStatusTextFormatter
             ? "Available"
             : workProfileState switch
             {
-                WorkProfileStateKind.ProvisioningInProgress => "Pending",
-                WorkProfileStateKind.WorkProfileQuietMode => "QuietMode",
-                WorkProfileStateKind.WorkProfileUnavailable => "Disabled",
+                WorkProfileStateKind.Unavailable => "Unavailable",
                 _ => hasSetup ? "Unavailable" : "NotCreated"
             };
     }
@@ -84,21 +82,11 @@ internal static class DashboardStatusTextFormatter
 
     private static string GetUnavailableHeadline(WorkProfileStateKind workProfileState)
     {
-        return workProfileState switch
-        {
-            WorkProfileStateKind.WorkProfileQuietMode => "WPQuietMode",
-            WorkProfileStateKind.WorkProfileUnavailable => "WPDisabled",
-            _ => "WPUnavailable"
-        };
+        return "WPUnavailable";
     }
 
     private static string GetUnavailableDetail(WorkProfileStateKind workProfileState)
     {
-        return workProfileState switch
-        {
-            WorkProfileStateKind.WorkProfileQuietMode => "WPQuietMode",
-            WorkProfileStateKind.WorkProfileUnavailable => "WPDisabled",
-            _ => "WPUnavailable"
-        };
+        return "WPUnavailable";
     }
 }

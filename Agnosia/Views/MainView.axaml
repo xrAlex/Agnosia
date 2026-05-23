@@ -88,11 +88,11 @@
                                 Classes="primary"
                                 MinHeight="58"
                                 HorizontalAlignment="Right"
-                                Command="{Binding OpenWorkProfileSettingsCommand}">
+                                Command="{Binding RestartOnboardingFromWorkProfileRecoveryCommand}">
                             <TextBlock Classes="button-label"
                                        TextAlignment="Center"
                                        HorizontalAlignment="Center"
-                                       Text="Открыть настройки" />
+                                       Text="К началу настройки" />
                         </Button>
                     </Grid>
                 </StackPanel>

@@ -7,7 +7,7 @@ internal static class TestSnapshots
     public static DashboardSnapshot Dashboard(
         bool hasSetup = true,
         bool workProfileAvailable = true,
-        WorkProfileStateKind workProfileState = WorkProfileStateKind.AppIsProfileOwner,
+        WorkProfileStateKind workProfileState = WorkProfileStateKind.Available,
         WorkProfileRecoveryKind workProfileRecovery = WorkProfileRecoveryKind.None,
         string workProfileDiagnosticReason = "",
         AppSettingsSnapshot? settings = null,

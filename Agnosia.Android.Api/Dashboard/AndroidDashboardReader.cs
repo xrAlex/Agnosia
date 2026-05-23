@@ -11,11 +11,6 @@ namespace Agnosia.Android.Api.Dashboard;
 internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway commandRunner)
 {
     private const string LogTag = "AgnosiaProfileDetection";
-    private static readonly TimeSpan SetupStateTimeout = TimeSpan.FromMinutes(3);
-    private static readonly TimeSpan ProvisionedSetupStateTimeout = TimeSpan.FromMinutes(10);
-    private static readonly TimeSpan WorkProfileOwnerCacheTtl = TimeSpan.FromSeconds(5);
-    private readonly Lock _workProfileOwnerCacheSync = new();
-    private CachedWorkProfileOwnerCheck? _cachedWorkProfileOwnerCheck;
 
     public async Task<DashboardSnapshot> LoadDashboardAsync(CancellationToken cancellationToken)
     {
@@ -42,81 +37,38 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
 
         var storage = LocalStorageManager.Instance;
         var settings = AndroidSettingsStore.LoadSnapshot(storage);
+        var hadConfiguredWorkProfile = HasConfiguredWorkProfileSignal(storage);
         var profileDiagnostics = AndroidWorkProfileDiagnosticsReader.Read(activity);
-        var hasAssociatedProfile = profileDiagnostics.ManagedProfileExists;
-        var hasWorkProfileTarget = profileDiagnostics.CommandTargetResolvable;
-        var storedHasSetup = storage.GetBoolean(StorageKeys.HasSetup);
-        var onboardingCompleted = storage.GetBoolean(StorageKeys.OnboardingCompleted);
-        var isSettingUp = storage.GetBoolean(StorageKeys.IsSettingUp);
-        var hasManagedProfileProvisionedSignal = storage.GetLong(StorageKeys.ManagedProfileProvisionedAtUtc) > 0;
-        if (isSettingUp && IsSetupStateStale(
-                storage,
-                hasAssociatedProfile,
-                hasWorkProfileTarget,
-                hasManagedProfileProvisionedSignal))
-        {
-            Log.Warn(LogTag,
-                "Provisioning state timed out without a reachable work profile. Clearing stale setup state.");
-            AgnosiaUtilities.ClearWorkProfileConfiguredState();
-            isSettingUp = false;
-            storedHasSetup = false;
-            onboardingCompleted = false;
-            hasManagedProfileProvisionedSignal = false;
-        }
-
         var ownerCheck = await ReadWorkProfileOwnerCheckAsync(
                 profileDiagnostics,
                 cancellationToken)
             .ConfigureAwait(false);
-        var workProfileAvailable = ownerCheck.Kind == WorkProfileOwnerCheckKind.AppIsProfileOwner;
+
+        var workProfileState = ResolveWorkProfileState(
+            hadConfiguredWorkProfile,
+            profileDiagnostics,
+            ownerCheck);
+        SynchronizeStorageWithResolvedState(workProfileState);
+
+        var workProfileAvailable = workProfileState == WorkProfileStateKind.Available;
+        var hasSetup = workProfileState == WorkProfileStateKind.Available
+                       || workProfileState == WorkProfileStateKind.Unavailable;
+        var recoveryKind = workProfileState == WorkProfileStateKind.Unavailable
+            ? WorkProfileRecoveryKind.DeleteWorkProfile
+            : WorkProfileRecoveryKind.None;
+        var diagnosticReason = BuildDiagnosticReason(workProfileState, profileDiagnostics, ownerCheck);
+
         Log.Info(
             LogTag,
-            $"Work profile diagnostics. {profileDiagnostics.ToLogString()}; ping={ownerCheck.Kind}; {ownerCheck.DiagnosticReason}.");
-        if (workProfileAvailable)
-        {
-            AgnosiaUtilities.MarkWorkProfileReady();
-            storedHasSetup = true;
-            onboardingCompleted = true;
-        }
-        else if (!isSettingUp
-                 && !hasAssociatedProfile
-                 && !hasWorkProfileTarget
-                 && (storedHasSetup || onboardingCompleted))
-        {
-            Log.Warn(LogTag, "Previously configured work profile is no longer present. Clearing setup state.");
-            AgnosiaUtilities.ClearWorkProfileConfiguredState();
-            storedHasSetup = false;
-            onboardingCompleted = false;
-        }
-
-        var workProfileState = GetWorkProfileState(
-            isSettingUp,
-            workProfileAvailable,
-            hasManagedProfileProvisionedSignal,
-            profileDiagnostics,
-            storedHasSetup,
-            onboardingCompleted,
-            ownerCheck);
-        var recoveryKind = GetWorkProfileRecoveryKind(workProfileState);
-        var diagnosticReason = BuildDiagnosticReason(
-            workProfileState,
-            hasManagedProfileProvisionedSignal,
-            profileDiagnostics,
-            storedHasSetup,
-            onboardingCompleted,
-            ownerCheck);
+            $"Work profile check. state={workProfileState}; {profileDiagnostics.ToLogString()}; " +
+            $"ownerCheck={ownerCheck.Kind}; {ownerCheck.DiagnosticReason}.");
         if (recoveryKind != WorkProfileRecoveryKind.None)
-            Log.Warn(
-                LogTag,
-                $"Work profile needs user attention. state={workProfileState}, recovery={recoveryKind}, reason={diagnosticReason}.");
-
-        var hasSetup = storedHasSetup && (workProfileAvailable || recoveryKind != WorkProfileRecoveryKind.None);
-        isSettingUp = storage.GetBoolean(StorageKeys.IsSettingUp) && !hasSetup;
+            Log.Warn(LogTag, $"Work profile must be recreated. reason={diagnosticReason}.");
 
         return new DashboardSnapshot(
             true,
             hasSetup,
-            isSettingUp,
+            false,
             workProfileAvailable,
             workProfileState,
             recoveryKind,
@@ -170,10 +122,12 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         if (!LocalStorageManager.Instance.GetBoolean(StorageKeys.LoggingEnabled, true)) return [];
 
         var logs = AndroidAppLogArchive.Load(activity).ToList();
-        if (AgnosiaUtilities.HasWorkProfileTarget(activity)
-            && (await TryCheckWorkProfileOwnerWithRetryAsync(cancellationToken).ConfigureAwait(false)).Kind
-            == WorkProfileOwnerCheckKind.AppIsProfileOwner)
-            logs.AddRange(await AndroidProfileCommandGateway.QueryWorkLogsAsync(commandRunner, cancellationToken));
+        var profileDiagnostics = AndroidWorkProfileDiagnosticsReader.Read(activity);
+        if (CanAttemptWorkProfileOwnerCheck(profileDiagnostics)
+            && (await AndroidProfileCommandGateway.CheckWorkProfileOwnerAsync(commandRunner, cancellationToken)
+                .ConfigureAwait(false)).Kind == WorkProfileOwnerCheckKind.AppIsProfileOwner)
+            logs.AddRange(await AndroidProfileCommandGateway.QueryWorkLogsAsync(commandRunner, cancellationToken)
+                .ConfigureAwait(false));
 
         if (logs.Count == 0) return [];
 
@@ -196,7 +150,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             profile,
             showAll,
             cancellationToken).ConfigureAwait(false);
-        
+
         return payload is null ? AppQueryResult.Empty : new AppQueryResult(payload.Apps, payload.InteractionPackages);
     }
 
@@ -205,7 +159,8 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         CancellationToken cancellationToken)
     {
         return CanAttemptWorkProfileOwnerCheck(profileDiagnostics)
-            ? await TryCheckWorkProfileOwnerWithRetryAsync(cancellationToken).ConfigureAwait(false)
+            ? await AndroidProfileCommandGateway.CheckWorkProfileOwnerAsync(commandRunner, cancellationToken)
+                .ConfigureAwait(false)
             : new WorkProfileOwnerCheckResult(
                 WorkProfileOwnerCheckKind.TargetUnavailable,
                 "crossProfileTarget=missing");
@@ -218,179 +173,63 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
                && profileDiagnostics.QuietModeEnabled != true;
     }
 
-    private async Task<WorkProfileOwnerCheckResult> TryCheckWorkProfileOwnerWithRetryAsync(
-        CancellationToken cancellationToken)
-    {
-        if (TryGetCachedWorkProfileOwnerCheck(out var cachedResult)) return cachedResult;
-
-        const int maxAttempts = 5;
-        const int delayMs = 500;
-
-        var lastResult = new WorkProfileOwnerCheckResult(
-            WorkProfileOwnerCheckKind.Unreachable,
-            "profilePing=notAttempted");
-        for (var attempt = 0; attempt < maxAttempts; attempt++)
-        {
-            lastResult = await AndroidProfileCommandGateway.CheckWorkProfileOwnerAsync(
-                commandRunner,
-                cancellationToken).ConfigureAwait(false);
-            if (lastResult.Kind is WorkProfileOwnerCheckKind.AppIsProfileOwner
-                or WorkProfileOwnerCheckKind.AppInstalledButNotOwner
-                or WorkProfileOwnerCheckKind.AuthenticationKeyMissing
-                or WorkProfileOwnerCheckKind.TargetUnavailable)
-            {
-                SetCachedWorkProfileOwnerCheck(lastResult);
-                return lastResult;
-            }
-
-            if (attempt < maxAttempts - 1) await Task.Delay(delayMs, cancellationToken).ConfigureAwait(false);
-        }
-
-        SetCachedWorkProfileOwnerCheck(lastResult);
-        return lastResult;
-    }
-
-    private bool TryGetCachedWorkProfileOwnerCheck(out WorkProfileOwnerCheckResult result)
-    {
-        lock (_workProfileOwnerCacheSync)
-        {
-            if (_cachedWorkProfileOwnerCheck is { } cached
-                && DateTimeOffset.UtcNow - cached.CachedAt <= WorkProfileOwnerCacheTtl)
-            {
-                result = cached.Result;
-                return true;
-            }
-        }
-
-        result = new WorkProfileOwnerCheckResult(
-            WorkProfileOwnerCheckKind.Unreachable,
-            "profilePing=cacheMiss");
-        return false;
-    }
-
-    private void SetCachedWorkProfileOwnerCheck(WorkProfileOwnerCheckResult result)
-    {
-        lock (_workProfileOwnerCacheSync)
-        {
-            _cachedWorkProfileOwnerCheck = new CachedWorkProfileOwnerCheck(result, DateTimeOffset.UtcNow);
-        }
-    }
-
-    private static bool IsSetupStateStale(
-        LocalStorageManager storage,
-        bool hasAssociatedProfile,
-        bool hasWorkProfileTarget,
-        bool hasManagedProfileProvisionedSignal)
-    {
-        var startedAtUnixSeconds = storage.GetLong(StorageKeys.SetupStartedAtUtc);
-        if (hasManagedProfileProvisionedSignal
-            && !IsSetupStartedBefore(ProvisionedSetupStateTimeout, startedAtUnixSeconds))
-            return false;
-
-        if (startedAtUnixSeconds <= 0) return !hasAssociatedProfile && !hasWorkProfileTarget;
-
-        return IsSetupStartedBefore(SetupStateTimeout, startedAtUnixSeconds);
-    }
-
-    private static bool IsSetupStartedBefore(TimeSpan timeout, long startedAtUnixSeconds)
-    {
-        if (startedAtUnixSeconds <= 0) return false;
-
-        var startedAt = DateTimeOffset.FromUnixTimeSeconds(startedAtUnixSeconds);
-        return DateTimeOffset.UtcNow - startedAt >= timeout;
-    }
-
-    private static WorkProfileStateKind GetWorkProfileState(
-        bool isSettingUp,
-        bool workProfileAvailable,
-        bool hasManagedProfileProvisionedSignal,
+    private static WorkProfileStateKind ResolveWorkProfileState(
+        bool hadConfiguredWorkProfile,
         WorkProfileDiagnostics profileDiagnostics,
-        bool storedHasSetup,
-        bool onboardingCompleted,
         WorkProfileOwnerCheckResult ownerCheck)
     {
-        if (workProfileAvailable) return WorkProfileStateKind.AppIsProfileOwner;
+        if (ownerCheck.Kind == WorkProfileOwnerCheckKind.AppIsProfileOwner)
+            return WorkProfileStateKind.Available;
 
-        if (ownerCheck.Kind == WorkProfileOwnerCheckKind.AppInstalledButNotOwner)
-            return WorkProfileStateKind.AppInstalledInWorkProfileButNotOwner;
-
-        if (isSettingUp) return WorkProfileStateKind.ProvisioningInProgress;
-
-        if (!HasAgnosiaWorkProfileSignal(
-                hasManagedProfileProvisionedSignal,
-                profileDiagnostics,
-                storedHasSetup,
-                onboardingCompleted))
-        {
-            return WorkProfileStateKind.NoWorkProfile;
-        }
-
-        if (profileDiagnostics.QuietModeEnabled == true) return WorkProfileStateKind.WorkProfileQuietMode;
-
-        if (profileDiagnostics.ManagedProfileExists && !profileDiagnostics.AvailableToCrossProfileApps)
-            return WorkProfileStateKind.WorkProfileUnavailable;
-
-        if (profileDiagnostics.ManagedProfileExists && !profileDiagnostics.CommandTargetResolvable)
-            return WorkProfileStateKind.WorkProfileCommandTargetUnavailable;
-
-        if (profileDiagnostics.ManagedProfileExists && ownerCheck.Kind == WorkProfileOwnerCheckKind.Unreachable)
-            return WorkProfileStateKind.WorkProfileCommandChannelUnavailable;
-
-        if (hasManagedProfileProvisionedSignal) return WorkProfileStateKind.WorkProfileCreatedButAppNotReady;
-
-        if (storedHasSetup || onboardingCompleted || profileDiagnostics.CommandTargetResolvable)
-            return WorkProfileStateKind.ErrorUnknownWithDiagnostics;
+        if (hadConfiguredWorkProfile || HasAnyWorkProfileSignal(profileDiagnostics, ownerCheck))
+            return WorkProfileStateKind.Unavailable;
 
         return WorkProfileStateKind.NoWorkProfile;
     }
 
-    private static bool HasAgnosiaWorkProfileSignal(
-        bool hasManagedProfileProvisionedSignal,
-        WorkProfileDiagnostics profileDiagnostics,
-        bool storedHasSetup,
-        bool onboardingCompleted)
+    private static bool HasConfiguredWorkProfileSignal(LocalStorageManager storage)
     {
-        return storedHasSetup
-               || onboardingCompleted
-               || hasManagedProfileProvisionedSignal
-               || profileDiagnostics.CommandTargetResolvable;
+        return storage.GetBoolean(StorageKeys.HasSetup)
+               || storage.GetBoolean(StorageKeys.OnboardingCompleted)
+               || storage.GetBoolean(StorageKeys.IsSettingUp)
+               || storage.GetLong(StorageKeys.ManagedProfileProvisionedAtUtc) > 0
+               || !string.IsNullOrWhiteSpace(AuthenticationUtility.GetExistingKey());
     }
 
-    private static WorkProfileRecoveryKind GetWorkProfileRecoveryKind(WorkProfileStateKind state)
+    private static bool HasAnyWorkProfileSignal(
+        WorkProfileDiagnostics profileDiagnostics,
+        WorkProfileOwnerCheckResult ownerCheck)
     {
-        return state switch
+        return profileDiagnostics.ManagedProfileExists
+               || profileDiagnostics.AvailableToCrossProfileApps
+               || profileDiagnostics.CommandTargetResolvable
+               || ownerCheck.Kind is WorkProfileOwnerCheckKind.AuthenticationKeyMissing
+                   or WorkProfileOwnerCheckKind.Unreachable
+                   or WorkProfileOwnerCheckKind.AppInstalledButNotOwner;
+    }
+
+    private static void SynchronizeStorageWithResolvedState(WorkProfileStateKind workProfileState)
+    {
+        switch (workProfileState)
         {
-            WorkProfileStateKind.WorkProfileQuietMode =>
-                WorkProfileRecoveryKind.WorkProfileQuietMode,
-            WorkProfileStateKind.WorkProfileUnavailable =>
-                WorkProfileRecoveryKind.WorkProfileUnavailable,
-            WorkProfileStateKind.WorkProfileCommandTargetUnavailable =>
-                WorkProfileRecoveryKind.WorkProfileCommandTargetUnavailable,
-            WorkProfileStateKind.WorkProfileCommandChannelUnavailable =>
-                WorkProfileRecoveryKind.WorkProfileCommandChannelUnavailable,
-            WorkProfileStateKind.WorkProfileCreatedButAppNotReady =>
-                WorkProfileRecoveryKind.WorkProfileCreatedButAppNotReady,
-            WorkProfileStateKind.AppInstalledInWorkProfileButNotOwner =>
-                WorkProfileRecoveryKind.AppInstalledInWorkProfileButNotOwner,
-            WorkProfileStateKind.ForeignProfileOwner =>
-                WorkProfileRecoveryKind.ForeignProfileOwner,
-            WorkProfileStateKind.ErrorUnknownWithDiagnostics =>
-                WorkProfileRecoveryKind.ErrorUnknownWithDiagnostics,
-            _ => WorkProfileRecoveryKind.None
-        };
+            case WorkProfileStateKind.Available:
+                AgnosiaUtilities.MarkWorkProfileReady();
+                break;
+            case WorkProfileStateKind.Unavailable:
+                AgnosiaUtilities.MarkWorkProfileResetRequired();
+                break;
+            case WorkProfileStateKind.NoWorkProfile:
+                AgnosiaUtilities.ClearWorkProfileConfiguredState();
+                break;
+        }
     }
 
     private static string BuildDiagnosticReason(
         WorkProfileStateKind state,
-        bool hasManagedProfileProvisionedSignal,
         WorkProfileDiagnostics profileDiagnostics,
-        bool storedHasSetup,
-        bool onboardingCompleted,
         WorkProfileOwnerCheckResult ownerCheck)
     {
-        return $"state={state}; managedProfileProvisioned={hasManagedProfileProvisionedSignal}; " +
-               $"{profileDiagnostics.ToLogString()}; " +
-               $"storedSetup={storedHasSetup}; onboardingCompleted={onboardingCompleted}; " +
+        return $"state={state}; {profileDiagnostics.ToLogString()}; " +
                $"ownerCheck={ownerCheck.Kind}; {ownerCheck.DiagnosticReason}";
     }
 
@@ -435,8 +274,4 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
     {
         public static AppQueryResult Empty { get; } = new([], []);
     }
-
-    private sealed record CachedWorkProfileOwnerCheck(
-        WorkProfileOwnerCheckResult Result,
-        DateTimeOffset CachedAt);
 }

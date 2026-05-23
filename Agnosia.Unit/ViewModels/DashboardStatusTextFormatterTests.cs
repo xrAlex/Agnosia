@@ -9,11 +9,7 @@ public sealed class DashboardStatusTextFormatterTests
     // Проверяет ключи статуса рабочего профиля для основных состояний профиля.
     [Theory]
     [InlineData(WorkProfileStateKind.NoWorkProfile, true, false, "Available")]
-    [InlineData(WorkProfileStateKind.ProvisioningInProgress, false, false, "Pending")]
-    [InlineData(WorkProfileStateKind.WorkProfileQuietMode, false, true, "QuietMode")]
-    [InlineData(WorkProfileStateKind.WorkProfileUnavailable, false, true, "Disabled")]
-    [InlineData(WorkProfileStateKind.WorkProfileCommandTargetUnavailable, false, true, "Unavailable")]
-    [InlineData(WorkProfileStateKind.WorkProfileCommandChannelUnavailable, false, true, "Unavailable")]
+    [InlineData(WorkProfileStateKind.Unavailable, false, true, "Unavailable")]
     [InlineData(WorkProfileStateKind.NoWorkProfile, false, false, "NotCreated")]
     [InlineData(WorkProfileStateKind.NoWorkProfile, false, true, "Unavailable")]
     public void GetWorkProfileStatus_returns_expected_status_key(
@@ -32,14 +28,12 @@ public sealed class DashboardStatusTextFormatterTests
 
     // Проверяет приоритет headline на overview для загрузки, ошибок setup и состояния профиля.
     [Theory]
-    [InlineData(false, true, true, false, true, WorkProfileStateKind.AppIsProfileOwner, "Loading")]
-    [InlineData(true, false, true, false, true, WorkProfileStateKind.AppIsProfileOwner, "NotSupported")]
-    [InlineData(true, true, false, false, true, WorkProfileStateKind.AppIsProfileOwner, "NotSetup")]
-    [InlineData(true, true, true, true, true, WorkProfileStateKind.AppIsProfileOwner, "Syncing")]
-    [InlineData(true, true, true, false, true, WorkProfileStateKind.AppIsProfileOwner, "Active")]
-    [InlineData(true, true, true, false, false, WorkProfileStateKind.WorkProfileQuietMode, "WPQuietMode")]
-    [InlineData(true, true, true, false, false, WorkProfileStateKind.WorkProfileUnavailable, "WPDisabled")]
-    [InlineData(true, true, true, false, false, WorkProfileStateKind.WorkProfileCommandTargetUnavailable, "WPUnavailable")]
+    [InlineData(false, true, true, false, true, WorkProfileStateKind.Available, "Loading")]
+    [InlineData(true, false, true, false, true, WorkProfileStateKind.Available, "NotSupported")]
+    [InlineData(true, true, false, false, true, WorkProfileStateKind.Available, "NotSetup")]
+    [InlineData(true, true, true, true, true, WorkProfileStateKind.Available, "Syncing")]
+    [InlineData(true, true, true, false, true, WorkProfileStateKind.Available, "Active")]
+    [InlineData(true, true, true, false, false, WorkProfileStateKind.Unavailable, "WPUnavailable")]
     [InlineData(true, true, true, false, false, WorkProfileStateKind.NoWorkProfile, "WPUnavailable")]
     public void GetOverviewHeadline_respects_status_priority(
         bool hasLoadedSnapshot,
@@ -92,16 +86,14 @@ public sealed class DashboardStatusTextFormatterTests
 
     // Проверяет caption общего статуса с детализацией причин нестабильности.
     [Theory]
-    [InlineData(true, true, false, true, true, true, WorkProfileStateKind.AppIsProfileOwner, "Error")]
-    [InlineData(false, false, false, true, true, true, WorkProfileStateKind.AppIsProfileOwner, "Loading")]
-    [InlineData(false, true, true, true, true, true, WorkProfileStateKind.AppIsProfileOwner, "Syncing")]
-    [InlineData(false, true, false, false, true, true, WorkProfileStateKind.AppIsProfileOwner, "NotSupported")]
-    [InlineData(false, true, false, true, false, true, WorkProfileStateKind.AppIsProfileOwner, "NotSetup")]
-    [InlineData(false, true, false, true, true, false, WorkProfileStateKind.WorkProfileQuietMode, "WPQuietMode")]
-    [InlineData(false, true, false, true, true, false, WorkProfileStateKind.WorkProfileUnavailable, "WPDisabled")]
-    [InlineData(false, true, false, true, true, false, WorkProfileStateKind.WorkProfileCommandChannelUnavailable, "WPUnavailable")]
+    [InlineData(true, true, false, true, true, true, WorkProfileStateKind.Available, "Error")]
+    [InlineData(false, false, false, true, true, true, WorkProfileStateKind.Available, "Loading")]
+    [InlineData(false, true, true, true, true, true, WorkProfileStateKind.Available, "Syncing")]
+    [InlineData(false, true, false, false, true, true, WorkProfileStateKind.Available, "NotSupported")]
+    [InlineData(false, true, false, true, false, true, WorkProfileStateKind.Available, "NotSetup")]
+    [InlineData(false, true, false, true, true, false, WorkProfileStateKind.Unavailable, "WPUnavailable")]
     [InlineData(false, true, false, true, true, false, WorkProfileStateKind.NoWorkProfile, "WPUnavailable")]
-    [InlineData(false, true, false, true, true, true, WorkProfileStateKind.AppIsProfileOwner, "Ok")]
+    [InlineData(false, true, false, true, true, true, WorkProfileStateKind.Available, "Ok")]
     public void GetOverallStatusCaption_returns_expected_key(
         bool statusIsError,
         bool hasLoadedSnapshot,

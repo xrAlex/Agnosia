@@ -81,6 +81,14 @@ public static class AgnosiaUtilities
         storage.Remove(StorageKeys.SetupStartedAtUtc);
     }
 
+    public static void MarkWorkProfileResetRequired()
+    {
+        var storage = LocalStorageManager.Instance;
+        storage.SetBoolean(StorageKeys.IsSettingUp, false);
+        storage.SetBoolean(StorageKeys.HasSetup, true);
+        storage.Remove(StorageKeys.SetupStartedAtUtc);
+    }
+
     public static void MarkWorkProfileSetupStarted()
     {
         var storage = LocalStorageManager.Instance;
@@ -119,6 +127,7 @@ public static class AgnosiaUtilities
         storage.SetBoolean(StorageKeys.OnboardingCompleted, false);
         storage.Remove(StorageKeys.SetupStartedAtUtc);
         ClearManagedProfileTracking(storage);
+        AuthenticationUtility.Reset();
     }
 
     private static void ClearManagedProfileTracking(LocalStorageManager storage)

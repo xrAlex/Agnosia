@@ -318,35 +318,19 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             _permissionItems.Any(item => item.Kind == kind && item.IsGranted));
 
     public bool IsWorkProfileRecoveryVisible =>
-        WorkProfileRecovery != WorkProfileRecoveryKind.None && !WorkProfileRecoveryDismissed;
+        WorkProfileRecovery != WorkProfileRecoveryKind.None
+        && !WorkProfileRecoveryDismissed;
 
     public string WorkProfileRecoveryTitle => WorkProfileRecovery switch
     {
-        WorkProfileRecoveryKind.WorkProfileQuietMode
-            or WorkProfileRecoveryKind.WorkProfileUnavailable
-            or WorkProfileRecoveryKind.WorkProfileCreatedButAppNotReady => "Рабочий профиль временно недоступен",
-        WorkProfileRecoveryKind.WorkProfileCommandTargetUnavailable
-            or WorkProfileRecoveryKind.WorkProfileCommandChannelUnavailable
-            or WorkProfileRecoveryKind.AppInstalledInWorkProfileButNotOwner => "Agnosia не может управлять рабочим профилем",
-        WorkProfileRecoveryKind.ForeignProfileOwner => "Рабочим профилем управляет другое приложение",
-        WorkProfileRecoveryKind.ErrorUnknownWithDiagnostics => "Рабочий профиль требует повторной настройки",
+        WorkProfileRecoveryKind.DeleteWorkProfile => "Удалите рабочий профиль",
         _ => "Проблема с рабочим профилем"
     };
 
     public string WorkProfileRecoveryMessage => WorkProfileRecovery switch
     {
-        WorkProfileRecoveryKind.WorkProfileQuietMode
-            or WorkProfileRecoveryKind.WorkProfileUnavailable
-            or WorkProfileRecoveryKind.WorkProfileCreatedButAppNotReady =>
-            "Подождите несколько секунд, включите или разблокируйте рабочий профиль в Android, затем обновите экран.",
-        WorkProfileRecoveryKind.WorkProfileCommandTargetUnavailable
-            or WorkProfileRecoveryKind.WorkProfileCommandChannelUnavailable
-            or WorkProfileRecoveryKind.AppInstalledInWorkProfileButNotOwner =>
-            "Удалите рабочий профиль в настройках Android, затем создайте его заново через Agnosia.",
-        WorkProfileRecoveryKind.ForeignProfileOwner =>
-            "Удалите существующий рабочий профиль в настройках Android, затем создайте профиль заново через Agnosia.",
-        WorkProfileRecoveryKind.ErrorUnknownWithDiagnostics =>
-            "Обновите экран. Если состояние не изменится, удалите рабочий профиль в настройках Android и создайте его заново через Agnosia.",
+        WorkProfileRecoveryKind.DeleteWorkProfile =>
+            "Этот профиль недоступен или не управляется Agnosia. Удалите его в настройках Android, затем вернитесь в Agnosia и создайте рабочий профиль заново.",
         _ => string.Empty
     };
 
@@ -461,9 +445,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         !IsBusy
         && !_isOperationInProgress
         && IsSupported
-        && !HasSetup
-        && !IsSettingUp
-        && WorkProfileState == WorkProfileStateKind.NoWorkProfile;
+        && !WorkProfileAvailable;
 
     public bool IsOperationActive => IsBusy || _isOperationInProgress;
 
@@ -1035,6 +1017,12 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         WorkProfileRecoveryDismissed = true;
     }
 
+    [RelayCommand]
+    private void RestartOnboardingFromWorkProfileRecovery()
+    {
+        MoveToOnboardingStart();
+    }
+
     private async Task CompleteOnboardingAsync()
     {
         var result = await _onboardingService.CompleteOnboardingAsync();
@@ -1381,7 +1369,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
                 && WorkProfileState == WorkProfileStateKind.NoWorkProfile)
             {
                 OnboardingCompleted = false;
-                OnboardingStep = OnboardingStep.Welcome;
+                OnboardingStep = OnboardingStep.WorkProfile;
             }
 
             OnPropertyChanged(nameof(CanContinueOnboardingFromWorkProfile));
@@ -1505,6 +1493,13 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     {
         if (!IsDashboardVisible && SelectedSection != DashboardSection.Overview)
             SelectedSection = DashboardSection.Overview;
+    }
+
+    private void MoveToOnboardingStart()
+    {
+        OnboardingCompleted = false;
+        OnboardingStep = OnboardingStep.Welcome;
+        WorkProfileRecoveryDismissed = true;
     }
 
     private async Task RunOperationAsync(

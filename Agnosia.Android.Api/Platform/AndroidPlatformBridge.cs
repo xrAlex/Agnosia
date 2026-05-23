@@ -11,25 +11,20 @@ using Android.Content.PM;
 using Android.OS;
 using Android.Provider;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
-using OperationCanceledException = System.OperationCanceledException;
 
 namespace Agnosia.Android.Api.Platform;
 
 public sealed class AndroidPlatformBridge : IPlatformBridge
 {
     private const string LogTag = "AgnosiaPlatformBridge";
-    private const int ProvisioningWarmupAttempts = 20;
-    private const int ProvisioningWarmupDelayMilliseconds = 300;
-    private const int ProvisioningBackgroundReadinessAttempts = 45;
-    private const int ProvisioningBackgroundReadinessDelayMilliseconds = 2000;
+    private const int ProvisioningWarmupAttempts = 5;
+    private const int ProvisioningWarmupDelayMilliseconds = 2000;
 
     private readonly AndroidActivityCommandGateway _commandRunner;
     private readonly AndroidDashboardReader _dashboardReader;
     private readonly AndroidPermissionCoordinator _permissionCoordinator;
     private readonly AndroidAppCommandCoordinator _appCommandCoordinator;
-    private readonly Lock _provisioningReadinessPollingSync = new();
     private WeakReference<IAndroidActivityHost>? _activityHostReference;
-    private CancellationTokenSource? _provisioningReadinessPollingCancellation;
 
     public static AndroidPlatformBridge Instance { get; } = new();
 
@@ -47,13 +42,11 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
     {
         AgnosiaRuntime.Initialize(activityHost.CurrentActivity);
         _activityHostReference = new WeakReference<IAndroidActivityHost>(activityHost);
-        TryStartPendingProvisioningReadinessPolling("activity_attached");
     }
 
     public void DetachActivity()
     {
         _activityHostReference = null;
-        CancelPendingProvisioningReadinessPolling();
     }
 
     public Task<DashboardSnapshot> LoadDashboardAsync(CancellationToken cancellationToken = default)
@@ -203,14 +196,11 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         if (result.ResultCode != Result.Ok)
         {
             if (AgnosiaUtilities.HasAssociatedProfile(activity))
-            {
-                TryStartPendingProvisioningReadinessPolling("provisioning_result_with_associated_profile");
-                return OperationResult.Success(
-                    "Рабочий профиль создан, но Android не вернул код успешного завершения. Проверяем доступность профиля.");
-            }
+                return MarkProfileResetRequired(
+                    "Android создал рабочий профиль, но Agnosia не может подтвердить управление им. " +
+                    "Удалите рабочий профиль в настройках Android, затем создайте его заново через Agnosia.");
 
             AgnosiaUtilities.ClearWorkProfileConfiguredState();
-            AuthenticationUtility.Reset();
             return OperationResult.Failure("Создание рабочего профиля отменено или отклонено Android.");
         }
 
@@ -221,14 +211,12 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         }
 
         if (AgnosiaUtilities.HasAssociatedProfile(activity))
-        {
-            TryStartPendingProvisioningReadinessPolling("provisioning_result_pending_work_profile");
-            return OperationResult.Success(
-                "Рабочий профиль создан. Android еще завершает запуск, обновите состояние через несколько секунд.");
-        }
+            return MarkProfileResetRequired(
+                "Рабочий профиль создан, но сейчас недоступен для Agnosia. " +
+                "Удалите рабочий профиль в настройках Android, затем создайте его заново через Agnosia.");
 
-        return OperationResult.Success(
-            "Создание рабочего профиля запущено. Завершите шаги Android и вернитесь в Agnosia.");
+        AgnosiaUtilities.ClearWorkProfileConfiguredState();
+        return OperationResult.Failure("Android не создал рабочий профиль. Запустите создание заново через Agnosia.");
     }
 
     public async Task<OperationResult> OpenWorkProfileSettingsAsync(CancellationToken cancellationToken = default)
@@ -323,7 +311,12 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
     {
         AgnosiaRuntime.Initialize(context);
         AgnosiaUtilities.MarkManagedProfileProvisioned(context, intent);
-        TryStartPendingProvisioningReadinessPolling("managed_profile_provisioned_broadcast");
+    }
+
+    private static OperationResult MarkProfileResetRequired(string message)
+    {
+        AgnosiaUtilities.MarkWorkProfileResetRequired();
+        return OperationResult.Failure(message);
     }
 
     private async Task<bool> WaitForWorkProfileAvailabilityAsync(
@@ -354,93 +347,6 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
     {
         return result.ResultCode == Result.Canceled
                && !string.IsNullOrWhiteSpace(AndroidActivityResultApi.ExtractError(result));
-    }
-
-    private void TryStartPendingProvisioningReadinessPolling(string trigger)
-    {
-        if (!ShouldPollForProvisioningReadiness()) return;
-
-        if (!TryGetActivityHost(out _))
-        {
-            Log.Info(LogTag,
-                $"Deferred work-profile readiness polling until the primary activity is attached. trigger={trigger}.");
-            return;
-        }
-
-        CancellationTokenSource pollingCancellation;
-        lock (_provisioningReadinessPollingSync)
-        {
-            if (_provisioningReadinessPollingCancellation is { IsCancellationRequested: false }) return;
-
-            pollingCancellation = new CancellationTokenSource();
-            _provisioningReadinessPollingCancellation = pollingCancellation;
-        }
-
-        _ = PollForWorkProfileReadinessAsync(trigger, pollingCancellation);
-    }
-
-    private static bool ShouldPollForProvisioningReadiness()
-    {
-        var storage = LocalStorageManager.Instance;
-        return !storage.GetBoolean(StorageKeys.HasSetup)
-               && (storage.GetBoolean(StorageKeys.IsSettingUp)
-                   || storage.GetLong(StorageKeys.ManagedProfileProvisionedAtUtc) > 0);
-    }
-
-    private async Task PollForWorkProfileReadinessAsync(
-        string trigger,
-        CancellationTokenSource pollingCancellation)
-    {
-        try
-        {
-            Log.Info(LogTag, $"Polling work-profile readiness. trigger={trigger}.");
-            if (await WaitForWorkProfileAvailabilityAsync(
-                    pollingCancellation.Token,
-                    ProvisioningBackgroundReadinessAttempts,
-                    ProvisioningBackgroundReadinessDelayMilliseconds))
-            {
-                AgnosiaUtilities.MarkWorkProfileReady();
-                Log.Info(LogTag, "Work-profile Agnosia confirmed profile-owner readiness.");
-                return;
-            }
-
-            Log.Warn(LogTag, "Work-profile readiness polling finished without profile-owner confirmation.");
-        }
-        catch (OperationCanceledException) when (pollingCancellation.IsCancellationRequested)
-        {
-            Log.Debug(LogTag, "Work-profile readiness polling canceled.");
-        }
-        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
-        {
-            Log.Warn(LogTag, $"Work-profile readiness polling failed: {exception}");
-        }
-        catch (Exception exception)
-        {
-            Log.Error(LogTag, $"Unexpected work-profile readiness polling failure: {exception}");
-        }
-        finally
-        {
-            ClearProvisioningReadinessPolling(pollingCancellation);
-        }
-    }
-
-    private void CancelPendingProvisioningReadinessPolling()
-    {
-        lock (_provisioningReadinessPollingSync)
-        {
-            _provisioningReadinessPollingCancellation?.Cancel();
-        }
-    }
-
-    private void ClearProvisioningReadinessPolling(CancellationTokenSource pollingCancellation)
-    {
-        lock (_provisioningReadinessPollingSync)
-        {
-            if (ReferenceEquals(_provisioningReadinessPollingCancellation, pollingCancellation))
-                _provisioningReadinessPollingCancellation = null;
-        }
-
-        pollingCancellation.Dispose();
     }
 
     private bool TryGetActivityHost(out IAndroidActivityHost activityHost)
