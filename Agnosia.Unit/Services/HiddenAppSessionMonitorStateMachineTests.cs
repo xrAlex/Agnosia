@@ -119,6 +119,27 @@ public sealed class HiddenAppSessionMonitorStateMachineTests
         Assert.Equal(TimeSpan.FromSeconds(9), pendingAgain.InactiveFor);
     }
 
+    // Проверяет, что системный экран, открытый из target-приложения, продлевает сессию.
+    [Fact]
+    public void MoveNext_keeps_alive_for_system_delegated_flow_after_target_inactivity()
+    {
+        var stateMachine = CreateStateMachine();
+        stateMachine.MoveNext(StartedAt.AddSeconds(1), true, TargetForeground());
+        var inactiveSince = StartedAt.AddSeconds(2);
+        stateMachine.MoveNext(inactiveSince.AddSeconds(9), true, ConfirmedInactive(inactiveSince));
+
+        var delegated = stateMachine.MoveNext(
+            inactiveSince.AddSeconds(10),
+            true,
+            SystemDelegatedFlow());
+
+        Assert.Equal(HiddenAppSessionTransitionAction.KeepAlive, delegated.Action);
+        Assert.Equal(HiddenAppSessionMonitorPhase.TargetForegroundOrDelegated, delegated.Phase);
+        Assert.Equal("system_delegated_flow", delegated.DecisionReason);
+        Assert.Equal(inactiveSince, delegated.ResetInactiveSince);
+        Assert.Null(delegated.InactiveSince);
+    }
+
     private static HiddenAppSessionMonitorStateMachine CreateStateMachine()
     {
         return new HiddenAppSessionMonitorStateMachine(
@@ -154,5 +175,16 @@ public sealed class HiddenAppSessionMonitorStateMachineTests
             inactiveSince,
             sawTargetForeground,
             false);
+    }
+
+    private static SessionObservation SystemDelegatedFlow()
+    {
+        return new SessionObservation(
+            false,
+            "com.android.settings",
+            false,
+            null,
+            true,
+            true);
     }
 }

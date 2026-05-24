@@ -61,6 +61,7 @@ public sealed partial class HiddenAppSessionMonitorService : Service
     private static readonly TimeSpan InitialFastPollingWindow = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan PostLaunchTransientUiGracePeriod = TimeSpan.FromSeconds(45);
     private static readonly TimeSpan UserBackgroundHideDelay = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan SystemDelegatedUsageFallbackWindow = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan UsageEventsLookback = TimeSpan.FromMinutes(10);
 
     private readonly Lock _sync = new();
@@ -406,7 +407,7 @@ public sealed partial class HiddenAppSessionMonitorService : Service
             usageObservation?.IsForeground == false && usageObservation.ConfirmedInactive,
             usageObservation?.InactiveSince,
             usageObservation?.SawTargetForeground == true,
-            false);
+            usageObservation?.IsSystemDelegatedFlow == true);
         return observation;
     }
 
@@ -721,9 +722,26 @@ public sealed partial class HiddenAppSessionMonitorService : Service
 
             UsageSessionObservation observation;
             string reason;
+            var hasSeenTargetForeground =
+                sawTargetForeground || _lastUsageSessionObservation?.SawTargetForeground == true;
             if (latestTargetEventType < 0)
             {
-                if (_lastUsageSessionObservation is { } previousObservation
+                if (_lastUsageSessionObservation is { IsSystemDelegatedFlow: true } previousDelegatedObservation
+                    && latestForegroundAt > 0
+                    && !string.IsNullOrWhiteSpace(latestForegroundPackage)
+                    && !string.Equals(latestForegroundPackage, packageName, StringComparison.Ordinal)
+                    && !IsSystemDelegatedFlow(latestForegroundPackage, latestForegroundClassName))
+                {
+                    observation = new UsageSessionObservation(
+                        false,
+                        true,
+                        previousDelegatedObservation.SawTargetForeground || sawTargetForeground,
+                        DateTimeOffset.FromUnixTimeMilliseconds(latestForegroundAt),
+                        latestForegroundPackage,
+                        false);
+                    reason = "delegated_flow_exited_to_successor_foreground";
+                }
+                else if (_lastUsageSessionObservation is { } previousObservation
                     && TryResolvePendingInactiveObservation(
                         previousObservation,
                         latestForegroundPackage,
@@ -745,32 +763,44 @@ public sealed partial class HiddenAppSessionMonitorService : Service
                             SawTargetForeground = previousObservationForCarry.SawTargetForeground || sawTargetForeground,
                             TopPackage = latestForegroundPackage ?? previousObservationForCarry.TopPackage
                         }
-                        : new UsageSessionObservation(false, false, sawTargetForeground, null, latestForegroundPackage);
+                        : new UsageSessionObservation(false, false, sawTargetForeground, null, latestForegroundPackage, false);
                     reason = "no_target_lifecycle_event";
                 }
             }
             else if (IsUsageForegroundEvent(latestTargetEventType))
             {
-                observation = new UsageSessionObservation(true, false, true, null, packageName);
+                observation = new UsageSessionObservation(true, false, true, null, packageName, false);
                 reason = "target_latest_event_foreground";
             }
             else if (string.Equals(latestForegroundPackage, packageName, StringComparison.Ordinal)
                      && latestForegroundAt >= latestTargetEventAt)
             {
-                observation = new UsageSessionObservation(true, false, true, null, packageName);
+                observation = new UsageSessionObservation(true, false, true, null, packageName, false);
                 reason = "target_is_latest_foreground";
+            }
+            else if (IsRecentSystemDelegatedUsageForeground(
+                         latestForegroundPackage,
+                         latestForegroundClassName,
+                         latestForegroundAt,
+                         latestTargetEventType,
+                         latestTargetEventAt,
+                         hasSeenTargetForeground))
+            {
+                observation =
+                    new UsageSessionObservation(false, false, hasSeenTargetForeground, null, latestForegroundPackage, true);
+                reason = "system_delegated_usage_foreground";
             }
             else if (IsTransientSystemPackage(latestForegroundPackage))
             {
                 observation =
-                    new UsageSessionObservation(true, false, sawTargetForeground, null, latestForegroundPackage);
+                    new UsageSessionObservation(true, false, sawTargetForeground, null, latestForegroundPackage, false);
                 reason = "transient_system_ui_foreground";
             }
             else if (IsUsageInactiveEvent(latestTargetEventType)
                      && string.Equals(latestForegroundPackage, packageName, StringComparison.Ordinal))
             {
                 observation =
-                    new UsageSessionObservation(false, false, sawTargetForeground, null, latestForegroundPackage);
+                    new UsageSessionObservation(false, false, sawTargetForeground, null, latestForegroundPackage, false);
                 reason = "target_inactive_but_top_still_target";
             }
             else if (IsUsageInactiveEvent(latestTargetEventType)
@@ -782,7 +812,8 @@ public sealed partial class HiddenAppSessionMonitorService : Service
                     true,
                     sawTargetForeground,
                     latestTargetEventAt > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(latestTargetEventAt) : null,
-                    latestForegroundPackage);
+                    latestForegroundPackage,
+                    false);
                 reason = "target_latest_event_inactive";
             }
             else if (IsUsageInactiveEvent(latestTargetEventType))
@@ -795,13 +826,14 @@ public sealed partial class HiddenAppSessionMonitorService : Service
                     true,
                     sawTargetForeground,
                     inactiveSince,
-                    latestForegroundPackage);
+                    latestForegroundPackage,
+                    false);
                 reason = "target_activity_inactive_without_successor_foreground";
             }
             else
             {
                 observation =
-                    new UsageSessionObservation(false, false, sawTargetForeground, null, latestForegroundPackage);
+                    new UsageSessionObservation(false, false, sawTargetForeground, null, latestForegroundPackage, false);
                 reason = "target_latest_event_unknown";
             }
 
@@ -903,6 +935,7 @@ public sealed partial class HiddenAppSessionMonitorService : Service
             observation.ConfirmedInactive,
             observation.SawTargetForeground,
             observation.TopPackage,
+            observation.IsSystemDelegatedFlow,
             observation.InactiveSince,
             latestTargetEventName,
             latestTargetEventAt,
@@ -921,7 +954,7 @@ public sealed partial class HiddenAppSessionMonitorService : Service
         _lastUsageObservationSnapshot = snapshot;
         Log.Debug(
             LogTag,
-            $"Usage observation changed. package={packageName}, reason={reason}, queryBegin={DateTimeOffset.FromUnixTimeMilliseconds(queryBegin):O}, queryEnd={queryEnd:O}, scanned={scannedEvents}, targetEvents={targetEvents}, foregroundEvents={foregroundEvents}, targetUsageEvents=[{FormatTrace(targetUsageEvents)}], latestTarget={latestTargetEventName ?? "<none>"}:{latestTargetClassName ?? "<none>"}@{FormatUnixTime(latestTargetEventAt)}, latestForeground={latestForegroundPackage ?? "<none>"}:{latestForegroundEventName ?? "<none>"}:{latestForegroundClassName ?? "<none>"}@{FormatUnixTime(latestForegroundAt)}, resultForeground={observation.IsForeground}, resultInactive={observation.ConfirmedInactive}, sawTargetForeground={observation.SawTargetForeground}, inactiveSince={FormatTime(observation.InactiveSince)}, top={observation.TopPackage ?? "<none>"}.");
+            $"Usage observation changed. package={packageName}, reason={reason}, queryBegin={DateTimeOffset.FromUnixTimeMilliseconds(queryBegin):O}, queryEnd={queryEnd:O}, scanned={scannedEvents}, targetEvents={targetEvents}, foregroundEvents={foregroundEvents}, targetUsageEvents=[{FormatTrace(targetUsageEvents)}], latestTarget={latestTargetEventName ?? "<none>"}:{latestTargetClassName ?? "<none>"}@{FormatUnixTime(latestTargetEventAt)}, latestForeground={latestForegroundPackage ?? "<none>"}:{latestForegroundEventName ?? "<none>"}:{latestForegroundClassName ?? "<none>"}@{FormatUnixTime(latestForegroundAt)}, resultForeground={observation.IsForeground}, resultInactive={observation.ConfirmedInactive}, resultDelegated={observation.IsSystemDelegatedFlow}, sawTargetForeground={observation.SawTargetForeground}, inactiveSince={FormatTime(observation.InactiveSince)}, top={observation.TopPackage ?? "<none>"}.");
     }
 
     private void LogTaskObservationIfChanged(string packageName, TaskSessionObservation observation)
@@ -987,6 +1020,28 @@ public sealed partial class HiddenAppSessionMonitorService : Service
                || string.Equals(packageName, GoogleDocumentsUiPackage, StringComparison.Ordinal)
                || string.Equals(packageName, AospDocumentsUiPackage, StringComparison.Ordinal)
                || IsKnownSystemDelegatedActivity(className);
+    }
+
+    private static bool IsRecentSystemDelegatedUsageForeground(
+        string? foregroundPackageName,
+        string? foregroundClassName,
+        long foregroundAtUnixTimeMilliseconds,
+        int latestTargetEventType,
+        long latestTargetEventAtUnixTimeMilliseconds,
+        bool hasSeenTargetForeground)
+    {
+        if (!hasSeenTargetForeground
+            || !IsUsageInactiveEvent(latestTargetEventType)
+            || latestTargetEventAtUnixTimeMilliseconds <= 0
+            || foregroundAtUnixTimeMilliseconds < latestTargetEventAtUnixTimeMilliseconds
+            || !IsSystemDelegatedFlow(foregroundPackageName, foregroundClassName))
+        {
+            return false;
+        }
+
+        var elapsed = TimeSpan.FromMilliseconds(
+            foregroundAtUnixTimeMilliseconds - latestTargetEventAtUnixTimeMilliseconds);
+        return elapsed <= SystemDelegatedUsageFallbackWindow;
     }
 
     private static bool IsKnownSystemDelegatedActivity(string? className)
@@ -1064,7 +1119,8 @@ public sealed partial class HiddenAppSessionMonitorService : Service
         bool ConfirmedInactive,
         bool SawTargetForeground,
         DateTimeOffset? InactiveSince,
-        string? TopPackage);
+        string? TopPackage,
+        bool IsSystemDelegatedFlow);
 
     private sealed record TaskSessionObservation(
         int TaskId,
@@ -1079,6 +1135,7 @@ public sealed partial class HiddenAppSessionMonitorService : Service
         bool ConfirmedInactive,
         bool SawTargetForeground,
         string? TopPackage,
+        bool IsSystemDelegatedFlow,
         DateTimeOffset? InactiveSince,
         string? LatestTargetEventName,
         long LatestTargetEventAt,
