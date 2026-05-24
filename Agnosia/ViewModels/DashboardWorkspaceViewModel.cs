@@ -218,6 +218,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsWorkProfileRecoveryVisible))]
     [NotifyPropertyChangedFor(nameof(WorkProfileRecoveryTitle))]
     [NotifyPropertyChangedFor(nameof(WorkProfileRecoveryMessage))]
+    [NotifyPropertyChangedFor(nameof(IsWorkProfileRecoveryOnboardingRestart))]
     private partial WorkProfileRecoveryKind WorkProfileRecovery { get; set; }
 
     [ObservableProperty]
@@ -290,16 +291,25 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public string WorkProfileRecoveryTitle => WorkProfileRecovery switch
     {
+        WorkProfileRecoveryKind.UpdateFailedDeleteWorkProfile => "Обновление не удалось",
+        WorkProfileRecoveryKind.ProbablyDeletedRestartOnboarding => "Рабочий профиль удалён",
         WorkProfileRecoveryKind.DeleteWorkProfile => "Удалите рабочий профиль",
         _ => "Проблема с рабочим профилем"
     };
 
     public string WorkProfileRecoveryMessage => WorkProfileRecovery switch
     {
+        WorkProfileRecoveryKind.UpdateFailedDeleteWorkProfile =>
+            "Обновление не удалось, удалите профиль.",
+        WorkProfileRecoveryKind.ProbablyDeletedRestartOnboarding =>
+            "Вероятно, рабочий профиль был удалён или Android завершает его удаление. Нажмите OK, чтобы начать настройку заново.",
         WorkProfileRecoveryKind.DeleteWorkProfile =>
             "Этот профиль недоступен или не управляется Agnosia. Удалите его в настройках Android, затем вернитесь в Agnosia и создайте рабочий профиль заново.",
         _ => string.Empty
     };
+
+    public bool IsWorkProfileRecoveryOnboardingRestart =>
+        WorkProfileRecovery == WorkProfileRecoveryKind.ProbablyDeletedRestartOnboarding;
 
     public bool IsOnboardingVisible => !OnboardingCompleted;
 
@@ -572,9 +582,12 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             _lastProfileSnapshot = profileSnapshot;
             ApplyProfileSnapshot(profileSnapshot);
             HasLoadedSnapshot = true;
-            StatusMessage = IsSupported
-                ? "Updated"
-                : "NotSupported";
+            StatusMessage = !string.IsNullOrWhiteSpace(profileSnapshot.StatusMessage)
+                ? profileSnapshot.StatusMessage
+                : IsSupported
+                    ? "Updated"
+                    : "NotSupported";
+            StatusIsError = WorkProfileRecovery == WorkProfileRecoveryKind.UpdateFailedDeleteWorkProfile;
 
             if (IsDashboardVisible)
             {
@@ -694,7 +707,25 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private void SelectLightTheme() => SelectedTheme = AppThemeKind.Light;
 
     [RelayCommand]
-    private void StartOnboarding() => OnboardingStep = OnboardingStep.WorkProfile;
+    private async Task StartOnboardingAsync()
+    {
+        if (!WorkProfileAvailable)
+        {
+            OnboardingStep = OnboardingStep.WorkProfile;
+            return;
+        }
+
+        SetPreparingOnboardingPermissions(true);
+        try
+        {
+            await ReloadPermissionsAsync();
+            OnboardingStep = OnboardingStep.Permissions;
+        }
+        finally
+        {
+            SetPreparingOnboardingPermissions(false);
+        }
+    }
 
     [RelayCommand]
     private async Task CheckOnboardingWorkProfileAsync()

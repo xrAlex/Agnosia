@@ -22,11 +22,13 @@ namespace Agnosia.Android.Activities;
     Name = "com.agnosia.app.DummyActivity",
     Theme = "@android:style/Theme.Translucent.NoTitleBar",
     Exported = true,
+    Permission = "com.agnosia.app.permission.CROSS_PROFILE_COMMAND",
     ExcludeFromRecents = true,
     LaunchMode = LaunchMode.SingleTop)]
 [IntentFilter(
 [
     AgnosiaActions.FinalizeProvision,
+    AgnosiaActions.RecoverAuthentication,
     AgnosiaActions.ProfilePing,
     AgnosiaActions.QueryApps,
     AgnosiaActions.QueryAppIcon,

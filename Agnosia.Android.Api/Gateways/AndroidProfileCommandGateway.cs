@@ -33,9 +33,8 @@ public static class AndroidProfileCommandGateway
         cancellationToken.ThrowIfCancellationRequested();
         var activity = commandRunner.CurrentActivity;
         if (string.IsNullOrWhiteSpace(AuthenticationUtility.GetExistingKey()))
-            return new WorkProfileOwnerCheckResult(
-                WorkProfileOwnerCheckKind.AuthenticationKeyMissing,
-                "authKey=missing");
+            return await TryRecoverAuthenticationAsync(commandRunner, cancellationToken)
+                .ConfigureAwait(false);
 
         if (!AgnosiaUtilities.HasWorkProfileTarget(activity))
             return new WorkProfileOwnerCheckResult(
@@ -58,6 +57,45 @@ public static class AndroidProfileCommandGateway
             return new WorkProfileOwnerCheckResult(
                 WorkProfileOwnerCheckKind.Unreachable,
                 $"profilePing=timeout:{ProfilePingTimeout.TotalMilliseconds:0}ms");
+        }
+    }
+
+    private static async Task<WorkProfileOwnerCheckResult> TryRecoverAuthenticationAsync(
+        AndroidActivityCommandGateway commandRunner,
+        CancellationToken cancellationToken)
+    {
+        var activity = commandRunner.CurrentActivity;
+        if (!AgnosiaUtilities.HasWorkProfileTarget(activity))
+            return new WorkProfileOwnerCheckResult(
+                WorkProfileOwnerCheckKind.TargetUnavailable,
+                "authKey=missing; crossProfileTarget=missing");
+
+        var replacementAuthKey = AuthenticationUtility.CreateAndStoreKey();
+        using var pingCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        pingCancellation.CancelAfter(ProfilePingTimeout);
+
+        try
+        {
+            var intent = new Intent(AgnosiaActions.RecoverAuthentication);
+            intent.PutExtra(AndroidCommandContract.ExtraReplacementAuthKey, replacementAuthKey);
+            var result = await commandRunner.StartUnsignedWorkProfileActivityForResultAsync(
+                    intent,
+                    pingCancellation.Token)
+                .ConfigureAwait(false);
+            var ownerCheck = InterpretProfilePingResult(result);
+            if (ownerCheck.Kind == WorkProfileOwnerCheckKind.AppIsProfileOwner)
+                return ownerCheck with { DiagnosticReason = "authKey=recovered; " + ownerCheck.DiagnosticReason };
+
+            AuthenticationUtility.Reset();
+            return ownerCheck with { DiagnosticReason = "authKey=recoveryFailed; " + ownerCheck.DiagnosticReason };
+        }
+        catch (System.OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            AuthenticationUtility.Reset();
+            Log.Warn(LogTag, "Timed out waiting for work-profile authentication recovery.");
+            return new WorkProfileOwnerCheckResult(
+                WorkProfileOwnerCheckKind.AuthenticationKeyMissing,
+                $"authKey=recoveryTimeout:{ProfilePingTimeout.TotalMilliseconds:0}ms");
         }
     }
 
@@ -210,6 +248,31 @@ public static class AndroidProfileCommandGateway
     {
         var intent = CreateSystemPackageIntent(AgnosiaActions.InstallPackage, packageName);
         return RunWorkPackageOperationAsync(commandRunner, intent, successMessage, cancellationToken);
+    }
+
+    internal static Task<OperationResult> UpdateAgnosiaInWorkProfileAsync(
+        AndroidActivityCommandGateway commandRunner,
+        CancellationToken cancellationToken)
+    {
+        var activity = commandRunner.CurrentActivity;
+        if (!AndroidPackageApi.TryResolveInstalledPackageSource(
+                activity.PackageManager,
+                activity.PackageName,
+                out var sourceDirectory,
+                out var splitApks))
+            return Task.FromResult(OperationResult.Failure(
+                "Android не смог определить APK Agnosia для обновления рабочего профиля."));
+
+        var intent = new Intent(AgnosiaActions.InstallPackage);
+        intent.PutExtra(AndroidCommandContract.ExtraPackage, activity.PackageName);
+        intent.PutExtra(AndroidCommandContract.ExtraIsSystem, false);
+        intent.PutExtra(AndroidCommandContract.ExtraApk, sourceDirectory);
+        intent.PutExtra(AndroidCommandContract.ExtraSplitApks, splitApks);
+        return commandRunner.RunPackageOperationAsync(
+            intent,
+            true,
+            cancellationToken,
+            "Agnosia обновлена в рабочем профиле.");
     }
 
     internal static Task<OperationResult> HideSystemAppInWorkProfileAsync(
@@ -554,13 +617,19 @@ public static class AndroidProfileCommandGateway
                     "profilePing=unsignedOwnerCheck");
 
             var isProfileOwner = result.Data.GetBooleanExtra(AndroidCommandContract.ResultIsProfileOwner, false);
+            var appVersionCode = result.Data.GetLongExtra(AndroidCommandContract.ResultAppVersionCode, 0);
+            var appVersionName = result.Data.GetStringExtra(AndroidCommandContract.ResultAppVersionName);
             return isProfileOwner
                 ? new WorkProfileOwnerCheckResult(
                     WorkProfileOwnerCheckKind.AppIsProfileOwner,
-                    "inProfileOwnerCheck=true")
+                    "inProfileOwnerCheck=true",
+                    appVersionCode,
+                    appVersionName)
                 : new WorkProfileOwnerCheckResult(
                     WorkProfileOwnerCheckKind.AppInstalledButNotOwner,
-                    "inProfileOwnerCheck=false");
+                    "inProfileOwnerCheck=false",
+                    appVersionCode,
+                    appVersionName);
         }
 
         var error = AndroidActivityResultApi.ExtractError(result);
@@ -581,10 +650,13 @@ internal enum WorkProfileOwnerCheckKind
     AuthenticationKeyMissing,
     TargetUnavailable,
     Unreachable,
+    VersionUpdateFailed,
     AppInstalledButNotOwner,
     AppIsProfileOwner
 }
 
 internal sealed record WorkProfileOwnerCheckResult(
     WorkProfileOwnerCheckKind Kind,
-    string DiagnosticReason);
+    string DiagnosticReason,
+    long AppVersionCode = 0,
+    string? AppVersionName = null);

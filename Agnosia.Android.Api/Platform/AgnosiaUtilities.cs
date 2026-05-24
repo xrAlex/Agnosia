@@ -31,6 +31,11 @@ public static class AgnosiaUtilities
         AuthenticationUtility.SignIntent(intent);
     }
 
+    internal static void TransferIntentToProfileWithoutAuthentication(Context context, Intent intent)
+    {
+        TransferIntentToProfileUnsigned(context, intent);
+    }
+
     private static void TransferIntentToProfileUnsigned(Context context, Intent intent)
     {
         if (!TryTransferIntentToProfileUnsigned(context, intent))

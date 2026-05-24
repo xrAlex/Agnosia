@@ -4,6 +4,8 @@
     <!-- Dashboard Status -->
     <system:String x:Key="String.Dashboard.Status.Ready">Готово к управлению приложениями между профилями.</system:String>
     <system:String x:Key="String.Dashboard.Status.Updating">Обновляем список приложений и состояние профилей...</system:String>
+    <system:String x:Key="String.Dashboard.Status.UpdatingWorkProfile">Обновляю Agnosia в рабочем профиле...</system:String>
+    <system:String x:Key="String.Dashboard.Status.WorkProfileUpdated">Agnosia в рабочем профиле обновлена.</system:String>
     <system:String x:Key="String.Dashboard.Status.LoadingApps">Загружаем каталог приложений в фоне...</system:String>
     <system:String x:Key="String.Dashboard.Status.Updated">Список приложений обновлен.</system:String>
     <system:String x:Key="String.Dashboard.Status.LoadAppsFailed">Не удалось загрузить каталог приложений.</system:String>
@@ -21,6 +23,7 @@
     <!-- Dashboard Errors -->
     <system:String x:Key="String.Dashboard.Error.FilterUpdate">Не удалось обновить фильтр списка приложений.</system:String>
     <system:String x:Key="String.Dashboard.Error.UpdateState">Не удалось обновить состояние приложения.</system:String>
+    <system:String x:Key="String.Dashboard.Error.WorkProfileUpdateFailed">Обновление не удалось, удалите профиль.</system:String>
     <system:String x:Key="String.Dashboard.Error.LoadAppsFailed">Не удалось загрузить каталог приложений.</system:String>
     <system:String x:Key="String.Dashboard.Error.CloneFailed">Android не смог скопировать приложение в рабочий профиль.</system:String>
     <system:String x:Key="String.Dashboard.Error.DeleteFailed">Android не смог удалить приложение из личного профиля.</system:String>

@@ -108,7 +108,7 @@
                         <Grid RowDefinitions="Auto,Auto"
                               ColumnDefinitions="*,Auto"
                               RowSpacing="10"
-                              ColumnSpacing="8">
+                              ColumnSpacing="6">
                             <Grid Grid.Column="0"
                                   ColumnDefinitions="Auto,*"
                                   ColumnSpacing="10">

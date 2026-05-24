@@ -10,7 +10,8 @@ public sealed record DashboardSnapshot(
     string WorkProfileDiagnosticReason,
     IReadOnlyList<AppSnapshot> PersonalApps,
     IReadOnlyList<AppSnapshot> WorkApps,
-    AppSettingsSnapshot Settings)
+    AppSettingsSnapshot Settings,
+    string StatusMessage = "")
 {
     public static DashboardSnapshot Unsupported { get; } =
         new(

@@ -89,11 +89,23 @@
                         <Button Classes="primary"
                                 MinHeight="58"
                                 HorizontalAlignment="Stretch"
+                                IsVisible="{Binding !IsWorkProfileRecoveryOnboardingRestart}"
                                 Command="{Binding OpenWorkProfileSettingsCommand}">
                             <TextBlock Classes="button-label"
                                        TextAlignment="Center"
                                        HorizontalAlignment="Center"
                                        Text="Открыть настройки профиля" />
+                        </Button>
+
+                        <Button Classes="primary"
+                                MinHeight="58"
+                                HorizontalAlignment="Stretch"
+                                IsVisible="{Binding IsWorkProfileRecoveryOnboardingRestart}"
+                                Command="{Binding RestartOnboardingFromWorkProfileRecoveryCommand}">
+                            <TextBlock Classes="button-label"
+                                       TextAlignment="Center"
+                                       HorizontalAlignment="Center"
+                                       Text="OK" />
                         </Button>
                     </StackPanel>
                 </Grid>

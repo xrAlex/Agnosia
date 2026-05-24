@@ -214,7 +214,7 @@
                             <TextBlock Classes="group-title"
                                        Text="Разрешения" />
                             <TextBlock Classes="page-caption"
-                                       Text="Выдайте доступы в указанных профилях" />
+                                       Text="Давайте выдадим доступы для Agnosia пока Android завершает настройку рабочего профиля" />
                         </StackPanel>
 
                         <Border Grid.Column="1"

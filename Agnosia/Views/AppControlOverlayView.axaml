@@ -233,7 +233,7 @@
                                                         IsVisible="{Binding HasRiskyPermissions}">
                                                 <TextBlock Classes="app-dialog-setting-caption"
                                                            FontWeight="SemiBold"
-                                                           Text="Рискованные permissions" />
+                                                           Text="Опасные разрешения" />
                                                 <TextBlock Classes="app-dialog-permission-risk-list"
                                                            Text="{Binding RiskyPermissionsText}" />
                                             </StackPanel>

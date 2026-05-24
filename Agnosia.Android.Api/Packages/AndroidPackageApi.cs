@@ -219,7 +219,11 @@ public static class AndroidPackageApi
     {
         error = null;
         var parts = new List<string>();
-        if (!string.IsNullOrWhiteSpace(packageName))
+        if (!string.IsNullOrWhiteSpace(apkPath))
+        {
+            AddInstallParts(parts, apkPath, splitApks);
+        }
+        else if (!string.IsNullOrWhiteSpace(packageName))
         {
             try
             {
@@ -232,9 +236,10 @@ public static class AndroidPackageApi
 
                 AddInstallParts(parts, app.SourceDir, app.SplitSourceDirs);
             }
-            catch (PackageManager.NameNotFoundException) when (!string.IsNullOrWhiteSpace(apkPath))
+            catch (PackageManager.NameNotFoundException)
             {
-                AddInstallParts(parts, apkPath, splitApks);
+                error = StaleApkMessage;
+                return null;
             }
         }
         else

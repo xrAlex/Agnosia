@@ -3,5 +3,7 @@ namespace Agnosia.Models;
 public enum WorkProfileRecoveryKind
 {
     None,
-    DeleteWorkProfile
+    DeleteWorkProfile,
+    UpdateFailedDeleteWorkProfile,
+    ProbablyDeletedRestartOnboarding
 }

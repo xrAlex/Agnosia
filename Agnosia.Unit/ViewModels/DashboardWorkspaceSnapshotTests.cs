@@ -127,4 +127,50 @@ public sealed class DashboardWorkspaceSnapshotTests
             "Этот профиль недоступен или не управляется Agnosia. Удалите его в настройках Android, затем вернитесь в Agnosia и создайте рабочий профиль заново.",
             viewModel.WorkProfileRecoveryMessage);
     }
+
+    [Fact]
+    public async Task Dashboard_snapshot_shows_update_failed_recovery_message()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(
+                workProfileAvailable: false,
+                workProfileState: WorkProfileStateKind.Unavailable,
+                workProfileRecovery: WorkProfileRecoveryKind.UpdateFailedDeleteWorkProfile,
+                workProfileDiagnosticReason: "profileUpdate=failed",
+                workApps: [])
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+
+        await viewModel.EnsureInitializedAsync();
+
+        Assert.True(viewModel.IsWorkProfileRecoveryVisible);
+        Assert.Equal("Обновление не удалось", viewModel.WorkProfileRecoveryTitle);
+        Assert.Equal("Обновление не удалось, удалите профиль.", viewModel.WorkProfileRecoveryMessage);
+    }
+
+    [Fact]
+    public async Task Dashboard_snapshot_shows_probably_deleted_recovery_and_restarts_onboarding()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(
+                workProfileAvailable: false,
+                workProfileState: WorkProfileStateKind.Unavailable,
+                workProfileRecovery: WorkProfileRecoveryKind.ProbablyDeletedRestartOnboarding,
+                workProfileDiagnosticReason: "quietMode=True; userRunning=False")
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+
+        await viewModel.EnsureInitializedAsync();
+
+        Assert.True(viewModel.IsWorkProfileRecoveryVisible);
+        Assert.True(viewModel.IsWorkProfileRecoveryOnboardingRestart);
+        Assert.Equal("Рабочий профиль удалён", viewModel.WorkProfileRecoveryTitle);
+
+        viewModel.RestartOnboardingFromWorkProfileRecoveryCommand.Execute(null);
+
+        Assert.True(viewModel.IsOnboardingVisible);
+        Assert.False(viewModel.IsWorkProfileRecoveryVisible);
+    }
 }

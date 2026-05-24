@@ -43,6 +43,36 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
                 profileDiagnostics,
                 cancellationToken)
             .ConfigureAwait(false);
+        var statusMessage = string.Empty;
+        if (hadConfiguredWorkProfile && ShouldUpdateWorkProfileApp(packageManager, activity.PackageName, ownerCheck))
+        {
+            Log.Info(
+                LogTag,
+                $"Work profile Agnosia version mismatch; starting update. ownerCheck={ownerCheck.DiagnosticReason}; workVersionCode={ownerCheck.AppVersionCode}; localVersionCode={GetLocalVersionCode(packageManager, activity.PackageName)}.");
+            statusMessage = "UpdatingWorkProfile";
+            var updateResult = await AndroidProfileCommandGateway.UpdateAgnosiaInWorkProfileAsync(
+                    commandRunner,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            ownerCheck = updateResult.Succeeded
+                ? await ReadWorkProfileOwnerCheckAsync(profileDiagnostics, cancellationToken).ConfigureAwait(false)
+                : new WorkProfileOwnerCheckResult(
+                    WorkProfileOwnerCheckKind.VersionUpdateFailed,
+                    $"profileUpdate=failed; message={updateResult.Message}; previous={ownerCheck.DiagnosticReason}",
+                    ownerCheck.AppVersionCode,
+                    ownerCheck.AppVersionName);
+
+            if (updateResult.Succeeded && ShouldUpdateWorkProfileApp(packageManager, activity.PackageName, ownerCheck))
+                ownerCheck = new WorkProfileOwnerCheckResult(
+                    WorkProfileOwnerCheckKind.VersionUpdateFailed,
+                    $"profileUpdate=stillMismatch; previous={ownerCheck.DiagnosticReason}",
+                    ownerCheck.AppVersionCode,
+                    ownerCheck.AppVersionName);
+
+            statusMessage = ownerCheck.Kind == WorkProfileOwnerCheckKind.VersionUpdateFailed
+                ? "WorkProfileUpdateFailed"
+                : "WorkProfileUpdated";
+        }
 
         var workProfileState = ResolveWorkProfileState(
             hadConfiguredWorkProfile,
@@ -73,7 +103,8 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             diagnosticReason,
             [],
             [],
-            settings);
+            settings,
+            statusMessage);
     }
 
     public async Task<DashboardAppInventorySnapshot> LoadAppInventoryAsync(
@@ -193,11 +224,66 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         if (workProfileState != WorkProfileStateKind.Unavailable)
             return WorkProfileRecoveryKind.None;
 
+        if (IsProbablyDeletedManagedProfile(profileDiagnostics))
+            return WorkProfileRecoveryKind.ProbablyDeletedRestartOnboarding;
+
+        if (IsForeignManagedProfile(profileDiagnostics, ownerCheck))
+            return WorkProfileRecoveryKind.DeleteWorkProfile;
+
+        return ownerCheck.Kind switch
+        {
+            WorkProfileOwnerCheckKind.VersionUpdateFailed => WorkProfileRecoveryKind.UpdateFailedDeleteWorkProfile,
+            WorkProfileOwnerCheckKind.AppInstalledButNotOwner => WorkProfileRecoveryKind.DeleteWorkProfile,
+            _ => WorkProfileRecoveryKind.None
+        };
+    }
+
+    private static bool IsProbablyDeletedManagedProfile(WorkProfileDiagnostics profileDiagnostics)
+    {
         return profileDiagnostics.ManagedProfileExists
-               || ownerCheck.Kind is WorkProfileOwnerCheckKind.AuthenticationKeyMissing
-            or WorkProfileOwnerCheckKind.AppInstalledButNotOwner
-            ? WorkProfileRecoveryKind.DeleteWorkProfile
-            : WorkProfileRecoveryKind.None;
+               && profileDiagnostics.QuietModeEnabled == true
+               && profileDiagnostics.UserRunning == false
+               && !profileDiagnostics.AvailableToCrossProfileApps
+               && !profileDiagnostics.CommandTargetResolvable;
+    }
+
+    private static bool IsForeignManagedProfile(
+        WorkProfileDiagnostics profileDiagnostics,
+        WorkProfileOwnerCheckResult ownerCheck)
+    {
+        return profileDiagnostics.ManagedProfileExists
+               && profileDiagnostics.UserRunning == true
+               && profileDiagnostics.QuietModeEnabled != true
+               && !profileDiagnostics.AvailableToCrossProfileApps
+               && !profileDiagnostics.CommandTargetResolvable
+               && ownerCheck.Kind == WorkProfileOwnerCheckKind.TargetUnavailable;
+    }
+
+    private static bool ShouldUpdateWorkProfileApp(
+        PackageManager? packageManager,
+        string? packageName,
+        WorkProfileOwnerCheckResult ownerCheck)
+    {
+        if (ownerCheck.Kind != WorkProfileOwnerCheckKind.AppIsProfileOwner)
+            return false;
+
+        var localVersionCode = GetLocalVersionCode(packageManager, packageName);
+        return localVersionCode > 0 && ownerCheck.AppVersionCode > 0 && ownerCheck.AppVersionCode != localVersionCode;
+    }
+
+    private static long GetLocalVersionCode(PackageManager? packageManager, string? packageName)
+    {
+        if (packageManager is null || string.IsNullOrWhiteSpace(packageName)) return 0;
+
+        try
+        {
+            return packageManager.GetPackageInfo(packageName, PackageInfoFlags.MatchAll)?.LongVersionCode ?? 0;
+        }
+        catch (Exception exception) when (exception is PackageManager.NameNotFoundException
+                                          || AndroidRecoverableException.IsMatch(exception))
+        {
+            return 0;
+        }
     }
 
     private static bool HasConfiguredWorkProfileSignal(LocalStorageManager storage)
@@ -218,6 +304,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
                || profileDiagnostics.CommandTargetResolvable
                || ownerCheck.Kind is WorkProfileOwnerCheckKind.AuthenticationKeyMissing
                    or WorkProfileOwnerCheckKind.Unreachable
+                   or WorkProfileOwnerCheckKind.VersionUpdateFailed
                    or WorkProfileOwnerCheckKind.AppInstalledButNotOwner;
     }
 

@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           android:installLocation="internalOnly">
+    <permission android:name="com.agnosia.app.permission.CROSS_PROFILE_COMMAND"
+                android:protectionLevel="signature"/>
+
     <uses-feature android:name="android.software.device_admin" android:required="true"/>
     <uses-feature android:name="android.software.managed_users" android:required="true"/>
 
+    <uses-permission android:name="com.agnosia.app.permission.CROSS_PROFILE_COMMAND"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>

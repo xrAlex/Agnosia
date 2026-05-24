@@ -132,6 +132,34 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
         }
     }
 
+    internal async Task<AndroidActivityResult> StartUnsignedWorkProfileActivityForResultAsync(
+        Intent intent,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var host = getActivityHost();
+            var activity = host.CurrentActivity;
+            AgnosiaRuntime.Initialize(activity);
+            AgnosiaUtilities.TransferIntentToProfileWithoutAuthentication(activity, intent);
+            return await RunWorkProfileActivityCommandAsync(
+                host,
+                intent,
+                false,
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            var error = AndroidRecoverableException.ToUserMessage(exception);
+            Log.Warn(ActivityResultLogTag, $"{error} Details: {exception}");
+            return AndroidActivityResultApi.CreateCanceledResult(error);
+        }
+    }
+
     private static async Task<AndroidActivityResult> RunLocalActivityCommandAsync(
         IAndroidActivityHost host,
         Intent intent,

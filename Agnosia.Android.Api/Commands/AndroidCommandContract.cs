@@ -18,6 +18,7 @@ public static class AndroidCommandContract
     public const string ExtraShortcutIconBase64 = "iconBase64";
     public const string ExtraShortcutToken = "shortcutToken";
     public const string ExtraTrigger = "trigger";
+    public const string ExtraReplacementAuthKey = "replacement_auth_key";
     public const string ResultAppsJson = "apps_json";
     public const string ResultIconPng = "icon_png";
     public const string ResultIconsBundle = "icons_bundle";
@@ -28,6 +29,8 @@ public static class AndroidCommandContract
     public const string ResultMessage = "message";
     public const string ResultProfileOwnerCheckPerformed = "profile_owner_check_performed";
     public const string ResultIsProfileOwner = "is_profile_owner";
+    public const string ResultAppVersionCode = "app_version_code";
+    public const string ResultAppVersionName = "app_version_name";
     public const string ResultHideImmediately = "hide_immediately";
     public const string ResultPreHideSucceeded = "pre_hide_succeeded";
     public const string ResultLaunchJson = "launch_json";

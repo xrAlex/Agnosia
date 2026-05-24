@@ -2,6 +2,7 @@ using Agnosia.Android.Api.Commands;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Infrastructure;
 using Android.Content;
+using Android.Content.PM;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Activities;
@@ -24,6 +25,12 @@ public sealed partial class DummyActivity
         }
 
         Log.Debug(LogTag, $"Handling signed action={action}, isProfileOwner={_isProfileOwner}.");
+        if (string.Equals(action, AgnosiaActions.RecoverAuthentication, StringComparison.Ordinal))
+        {
+            ActionRecoverAuthentication();
+            return;
+        }
+
         if (!AuthenticationUtility.CheckIntent(Intent)
             && !AuthenticationUtility.CheckWorkAppFrozenCallback(Intent))
         {
@@ -38,25 +45,7 @@ public sealed partial class DummyActivity
             switch (action)
             {
                 case AgnosiaActions.ProfilePing:
-                    var pingResult = new Intent();
-                    pingResult.PutExtra(AndroidCommandContract.ResultProfileOwnerCheckPerformed, true);
-                    pingResult.PutExtra(AndroidCommandContract.ResultIsProfileOwner, _isProfileOwner);
-                    if (!_isProfileOwner)
-                    {
-                        pingResult.PutExtra(AndroidCommandContract.ResultError,
-                            "Рабочий профиль не управляется Agnosia.");
-                        AuthenticationUtility.SignIntent(pingResult);
-                        FinishWithResult(Result.Canceled, pingResult);
-                        break;
-                    }
-
-                    if (_isProfileOwner)
-                    {
-                        AndroidStartup.EnforceWorkProfilePoliciesAndStartLockFreezeMonitor(this);
-                    }
-
-                    AuthenticationUtility.SignIntent(pingResult);
-                    FinishWithResult(Result.Ok, pingResult);
+                    FinishWithProfileOwnerCheck();
                     break;
                 case AgnosiaActions.QueryApps:
                     RunAction(ActionQueryAppsAsync, "Android не смог получить список приложений.");
@@ -132,6 +121,69 @@ public sealed partial class DummyActivity
             Log.Error(LogTag, $"Failed to handle action {action}: {exception}");
             FinishWithError("Android не смог выполнить системное действие Agnosia.");
         }
+    }
+
+    private void ActionRecoverAuthentication()
+    {
+        if (!_isProfileOwner)
+        {
+            FinishWithProfileOwnerCheck();
+            return;
+        }
+
+        var replacementAuthKey = Intent?.GetStringExtra(AndroidCommandContract.ExtraReplacementAuthKey);
+        if (!AuthenticationUtility.TryStoreProvisioningKey(replacementAuthKey))
+        {
+            FinishWithError("Android не смог восстановить ключ управления рабочим профилем.");
+            return;
+        }
+
+        FinishWithProfileOwnerCheck();
+    }
+
+    private void FinishWithProfileOwnerCheck()
+    {
+        var pingResult = new Intent();
+        pingResult.PutExtra(AndroidCommandContract.ResultProfileOwnerCheckPerformed, true);
+        pingResult.PutExtra(AndroidCommandContract.ResultIsProfileOwner, _isProfileOwner);
+        WriteAppVersionToResult(pingResult);
+        if (!_isProfileOwner)
+        {
+            pingResult.PutExtra(AndroidCommandContract.ResultError,
+                "Рабочий профиль не управляется Agnosia.");
+            TrySignResult(pingResult);
+            FinishWithResult(Result.Canceled, pingResult);
+            return;
+        }
+
+        AndroidStartup.EnforceWorkProfilePoliciesAndStartLockFreezeMonitor(this);
+        AuthenticationUtility.SignIntent(pingResult);
+        FinishWithResult(Result.Ok, pingResult);
+    }
+
+    private void WriteAppVersionToResult(Intent result)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(PackageName)) return;
+
+            var packageInfo = PackageManager?.GetPackageInfo(PackageName, PackageInfoFlags.MatchAll);
+            if (packageInfo is null) return;
+
+            result.PutExtra(AndroidCommandContract.ResultAppVersionCode, packageInfo.LongVersionCode);
+            result.PutExtra(AndroidCommandContract.ResultAppVersionName, packageInfo.VersionName);
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn(LogTag, $"Failed to write app version to profile check result: {exception.Message}");
+        }
+    }
+
+    private static void TrySignResult(Intent result)
+    {
+        if (string.IsNullOrWhiteSpace(AuthenticationUtility.GetExistingKey())) return;
+
+        AuthenticationUtility.SignIntent(result);
     }
 
     private void RunAction(

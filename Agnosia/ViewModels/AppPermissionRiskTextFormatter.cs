@@ -32,7 +32,7 @@ internal static class AppPermissionRiskTextFormatter
         new(["REQUEST_INSTALL_PACKAGES"], "может устанавливать APK из внешних источников"),
         new(["RECEIVE_BOOT_COMPLETED"], "может запускаться после перезагрузки устройства"),
         new(["REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"], "может обходить ограничения энергосбережения"),
-        new(["SCHEDULE_EXACT_ALARM", "USE_EXACT_ALARM"], "может точно запускать приложение по расписанию"),
+        new(["SCHEDULE_EXACT_ALARM", "USE_EXACT_ALARM"], "может запускать приложение по расписанию"),
         new(["FOREGROUND_SERVICE"], "может длительно работать в фоне"),
         new(["ACCESS_NETWORK_STATE"], "может отслеживать состояние сети"),
         new(["ACCESS_LOCAL_NETWORK"], "может обращаться к устройствам в локальной сети"),
@@ -80,16 +80,13 @@ internal static class AppPermissionRiskTextFormatter
             reasons.Add("может запускаться или продолжать работу в фоне");
 
         if (breakdown.ExfiltrationScore > 0)
-            reasons.Add("имеет канал для передачи данных наружу");
+            reasons.Add("имеет доступ в интернет");
 
         if (breakdown.ControlSurfaceScore > 0)
             reasons.Add("получило доступ к чувствительной системной поверхности");
 
         if (breakdown.StealthScore > 0)
             reasons.Add("может обходить ограничения фоновой работы");
-
-        if (matchedPermissionRiskRuleIds.Count > 1)
-            reasons.Add($"имеет несколько опасных разрешений ({matchedPermissionRiskRuleIds.Count})");
 
         return reasons.Count == 0 ? [] : reasons.ToArray();
     }

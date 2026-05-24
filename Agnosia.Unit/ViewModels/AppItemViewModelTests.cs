@@ -166,8 +166,7 @@ public sealed class AppItemViewModelTests
 
         Assert.Equal("Повышенный риск по разрешениям", app.PermissionRiskSummaryText);
         Assert.Contains("может читать или отправлять SMS", app.PermissionRiskReasons);
-        Assert.Contains("имеет канал для передачи данных наружу", app.PermissionRiskReasons);
-        Assert.Contains("имеет несколько опасных разрешений (2)", app.PermissionRiskReasons);
+        Assert.Contains("имеет доступ в интернет", app.PermissionRiskReasons);
         Assert.True(app.HasPermissionDetails);
         Assert.True(app.HasManifestPermissions);
         Assert.True(app.HasRuntimePermissions);
