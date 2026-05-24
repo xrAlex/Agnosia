@@ -1,6 +1,7 @@
 using Agnosia.Models;
 using Agnosia.Unit.TestDoubles;
 using Agnosia.Unit.TestSupport;
+using Agnosia.ViewModels;
 using Xunit;
 
 namespace Agnosia.Unit.ViewModels;
@@ -107,14 +108,14 @@ public sealed class DashboardWorkspaceScenarioTests
 
         viewModel.DisableVpnBeforeWorkLaunch = true;
         viewModel.EnableVpnAfterWorkFreeze = true;
-        viewModel.SelectTunguskaVpnAfterFreezeCommand.Execute(null);
+        SelectVpnAfterFreezeClient(viewModel, VpnAutomationClientKind.Tunguska);
         viewModel.TunguskaAutomationToken = "unit-token";
 
         Assert.True(viewModel.DisableVpnBeforeWorkLaunch);
         Assert.True(viewModel.EnableVpnAfterWorkFreeze);
         Assert.Equal("unit-token", viewModel.TunguskaAutomationToken);
         Assert.True(viewModel.IsVpnAfterFreezeClientPickerVisible);
-        Assert.True(viewModel.IsTunguskaVpnAfterFreezeSelected);
+        Assert.True(IsVpnAfterFreezeClientSelected(viewModel, VpnAutomationClientKind.Tunguska));
         Assert.True(viewModel.IsTunguskaAutomationTokenVisible);
         Assert.False(viewModel.IsToggleOnlyVpnAfterFreezeWarningVisible);
         Assert.Empty(services.SavedSettings);
@@ -135,11 +136,26 @@ public sealed class DashboardWorkspaceScenarioTests
         await viewModel.EnsureInitializedAsync();
 
         viewModel.EnableVpnAfterWorkFreeze = true;
-        viewModel.SelectHappVpnAfterFreezeCommand.Execute(null);
+        SelectVpnAfterFreezeClient(viewModel, VpnAutomationClientKind.Happ);
 
-        Assert.True(viewModel.IsHappVpnAfterFreezeSelected);
+        Assert.True(IsVpnAfterFreezeClientSelected(viewModel, VpnAutomationClientKind.Happ));
         Assert.True(viewModel.IsToggleOnlyVpnAfterFreezeWarningVisible);
         Assert.False(viewModel.IsTunguskaAutomationTokenVisible);
+    }
+
+    private static void SelectVpnAfterFreezeClient(
+        DashboardWorkspaceViewModel viewModel,
+        VpnAutomationClientKind kind)
+    {
+        var option = viewModel.VpnAfterFreezeClientOptions.Single(option => option.Kind == kind);
+        option.SelectCommand.Execute(null);
+    }
+
+    private static bool IsVpnAfterFreezeClientSelected(
+        DashboardWorkspaceViewModel viewModel,
+        VpnAutomationClientKind kind)
+    {
+        return viewModel.VpnAfterFreezeClientOptions.Single(option => option.Kind == kind).IsSelected;
     }
 
     // Проверяет уведомление при недоступном ранее настроенном рабочем профиле.

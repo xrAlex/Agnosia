@@ -26,22 +26,20 @@ public sealed class DashboardStatusTextFormatterTests
         Assert.Equal(expected, actual);
     }
 
-    // Проверяет приоритет headline на overview для загрузки, ошибок setup и состояния профиля.
+    // Проверяет приоритет headline на overview для загрузки, ошибок setup и доступности профиля.
     [Theory]
-    [InlineData(false, true, true, false, true, WorkProfileStateKind.Available, "Loading")]
-    [InlineData(true, false, true, false, true, WorkProfileStateKind.Available, "NotSupported")]
-    [InlineData(true, true, false, false, true, WorkProfileStateKind.Available, "NotSetup")]
-    [InlineData(true, true, true, true, true, WorkProfileStateKind.Available, "Syncing")]
-    [InlineData(true, true, true, false, true, WorkProfileStateKind.Available, "Active")]
-    [InlineData(true, true, true, false, false, WorkProfileStateKind.Unavailable, "WPUnavailable")]
-    [InlineData(true, true, true, false, false, WorkProfileStateKind.NoWorkProfile, "WPUnavailable")]
+    [InlineData(false, true, true, false, true, "Loading")]
+    [InlineData(true, false, true, false, true, "NotSupported")]
+    [InlineData(true, true, false, false, true, "NotSetup")]
+    [InlineData(true, true, true, true, true, "Syncing")]
+    [InlineData(true, true, true, false, true, "Active")]
+    [InlineData(true, true, true, false, false, "WPUnavailable")]
     public void GetOverviewHeadline_respects_status_priority(
         bool hasLoadedSnapshot,
         bool isSupported,
         bool hasSetup,
         bool isBusy,
         bool workProfileAvailable,
-        WorkProfileStateKind workProfileState,
         string expected)
     {
         var actual = DashboardStatusTextFormatter.GetOverviewHeadline(
@@ -49,8 +47,7 @@ public sealed class DashboardStatusTextFormatterTests
             isSupported,
             hasSetup,
             isBusy,
-            workProfileAvailable,
-            workProfileState);
+            workProfileAvailable);
 
         Assert.Equal(expected, actual);
     }
@@ -86,14 +83,13 @@ public sealed class DashboardStatusTextFormatterTests
 
     // Проверяет caption общего статуса с детализацией причин нестабильности.
     [Theory]
-    [InlineData(true, true, false, true, true, true, WorkProfileStateKind.Available, "Error")]
-    [InlineData(false, false, false, true, true, true, WorkProfileStateKind.Available, "Loading")]
-    [InlineData(false, true, true, true, true, true, WorkProfileStateKind.Available, "Syncing")]
-    [InlineData(false, true, false, false, true, true, WorkProfileStateKind.Available, "NotSupported")]
-    [InlineData(false, true, false, true, false, true, WorkProfileStateKind.Available, "NotSetup")]
-    [InlineData(false, true, false, true, true, false, WorkProfileStateKind.Unavailable, "WPUnavailable")]
-    [InlineData(false, true, false, true, true, false, WorkProfileStateKind.NoWorkProfile, "WPUnavailable")]
-    [InlineData(false, true, false, true, true, true, WorkProfileStateKind.Available, "Ok")]
+    [InlineData(true, true, false, true, true, true, "Error")]
+    [InlineData(false, false, false, true, true, true, "Loading")]
+    [InlineData(false, true, true, true, true, true, "Syncing")]
+    [InlineData(false, true, false, false, true, true, "NotSupported")]
+    [InlineData(false, true, false, true, false, true, "NotSetup")]
+    [InlineData(false, true, false, true, true, false, "WPUnavailable")]
+    [InlineData(false, true, false, true, true, true, "Ok")]
     public void GetOverallStatusCaption_returns_expected_key(
         bool statusIsError,
         bool hasLoadedSnapshot,
@@ -101,7 +97,6 @@ public sealed class DashboardStatusTextFormatterTests
         bool isSupported,
         bool hasSetup,
         bool workProfileAvailable,
-        WorkProfileStateKind workProfileState,
         string expected)
     {
         var actual = DashboardStatusTextFormatter.GetOverallStatusCaption(
@@ -110,8 +105,7 @@ public sealed class DashboardStatusTextFormatterTests
             isBusy,
             isSupported,
             hasSetup,
-            workProfileAvailable,
-            workProfileState);
+            workProfileAvailable);
 
         Assert.Equal(expected, actual);
     }

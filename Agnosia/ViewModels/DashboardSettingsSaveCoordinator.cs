@@ -38,13 +38,11 @@ internal sealed class DashboardSettingsSaveCoordinator
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _canQueue = canQueue ?? throw new ArgumentNullException(nameof(canQueue));
         _canProcess = canProcess ?? throw new ArgumentNullException(nameof(canProcess));
-        _isAppsSectionSelected =
-            isAppsSectionSelected ?? throw new ArgumentNullException(nameof(isAppsSectionSelected));
+        _isAppsSectionSelected = isAppsSectionSelected ?? throw new ArgumentNullException(nameof(isAppsSectionSelected));
         _captureSettings = captureSettings ?? throw new ArgumentNullException(nameof(captureSettings));
         _refreshAsync = refreshAsync ?? throw new ArgumentNullException(nameof(refreshAsync));
         _setStatus = setStatus ?? throw new ArgumentNullException(nameof(setStatus));
-        _resolveExceptionMessage =
-            resolveExceptionMessage ?? throw new ArgumentNullException(nameof(resolveExceptionMessage));
+        _resolveExceptionMessage = resolveExceptionMessage ?? throw new ArgumentNullException(nameof(resolveExceptionMessage));
         _saveDebouncer = new DebouncedAsyncAction(
             saveDelay,
             exception => reportErrorOnUiThreadAsync(exception, "SettingsScheduleFailed"),
@@ -66,10 +64,7 @@ internal sealed class DashboardSettingsSaveCoordinator
         Schedule();
     }
 
-    private void CancelPending()
-    {
-        _saveDebouncer.Cancel();
-    }
+    private void CancelPending() => _saveDebouncer.Cancel();
 
     public void TryStartQueued()
     {

@@ -97,11 +97,11 @@ public partial class DashboardWorkspaceViewModel
     private static AppSnapshot[] GetDistinctIconSnapshots(IReadOnlyList<PendingIconLoad> batch)
     {
         var snapshots = new List<AppSnapshot>(batch.Count);
-        var seen = new HashSet<AppItemKey>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
         for (var index = 0; index < batch.Count; index++)
         {
             var snapshot = batch[index].Snapshot;
-            if (seen.Add(new AppItemKey(snapshot.Profile, snapshot.PackageName)))
+            if (seen.Add(snapshot.PackageName))
                 snapshots.Add(snapshot);
         }
 
@@ -145,9 +145,6 @@ public partial class DashboardWorkspaceViewModel
             Dispose();
         }
 
-        public void Dispose()
-        {
-            _cancellationRegistration.Dispose();
-        }
+        public void Dispose() => _cancellationRegistration.Dispose();
     }
 }

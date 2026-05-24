@@ -196,68 +196,26 @@
 
                         <StackPanel IsVisible="{Binding IsVpnAfterFreezeClientPickerVisible}"
                                     Spacing="10">
-                            <Grid ColumnDefinitions="*,*"
-                                  RowDefinitions="Auto,Auto,Auto,Auto"
-                                  ColumnSpacing="10"
-                                  HorizontalAlignment="Center"
-                                  RowSpacing="10">
-                                <Button MinWidth="100" Classes="segment-chip"
-                                        Classes.selected="{Binding IsFlClashVpnAfterFreezeSelected}"
-                                        Command="{Binding SelectFlClashVpnAfterFreezeCommand}">
-                                    <TextBlock Classes="button-label"
-                                               Text="FlClash" />
-                                </Button>
-                                <Button MinWidth="100" Grid.Row="0" Grid.Column="1"
-                                        Classes="segment-chip"
-                                        Classes.selected="{Binding IsClashMetaVpnAfterFreezeSelected}"
-                                        Command="{Binding SelectClashMetaVpnAfterFreezeCommand}">
-                                    <TextBlock Classes="button-label"
-                                               Text="Clash Meta" />
-                                </Button>
-                                <Button MinWidth="100" Grid.Row="1" Grid.Column="0"
-                                        Classes="segment-chip"
-                                        Classes.selected="{Binding IsHappVpnAfterFreezeSelected}"
-                                        Command="{Binding SelectHappVpnAfterFreezeCommand}">
-                                    <TextBlock Classes="button-label"
-                                               Text="Happ" />
-                                </Button>
-                                <Button MinWidth="100" Grid.Row="1"
-                                        Grid.Column="1"
-                                        Classes="segment-chip"
-                                        Classes.selected="{Binding IsTunguskaVpnAfterFreezeSelected}"
-                                        Command="{Binding SelectTunguskaVpnAfterFreezeCommand}">
-                                    <TextBlock Classes="button-label"
-                                               Text="Tunguska" />
-                                </Button>
-                                <Button MinWidth="100" Grid.Row="2" Grid.Column="0"
-                                        Classes="segment-chip"
-                                        Classes.selected="{Binding IsIncyVpnAfterFreezeSelected}"
-                                        Command="{Binding SelectIncyVpnAfterFreezeCommand}">
-                                    <TextBlock Classes="button-label"
-                                               Text="INCY" />
-                                </Button>
-                                <Button MinWidth="100" Grid.Row="2" Grid.Column="1"
-                                        Classes="segment-chip"
-                                        Classes.selected="{Binding IsExclaveVpnAfterFreezeSelected}"
-                                        Command="{Binding SelectExclaveVpnAfterFreezeCommand}">
-                                    <TextBlock Classes="button-label"
-                                               Text="Exclave" />
-                                </Button>
-                                <Button MinWidth="100" Grid.Row="3" Grid.Column="0"
-                                        Classes="segment-chip"
-                                        Classes.selected="{Binding IsHusiVpnAfterFreezeSelected}"
-                                        Command="{Binding SelectHusiVpnAfterFreezeCommand}">
-                                    <TextBlock Classes="button-label"
-                                               Text="husi" />
-                                </Button>
-                                <Button MinWidth="100" Grid.Row="3" Grid.Column="1"
-                                        Classes="segment-chip"
-                                        Classes.selected="{Binding IsNekoBoxPlusVpnAfterFreezeSelected}"
-                                        Command="{Binding SelectNekoBoxPlusVpnAfterFreezeCommand}">
-                                    <TextBlock Classes="button-label"
-                                               Text="NekoBox+" />
-                                </Button>
-                            </Grid>
+                            <ItemsControl ItemsSource="{Binding VpnAfterFreezeClientOptions}"
+                                          HorizontalAlignment="Center">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="2" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:VpnAutomationClientOptionViewModel">
+                                        <Button MinWidth="100"
+                                                Margin="5"
+                                                Classes="segment-chip"
+                                                Classes.selected="{Binding IsSelected}"
+                                                Command="{Binding SelectCommand}">
+                                            <TextBlock Classes="button-label"
+                                                       Text="{Binding DisplayName}" />
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
 
                             <Border Classes="tag-chip accent"
                                     IsVisible="{Binding IsToggleOnlyVpnAfterFreezeWarningVisible}">

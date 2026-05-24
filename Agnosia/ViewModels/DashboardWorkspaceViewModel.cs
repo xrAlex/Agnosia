@@ -65,6 +65,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public ReadOnlyObservableCollection<PermissionItemViewModel> PermissionItems { get; }
 
+    public IReadOnlyList<VpnAutomationClientOptionViewModel> VpnAfterFreezeClientOptions { get; }
+
     public string AppVersion => GetAppVersion();
 
     [ObservableProperty]
@@ -86,8 +88,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private partial DashboardSection SelectedSection { get; set; } = DashboardSection.Overview;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsEmptyStateVisible))]
-    [NotifyPropertyChangedFor(nameof(IsAppInventoryProgressVisible))]
     [NotifyPropertyChangedFor(nameof(CanStartProvisioning))]
     [NotifyPropertyChangedFor(nameof(OverviewHeadline))]
     [NotifyPropertyChangedFor(nameof(OverallStatusText))]
@@ -114,20 +114,15 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsDashboardVisible))]
     [NotifyPropertyChangedFor(nameof(IsEmptyStateVisible))]
     [NotifyPropertyChangedFor(nameof(IsAppInventoryProgressVisible))]
-    [NotifyPropertyChangedFor(nameof(CanStartProvisioning))]
     [NotifyPropertyChangedFor(nameof(CanOpenAppsSection))]
     [NotifyPropertyChangedFor(nameof(CanOpenSettingsSection))]
     [NotifyPropertyChangedFor(nameof(WorkProfileStatusText))]
     [NotifyPropertyChangedFor(nameof(OverviewHeadline))]
     [NotifyPropertyChangedFor(nameof(OverallStatusText))]
     [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
-    [NotifyCanExecuteChangedFor(nameof(StartProvisioningCommand))]
     public partial bool HasSetup { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanStartProvisioning))]
-    [NotifyPropertyChangedFor(nameof(OverviewHeadline))]
-    [NotifyCanExecuteChangedFor(nameof(StartProvisioningCommand))]
     private partial bool IsSettingUp { get; set; }
 
     [ObservableProperty]
@@ -142,26 +137,20 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     public partial bool WorkProfileAvailable { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsEmptyStateVisible))]
     [NotifyPropertyChangedFor(nameof(IsPersonalProfileSelected))]
     [NotifyPropertyChangedFor(nameof(IsWorkProfileSelected))]
     private partial ProfileKind SelectedProfile { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsEmptyStateVisible))]
     public partial string SearchText { get; set; } = string.Empty;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEmptyStateVisible))]
-    [NotifyPropertyChangedFor(nameof(IsAppInventoryProgressVisible))]
     private partial bool HasLoadedInventory { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEmptyStateVisible))]
     [NotifyPropertyChangedFor(nameof(IsAppInventoryProgressVisible))]
-    [NotifyPropertyChangedFor(nameof(OverviewHeadline))]
-    [NotifyPropertyChangedFor(nameof(OverallStatusText))]
-    [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
     private partial bool IsInventoryLoading { get; set; }
 
     [ObservableProperty]
@@ -185,14 +174,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     public partial bool EnableVpnAfterWorkFreeze { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsFlClashVpnAfterFreezeSelected))]
-    [NotifyPropertyChangedFor(nameof(IsClashMetaVpnAfterFreezeSelected))]
-    [NotifyPropertyChangedFor(nameof(IsHappVpnAfterFreezeSelected))]
-    [NotifyPropertyChangedFor(nameof(IsTunguskaVpnAfterFreezeSelected))]
-    [NotifyPropertyChangedFor(nameof(IsIncyVpnAfterFreezeSelected))]
-    [NotifyPropertyChangedFor(nameof(IsExclaveVpnAfterFreezeSelected))]
-    [NotifyPropertyChangedFor(nameof(IsHusiVpnAfterFreezeSelected))]
-    [NotifyPropertyChangedFor(nameof(IsNekoBoxPlusVpnAfterFreezeSelected))]
     [NotifyPropertyChangedFor(nameof(IsToggleOnlyVpnAfterFreezeWarningVisible))]
     [NotifyPropertyChangedFor(nameof(IsTunguskaAutomationTokenVisible))]
     private partial VpnAutomationClientKind VpnAfterWorkFreezeClient { get; set; } = VpnAutomationClientKind.FlClash;
@@ -204,7 +185,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     public partial bool IsLogWindowOpen { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PermissionSummary))]
     public partial bool IsPermissionsWindowOpen { get; set; }
 
     [ObservableProperty]
@@ -231,14 +211,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private partial bool OnboardingCompleted { get; set; } = true;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsWorkProfileRecoveryVisible))]
-    [NotifyPropertyChangedFor(nameof(WorkProfileRecoveryTitle))]
-    [NotifyPropertyChangedFor(nameof(WorkProfileRecoveryMessage))]
     [NotifyPropertyChangedFor(nameof(WorkProfileStatusText))]
-    [NotifyPropertyChangedFor(nameof(OverviewHeadline))]
-    [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
-    [NotifyPropertyChangedFor(nameof(CanStartProvisioning))]
-    [NotifyCanExecuteChangedFor(nameof(StartProvisioningCommand))]
     private partial WorkProfileStateKind WorkProfileState { get; set; }
 
     [ObservableProperty]
@@ -246,10 +219,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(WorkProfileRecoveryTitle))]
     [NotifyPropertyChangedFor(nameof(WorkProfileRecoveryMessage))]
     private partial WorkProfileRecoveryKind WorkProfileRecovery { get; set; }
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(WorkProfileRecoveryMessage))]
-    private partial string WorkProfileDiagnosticReason { get; set; } = string.Empty;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsWorkProfileRecoveryVisible))]
@@ -284,8 +253,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             IsSupported,
             HasSetup,
             IsOperationActive,
-            WorkProfileAvailable,
-            WorkProfileState);
+            WorkProfileAvailable);
 
     public string OverallStatusText =>
         DashboardStatusTextFormatter.GetOverallStatusText(
@@ -303,8 +271,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             IsOperationActive,
             IsSupported,
             HasSetup,
-            WorkProfileAvailable,
-            WorkProfileState);
+            WorkProfileAvailable);
 
     public string LogSummary => _eventLogService.Summary;
 
@@ -415,22 +382,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public bool IsVpnAfterFreezeClientPickerVisible => EnableVpnAfterWorkFreeze;
 
-    public bool IsFlClashVpnAfterFreezeSelected => VpnAfterWorkFreezeClient == VpnAutomationClientKind.FlClash;
-
-    public bool IsClashMetaVpnAfterFreezeSelected => VpnAfterWorkFreezeClient == VpnAutomationClientKind.ClashMeta;
-
-    public bool IsHappVpnAfterFreezeSelected => VpnAfterWorkFreezeClient == VpnAutomationClientKind.Happ;
-
-    public bool IsTunguskaVpnAfterFreezeSelected => VpnAfterWorkFreezeClient == VpnAutomationClientKind.Tunguska;
-
-    public bool IsIncyVpnAfterFreezeSelected => VpnAfterWorkFreezeClient == VpnAutomationClientKind.Incy;
-
-    public bool IsExclaveVpnAfterFreezeSelected => VpnAfterWorkFreezeClient == VpnAutomationClientKind.Exclave;
-
-    public bool IsHusiVpnAfterFreezeSelected => VpnAfterWorkFreezeClient == VpnAutomationClientKind.Husi;
-
-    public bool IsNekoBoxPlusVpnAfterFreezeSelected => VpnAfterWorkFreezeClient == VpnAutomationClientKind.NekoBoxPlus;
-
     public bool IsToggleOnlyVpnAfterFreezeWarningVisible =>
         EnableVpnAfterWorkFreeze
         && (VpnAfterWorkFreezeClient == VpnAutomationClientKind.Happ
@@ -468,10 +419,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         RefreshVisibleApps();
     }
 
-    partial void OnSearchTextChanged(string value)
-    {
-        QueueSearchRefresh();
-    }
+    partial void OnSearchTextChanged(string value) => QueueSearchRefresh();
 
     partial void OnSelectedThemeChanged(AppThemeKind value)
     {
@@ -493,30 +441,20 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         QueueSettingsSave();
     }
 
-    partial void OnShowAllAppsChanged(bool value)
-    {
-        QueueSettingsSave();
-    }
+    partial void OnShowAllAppsChanged(bool value) => QueueSettingsSave();
 
-    partial void OnDisableVpnBeforeWorkLaunchChanged(bool value)
-    {
-        QueueSettingsSave();
-    }
+    partial void OnDisableVpnBeforeWorkLaunchChanged(bool value) => QueueSettingsSave();
 
-    partial void OnEnableVpnAfterWorkFreezeChanged(bool value)
-    {
-        QueueSettingsSave();
-    }
+    partial void OnEnableVpnAfterWorkFreezeChanged(bool value) => QueueSettingsSave();
 
     partial void OnVpnAfterWorkFreezeClientChanged(VpnAutomationClientKind value)
     {
+        foreach (var option in VpnAfterFreezeClientOptions) option.NotifySelectionChanged();
+
         QueueSettingsSave();
     }
 
-    partial void OnTunguskaAutomationTokenChanged(string value)
-    {
-        QueueSettingsSave();
-    }
+    partial void OnTunguskaAutomationTokenChanged(string value) => QueueSettingsSave();
 
     partial void OnOnboardingCompletedChanged(bool value)
     {
@@ -585,6 +523,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             ReportErrorOnUiThreadAsync,
             _delayAsync);
         PermissionItems = new ReadOnlyObservableCollection<PermissionItemViewModel>(_permissionItems);
+        VpnAfterFreezeClientOptions = CreateVpnAfterFreezeClientOptions();
         SelectedProfile = ProfileKind.Personal;
     }
 
@@ -612,10 +551,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private Task RefreshAsync()
-    {
-        return RefreshDashboardAsync(false);
-    }
+    private Task RefreshAsync() => RefreshDashboardAsync(false);
 
     private async Task RefreshDashboardAsync(bool allowDuringOperation)
     {
@@ -676,10 +612,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void SelectPersonal()
-    {
-        SelectedProfile = ProfileKind.Personal;
-    }
+    private void SelectPersonal() => SelectedProfile = ProfileKind.Personal;
 
     [RelayCommand]
     private void SelectWork()
@@ -688,10 +621,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void OpenOverviewSection()
-    {
-        SelectedSection = DashboardSection.Overview;
-    }
+    private void OpenOverviewSection() => SelectedSection = DashboardSection.Overview;
 
     [RelayCommand]
     private void OpenAppsSection()
@@ -720,10 +650,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void CloseLogs()
-    {
-        IsLogWindowOpen = false;
-    }
+    private void CloseLogs() => IsLogWindowOpen = false;
 
     [RelayCommand]
     private void ClearLogs()
@@ -740,16 +667,10 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void ClosePermissions()
-    {
-        IsPermissionsWindowOpen = false;
-    }
+    private void ClosePermissions() => IsPermissionsWindowOpen = false;
 
     [RelayCommand]
-    private void CloseAppControlWindow()
-    {
-        CloseAppControl();
-    }
+    private void CloseAppControlWindow() => CloseAppControl();
 
     internal void OpenAppControl(AppItemViewModel app)
     {
@@ -764,82 +685,21 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void SelectAgnosiaTheme()
-    {
-        SelectedTheme = AppThemeKind.Agnosia;
-    }
+    private void SelectAgnosiaTheme() => SelectedTheme = AppThemeKind.Agnosia;
 
     [RelayCommand]
-    private void SelectDarkTheme()
-    {
-        SelectedTheme = AppThemeKind.Dark;
-    }
+    private void SelectDarkTheme() => SelectedTheme = AppThemeKind.Dark;
 
     [RelayCommand]
-    private void SelectLightTheme()
-    {
-        SelectedTheme = AppThemeKind.Light;
-    }
+    private void SelectLightTheme() => SelectedTheme = AppThemeKind.Light;
 
     [RelayCommand]
-    private void SelectFlClashVpnAfterFreeze()
-    {
-        VpnAfterWorkFreezeClient = VpnAutomationClientKind.FlClash;
-    }
-
-    [RelayCommand]
-    private void SelectClashMetaVpnAfterFreeze()
-    {
-        VpnAfterWorkFreezeClient = VpnAutomationClientKind.ClashMeta;
-    }
-
-    [RelayCommand]
-    private void SelectHappVpnAfterFreeze()
-    {
-        VpnAfterWorkFreezeClient = VpnAutomationClientKind.Happ;
-    }
-
-    [RelayCommand]
-    private void SelectTunguskaVpnAfterFreeze()
-    {
-        VpnAfterWorkFreezeClient = VpnAutomationClientKind.Tunguska;
-    }
-
-    [RelayCommand]
-    private void SelectIncyVpnAfterFreeze()
-    {
-        VpnAfterWorkFreezeClient = VpnAutomationClientKind.Incy;
-    }
-
-    [RelayCommand]
-    private void SelectExclaveVpnAfterFreeze()
-    {
-        VpnAfterWorkFreezeClient = VpnAutomationClientKind.Exclave;
-    }
-
-    [RelayCommand]
-    private void SelectHusiVpnAfterFreeze()
-    {
-        VpnAfterWorkFreezeClient = VpnAutomationClientKind.Husi;
-    }
-
-    [RelayCommand]
-    private void SelectNekoBoxPlusVpnAfterFreeze()
-    {
-        VpnAfterWorkFreezeClient = VpnAutomationClientKind.NekoBoxPlus;
-    }
-
-    [RelayCommand]
-    private void StartOnboarding()
-    {
-        OnboardingStep = OnboardingStep.WorkProfile;
-    }
+    private void StartOnboarding() => OnboardingStep = OnboardingStep.WorkProfile;
 
     [RelayCommand]
     private async Task CheckOnboardingWorkProfileAsync()
     {
         await RefreshAsync();
-        OnPropertyChanged(nameof(CanContinueOnboardingFromWorkProfile));
     }
 
     [RelayCommand]
@@ -892,16 +752,10 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void DismissWorkProfileRecovery()
-    {
-        WorkProfileRecoveryDismissed = true;
-    }
+    private void DismissWorkProfileRecovery() => WorkProfileRecoveryDismissed = true;
 
     [RelayCommand]
-    private void RestartOnboardingFromWorkProfileRecovery()
-    {
-        MoveToOnboardingStart();
-    }
+    private void RestartOnboardingFromWorkProfileRecovery() => MoveToOnboardingStart();
 
     private async Task CompleteOnboardingAsync()
     {
@@ -992,10 +846,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }
     }
 
-    internal Task UninstallAsync(AppItemViewModel app)
-    {
-        return RunAppOperationAsync(app, snapshot => _appCommandService.UninstallAsync(snapshot), "Deleted");
-    }
+    internal Task UninstallAsync(AppItemViewModel app) => RunAppOperationAsync(app, snapshot => _appCommandService.UninstallAsync(snapshot), "Deleted");
 
     internal Task ToggleFrozenAsync(AppItemViewModel app)
     {
@@ -1005,10 +856,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             app.IsHidden ? "Restored" : "Hidden");
     }
 
-    internal Task ForceFreezeAsync(AppItemViewModel app)
-    {
-        return RunAppOperationAsync(app, snapshot => _appCommandService.ForceFreezeAsync(snapshot), "ForceHidden");
-    }
+    internal Task ForceFreezeAsync(AppItemViewModel app) => RunAppOperationAsync(app, snapshot => _appCommandService.ForceFreezeAsync(snapshot), "ForceHidden");
 
     internal Task CreateShortcutAsync(AppItemViewModel app)
     {
@@ -1016,10 +864,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             "ShortcutRequested");
     }
 
-    internal Task LaunchAsync(AppItemViewModel app)
-    {
-        return RunAppOperationAsync(app, snapshot => _appCommandService.LaunchAsync(snapshot), "Launching");
-    }
+    internal Task LaunchAsync(AppItemViewModel app) => RunAppOperationAsync(app, snapshot => _appCommandService.LaunchAsync(snapshot), "Launching");
 
     internal Task ToggleInteractionAccessAsync(AppItemViewModel app)
     {
@@ -1114,15 +959,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }
     }
 
-    private void ApplySnapshot(DashboardSnapshot snapshot)
-    {
-        _lastProfileSnapshot = snapshot;
-        ApplyProfileSnapshot(snapshot);
-        ApplyInventorySnapshot(new DashboardAppInventorySnapshot(snapshot.PersonalApps, snapshot.WorkApps));
-        HasLoadedSnapshot = true;
-        HasLoadedInventory = true;
-    }
-
     private void ApplyProfileSnapshot(DashboardSnapshot snapshot)
     {
         _isApplyingSnapshot = true;
@@ -1134,7 +970,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             IsSettingUp = snapshot.IsSettingUp;
             WorkProfileAvailable = snapshot.WorkProfileAvailable;
             WorkProfileState = snapshot.WorkProfileState;
-            WorkProfileDiagnosticReason = snapshot.WorkProfileDiagnosticReason;
             WorkProfileRecovery = snapshot.WorkProfileRecovery;
             if (WorkProfileRecovery == WorkProfileRecoveryKind.None
                 || WorkProfileRecovery != previousRecovery)
@@ -1149,8 +984,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
                 OnboardingStep = OnboardingStep.WorkProfile;
             }
 
-            OnPropertyChanged(nameof(CanContinueOnboardingFromWorkProfile));
-
             ShowAllApps = snapshot.Settings.ShowAllApps;
             DisableVpnBeforeWorkLaunch = snapshot.Settings.DisableVpnBeforeWorkLaunch;
             EnableVpnAfterWorkFreeze = snapshot.Settings.EnableVpnAfterWorkFreeze;
@@ -1164,8 +997,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
             if (!WorkProfileAvailable && SelectedProfile == ProfileKind.Work) SelectedProfile = ProfileKind.Personal;
 
-            OnPropertyChanged(nameof(CanOpenAppsSection));
-            OnPropertyChanged(nameof(CanOpenSettingsSection));
             NotifyOverviewMetricsChanged();
 
             EnsureSelectedSectionIsAvailable();
@@ -1213,15 +1044,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         return new DashboardAppInventorySnapshot(inventory.PersonalApps, preservedWorkApps);
     }
 
-    private void RefreshVisibleApps()
-    {
-        SetVisibleApps(AppCatalogFilter.FilterVisibleApps(_personalApps, _workApps, SelectedProfile, SearchText));
-    }
+    private void RefreshVisibleApps() => SetVisibleApps(AppCatalogFilter.FilterVisibleApps(_personalApps, _workApps, SelectedProfile, SearchText));
 
-    private void QueueSearchRefresh()
-    {
-        _searchRefreshDebouncer.Schedule(RefreshVisibleAppsAfterDelayAsync);
-    }
+    private void QueueSearchRefresh() => _searchRefreshDebouncer.Schedule(RefreshVisibleAppsAfterDelayAsync);
 
     private async Task RefreshVisibleAppsAfterDelayAsync(CancellationToken cancellationToken)
     {
@@ -1253,10 +1078,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         TracePerf("SetVisibleApps", startedAt, $"count={visibleApps.Length}; profile={SelectedProfile}");
     }
 
-    private void CancelPendingSearchRefresh()
-    {
-        _searchRefreshDebouncer.Cancel();
-    }
+    private void CancelPendingSearchRefresh() => _searchRefreshDebouncer.Cancel();
 
     private Task RunAppOperationAsync(
         AppItemViewModel app,
@@ -1334,10 +1156,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         StatusMessage = statusMessage;
     }
 
-    private static bool IsStaleInstallSourceMessage(string? message)
-    {
-        return message?.Contains(StaleApkMessageMarker, StringComparison.Ordinal) == true;
-    }
+    private static bool IsStaleInstallSourceMessage(string? message) => message?.Contains(StaleApkMessageMarker, StringComparison.Ordinal) == true;
 
     private static bool IsRequiredOnboardingPermission(PermissionKind kind)
     {
@@ -1400,9 +1219,31 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             TunguskaAutomationToken);
     }
 
-    private void QueueSettingsSave()
+    private void QueueSettingsSave() => _settingsSaveCoordinator.Queue();
+
+    internal bool IsVpnAfterFreezeClientSelected(VpnAutomationClientKind kind)
     {
-        _settingsSaveCoordinator.Queue();
+        return VpnAfterWorkFreezeClient == kind;
+    }
+
+    internal void SelectVpnAfterFreezeClient(VpnAutomationClientKind kind)
+    {
+        VpnAfterWorkFreezeClient = kind;
+    }
+
+    private VpnAutomationClientOptionViewModel[] CreateVpnAfterFreezeClientOptions()
+    {
+        return
+        [
+            new(this, VpnAutomationClientKind.FlClash, "FlClash"),
+            new(this, VpnAutomationClientKind.ClashMeta, "Clash Meta"),
+            new(this, VpnAutomationClientKind.Happ, "Happ"),
+            new(this, VpnAutomationClientKind.Tunguska, "Tunguska"),
+            new(this, VpnAutomationClientKind.Incy, "INCY"),
+            new(this, VpnAutomationClientKind.Exclave, "Exclave"),
+            new(this, VpnAutomationClientKind.Husi, "husi"),
+            new(this, VpnAutomationClientKind.NekoBoxPlus, "NekoBox+")
+        ];
     }
 
     private void SetSettingsSaveStatus(bool isError, string? message)
@@ -1561,7 +1402,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private void NotifyOverviewMetricsChanged()
     {
-        OnPropertyChanged(nameof(OverviewHeadline));
         OnPropertyChanged(nameof(TotalManagedAppsCount));
         OnPropertyChanged(nameof(HiddenWorkAppsCount));
         OnPropertyChanged(nameof(InteractionAccessAppsCount));

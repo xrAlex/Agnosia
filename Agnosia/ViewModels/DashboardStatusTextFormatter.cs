@@ -23,8 +23,7 @@ internal static class DashboardStatusTextFormatter
         bool isSupported,
         bool hasSetup,
         bool isBusy,
-        bool workProfileAvailable,
-        WorkProfileStateKind workProfileState)
+        bool workProfileAvailable)
     {
         return !hasLoadedSnapshot
             ? "Loading"
@@ -36,7 +35,7 @@ internal static class DashboardStatusTextFormatter
                         ? "Syncing"
                         : workProfileAvailable
                             ? "Active"
-                            : GetUnavailableHeadline(workProfileState);
+                            : "WPUnavailable";
     }
 
     public static string GetOverallStatusText(
@@ -62,8 +61,7 @@ internal static class DashboardStatusTextFormatter
         bool isBusy,
         bool isSupported,
         bool hasSetup,
-        bool workProfileAvailable,
-        WorkProfileStateKind workProfileState)
+        bool workProfileAvailable)
     {
         return statusIsError
             ? "Error"
@@ -76,17 +74,7 @@ internal static class DashboardStatusTextFormatter
                         : !hasSetup
                             ? "NotSetup"
                             : !workProfileAvailable
-                                ? GetUnavailableDetail(workProfileState)
+                                ? "WPUnavailable"
                                 : "Ok";
-    }
-
-    private static string GetUnavailableHeadline(WorkProfileStateKind workProfileState)
-    {
-        return "WPUnavailable";
-    }
-
-    private static string GetUnavailableDetail(WorkProfileStateKind workProfileState)
-    {
-        return "WPUnavailable";
     }
 }

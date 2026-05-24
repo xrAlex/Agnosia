@@ -125,7 +125,6 @@ public partial class DashboardWorkspaceViewModel
 
     private async Task CompleteOnboardingIfReadyAsync()
     {
-        OnPropertyChanged(nameof(AreOnboardingPermissionsGranted));
         if (OnboardingStep == OnboardingStep.Permissions && AreOnboardingPermissionsGranted)
             OnboardingStep = OnboardingStep.Final;
     }

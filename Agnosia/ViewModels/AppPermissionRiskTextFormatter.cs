@@ -6,6 +6,46 @@ internal static class AppPermissionRiskTextFormatter
 {
     private const string AndroidPermissionPrefix = "android.permission.";
     private const string AndroidHealthPermissionPrefix = "android.permission.health.";
+    private static readonly PermissionReasonRule[] SpecificPermissionReasonRules =
+    [
+        new(["READ_SMS", "RECEIVE_SMS", "SEND_SMS"], "может читать или отправлять SMS"),
+        new(["ANSWER_PHONE_CALLS"], "может отвечать на телефонные звонки"),
+        new(["READ_CALL_LOG", "WRITE_CALL_LOG", "READ_PHONE_NUMBERS", "READ_PHONE_STATE"], "имеет доступ к звонкам или телефонным данным"),
+        new(["READ_CONTACTS", "GET_ACCOUNTS"], "может читать контакты или аккаунты"),
+        new(["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "ACCESS_BACKGROUND_LOCATION"], "имеет доступ к геолокации"),
+        new(["ACCESS_MEDIA_LOCATION"], "может читать геометки внутри фото и видео"),
+        new(["CAMERA"], "может использовать камеру"),
+        new(["FOREGROUND_SERVICE_CAMERA"], "может держать камеру активной через foreground service"),
+        new(["RECORD_AUDIO"], "может использовать микрофон"),
+        new(["FOREGROUND_SERVICE_MICROPHONE"], "может держать микрофон активным через foreground service"),
+        new(["READ_MEDIA_IMAGES", "READ_MEDIA_VIDEO", "READ_MEDIA_AUDIO", "READ_MEDIA_VISUAL_USER_SELECTED", "READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE", "MANAGE_EXTERNAL_STORAGE"], "имеет доступ к файлам"),
+        new(["READ_MEDIA_VISUAL_USER_SELECTED"], "имеет доступ к выбранным фото или видео"),
+        new(["READ_HEALTH", "READ_HEART", "READ_MEDICAL", "READ_SYMPTOM"], "может читать медицинские или фитнес-данные"),
+        new(["BODY_SENSORS"], "может читать данные датчиков тела"),
+        new(["BODY_SENSORS_BACKGROUND", "READ_HEALTH_DATA_IN_BACKGROUND"], "может читать health-данные в фоне"),
+        new(["READ_HEALTH_DATA_HISTORY"], "может читать исторические health-данные"),
+        new(["BIND_ACCESSIBILITY_SERVICE", "SYSTEM_ALERT_WINDOW", "BIND_NOTIFICATION_LISTENER_SERVICE"], "может читать данные с экрана, уведомления или показывать окна поверх других приложений"),
+        new(["BIND_ACCESSIBILITY_SERVICE"], "может управлять интерфейсом"),
+        new(["BIND_NOTIFICATION_LISTENER_SERVICE"], "может читать уведомления"),
+        new(["SYSTEM_ALERT_WINDOW"], "может показывать окна поверх других приложений"),
+        new(["BIND_VPN_SERVICE"], "может направлять трафик через VPN-сервис"),
+        new(["PACKAGE_USAGE_STATS"], "может видеть, какие приложения используются"),
+        new(["QUERY_ALL_PACKAGES"], "может видеть список установленных приложений"),
+        new(["FOREGROUND_SERVICE_MEDIA_PROJECTION"], "может быть связано с записью экрана"),
+        new(["READ_ASSIST_STRUCTURE_SCREEN_CONTENT"], "может получать содержимое экрана через assistant API"),
+        new(["REQUEST_INSTALL_PACKAGES"], "может устанавливать APK из внешних источников"),
+        new(["RECEIVE_BOOT_COMPLETED"], "может запускаться после перезагрузки устройства"),
+        new(["REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"], "может обходить ограничения энергосбережения"),
+        new(["SCHEDULE_EXACT_ALARM", "USE_EXACT_ALARM"], "может точно будить приложение по расписанию"),
+        new(["FOREGROUND_SERVICE"], "может длительно работать в фоне"),
+        new(["POST_NOTIFICATIONS"], "может активно показывать уведомления"),
+        new(["ACCESS_NETWORK_STATE"], "может отслеживать состояние сети"),
+        new(["ACCESS_LOCAL_NETWORK"], "может обращаться к устройствам в локальной сети"),
+        new(["NEARBY_WIFI_DEVICES"], "может видеть окружающие Wi-Fi сети и подключаться к ним"),
+        new(["BLUETOOTH_CONNECT", "BLUETOOTH_SCAN"], "может использовать Bluetooth для поиска или обмена с устройствами рядом"),
+        new(["NFC"], "может использовать NFC модуль"),
+        new(["RANGING"], "может оценивать расстояние до nearby-устройств")
+    ];
 
     public static string FormatPermissionInlineList(IReadOnlyList<string> permissions)
     {
@@ -73,93 +113,35 @@ internal static class AppPermissionRiskTextFormatter
 
     private static void AddSpecificPermissionReasons(IReadOnlyList<string> permissions, List<string> reasons)
     {
-        if (ContainsAny(permissions, "READ_SMS", "RECEIVE_SMS", "SEND_SMS"))
-            reasons.Add("может читать или отправлять SMS");
-        if (ContainsAny(permissions, "ANSWER_PHONE_CALLS"))
-            reasons.Add("может отвечать на телефонные звонки");
-        if (ContainsAny(permissions, "READ_CALL_LOG", "WRITE_CALL_LOG", "READ_PHONE_NUMBERS", "READ_PHONE_STATE"))
-            reasons.Add("имеет доступ к звонкам или телефонным данным");
-        if (ContainsAny(permissions, "READ_CONTACTS", "GET_ACCOUNTS"))
-            reasons.Add("может читать контакты или аккаунты");
-        if (ContainsAny(permissions, "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "ACCESS_BACKGROUND_LOCATION"))
-            reasons.Add("имеет доступ к геолокации");
-        if (ContainsAny(permissions, "ACCESS_MEDIA_LOCATION"))
-            reasons.Add("может читать геометки внутри фото и видео");
-        if (ContainsAny(permissions, "CAMERA"))
-            reasons.Add("может использовать камеру");
-        if (ContainsAny(permissions, "FOREGROUND_SERVICE_CAMERA"))
-            reasons.Add("может держать камеру активной через foreground service");
-        if (ContainsAny(permissions, "RECORD_AUDIO"))
-            reasons.Add("может использовать микрофон");
-        if (ContainsAny(permissions, "FOREGROUND_SERVICE_MICROPHONE"))
-            reasons.Add("может держать микрофон активным через foreground service");
-        if (ContainsAny(permissions, "READ_MEDIA_IMAGES", "READ_MEDIA_VIDEO", "READ_MEDIA_AUDIO", "READ_MEDIA_VISUAL_USER_SELECTED", "READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE", "MANAGE_EXTERNAL_STORAGE"))
-            reasons.Add("имеет доступ к файлам");
-        if (ContainsAny(permissions, "READ_MEDIA_VISUAL_USER_SELECTED"))
-            reasons.Add("имеет доступ к выбранным фото или видео");
-        if (ContainsAny(permissions, "READ_HEALTH", "READ_HEART", "READ_MEDICAL", "READ_SYMPTOM"))
-            reasons.Add("может читать медицинские или фитнес-данные");
-        if (ContainsAny(permissions, "BODY_SENSORS"))
-            reasons.Add("может читать данные датчиков тела");
-        if (ContainsAny(permissions, "BODY_SENSORS_BACKGROUND", "READ_HEALTH_DATA_IN_BACKGROUND"))
-            reasons.Add("может читать health-данные в фоне");
-        if (ContainsAny(permissions, "READ_HEALTH_DATA_HISTORY"))
-            reasons.Add("может читать исторические health-данные");
-        if (ContainsAny(permissions, "BIND_ACCESSIBILITY_SERVICE", "SYSTEM_ALERT_WINDOW", "BIND_NOTIFICATION_LISTENER_SERVICE"))
-            reasons.Add("может читать данные с экрана, уведомления или показывать окна поверх других приложений");
-        if (ContainsAny(permissions, "BIND_ACCESSIBILITY_SERVICE"))
-            reasons.Add("может управлять интерфейсом");
-        if (ContainsAny(permissions, "BIND_NOTIFICATION_LISTENER_SERVICE"))
-            reasons.Add("может читать уведомления");
-        if (ContainsAny(permissions, "SYSTEM_ALERT_WINDOW"))
-            reasons.Add("может показывать окна поверх других приложений");
-        if (ContainsAny(permissions, "BIND_VPN_SERVICE"))
-            reasons.Add("может направлять трафик через VPN-сервис");
-        if (ContainsAny(permissions, "PACKAGE_USAGE_STATS"))
-            reasons.Add("может видеть, какие приложения используются");
-        if (ContainsAny(permissions, "QUERY_ALL_PACKAGES"))
-            reasons.Add("может видеть список установленных приложений");
-        if (ContainsAny(permissions, "FOREGROUND_SERVICE_MEDIA_PROJECTION"))
-            reasons.Add("может быть связано с записью экрана");
-        if (ContainsAny(permissions, "READ_ASSIST_STRUCTURE_SCREEN_CONTENT"))
-            reasons.Add("может получать содержимое экрана через assistant API");
-        if (ContainsAny(permissions, "REQUEST_INSTALL_PACKAGES"))
-            reasons.Add("может устанавливать APK из внешних источников");
-        if (ContainsAny(permissions, "RECEIVE_BOOT_COMPLETED"))
-            reasons.Add("может запускаться после перезагрузки устройства");
-        if (ContainsAny(permissions, "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"))
-            reasons.Add("может обходить ограничения энергосбережения");
-        if (ContainsAny(permissions, "SCHEDULE_EXACT_ALARM", "USE_EXACT_ALARM"))
-            reasons.Add("может точно будить приложение по расписанию");
-        if (ContainsAny(permissions, "FOREGROUND_SERVICE"))
-            reasons.Add("может длительно работать в фоне");
-        if (ContainsAny(permissions, "POST_NOTIFICATIONS"))
-            reasons.Add("может активно показывать уведомления");
-        if (ContainsAny(permissions, "ACCESS_NETWORK_STATE"))
-            reasons.Add("может отслеживать состояние сети");
-        if (ContainsAny(permissions, "ACCESS_LOCAL_NETWORK"))
-            reasons.Add("может обращаться к устройствам в локальной сети");
-        if (ContainsAny(permissions, "NEARBY_WIFI_DEVICES"))
-            reasons.Add("может видеть окружающие Wi-Fi сети и подключаться к ним");
-        if (ContainsAny(permissions, "BLUETOOTH_CONNECT", "BLUETOOTH_SCAN"))
-            reasons.Add("может использовать Bluetooth для поиска или обмена с устройствами рядом");
-        if (ContainsAny(permissions, "NFC"))
-            reasons.Add("может использовать NFC модуль");
-        if (ContainsAny(permissions, "RANGING"))
-            reasons.Add("может оценивать расстояние до nearby-устройств");
-    }
+        if (permissions.Count == 0) return;
 
-    private static bool ContainsAny(IReadOnlyList<string> permissions, params string[] tokens)
-    {
+        var matchedRules = new bool[SpecificPermissionReasonRules.Length];
         for (var permissionIndex = 0; permissionIndex < permissions.Count; permissionIndex++)
         {
             var permission = permissions[permissionIndex];
-            for (var tokenIndex = 0; tokenIndex < tokens.Length; tokenIndex++)
+            for (var ruleIndex = 0; ruleIndex < SpecificPermissionReasonRules.Length; ruleIndex++)
             {
-                if (permission.Contains(tokens[tokenIndex], StringComparison.Ordinal)) return true;
+                if (!matchedRules[ruleIndex] && SpecificPermissionReasonRules[ruleIndex].Matches(permission))
+                    matchedRules[ruleIndex] = true;
             }
         }
 
-        return false;
+        for (var ruleIndex = 0; ruleIndex < SpecificPermissionReasonRules.Length; ruleIndex++)
+        {
+            if (matchedRules[ruleIndex]) reasons.Add(SpecificPermissionReasonRules[ruleIndex].Reason);
+        }
+    }
+
+    private readonly record struct PermissionReasonRule(string[] Tokens, string Reason)
+    {
+        public bool Matches(string permission)
+        {
+            for (var tokenIndex = 0; tokenIndex < Tokens.Length; tokenIndex++)
+            {
+                if (permission.Contains(Tokens[tokenIndex], StringComparison.Ordinal)) return true;
+            }
+
+            return false;
+        }
     }
 }
