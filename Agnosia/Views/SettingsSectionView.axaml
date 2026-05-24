@@ -13,21 +13,8 @@
 
     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
         <StackPanel Classes="content-root">
-            <Grid ColumnDefinitions="*,Auto"
-                  ColumnSpacing="10">
-                <StackPanel Spacing="4">
-                    <TextBlock Classes="page-title"
-                               Text="Настройки" />
-                </StackPanel>
-
-                <Button Grid.Column="1"
-                        Classes="icon-button"
-                        ToolTip.Tip="Обновить"
-                        Command="{Binding RefreshCommand}">
-                    <PathIcon Classes="action-icon"
-                              Data="{StaticResource IconRefreshGeometry}" />
-                </Button>
-            </Grid>
+            <TextBlock Classes="page-title"
+                       Text="Настройки" />
 
             <StackPanel IsVisible="{Binding IsDashboardVisible}"
                         Spacing="12">
