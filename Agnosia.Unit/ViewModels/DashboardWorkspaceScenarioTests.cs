@@ -256,6 +256,60 @@ public sealed class DashboardWorkspaceScenarioTests
         Assert.True(viewModel.IsOnboardingVisible);
     }
 
+    // Проверяет, что кнопка создания профиля не блокируется stale recovery-состоянием:
+    // Android provisioning сам решает, можно ли создать новый профиль после удаления старого.
+    [Fact]
+    public async Task StartProvisioningCommand_calls_android_when_recovery_was_dismissed()
+    {
+        var services = new TestPlatformServices
+        {
+            OnboardingCompleted = true,
+            DashboardProfile = TestSnapshots.Dashboard(
+                hasSetup: true,
+                workProfileAvailable: false,
+                workProfileState: WorkProfileStateKind.Unavailable,
+                workProfileRecovery: WorkProfileRecoveryKind.DeleteWorkProfile),
+            DefaultOperationResult = OperationResult.Success("ProvisioningStarted")
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+        await viewModel.EnsureInitializedAsync();
+        viewModel.WorkProfileRecoveryDismissed = true;
+
+        await viewModel.StartProvisioningCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, services.StartProvisioningCallCount);
+        Assert.False(viewModel.StatusIsError);
+        Assert.Equal("Updated", viewModel.StatusMessage);
+    }
+
+    // Проверяет переход из recovery-окна к настройкам удаления рабочего профиля
+    // и перевод Agnosia в режим первой установки.
+    [Fact]
+    public async Task OpenWorkProfileSettingsCommand_moves_recovery_to_first_setup()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(
+                hasSetup: true,
+                workProfileAvailable: false,
+                workProfileState: WorkProfileStateKind.Unavailable,
+                workProfileRecovery: WorkProfileRecoveryKind.DeleteWorkProfile),
+            DefaultOperationResult = OperationResult.Success("SettingsOpened")
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+
+        await viewModel.EnsureInitializedAsync();
+        await viewModel.OpenWorkProfileSettingsCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, services.OpenWorkProfileSettingsCallCount);
+        Assert.False(viewModel.StatusIsError);
+        Assert.Equal("SettingsOpened", viewModel.StatusMessage);
+        Assert.True(viewModel.IsOnboardingVisible);
+        Assert.True(viewModel.IsOnboardingWelcomeStep);
+        Assert.Equal("1", viewModel.OnboardingStepLabel);
+        Assert.False(viewModel.IsWorkProfileRecoveryVisible);
+    }
+
     // Проверяет, что действие recovery возвращает пользователя в начало онбординга.
     [Fact]
     public async Task RestartOnboardingFromWorkProfileRecoveryCommand_moves_unavailable_work_profile_to_onboarding_start()

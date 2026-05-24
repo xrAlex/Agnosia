@@ -17,6 +17,7 @@ namespace Agnosia.Android.Api.Platform;
 public sealed class AndroidPlatformBridge : IPlatformBridge
 {
     private const string LogTag = "AgnosiaPlatformBridge";
+    private const string ManagedProfileSettingsAction = "android.settings.MANAGED_PROFILE_SETTINGS";
     private const int ProvisioningWarmupAttempts = 5;
     private const int ProvisioningWarmupDelayMilliseconds = 2000;
 
@@ -157,7 +158,7 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         Log.Warn(LogTag, $"Managed profile provisioning blocked. {diagnostics.ToLogString()}.");
 
         if (diagnostics.ManagedProfileExists)
-            return OperationResult.Failure(
+            return MarkProfileResetRequired(
                 "Android не разрешает создать новый рабочий профиль, потому что в системе уже есть другой или остаточный рабочий профиль. " +
                 "Если рабочий профиль виден в настройках Android, удалите его и повторите создание профиля Agnosia. " +
                 "Если Android больше не показывает рабочий профиль, перезагрузите устройство и попробуйте снова.");
@@ -221,20 +222,23 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
 
     public async Task<OperationResult> OpenWorkProfileSettingsAsync(CancellationToken cancellationToken = default)
     {
-        _ = GetInitializedActivity();
+        var activity = GetInitializedActivity();
 
-        var intent = new Intent(Settings.ActionSyncSettings);
-        var result = await _commandRunner.StartExternalActivityForResultAsync(intent, cancellationToken);
-        if (WasCanceledWithError(result))
+        var intents = new[]
         {
-            var fallbackIntent = new Intent(Settings.ActionSettings);
-            var fallbackResult =
-                await _commandRunner.StartExternalActivityForResultAsync(fallbackIntent, cancellationToken);
-            if (WasCanceledWithError(fallbackResult))
-                return OperationResult.Failure("Android не смог открыть настройки устройства.");
+            new Intent(ManagedProfileSettingsAction),
+            new Intent(Settings.ActionSyncSettings),
+            new Intent(Settings.ActionSettings)
+        };
+
+        foreach (var intent in intents)
+        {
+            var result = await TryOpenSettingsIntentAsync(activity, intent, cancellationToken);
+            if (!WasCanceledWithError(result))
+                return OperationResult.Success("Проверьте удаление рабочего профиля в настройках Android.");
         }
 
-        return OperationResult.Success("Проверяем состояние рабочего профиля после возврата из настроек.");
+        return OperationResult.Failure("Android не смог открыть настройки устройства.");
     }
 
     public Task<OperationResult> CloneAsync(AppSnapshot app, CancellationToken cancellationToken = default)
@@ -347,6 +351,18 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
     {
         return result.ResultCode == Result.Canceled
                && !string.IsNullOrWhiteSpace(AndroidActivityResultApi.ExtractError(result));
+    }
+
+    private async Task<AndroidActivityResult> TryOpenSettingsIntentAsync(
+        Activity activity,
+        Intent intent,
+        CancellationToken cancellationToken)
+    {
+        if (activity.PackageManager is not { } packageManager
+            || intent.ResolveActivity(packageManager) is null)
+            return AndroidActivityResultApi.CreateCanceledResult("Android не нашёл подходящий экран настроек.");
+
+        return await _commandRunner.StartExternalActivityForResultAsync(intent, cancellationToken);
     }
 
     private bool TryGetActivityHost(out IAndroidActivityHost activityHost)

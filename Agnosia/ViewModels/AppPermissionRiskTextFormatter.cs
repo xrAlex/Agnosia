@@ -89,7 +89,7 @@ internal static class AppPermissionRiskTextFormatter
             reasons.Add("может обходить ограничения фоновой работы");
 
         if (matchedPermissionRiskRuleIds.Count > 1)
-            reasons.Add($"совпало несколько рискованных правил ({matchedPermissionRiskRuleIds.Count})");
+            reasons.Add($"имеет несколько опасных разрешений ({matchedPermissionRiskRuleIds.Count})");
 
         return reasons.Count == 0 ? [] : reasons.ToArray();
     }

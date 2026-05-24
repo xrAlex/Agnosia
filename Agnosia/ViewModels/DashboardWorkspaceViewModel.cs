@@ -745,10 +745,34 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [RelayCommand]
     private async Task OpenWorkProfileSettingsAsync()
     {
-        await RunOperationAsync(
-            () => _onboardingService.OpenWorkProfileSettingsAsync(),
-            "WorkProfileSettingsOpened",
-            true);
+        if (!TryBeginOperation()) return;
+
+        IsBusy = true;
+        try
+        {
+            var result = await _onboardingService.OpenWorkProfileSettingsAsync();
+            StatusIsError = !result.Succeeded;
+            StatusMessage = string.IsNullOrWhiteSpace(result.Message) ? "WorkProfileSettingsOpened" : result.Message;
+            if (result.Succeeded) MoveToOnboardingStart();
+        }
+        catch (Exception ex)
+        {
+            StatusIsError = true;
+            StatusMessage = ResolveExceptionMessage(ex, "WorkProfileSettingsOpened");
+        }
+        finally
+        {
+            try
+            {
+                await ReloadPlatformLogsAsync();
+            }
+            finally
+            {
+                IsBusy = false;
+                EndOperation();
+                _settingsSaveCoordinator.TryStartQueued();
+            }
+        }
     }
 
     [RelayCommand]

@@ -66,6 +66,8 @@ public sealed class TestPlatformServices :
 
     public int StartProvisioningCallCount { get; private set; }
 
+    public int OpenWorkProfileSettingsCallCount { get; private set; }
+
     public List<AppSnapshot> CloneRequests { get; } = [];
 
     public List<AppSnapshot> UninstallRequests { get; } = [];
@@ -182,6 +184,8 @@ public sealed class TestPlatformServices :
 
     public Task<OperationResult> OpenWorkProfileSettingsAsync(CancellationToken cancellationToken = default)
     {
+        OpenWorkProfileSettingsCallCount++;
+
         return Task.FromResult(DefaultOperationResult);
     }
 

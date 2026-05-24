@@ -53,7 +53,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         var workProfileAvailable = workProfileState == WorkProfileStateKind.Available;
         var hasSetup = workProfileState == WorkProfileStateKind.Available
                        || workProfileState == WorkProfileStateKind.Unavailable;
-        var recoveryKind = ResolveWorkProfileRecoveryKind(workProfileState, ownerCheck);
+        var recoveryKind = ResolveWorkProfileRecoveryKind(workProfileState, profileDiagnostics, ownerCheck);
         var diagnosticReason = BuildDiagnosticReason(workProfileState, profileDiagnostics, ownerCheck);
 
         Log.Info(
@@ -187,12 +187,14 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
 
     private static WorkProfileRecoveryKind ResolveWorkProfileRecoveryKind(
         WorkProfileStateKind workProfileState,
+        WorkProfileDiagnostics profileDiagnostics,
         WorkProfileOwnerCheckResult ownerCheck)
     {
         if (workProfileState != WorkProfileStateKind.Unavailable)
             return WorkProfileRecoveryKind.None;
 
-        return ownerCheck.Kind is WorkProfileOwnerCheckKind.AuthenticationKeyMissing
+        return profileDiagnostics.ManagedProfileExists
+               || ownerCheck.Kind is WorkProfileOwnerCheckKind.AuthenticationKeyMissing
             or WorkProfileOwnerCheckKind.AppInstalledButNotOwner
             ? WorkProfileRecoveryKind.DeleteWorkProfile
             : WorkProfileRecoveryKind.None;
