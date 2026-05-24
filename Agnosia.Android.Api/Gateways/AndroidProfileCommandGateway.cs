@@ -13,7 +13,7 @@ public static class AndroidProfileCommandGateway
 {
     private const string LogTag = "AgnosiaProfileCommand";
     public const string ExtraTrigger = AndroidCommandContract.ExtraTrigger;
-    private static readonly TimeSpan ProfilePingTimeout = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan ProfilePingTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan BooleanQueryCacheTtl = TimeSpan.FromSeconds(5);
     private static readonly Lock BooleanQueryCacheSync = new();
     private static readonly Dictionary<string, CachedBooleanQuery> BooleanQueryCache = [];

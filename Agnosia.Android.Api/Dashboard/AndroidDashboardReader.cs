@@ -53,9 +53,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         var workProfileAvailable = workProfileState == WorkProfileStateKind.Available;
         var hasSetup = workProfileState == WorkProfileStateKind.Available
                        || workProfileState == WorkProfileStateKind.Unavailable;
-        var recoveryKind = workProfileState == WorkProfileStateKind.Unavailable
-            ? WorkProfileRecoveryKind.DeleteWorkProfile
-            : WorkProfileRecoveryKind.None;
+        var recoveryKind = ResolveWorkProfileRecoveryKind(workProfileState, ownerCheck);
         var diagnosticReason = BuildDiagnosticReason(workProfileState, profileDiagnostics, ownerCheck);
 
         Log.Info(
@@ -185,6 +183,19 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             return WorkProfileStateKind.Unavailable;
 
         return WorkProfileStateKind.NoWorkProfile;
+    }
+
+    private static WorkProfileRecoveryKind ResolveWorkProfileRecoveryKind(
+        WorkProfileStateKind workProfileState,
+        WorkProfileOwnerCheckResult ownerCheck)
+    {
+        if (workProfileState != WorkProfileStateKind.Unavailable)
+            return WorkProfileRecoveryKind.None;
+
+        return ownerCheck.Kind is WorkProfileOwnerCheckKind.AuthenticationKeyMissing
+            or WorkProfileOwnerCheckKind.AppInstalledButNotOwner
+            ? WorkProfileRecoveryKind.DeleteWorkProfile
+            : WorkProfileRecoveryKind.None;
     }
 
     private static bool HasConfiguredWorkProfileSignal(LocalStorageManager storage)
