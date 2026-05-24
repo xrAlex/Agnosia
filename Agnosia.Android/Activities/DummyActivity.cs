@@ -54,6 +54,7 @@ public sealed class DummyActivity : Activity
 {
     private const string LogTag = "AgnosiaDummyActivity";
     private const int ProxyLaunchRequestCode = 7201;
+    private const int PackageInstallerUserActionRequestCode = 7202;
     private static readonly TimeSpan PackageAvailabilityWaitTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan PackageAvailabilityRetryDelay = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan HideAfterInstallRetryTimeout = TimeSpan.FromSeconds(10);
@@ -124,6 +125,12 @@ public sealed class DummyActivity : Activity
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
     {
         base.OnActivityResult(requestCode, resultCode, data);
+        if (requestCode == PackageInstallerUserActionRequestCode)
+        {
+            HandlePackageInstallerUserActionResult(resultCode);
+            return;
+        }
+
         if (requestCode != ProxyLaunchRequestCode) return;
 
         var fallback = _pendingProxyLaunchResult
@@ -144,6 +151,15 @@ public sealed class DummyActivity : Activity
             "ProxyActivity не вернула результат попытки запуска приложения.");
         failedResult.Log(LogTag);
         FinishWithResult(Result.Canceled, failedResult.ToIntent());
+    }
+
+    private void HandlePackageInstallerUserActionResult(Result resultCode)
+    {
+        DeliverPendingPackageInstallerCallback();
+        if (_finishRequested) return;
+
+        if (resultCode == Result.Canceled)
+            FinishWithError("Операция с пакетом отменена пользователем.");
     }
 
     private void HandleAction()
@@ -1260,13 +1276,15 @@ public sealed class DummyActivity : Activity
             var confirmationIntent = (Intent?)intent?.Extras?.Get(Intent.ExtraIntent);
             if (confirmationIntent is not null)
             {
-                if (!AndroidIntentApi.TryStartActivity(
-                        this,
-                        confirmationIntent,
-                        LogTag,
-                        "Android не смог открыть подтверждение установки пакета.",
-                        out var error))
-                    FinishWithError(error ?? "Android не смог открыть подтверждение установки пакета.");
+                try
+                {
+                    StartActivityForResult(confirmationIntent, PackageInstallerUserActionRequestCode);
+                }
+                catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+                {
+                    Log.Warn(LogTag, $"Android не смог открыть подтверждение установки пакета. Details: {exception}");
+                    FinishWithError("Android не смог открыть подтверждение установки пакета.");
+                }
 
                 return;
             }
