@@ -73,15 +73,12 @@ public static class AndroidProfileCommandGateway
 
         var intent = new Intent(AgnosiaActions.QueryApps);
         intent.PutExtra(AndroidCommandContract.ExtraShowAll, showAll);
-        var result = await commandRunner.StartActivityForResultAsync(
+        var data = await StartCommandForDataAsync(
+            commandRunner,
             intent,
-            true,
+            "Failed to query work apps through the profile activity command.",
             cancellationToken).ConfigureAwait(false);
-        if (!TryGetResultData(result, out var data))
-        {
-            Log.Warn(LogTag, "Failed to query work apps through the profile activity command.");
-            return null;
-        }
+        if (data is null) return null;
 
         var apps = DeserializeResult<IReadOnlyList<AppServiceModel>>(
             data.GetStringExtra(AndroidCommandContract.ResultAppsJson),
@@ -106,16 +103,13 @@ public static class AndroidProfileCommandGateway
 
         var intent = new Intent(AgnosiaActions.QueryAppIcon);
         intent.PutExtra(AndroidCommandContract.ExtraPackage, app.PackageName);
-        var result = await commandRunner.StartActivityForResultAsync(
+        var data = await StartCommandForDataAsync(
+                commandRunner,
                 intent,
-                true,
+                $"Failed to query work app icon for {app.PackageName}.",
                 cancellationToken)
             .ConfigureAwait(false);
-        if (!TryGetResultData(result, out var data))
-        {
-            Log.Warn(LogTag, $"Failed to query work app icon for {app.PackageName}.");
-            return null;
-        }
+        if (data is null) return null;
 
         return data.GetByteArrayExtra(AndroidCommandContract.ResultIconPng);
     }
@@ -160,15 +154,12 @@ public static class AndroidProfileCommandGateway
         AndroidActivityCommandGateway commandRunner,
         CancellationToken cancellationToken)
     {
-        var result = await commandRunner.StartActivityForResultAsync(
+        var data = await StartCommandForDataAsync(
+            commandRunner,
             new Intent(AgnosiaActions.QueryCrossProfilePackages),
-            true,
+            "Failed to query work cross-profile packages through the profile activity command.",
             cancellationToken);
-        if (!TryGetResultData(result, out var data))
-        {
-            Log.Warn(LogTag, "Failed to query work cross-profile packages through the profile activity command.");
-            return [];
-        }
+        if (data is null) return [];
 
         return data.GetStringArrayExtra(AndroidCommandContract.ResultInteractionPackages) ?? [];
     }
@@ -177,15 +168,12 @@ public static class AndroidProfileCommandGateway
         AndroidActivityCommandGateway commandRunner,
         CancellationToken cancellationToken)
     {
-        var result = await commandRunner.StartActivityForResultAsync(
+        var data = await StartCommandForDataAsync(
+            commandRunner,
             new Intent(AgnosiaActions.QueryLogs),
-            true,
+            "Failed to query work logs through the profile activity command.",
             cancellationToken);
-        if (!TryGetResultData(result, out var data))
-        {
-            Log.Warn(LogTag, "Failed to query work logs through the profile activity command.");
-            return [];
-        }
+        if (data is null) return [];
 
         return DeserializeResult<IReadOnlyList<AppLogEntry>>(
             data.GetStringExtra(AndroidCommandContract.ResultLogsJson),
@@ -359,6 +347,22 @@ public static class AndroidProfileCommandGateway
             true,
             cancellationToken);
         return AndroidActivityResultApi.ToPackageOperationResult(result, successMessage);
+    }
+
+    private static async Task<Intent?> StartCommandForDataAsync(
+        AndroidActivityCommandGateway commandRunner,
+        Intent intent,
+        string failureLogMessage,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandRunner.StartActivityForResultAsync(
+            intent,
+            true,
+            cancellationToken).ConfigureAwait(false);
+        if (TryGetResultData(result, out var data)) return data;
+
+        Log.Warn(LogTag, failureLogMessage);
+        return null;
     }
 
     private static Task<ProfileAppsQueryResult?> QueryLocalAppsAsync(

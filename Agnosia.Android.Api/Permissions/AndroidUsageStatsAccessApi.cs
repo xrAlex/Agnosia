@@ -21,9 +21,7 @@ public static class AndroidUsageStatsAccessApi
             var packageName = context.PackageName;
             if (uid < 0 || string.IsNullOrWhiteSpace(packageName)) return fallbackWhenUnavailable;
 
-#pragma warning disable CA1422
             var mode = appOpsManager.CheckOpNoThrow(AppOpsManager.OpstrGetUsageStats, uid, packageName);
-#pragma warning restore CA1422
             return mode is AppOpsManagerMode.Allowed or AppOpsManagerMode.Foreground;
         }
         catch (Exception exception)

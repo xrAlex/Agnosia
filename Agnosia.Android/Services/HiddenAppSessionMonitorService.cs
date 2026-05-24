@@ -28,7 +28,7 @@ namespace Agnosia.Android.Services;
 [Service(Exported = false, ForegroundServiceType = ForegroundService.TypeSpecialUse)]
 [MetaData("android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE",
     Value = "monitor_hidden_work_profile_app_until_user_leaves_it")]
-public sealed class HiddenAppSessionMonitorService : Service
+public sealed partial class HiddenAppSessionMonitorService : Service
 {
     private const string LogTag = "AgnosiaHiddenSession";
     private const string PermissionControllerPackage = "com.google.android.permissioncontroller";
@@ -1031,42 +1031,6 @@ public sealed class HiddenAppSessionMonitorService : Service
         return string.IsNullOrWhiteSpace(value) ? "<none>" : value;
     }
 
-    private static void PersistSession(HiddenAppSessionState? session)
-    {
-        if (session is null)
-        {
-            LocalStorageManager.Instance.Remove(StorageKeys.HiddenAppActiveSession);
-            return;
-        }
-
-        LocalStorageManager.Instance.SetString(
-            StorageKeys.HiddenAppActiveSession,
-            JsonSerializer.Serialize(session));
-    }
-
-    private static bool TryLoadPersistedSession(out HiddenAppSessionState session)
-    {
-        var raw = LocalStorageManager.Instance.GetString(StorageKeys.HiddenAppActiveSession);
-        if (string.IsNullOrWhiteSpace(raw))
-        {
-            session = HiddenAppSessionState.Empty;
-            return false;
-        }
-
-        try
-        {
-            session = JsonSerializer.Deserialize<HiddenAppSessionState>(raw) ?? HiddenAppSessionState.Empty;
-            return !string.IsNullOrWhiteSpace(session.PackageName) && session.TaskId >= 0;
-        }
-        catch (JsonException exception)
-        {
-            Log.Warn(LogTag, $"Failed to restore hidden-app session: {exception.Message}");
-            LocalStorageManager.Instance.Remove(StorageKeys.HiddenAppActiveSession);
-            session = HiddenAppSessionState.Empty;
-            return false;
-        }
-    }
-
     private void CancelMonitorLocked()
     {
         if (_monitorCts is null) return;
@@ -1074,26 +1038,6 @@ public sealed class HiddenAppSessionMonitorService : Service
         _monitorCts.Cancel();
         _monitorCts.Dispose();
         _monitorCts = null;
-    }
-
-    private void StartForegroundServiceNotification(HiddenAppSessionState session)
-    {
-        var notification = AndroidNotificationApi.BuildNotification(
-            this,
-            NotificationChannelId,
-            NotificationChannelName,
-            NotificationChannelDescription,
-            $"Открыто: {session.DisplayName}",
-            $"Приложение снова скроется через {UserBackgroundHideDelay.TotalSeconds:0} секунд после сворачивания или закрытия.",
-            ResourceConstant.Drawable.icon);
-
-        if (OperatingSystem.IsAndroidVersionAtLeast(34))
-        {
-            StartForeground(NotificationId, notification, ForegroundService.TypeSpecialUse);
-            return;
-        }
-
-        StartForeground(NotificationId, notification);
     }
 
     private HiddenAppSessionState UpdateLaunchResult(
@@ -1113,23 +1057,6 @@ public sealed class HiddenAppSessionMonitorService : Service
         }
 
         return updatedSession;
-    }
-
-    private static AndroidAppLaunchResult GetSessionLaunchResult(HiddenAppSessionState session)
-    {
-        return session.LaunchResult ?? AndroidAppLaunchResult.CommandReceived(session.PackageName, session.DisplayName);
-    }
-
-    private sealed record HiddenAppSessionState(
-        string PackageName,
-        string DisplayName,
-        int TaskId,
-        long StartedAtUnixTimeMilliseconds = 0,
-        AndroidAppLaunchResult? LaunchResult = null)
-    {
-        public static HiddenAppSessionState Empty { get; } = new(string.Empty, string.Empty, -1);
-
-        [JsonIgnore] public PendingIntent? ParentFrozenCallback { get; init; }
     }
 
     private sealed record UsageSessionObservation(
