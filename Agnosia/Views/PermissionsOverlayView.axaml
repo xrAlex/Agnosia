@@ -19,7 +19,9 @@
                 <Grid RowDefinitions="Auto,*,Auto"
                       RowSpacing="14">
                     <Grid RowDefinitions="Auto,Auto"
-                          RowSpacing="10">
+                          ColumnDefinitions="*,Auto"
+                          RowSpacing="10"
+                          ColumnSpacing="12">
                         <StackPanel Spacing="4">
                             <TextBlock Classes="section-title"
                                        Text="Разрешения Android" />
@@ -27,7 +29,16 @@
                                        Text="{Binding PermissionSummary, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.Permission.'}" />
                         </StackPanel>
 
+                        <Button Grid.Column="1"
+                                Classes="icon-button"
+                                ToolTip.Tip="Закрыть"
+                                Command="{Binding ClosePermissionsCommand}">
+                            <PathIcon Classes="action-icon"
+                                      Data="{StaticResource IconCloseGeometry}" />
+                        </Button>
+
                         <WrapPanel Grid.Row="1"
+                                   Grid.ColumnSpan="2"
                                    Orientation="Horizontal">
                             <Button Classes="compact-action"
                                     Margin="0,0,10,0"
@@ -39,12 +50,6 @@
                                     <TextBlock Classes="button-label"
                                                Text="Обновить" />
                                 </StackPanel>
-                            </Button>
-
-                            <Button Classes="compact-action"
-                                    Command="{Binding ClosePermissionsCommand}">
-                                <TextBlock Classes="button-label"
-                                           Text="Закрыть" />
                             </Button>
                         </WrapPanel>
                     </Grid>
