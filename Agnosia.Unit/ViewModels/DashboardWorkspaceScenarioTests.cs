@@ -187,6 +187,31 @@ public sealed class DashboardWorkspaceScenarioTests
         Assert.False(viewModel.CanContinueOnboardingFromWorkProfile);
     }
 
+    [Fact]
+    public async Task HandlePrimaryActivityResumed_refreshes_dashboard_after_initialization()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(
+                workProfileAvailable: true,
+                workProfileState: WorkProfileStateKind.Available)
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+        await viewModel.EnsureInitializedAsync();
+        var initialLoads = services.DashboardProfileLoadCount;
+
+        services.DashboardProfile = TestSnapshots.Dashboard(
+            workProfileAvailable: false,
+            workProfileState: WorkProfileStateKind.Unavailable,
+            workProfileRecovery: WorkProfileRecoveryKind.DeleteWorkProfile);
+
+        viewModel.HandlePrimaryActivityResumed();
+
+        await AsyncAssert.EventuallyAsync(
+            () => services.DashboardProfileLoadCount > initialLoads && viewModel.IsWorkProfileRecoveryVisible,
+            "Resume should refresh dashboard state.");
+    }
+
     // Проверяет уведомление на первом запуске, если Android уже содержит чужой рабочий профиль.
     [Fact]
     public async Task EnsureInitializedAsync_shows_recovery_for_foreign_work_profile_on_first_launch()

@@ -18,6 +18,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private const int SettingsSaveDelayMs = 350;
     private const int OnboardingMonitorDelayMs = 1500;
     private const int IconBatchDelayMs = 60;
+    private static readonly TimeSpan ResumeRefreshMinimumInterval = TimeSpan.FromSeconds(2);
     private const string StaleApkMessageMarker = "APK изменился";
     private static readonly PermissionKind[] RequiredOnboardingPermissionKinds =
     [
@@ -60,6 +61,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private int _inventoryLoadGeneration;
     private CancellationTokenSource? _inventoryLoadCancellation;
     private CancellationTokenSource? _onboardingMonitorCancellation;
+    private DateTimeOffset? _lastResumeRefreshAt;
 
     public IReadOnlyList<AppItemViewModel> VisibleApps => _visibleApps;
 
@@ -553,11 +555,30 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public void HandlePrimaryActivityResumed()
     {
+        var handledPermissionResume = false;
         if (_refreshPermissionsOnResume)
         {
+            handledPermissionResume = true;
             _refreshPermissionsOnResume = false;
             _ = RefreshPermissionsAfterResumeAsync();
         }
+
+        if (handledPermissionResume || StatusIsError) return;
+
+        _ = RefreshDashboardAfterResumeAsync();
+    }
+
+    private async Task RefreshDashboardAfterResumeAsync()
+    {
+        if (!_initialized || IsBusy || _isOperationInProgress) return;
+
+        var now = DateTimeOffset.UtcNow;
+        if (_lastResumeRefreshAt is not null
+            && now - _lastResumeRefreshAt.Value < ResumeRefreshMinimumInterval)
+            return;
+
+        _lastResumeRefreshAt = now;
+        await RefreshDashboardAsync(false);
     }
 
     [RelayCommand]
