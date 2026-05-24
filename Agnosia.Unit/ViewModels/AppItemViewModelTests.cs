@@ -192,21 +192,19 @@ public sealed class AppItemViewModelTests
                 "android.permission.BLUETOOTH_SCAN",
                 "android.permission.RANGING",
                 "android.permission.READ_ASSIST_STRUCTURE_SCREEN_CONTENT",
-                "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION",
-                "android.permission.POST_NOTIFICATIONS"
+                "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"
             ]));
 
-        Assert.Contains("может видеть, какие приложения используются", app.PermissionRiskReasons);
+        Assert.Contains("может видеть статистику использования приложений", app.PermissionRiskReasons);
         Assert.Contains("может видеть список установленных приложений", app.PermissionRiskReasons);
         Assert.Contains("может устанавливать APK из внешних источников", app.PermissionRiskReasons);
         Assert.Contains("может запускаться после перезагрузки устройства", app.PermissionRiskReasons);
         Assert.Contains("может обходить ограничения энергосбережения", app.PermissionRiskReasons);
         Assert.Contains("может обращаться к устройствам в локальной сети", app.PermissionRiskReasons);
         Assert.Contains("может использовать Bluetooth для поиска или обмена с устройствами рядом", app.PermissionRiskReasons);
-        Assert.Contains("может оценивать расстояние до nearby-устройств", app.PermissionRiskReasons);
+        Assert.Contains("может оценивать расстояние до  соседних устройств", app.PermissionRiskReasons);
         Assert.Contains("может получать содержимое экрана через assistant API", app.PermissionRiskReasons);
-        Assert.Contains("может быть связано с записью экрана", app.PermissionRiskReasons);
-        Assert.Contains("может активно показывать уведомления", app.PermissionRiskReasons);
+        Assert.Contains("может записывать экран устройства", app.PermissionRiskReasons);
     }
 
     // Проверяет обновление вычисляемых свойств и PropertyChanged при новом snapshot.

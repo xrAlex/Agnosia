@@ -426,6 +426,9 @@ public static partial class AppPermissionRiskCatalog
             bool isNotificationListenerEnabled,
             bool canDrawOverlays,
             bool hasUsageStatsAccess,
+            bool isVpnControlEnabled,
+            bool isAssistantScreenContentEnabled,
+            bool isMediaProjectionActive,
             bool? isCameraAppOpAllowed,
             bool? isMicrophoneAppOpAllowed,
             bool? isFineLocationAppOpAllowed,
@@ -444,6 +447,9 @@ public static partial class AppPermissionRiskCatalog
             IsNotificationListenerEnabled = isNotificationListenerEnabled;
             CanDrawOverlays = canDrawOverlays;
             HasUsageStatsAccess = hasUsageStatsAccess;
+            IsVpnControlEnabled = isVpnControlEnabled;
+            IsAssistantScreenContentEnabled = isAssistantScreenContentEnabled;
+            IsMediaProjectionActive = isMediaProjectionActive;
             IsCameraAppOpAllowed = isCameraAppOpAllowed;
             IsMicrophoneAppOpAllowed = isMicrophoneAppOpAllowed;
             IsFineLocationAppOpAllowed = isFineLocationAppOpAllowed;
@@ -469,6 +475,12 @@ public static partial class AppPermissionRiskCatalog
 
         public bool HasUsageStatsAccess { get; }
 
+        public bool IsVpnControlEnabled { get; }
+
+        public bool IsAssistantScreenContentEnabled { get; }
+
+        public bool IsMediaProjectionActive { get; }
+
         public bool? IsCameraAppOpAllowed { get; }
 
         public bool? IsMicrophoneAppOpAllowed { get; }
@@ -485,6 +497,9 @@ public static partial class AppPermissionRiskCatalog
             || IsNotificationListenerEnabled
             || CanDrawOverlays
             || HasUsageStatsAccess
+            || IsVpnControlEnabled
+            || IsAssistantScreenContentEnabled
+            || IsMediaProjectionActive
             || IsCameraAppOpAllowed is not null
             || IsMicrophoneAppOpAllowed is not null
             || IsFineLocationAppOpAllowed is not null
@@ -497,7 +512,10 @@ public static partial class AppPermissionRiskCatalog
             || IsAccessibilityServiceEnabled
             || IsNotificationListenerEnabled
             || CanDrawOverlays
-            || HasUsageStatsAccess;
+            || HasUsageStatsAccess
+            || IsVpnControlEnabled
+            || IsAssistantScreenContentEnabled
+            || IsMediaProjectionActive;
 
         public int DangerousScoreThreshold => BaseDangerousScoreThreshold;
 
@@ -528,6 +546,9 @@ public static partial class AppPermissionRiskCatalog
                 input.IsNotificationListenerEnabled,
                 input.CanDrawOverlays,
                 input.HasUsageStatsAccess,
+                input.IsVpnControlEnabled,
+                input.IsAssistantScreenContentEnabled,
+                input.IsMediaProjectionActive,
                 input.IsCameraAppOpAllowed,
                 input.IsMicrophoneAppOpAllowed,
                 input.IsFineLocationAppOpAllowed,
@@ -570,7 +591,14 @@ public static partial class AppPermissionRiskCatalog
 
         public bool HasObservedSignal(string signal)
         {
-            return _observedSignals.Contains(signal);
+            return _observedSignals.Contains(signal)
+                   || signal switch
+                   {
+                       ObservedMediaProjection => IsMediaProjectionActive,
+                       ObservedVpnControl => IsVpnControlEnabled,
+                       ObservedAssistantScreenContent => IsAssistantScreenContentEnabled,
+                       _ => false
+                   };
         }
 
         public bool HasEffectivePermission(string permission)
@@ -620,8 +648,6 @@ public static partial class AppPermissionRiskCatalog
                        or AnswerPhoneCalls
                        or BluetoothConnect
                        or BluetoothScan
-                       or BodySensors
-                       or BodySensorsBackground
                        or Camera
                        or NearbyWifiDevices
                        or PostNotifications
@@ -640,8 +666,7 @@ public static partial class AppPermissionRiskCatalog
                        or RecordAudio
                        or SendSms
                        or WriteCallLog
-                       or WriteExternalStorage
-                   || permission.StartsWith(HealthReadPermissionPrefix, StringComparison.Ordinal);
+                       or WriteExternalStorage;
         }
 
         public bool HasEnabledControlSurface(string permission)
@@ -655,6 +680,8 @@ public static partial class AppPermissionRiskCatalog
             {
                 BindAccessibilityService => IsAccessibilityServiceEnabled,
                 BindNotificationListenerService => IsNotificationListenerEnabled,
+                BindVpnService => IsVpnControlEnabled,
+                ReadAssistStructureScreenContent => IsAssistantScreenContentEnabled,
                 SystemAlertWindow => CanDrawOverlays,
                 PackageUsageStats => HasUsageStatsAccess,
                 _ => false
@@ -662,6 +689,8 @@ public static partial class AppPermissionRiskCatalog
 
             return permission is BindAccessibilityService
                 or BindNotificationListenerService
+                or BindVpnService
+                or ReadAssistStructureScreenContent
                 or SystemAlertWindow
                 or PackageUsageStats;
         }
@@ -860,6 +889,10 @@ public static partial class AppPermissionRiskCatalog
                 AddDistinct(orderedPermissions, permissions, SystemAlertWindow);
             if (input.HasUsageStatsAccess)
                 AddDistinct(orderedPermissions, permissions, PackageUsageStats);
+            if (input.IsVpnControlEnabled)
+                AddDistinct(orderedPermissions, permissions, BindVpnService);
+            if (input.IsAssistantScreenContentEnabled)
+                AddDistinct(orderedPermissions, permissions, ReadAssistStructureScreenContent);
         }
     }
 }

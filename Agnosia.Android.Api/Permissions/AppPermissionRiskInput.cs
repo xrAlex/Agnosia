@@ -16,4 +16,7 @@ public sealed record AppPermissionRiskInput(
     bool? IsMicrophoneAppOpAllowed = null,
     bool? IsFineLocationAppOpAllowed = null,
     bool? IsCoarseLocationAppOpAllowed = null,
-    IEnumerable<string>? ObservedSignals = null);
+    IEnumerable<string>? ObservedSignals = null,
+    bool IsVpnControlEnabled = false,
+    bool IsAssistantScreenContentEnabled = false,
+    bool IsMediaProjectionActive = false);
