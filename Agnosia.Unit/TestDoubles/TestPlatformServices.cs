@@ -33,7 +33,7 @@ public sealed class TestPlatformServices :
         set;
     }
 
-    public Func<IReadOnlyList<AppSnapshot>, CancellationToken, Task<IReadOnlyDictionary<string, byte[]?>>>?
+    public Func<IReadOnlyList<AppSnapshot>, CancellationToken, Task<IReadOnlyDictionary<AppItemKey, byte[]?>>>?
         LoadAppIconsHandler { get; set; }
 
     public Func<PermissionKind, CancellationToken, Task<OperationResult>>? RequestPermissionHandler { get; set; }
@@ -110,7 +110,7 @@ public sealed class TestPlatformServices :
             : LoadAppInventoryHandler(profileSnapshot, cancellationToken);
     }
 
-    public Task<IReadOnlyDictionary<string, byte[]?>> LoadAppIconsAsync(
+    public Task<IReadOnlyDictionary<AppItemKey, byte[]?>> LoadAppIconsAsync(
         IReadOnlyList<AppSnapshot> apps,
         CancellationToken cancellationToken = default)
     {
@@ -119,10 +119,10 @@ public sealed class TestPlatformServices :
         if (LoadAppIconsHandler is not null)
             return LoadAppIconsHandler(apps, cancellationToken);
 
-        IReadOnlyDictionary<string, byte[]?> result = apps.ToDictionary(
-            app => app.PackageName,
+        IReadOnlyDictionary<AppItemKey, byte[]?> result = apps.ToDictionary(
+            AppItemKey.FromSnapshot,
             app => app.IconPng,
-            StringComparer.Ordinal);
+            EqualityComparer<AppItemKey>.Default);
 
         return Task.FromResult(result);
     }

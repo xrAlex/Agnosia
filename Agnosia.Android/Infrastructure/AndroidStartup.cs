@@ -51,5 +51,6 @@ internal static class AndroidStartup
     {
         EnforceWorkProfilePolicies(context, enableLauncher);
         WorkProfileLockFreezeService.EnsureRunning(context);
+        LockFreezeCleanupJobService.RunStartupSafetyNet(context);
     }
 }

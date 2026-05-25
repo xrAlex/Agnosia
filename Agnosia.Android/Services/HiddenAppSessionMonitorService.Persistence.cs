@@ -9,6 +9,11 @@ namespace Agnosia.Android.Services;
 
 public sealed partial class HiddenAppSessionMonitorService
 {
+    public static bool HasPersistedSessionForScreenLock()
+    {
+        return TryLoadPersistedSession(out _);
+    }
+
     private static void PersistSession(HiddenAppSessionState? session)
     {
         if (session is null)

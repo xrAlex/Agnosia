@@ -74,7 +74,7 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         return _dashboardReader.LoadAppIconAsync(app, cancellationToken);
     }
 
-    public Task<IReadOnlyDictionary<string, byte[]?>> LoadAppIconsAsync(
+    public Task<IReadOnlyDictionary<AppItemKey, byte[]?>> LoadAppIconsAsync(
         IReadOnlyList<AppSnapshot> apps,
         CancellationToken cancellationToken = default)
     {

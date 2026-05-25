@@ -61,6 +61,7 @@ public sealed class DashboardWorkspaceCommandTests
 
     public static TheoryData<PermissionKind> ResumePermissionKinds => new()
     {
+        PermissionKind.Notifications,
         PermissionKind.UsageStats,
         PermissionKind.PackageInstall,
         PermissionKind.Overlay
@@ -195,20 +196,20 @@ public sealed class DashboardWorkspaceCommandTests
         var services = new TestPlatformServices
         {
             DefaultOperationResult = OperationResult.Success("PermissionOpened"),
-            Permissions = [TestSnapshots.GrantedPermission(PermissionKind.Notifications)]
+            Permissions = [TestSnapshots.GrantedPermission(PermissionKind.VpnControl)]
         };
         var viewModel = TestWorkspaceFactory.Create(services);
         var permission = TestWorkspaceFactory.CreatePermission(
             viewModel,
-            TestSnapshots.RequiredPermission(PermissionKind.Notifications));
+            TestSnapshots.RequiredPermission(PermissionKind.VpnControl));
 
         await permission.RequestCommand.ExecuteAsync(null);
 
-        Assert.Equal([PermissionKind.Notifications], services.PermissionRequests);
+        Assert.Equal([PermissionKind.VpnControl], services.PermissionRequests);
         Assert.Equal(1, services.PermissionLoadCount);
         Assert.False(viewModel.StatusIsError);
         Assert.Equal("PermissionOpened", viewModel.StatusMessage);
-        Assert.Contains(viewModel.PermissionItems, item => item.Kind == PermissionKind.Notifications && item.IsGranted);
+        Assert.Contains(viewModel.PermissionItems, item => item.Kind == PermissionKind.VpnControl && item.IsGranted);
     }
 
     // Проверяет сброс resume flag после неуспешного запроса permission с отложенным refresh.

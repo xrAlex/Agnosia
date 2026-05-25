@@ -48,6 +48,45 @@ public sealed class AndroidSourceContractTests
         Assert.Contains("disable-camera", policyNames);
     }
 
+    // Проверяет, что boot/profile unlock не зависит только от background StartService.
+    [Fact]
+    public void Lock_freeze_startup_receiver_schedules_cleanup_job()
+    {
+        var receiverSource = ReadAndroidSource("Receivers\\LockFreezeStartupReceiver.cs");
+
+        Assert.Contains("LockFreezeCleanupJobService.Schedule(context, action)", receiverSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("WorkProfileLockFreezeService.EnsureRunning(context)", receiverSource, StringComparison.Ordinal);
+    }
+
+    // Проверяет контракт fallback job для persisted-session cleanup после boot/profile unlock.
+    [Fact]
+    public void Lock_freeze_cleanup_job_runs_persisted_session_cleanup()
+    {
+        var jobSource = ReadAndroidSource("Services\\LockFreezeCleanupJobService.cs");
+        var startupSource = ReadAndroidSource("Infrastructure\\AndroidStartup.cs");
+
+        Assert.Contains(": JobService", jobSource, StringComparison.Ordinal);
+        Assert.Contains("Permission = \"android.permission.BIND_JOB_SERVICE\"", jobSource, StringComparison.Ordinal);
+        Assert.Contains("SetOverrideDeadline(0)", jobSource, StringComparison.Ordinal);
+        Assert.Contains("CompletePersistedSessionForScreenLock(context)", jobSource, StringComparison.Ordinal);
+        Assert.Contains("skipped_no_session", jobSource, StringComparison.Ordinal);
+        Assert.Contains("LockFreezeCleanupJobService.RunStartupSafetyNet(context)", startupSource, StringComparison.Ordinal);
+    }
+
+    // Проверяет, что batch-загрузка иконок рабочего профиля идет через cross-profile command.
+    [Fact]
+    public void Work_profile_batch_icon_loading_uses_query_app_icons_command()
+    {
+        var gatewaySource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Gateways", "AndroidProfileCommandGateway.cs"));
+
+        Assert.Contains("new Intent(AgnosiaActions.QueryAppIcons)", gatewaySource, StringComparison.Ordinal);
+        Assert.Contains("AndroidCommandContract.ExtraPackages", gatewaySource, StringComparison.Ordinal);
+        Assert.Contains("AndroidCommandContract.ResultIconsBundle", gatewaySource, StringComparison.Ordinal);
+        Assert.Contains("new AppItemKey(ProfileKind.Work, packageName)", gatewaySource, StringComparison.Ordinal);
+        Assert.DoesNotContain("icons[app.PackageName] = app.IconPng", gatewaySource, StringComparison.Ordinal);
+    }
+
     private static string[] ReadIntentFilterActionNames(params string[] relativeSourcePaths)
     {
         var names = new HashSet<string>(StringComparer.Ordinal);

@@ -70,6 +70,19 @@ public sealed class AndroidManifestContractTests
         Assert.Contains("android.intent.category.LAUNCHER", categories);
     }
 
+    // Проверяет, что specialUse FGS subtype генерируется как service-level <property>, а не <meta-data>.
+    [Fact]
+    public void Hidden_session_monitor_declares_special_use_subtype_as_service_property()
+    {
+        var source = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Services", "HiddenAppSessionMonitorService.cs"));
+
+        Assert.Contains("ForegroundServiceType = ForegroundService.TypeSpecialUse", source, StringComparison.Ordinal);
+        Assert.Contains("[Property(\"android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("[MetaData(\"android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE\"", source,
+            StringComparison.Ordinal);
+    }
+
     private static XDocument ReadManifest()
     {
         return XDocument.Load(RepositoryPaths.Get("Agnosia.Android", "Properties", "AndroidManifest.xml"));

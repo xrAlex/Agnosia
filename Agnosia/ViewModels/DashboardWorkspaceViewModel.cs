@@ -1249,7 +1249,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private static bool ShouldRefreshPermissionOnResume(PermissionKind kind)
     {
-        return kind is PermissionKind.UsageStats
+        return kind is PermissionKind.Notifications
+            or PermissionKind.UsageStats
             or PermissionKind.PackageInstall
             or PermissionKind.Overlay;
     }
@@ -1497,6 +1498,4 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         var suffix = string.IsNullOrWhiteSpace(detail) ? string.Empty : $"; {detail}";
         Trace.WriteLine($"AgnosiaPerf {operation} elapsedMs={elapsedMs:0.0}{suffix}");
     }
-
-    private readonly record struct AppItemKey(ProfileKind Profile, string PackageName);
 }

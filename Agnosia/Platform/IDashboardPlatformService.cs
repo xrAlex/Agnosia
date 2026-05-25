@@ -10,7 +10,7 @@ public interface IDashboardPlatformService
         DashboardSnapshot profileSnapshot,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyDictionary<string, byte[]?>> LoadAppIconsAsync(
+    Task<IReadOnlyDictionary<AppItemKey, byte[]?>> LoadAppIconsAsync(
         IReadOnlyList<AppSnapshot> apps,
         CancellationToken cancellationToken = default);
 }

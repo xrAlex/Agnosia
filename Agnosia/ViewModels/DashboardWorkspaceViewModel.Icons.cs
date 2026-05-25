@@ -69,7 +69,7 @@ public partial class DashboardWorkspaceViewModel
         var snapshots = GetDistinctIconSnapshots(batch);
         var startedAt = Stopwatch.GetTimestamp();
 
-        IReadOnlyDictionary<string, byte[]?> icons;
+        IReadOnlyDictionary<AppItemKey, byte[]?> icons;
         await _iconLoadGate.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -89,7 +89,7 @@ public partial class DashboardWorkspaceViewModel
 
         foreach (var request in batch)
         {
-            icons.TryGetValue(request.Snapshot.PackageName, out var iconPng);
+            icons.TryGetValue(AppItemKey.FromSnapshot(request.Snapshot), out var iconPng);
             request.TrySetResult(iconPng);
         }
     }
@@ -97,11 +97,11 @@ public partial class DashboardWorkspaceViewModel
     private static AppSnapshot[] GetDistinctIconSnapshots(IReadOnlyList<PendingIconLoad> batch)
     {
         var snapshots = new List<AppSnapshot>(batch.Count);
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var seen = new HashSet<AppItemKey>();
         for (var index = 0; index < batch.Count; index++)
         {
             var snapshot = batch[index].Snapshot;
-            if (seen.Add(snapshot.PackageName))
+            if (seen.Add(AppItemKey.FromSnapshot(snapshot)))
                 snapshots.Add(snapshot);
         }
 

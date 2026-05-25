@@ -26,7 +26,7 @@ using StringBuilder = System.Text.StringBuilder;
 namespace Agnosia.Android.Services;
 
 [Service(Exported = false, ForegroundServiceType = ForegroundService.TypeSpecialUse)]
-[MetaData("android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE",
+[Property("android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE",
     Value = "monitor_hidden_work_profile_app_until_user_leaves_it")]
 public sealed partial class HiddenAppSessionMonitorService : Service
 {

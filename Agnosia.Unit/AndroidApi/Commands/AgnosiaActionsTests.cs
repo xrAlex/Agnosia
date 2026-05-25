@@ -43,6 +43,18 @@ public sealed class AgnosiaActionsTests
         });
     }
 
+    // Проверяет, что recovery command не может уйти в произвольный exported activity другого пакета.
+    [Fact]
+    public void Recovery_target_resolution_requires_android_cross_profile_forwarder()
+    {
+        var source = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Platform", "AgnosiaUtilities.cs"));
+
+        Assert.Contains("AndroidSystemApi.IsCrossProfileIntentForwarder(activity)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("fallback", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ActivityInfo?.PackageName, context.PackageName", source, StringComparison.Ordinal);
+    }
+
     // Проверяет namespace и уникальность всех объявленных Android actions.
     [Fact]
     public void Declared_action_constants_use_agnosia_action_namespace()

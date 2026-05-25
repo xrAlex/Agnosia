@@ -272,16 +272,9 @@ public static class AgnosiaUtilities
         var activities = context.PackageManager?.QueryIntentActivities(intent, flags);
         if (activities is null) return null;
 
-        ResolveInfo? fallback = null;
         foreach (var activity in activities)
-        {
             if (AndroidSystemApi.IsCrossProfileIntentForwarder(activity)) return activity;
 
-            if (fallback is null
-                && !string.Equals(activity.ActivityInfo?.PackageName, context.PackageName, StringComparison.Ordinal))
-                fallback = activity;
-        }
-
-        return fallback;
+        return null;
     }
 }

@@ -17,10 +17,10 @@ public sealed class DashboardWorkspaceIconLoadingTests
         {
             LoadAppIconsHandler = (apps, _) =>
             {
-                IReadOnlyDictionary<string, byte[]?> result = apps.ToDictionary(
-                    app => app.PackageName,
+                IReadOnlyDictionary<AppItemKey, byte[]?> result = apps.ToDictionary(
+                    AppItemKey.FromSnapshot,
                     _ => (byte[]?)icon,
-                    StringComparer.Ordinal);
+                    EqualityComparer<AppItemKey>.Default);
 
                 return Task.FromResult(result);
             }
@@ -69,7 +69,7 @@ public sealed class DashboardWorkspaceIconLoadingTests
         var services = new TestPlatformServices
         {
             LoadAppIconsHandler = (_, _) =>
-                Task.FromException<IReadOnlyDictionary<string, byte[]?>>(expected)
+                Task.FromException<IReadOnlyDictionary<AppItemKey, byte[]?>>(expected)
         };
         var viewModel = TestWorkspaceFactory.Create(services, delays.DelayAsync);
         var app = TestSnapshots.App(ProfileKind.Personal, "com.example.error", "Error");
@@ -80,5 +80,38 @@ public sealed class DashboardWorkspaceIconLoadingTests
             async () => await iconTask);
 
         Assert.Same(expected, actual);
+    }
+
+    // Проверяет, что batch-key учитывает профиль и не смешивает personal/work package twins.
+    [Fact]
+    public async Task LoadAppIconPngAsync_keeps_personal_and_work_icons_separate_for_same_package()
+    {
+        var delays = new ManualDelayScheduler();
+        var personalIcon = new byte[] { 1 };
+        var workIcon = new byte[] { 2 };
+        var services = new TestPlatformServices
+        {
+            LoadAppIconsHandler = (_, _) => Task.FromResult<IReadOnlyDictionary<AppItemKey, byte[]?>>(
+                new Dictionary<AppItemKey, byte[]?>
+                {
+                    [new AppItemKey(ProfileKind.Personal, "com.example.same")] = personalIcon,
+                    [new AppItemKey(ProfileKind.Work, "com.example.same")] = workIcon
+                })
+        };
+        var viewModel = TestWorkspaceFactory.Create(services, delays.DelayAsync);
+        var personal = TestSnapshots.App(ProfileKind.Personal, "com.example.same", "Same");
+        var work = TestSnapshots.App(ProfileKind.Work, "com.example.same", "Same Work");
+
+        var personalTask = viewModel.LoadAppIconPngAsync(personal, CancellationToken.None);
+        var workTask = viewModel.LoadAppIconPngAsync(work, CancellationToken.None);
+        delays.CompleteNext();
+
+        Assert.Same(personalIcon, await personalTask);
+        Assert.Same(workIcon, await workTask);
+
+        var request = Assert.Single(services.AppIconLoadRequests);
+        Assert.Equal(2, request.Count);
+        Assert.Contains(request, app => app.Profile == ProfileKind.Personal && app.PackageName == "com.example.same");
+        Assert.Contains(request, app => app.Profile == ProfileKind.Work && app.PackageName == "com.example.same");
     }
 }

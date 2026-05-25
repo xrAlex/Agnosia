@@ -152,22 +152,24 @@ public static class AndroidProfileCommandGateway
         return data.GetByteArrayExtra(AndroidCommandContract.ResultIconPng);
     }
 
-    internal static async Task<IReadOnlyDictionary<string, byte[]?>> LoadAppIconsAsync(
+    internal static async Task<IReadOnlyDictionary<AppItemKey, byte[]?>> LoadAppIconsAsync(
         AndroidActivityCommandGateway commandRunner,
         IReadOnlyList<AppSnapshot> apps,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (apps.Count == 0) return new Dictionary<string, byte[]?>(StringComparer.Ordinal);
+        if (apps.Count == 0) return new Dictionary<AppItemKey, byte[]?>();
 
-        var icons = new Dictionary<string, byte[]?>(StringComparer.Ordinal);
+        var icons = new Dictionary<AppItemKey, byte[]?>();
         var personalPackageNames = apps
             .Where(app => app.Profile == ProfileKind.Personal)
             .Select(app => app.PackageName)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
-        var workApps = apps
+        var workPackageNames = apps
             .Where(app => app.Profile == ProfileKind.Work)
+            .Select(app => app.PackageName)
+            .Distinct(StringComparer.Ordinal)
             .ToArray();
 
         if (personalPackageNames.Length > 0)
@@ -177,12 +179,27 @@ public static class AndroidProfileCommandGateway
                     personalPackageNames,
                     cancellationToken)
                 .ConfigureAwait(false);
-            foreach (var (packageName, iconPng) in personalIcons) icons[packageName] = iconPng;
+            foreach (var (packageName, iconPng) in personalIcons)
+                icons[new AppItemKey(ProfileKind.Personal, packageName)] = iconPng;
         }
 
-        if (workApps.Length > 0)
+        if (workPackageNames.Length > 0)
         {
-            foreach (var app in workApps) icons[app.PackageName] = app.IconPng;
+            foreach (var packageName in workPackageNames)
+                icons[new AppItemKey(ProfileKind.Work, packageName)] = null;
+
+            var intent = new Intent(AgnosiaActions.QueryAppIcons);
+            intent.PutExtra(AndroidCommandContract.ExtraPackages, workPackageNames);
+            var data = await StartCommandForDataAsync(
+                    commandRunner,
+                    intent,
+                    "Failed to query work app icons through the profile activity command.",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            var bundle = data?.GetBundleExtra(AndroidCommandContract.ResultIconsBundle);
+            if (bundle is not null)
+                foreach (var packageName in workPackageNames)
+                    icons[new AppItemKey(ProfileKind.Work, packageName)] = bundle.GetByteArray(packageName);
         }
 
         return icons;

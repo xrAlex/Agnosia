@@ -55,15 +55,14 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
         return Task.FromResult<byte[]?>(null);
     }
 
-    public Task<IReadOnlyDictionary<string, byte[]?>> LoadAppIconsAsync(
+    public Task<IReadOnlyDictionary<AppItemKey, byte[]?>> LoadAppIconsAsync(
         IReadOnlyList<AppSnapshot> apps,
         CancellationToken cancellationToken = default)
     {
-        return Task.FromResult<IReadOnlyDictionary<string, byte[]?>>(
-            apps
-                .Select(app => app.PackageName)
-                .Distinct(StringComparer.Ordinal)
-                .ToDictionary(packageName => packageName, byte[]? (_) => null, StringComparer.Ordinal));
+        var icons = new Dictionary<AppItemKey, byte[]?>();
+        foreach (var app in apps) icons[AppItemKey.FromSnapshot(app)] = null;
+
+        return Task.FromResult<IReadOnlyDictionary<AppItemKey, byte[]?>>(icons);
     }
 
     public string GetDeviceInfoString()

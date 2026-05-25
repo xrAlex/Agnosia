@@ -136,7 +136,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         return AndroidProfileCommandGateway.LoadAppIconAsync(commandRunner, app, cancellationToken);
     }
 
-    public Task<IReadOnlyDictionary<string, byte[]?>> LoadAppIconsAsync(
+    public Task<IReadOnlyDictionary<AppItemKey, byte[]?>> LoadAppIconsAsync(
         IReadOnlyList<AppSnapshot> apps,
         CancellationToken cancellationToken)
     {

@@ -26,7 +26,7 @@ public sealed partial class DummyActivity
 
         try
         {
-            var showAll = intent.GetBooleanExtra("show_all", false);
+            var showAll = intent.GetBooleanExtra(AndroidCommandContract.ExtraShowAll, false);
             var policyManager = _policyManager;
             var admin = _isProfileOwner && policyManager is not null
                 ? AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType)
@@ -63,7 +63,7 @@ public sealed partial class DummyActivity
     {
         var intent = Intent;
         var packageManager = PackageManager;
-        var packageName = intent?.GetStringExtra("package");
+        var packageName = intent?.GetStringExtra(AndroidCommandContract.ExtraPackage);
         if (string.IsNullOrWhiteSpace(packageName) || packageManager is null)
         {
             FinishWithResult(Result.Canceled);
@@ -95,7 +95,7 @@ public sealed partial class DummyActivity
     private async Task ActionQueryAppIconsAsync(CancellationToken cancellationToken)
     {
         var packageManager = PackageManager;
-        var packageNames = Intent?.GetStringArrayExtra("packages") ?? [];
+        var packageNames = Intent?.GetStringArrayExtra(AndroidCommandContract.ExtraPackages) ?? [];
         if (packageNames.Length == 0 || packageManager is null)
         {
             FinishWithResult(Result.Canceled);

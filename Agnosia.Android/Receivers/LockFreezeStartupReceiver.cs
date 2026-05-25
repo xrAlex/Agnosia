@@ -30,12 +30,13 @@ public sealed class LockFreezeStartupReceiver : BroadcastReceiver
             if (!AgnosiaUtilities.IsProfileOwner(context)) return;
 
             AndroidStartup.EnforceWorkProfilePolicies(context);
-            Log.Info(LogTag, $"Starting lock-freeze monitor after {intent?.Action ?? "<unknown>"}.");
-            WorkProfileLockFreezeService.EnsureRunning(context);
+            var action = intent?.Action ?? "<unknown>";
+            var result = LockFreezeCleanupJobService.Schedule(context, action);
+            Log.Info(LogTag, $"Lock-freeze cleanup fallback after {action}: {result}.");
         }
         catch (Exception exception)
         {
-            Log.Warn(LogTag, $"Failed to start lock-freeze monitor after system broadcast: {exception}");
+            Log.Warn(LogTag, $"Failed to schedule lock-freeze cleanup fallback after system broadcast: {exception}");
         }
     }
 }
