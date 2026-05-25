@@ -102,33 +102,12 @@
     <Style Selector="Border.surface-card.compact">
         <Setter Property="Padding" Value="14" />
     </Style>
-    <Style Selector="Border.onboarding-info-card">
-        <Setter Property="Transitions">
-            <Transitions>
-                <DoubleTransition Property="Opacity" Duration="0:0:0.35" />
-            </Transitions>
-        </Setter>
-    </Style>
-    <Style Selector="Border.onboarding-final-hero">
-        <Setter Property="BorderBrush" Value="{StaticResource AppAccentMutedBrush}" />
-    </Style>
-    <Style Selector="Border.tutorial-step-card">
-        <Setter Property="Background" Value="{StaticResource AppChromeBrush}" />
-    </Style>
-    <Style Selector="Border.tutorial-step-card:pointerover">
-        <Setter Property="Background" Value="{StaticResource AppSurfaceAltBrush}" />
-        <Setter Property="BorderBrush" Value="{StaticResource AppBorderBrush}" />
-    </Style>
     <Style Selector="Border.tutorial-step-icon">
         <Setter Property="Background" Value="{StaticResource AppAccentMutedBrush}" />
         <Setter Property="BorderBrush" Value="{StaticResource AppAccentMutedBrush}" />
     </Style>
     <Style Selector="Border.tutorial-step-icon PathIcon">
         <Setter Property="Foreground" Value="{StaticResource AppAccentBrush}" />
-    </Style>
-    <Style Selector="Border.tutorial-summary-card">
-        <Setter Property="Background" Value="{StaticResource AppSurfaceAltBrush}" />
-        <Setter Property="BorderBrush" Value="{StaticResource AppBorderSoftBrush}" />
     </Style>
     <Style Selector="Border.overlay-panel">
         <Setter Property="MaxWidth" Value="860" />
@@ -418,23 +397,6 @@
         <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
     <Style Selector="Button.app-card-button:pressed">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="Transparent" />
-    </Style>
-    <Style Selector="Button.icon-action">
-        <Setter Property="Width" Value="38" />
-        <Setter Property="Height" Value="38" />
-        <Setter Property="MinHeight" Value="38" />
-        <Setter Property="Padding" Value="0" />
-        <Setter Property="HorizontalContentAlignment" Value="Center" />
-        <Setter Property="VerticalContentAlignment" Value="Center" />
-        <Setter Property="CornerRadius" Value="6" />
-    </Style>
-    <Style Selector="Button.icon-action:pointerover">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="Transparent" />
-    </Style>
-    <Style Selector="Button.icon-action:pressed">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="Transparent" />
     </Style>

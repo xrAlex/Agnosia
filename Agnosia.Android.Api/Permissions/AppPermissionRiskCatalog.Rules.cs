@@ -8,7 +8,6 @@ public static partial class AppPermissionRiskCatalog
     private const int Android12LApi = 32;
     private const int Android13Api = 33;
     private const int Android14Api = 34;
-    private const int Android15Api = 35;
     private const int Android16Api = 36;
     private const int Android17Api = 37;
     private const int LegacyExternalStorageMaxTargetSdk = 29;

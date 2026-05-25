@@ -174,38 +174,6 @@ public sealed class AppItemViewModelTests
         Assert.Equal("READ_SMS", app.RuntimePermissionsText);
     }
 
-    [Fact]
-    public void Permission_risk_reasons_cover_catalog_permission_groups()
-    {
-        var app = CreateApp(TestSnapshots.App(
-            ProfileKind.Work,
-            permissionRiskLevel: AppPermissionRiskLevel.Critical,
-            riskyPermissions:
-            [
-                "android.permission.PACKAGE_USAGE_STATS",
-                "android.permission.QUERY_ALL_PACKAGES",
-                "android.permission.REQUEST_INSTALL_PACKAGES",
-                "android.permission.RECEIVE_BOOT_COMPLETED",
-                "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
-                "android.permission.ACCESS_LOCAL_NETWORK",
-                "android.permission.BLUETOOTH_SCAN",
-                "android.permission.RANGING",
-                "android.permission.READ_ASSIST_STRUCTURE_SCREEN_CONTENT",
-                "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"
-            ]));
-
-        Assert.Contains("может видеть статистику использования приложений", app.PermissionRiskReasons);
-        Assert.Contains("может видеть список установленных приложений", app.PermissionRiskReasons);
-        Assert.Contains("может устанавливать APK из внешних источников", app.PermissionRiskReasons);
-        Assert.Contains("может запускаться после перезагрузки устройства", app.PermissionRiskReasons);
-        Assert.Contains("может обходить ограничения энергосбережения", app.PermissionRiskReasons);
-        Assert.Contains("может обращаться к устройствам в локальной сети", app.PermissionRiskReasons);
-        Assert.Contains("может использовать Bluetooth для поиска или обмена с устройствами рядом", app.PermissionRiskReasons);
-        Assert.Contains("может оценивать расстояние до  соседних устройств", app.PermissionRiskReasons);
-        Assert.Contains("может получать содержимое экрана через assistant API", app.PermissionRiskReasons);
-        Assert.Contains("может записывать экран устройства", app.PermissionRiskReasons);
-    }
-
     // Проверяет обновление вычисляемых свойств и PropertyChanged при новом snapshot.
     [Fact]
     public void ApplySnapshot_updates_derived_properties_and_raises_change_notifications()

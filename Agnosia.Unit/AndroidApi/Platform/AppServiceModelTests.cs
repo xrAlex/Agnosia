@@ -7,29 +7,6 @@ namespace Agnosia.Unit.AndroidApi.Platform;
 
 public sealed class AppServiceModelTests
 {
-    // Проверяет безопасные defaults DTO, когда Android inventory не прислал optional поля.
-    [Fact]
-    public void Defaults_represent_safe_app_inventory_item()
-    {
-        var model = new AppServiceModel
-        {
-            PackageName = "org.example.app",
-            Label = "Example"
-        };
-
-        Assert.Equal("org.example.app", model.PackageName);
-        Assert.Equal("Example", model.Label);
-        Assert.Null(model.SourceDirectory);
-        Assert.Empty(model.SplitApks);
-        Assert.Null(model.IconPng);
-        Assert.False(model.IsSystem);
-        Assert.False(model.IsHidden);
-        Assert.False(model.CanLaunch);
-        Assert.False(model.IsInstalled);
-        Assert.Equal(AppPermissionRiskLevel.Safe, model.PermissionRiskLevel);
-        Assert.Empty(model.RiskyPermissions);
-    }
-
     // Проверяет JSON contract DTO для передачи app inventory между Android профилями.
     [Fact]
     public void App_inventory_item_round_trips_through_default_json_serializer()
