@@ -780,7 +780,15 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             return;
         }
 
+        if (OnboardingStep != OnboardingStep.Final)
+        {
+            StatusIsError = false;
+            OnboardingStep = OnboardingStep.Final;
+            return;
+        }
+
         await CompleteOnboardingAsync();
+        if (OnboardingCompleted && CanOpenAppsSection) SelectedSection = DashboardSection.Apps;
     }
 
     [RelayCommand(CanExecute = nameof(CanStartProvisioning))]

@@ -265,9 +265,9 @@ public sealed class DashboardWorkspaceCommandTests
             "Permission reload should happen after primary activity resume.");
     }
 
-    // Проверяет завершение onboarding, когда все обязательные permissions выданы.
+    // Проверяет переход onboarding на финальный шаг, когда все обязательные permissions выданы.
     [Fact]
-    public async Task FinishOnboardingCommand_completes_onboarding_when_all_required_permissions_are_granted()
+    public async Task FinishOnboardingCommand_moves_permissions_to_final_when_all_required_permissions_are_granted()
     {
         var services = new TestPlatformServices
         {
@@ -279,6 +279,29 @@ public sealed class DashboardWorkspaceCommandTests
         var viewModel = TestWorkspaceFactory.Create(services);
         await viewModel.EnsureInitializedAsync();
         viewModel.OnboardingStep = OnboardingStep.Permissions;
+
+        await viewModel.FinishOnboardingCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, services.CompleteOnboardingCallCount);
+        Assert.True(viewModel.IsOnboardingVisible);
+        Assert.True(viewModel.IsOnboardingFinalStep);
+        Assert.False(viewModel.StatusIsError);
+    }
+
+    // Проверяет завершение onboarding с финального шага.
+    [Fact]
+    public async Task FinishOnboardingCommand_completes_onboarding_from_final_step()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            OnboardingCompleted = false,
+            DefaultOperationResult = OperationResult.Success("ProvisioningFinished"),
+            Permissions = TestSnapshots.RequiredOnboardingPermissions(granted: true)
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+        await viewModel.EnsureInitializedAsync();
+        viewModel.OnboardingStep = OnboardingStep.Final;
 
         await viewModel.FinishOnboardingCommand.ExecuteAsync(null);
 
@@ -304,7 +327,7 @@ public sealed class DashboardWorkspaceCommandTests
         };
         var viewModel = TestWorkspaceFactory.Create(services);
         await viewModel.EnsureInitializedAsync();
-        viewModel.OnboardingStep = OnboardingStep.Permissions;
+        viewModel.OnboardingStep = OnboardingStep.Final;
 
         await viewModel.FinishOnboardingCommand.ExecuteAsync(null);
 
@@ -327,7 +350,7 @@ public sealed class DashboardWorkspaceCommandTests
         };
         var viewModel = TestWorkspaceFactory.Create(services);
         await viewModel.EnsureInitializedAsync();
-        viewModel.OnboardingStep = OnboardingStep.Permissions;
+        viewModel.OnboardingStep = OnboardingStep.Final;
 
         await viewModel.FinishOnboardingCommand.ExecuteAsync(null);
 

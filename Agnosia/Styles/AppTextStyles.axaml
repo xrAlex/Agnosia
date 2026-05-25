@@ -26,6 +26,11 @@
         <Setter Property="FontSize" Value="15" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="{StaticResource AppAccentBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="TextTrimming" Value="None" />
+    </Style>
+    <Style Selector="TextBlock.group-title.feature-title">
+        <Setter Property="Foreground" Value="{StaticResource AppTextPrimaryBrush}" />
     </Style>
     <Style Selector="TextBlock.section-title">
         <Setter Property="FontSize" Value="18" />
