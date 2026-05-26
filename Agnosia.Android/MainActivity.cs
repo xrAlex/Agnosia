@@ -88,7 +88,6 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
                 await Task.Delay(100);
 
                 RunOnUiThread(ApplyPreferredDisplayMode);
-                WorkProfileLockFreezeService.EnsureRunning(this);
 
                 if (!AgnosiaUtilities.IsProfileOwner(this)) return;
 

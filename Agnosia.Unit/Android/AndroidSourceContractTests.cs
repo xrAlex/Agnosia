@@ -73,6 +73,19 @@ public sealed class AndroidSourceContractTests
         Assert.Contains("LockFreezeCleanupJobService.RunStartupSafetyNet(context)", startupSource, StringComparison.Ordinal);
     }
 
+    // Проверяет, что SCREEN_OFF-монитор работает только в рабочем профиле.
+    [Fact]
+    public void Lock_freeze_service_does_not_restore_parent_vpn_directly()
+    {
+        var mainActivitySource = ReadAndroidSource("MainActivity.cs");
+        var serviceSource = ReadAndroidSource("Services\\WorkProfileLockFreezeService.cs");
+
+        Assert.DoesNotContain("WorkProfileLockFreezeService.EnsureRunning(this)", mainActivitySource, StringComparison.Ordinal);
+        Assert.DoesNotContain("EnableParentVpnAfterScreenLock", serviceSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("parent_screen_lock", serviceSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("AndroidVpnAutomationApi", serviceSource, StringComparison.Ordinal);
+    }
+
     // Проверяет, что batch-загрузка иконок рабочего профиля идет через cross-profile command.
     [Fact]
     public void Work_profile_batch_icon_loading_uses_query_app_icons_command()

@@ -522,8 +522,7 @@ public sealed partial class HiddenAppSessionMonitorService : Service
             if (string.Equals(reason, ScreenNonInteractiveReason, StringComparison.Ordinal))
             {
                 Log.Debug(LogTag,
-                    $"Skipping session-level VPN enable after screen-lock freeze for {session.PackageName}; lock service handles it.");
-                return;
+                    $"Screen-lock freeze completed for {session.PackageName}; notifying parent profile so VPN restore is not dependent on the parent lock receiver.");
             }
 
             if (TryNotifyParentWithPendingIntent(session, reason)) return;
