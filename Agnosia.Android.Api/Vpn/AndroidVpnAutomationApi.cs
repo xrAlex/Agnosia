@@ -2,6 +2,7 @@ using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Api.Storage;
 using Agnosia.Models;
 using Android.Content;
+using Android.Content.PM;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Api.Vpn;
@@ -65,11 +66,11 @@ public static class AndroidVpnAutomationApi
             RequireExplicitActivity: true),
         new(
             VpnAutomationClientKind.NekoBoxPlus,
-            "NekoBox+",
-            "moe.nb4a",
+            "NekoBox",
+            ["com.nb4a.plus", "moe.nb4a"],
             string.Empty,
-            ActivityClassName: "io.nekohasekai.sagernet.QuickToggleShortcut",
-            RequireExplicitActivity: true)
+            activityClassName: "io.nekohasekai.sagernet.QuickToggleShortcut",
+            requireExplicitActivity: true)
     ];
 
     public static Task<OperationResult> EnableConfiguredVpnAfterWorkFreezeAsync(Context context, string trigger)
@@ -97,7 +98,7 @@ public static class AndroidVpnAutomationApi
             return Task.FromResult(OperationResult.Success(string.Empty));
         }
 
-        var definition = ResolveClient(AndroidSettingsStore.LoadVpnAfterWorkFreezeClient(storage));
+        var definition = ResolveInstalledPackage(context, ResolveClient(AndroidSettingsStore.LoadVpnAfterWorkFreezeClient(storage)));
         Log.Debug(LogTag,
             $"Starting VPN after work freeze. client={definition.DisplayName}, trigger={trigger}, hadActiveVpnSession={hadActiveVpnSession}.");
 
@@ -273,6 +274,33 @@ public static class AndroidVpnAutomationApi
         return VpnClients[^1];
     }
 
+    private static VpnClientDefinition ResolveInstalledPackage(Context context, VpnClientDefinition definition)
+    {
+        if (definition.PackageNames.Length <= 1) return definition;
+
+        foreach (var packageName in definition.PackageNames)
+            if (IsPackageInstalled(context.PackageManager, packageName))
+                return definition with { PackageName = packageName };
+
+        return definition;
+    }
+
+    private static bool IsPackageInstalled(PackageManager? packageManager, string packageName)
+    {
+        if (packageManager is null || string.IsNullOrWhiteSpace(packageName)) return false;
+
+        try
+        {
+            packageManager.GetPackageInfo(packageName, 0);
+            return true;
+        }
+        catch (Exception exception) when (exception is PackageManager.NameNotFoundException
+                                          || AndroidRecoverableException.IsMatch(exception))
+        {
+            return false;
+        }
+    }
+
     private sealed record VpnClientDefinition(
         VpnAutomationClientKind Kind,
         string DisplayName,
@@ -283,5 +311,34 @@ public static class AndroidVpnAutomationApi
         string? ActivityClassName = null,
         string? ReceiverClassName = null,
         bool RequireExplicitActivity = false,
-        bool IsolateActivityTask = false);
+        bool IsolateActivityTask = false)
+    {
+        public string[] PackageNames { get; init; } = [PackageName];
+
+        public VpnClientDefinition(
+            VpnAutomationClientKind kind,
+            string displayName,
+            string[] packageNames,
+            string startAction,
+            string? stopAction = null,
+            string? toggleAction = null,
+            string? activityClassName = null,
+            string? receiverClassName = null,
+            bool requireExplicitActivity = false,
+            bool isolateActivityTask = false)
+            : this(
+                kind,
+                displayName,
+                packageNames.Length > 0 ? packageNames[0] : string.Empty,
+                startAction,
+                stopAction,
+                toggleAction,
+                activityClassName,
+                receiverClassName,
+                requireExplicitActivity,
+                isolateActivityTask)
+        {
+            PackageNames = packageNames;
+        }
+    }
 }

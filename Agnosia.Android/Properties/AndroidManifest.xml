@@ -28,6 +28,8 @@
         <package android:name="com.happproxy"/>
         <package android:name="io.acionyx.tunguska"/>
         <package android:name="llc.itdev.incy"/>
+        <package android:name="com.nb4a.plus"/>
+        <package android:name="moe.nb4a"/>
     </queries>
 
     <application android:label="@string/app_name"
