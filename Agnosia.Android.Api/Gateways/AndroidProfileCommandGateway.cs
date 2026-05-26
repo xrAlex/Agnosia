@@ -132,6 +132,8 @@ public static class AndroidProfileCommandGateway
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (app.IsSystem) return null;
+
         if (app.Profile == ProfileKind.Personal)
             return await LoadLocalAppIconAsync(
                     commandRunner.CurrentActivity,
@@ -161,8 +163,8 @@ public static class AndroidProfileCommandGateway
         if (apps.Count == 0) return new Dictionary<AppItemKey, byte[]?>();
 
         var icons = new Dictionary<AppItemKey, byte[]?>();
-        var personalPackageNames = apps
-            .Where(app => app.Profile == ProfileKind.Personal)
+        var loadablePersonalPackageNames = apps
+            .Where(app => app is { Profile: ProfileKind.Personal, IsSystem: false })
             .Select(app => app.PackageName)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
@@ -172,11 +174,14 @@ public static class AndroidProfileCommandGateway
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 
-        if (personalPackageNames.Length > 0)
+        foreach (var app in apps.Where(static app => app.IsSystem))
+            icons[AppItemKey.FromSnapshot(app)] = null;
+
+        if (loadablePersonalPackageNames.Length > 0)
         {
             var personalIcons = await LoadLocalAppIconsAsync(
                     commandRunner.CurrentActivity,
-                    personalPackageNames,
+                    loadablePersonalPackageNames,
                     cancellationToken)
                 .ConfigureAwait(false);
             foreach (var (packageName, iconPng) in personalIcons)
@@ -185,21 +190,30 @@ public static class AndroidProfileCommandGateway
 
         if (workPackageNames.Length > 0)
         {
+            var loadableWorkPackageNames = apps
+                .Where(app => app is { Profile: ProfileKind.Work, IsSystem: false })
+                .Select(app => app.PackageName)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+
             foreach (var packageName in workPackageNames)
                 icons[new AppItemKey(ProfileKind.Work, packageName)] = null;
 
-            var intent = new Intent(AgnosiaActions.QueryAppIcons);
-            intent.PutExtra(AndroidCommandContract.ExtraPackages, workPackageNames);
-            var data = await StartCommandForDataAsync(
-                    commandRunner,
-                    intent,
-                    "Failed to query work app icons through the profile activity command.",
-                    cancellationToken)
-                .ConfigureAwait(false);
-            var bundle = data?.GetBundleExtra(AndroidCommandContract.ResultIconsBundle);
-            if (bundle is not null)
-                foreach (var packageName in workPackageNames)
-                    icons[new AppItemKey(ProfileKind.Work, packageName)] = bundle.GetByteArray(packageName);
+            if (loadableWorkPackageNames.Length > 0)
+            {
+                var intent = new Intent(AgnosiaActions.QueryAppIcons);
+                intent.PutExtra(AndroidCommandContract.ExtraPackages, loadableWorkPackageNames);
+                var data = await StartCommandForDataAsync(
+                        commandRunner,
+                        intent,
+                        "Failed to query work app icons through the profile activity command.",
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                var bundle = data?.GetBundleExtra(AndroidCommandContract.ResultIconsBundle);
+                if (bundle is not null)
+                    foreach (var packageName in loadableWorkPackageNames)
+                        icons[new AppItemKey(ProfileKind.Work, packageName)] = bundle.GetByteArray(packageName);
+            }
         }
 
         return icons;
@@ -465,7 +479,7 @@ public static class AndroidProfileCommandGateway
                 AndroidSystemApi.GetDevicePolicyManager(context),
                 null,
                 showAll,
-                cancellationToken);
+                cancellationToken: cancellationToken);
             return new ProfileAppsQueryResult(apps, []);
         }, cancellationToken);
     }

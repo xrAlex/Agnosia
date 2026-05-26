@@ -92,7 +92,7 @@ public sealed class AppItemViewModelTests
 
         Assert.Equal("Work", app.ProfileLabel);
         Assert.True(app.ShowWorkControls);
-        Assert.True(app.CanFreeze);
+        Assert.False(app.CanFreeze);
         Assert.True(app.IsAgnosiaManaged);
         Assert.True(app.HasStatusTag);
         Assert.True(app.ShowSecondaryRow);
@@ -103,6 +103,24 @@ public sealed class AppItemViewModelTests
         Assert.Equal("Isolated", app.StatusTagLabel);
         Assert.Equal("UnfreezeAndOpen", app.LaunchLabel);
         Assert.Equal("CopyToPersonal", app.CloneLabel);
+    }
+
+    [Fact]
+    public void System_app_without_embedded_icon_does_not_request_icon_load()
+    {
+        var services = new TestPlatformServices();
+        var owner = TestWorkspaceFactory.Create(services);
+        var personal = TestWorkspaceFactory.CreateApp(
+            owner,
+            TestSnapshots.App(ProfileKind.Personal, isSystem: true));
+        var work = TestWorkspaceFactory.CreateApp(
+            owner,
+            TestSnapshots.App(ProfileKind.Work, isSystem: true));
+
+        Assert.False(personal.HasIcon);
+        Assert.False(work.HasIcon);
+
+        Assert.Empty(services.AppIconLoadRequests);
     }
 
     // Проверяет отображаемое состояние рейтинга разрешений.
@@ -208,6 +226,7 @@ public sealed class AppItemViewModelTests
         Assert.Contains(nameof(AppItemViewModel.Monogram), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.CanMoveToWork), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.CanUninstall), changedProperties);
+        Assert.Contains(nameof(AppItemViewModel.CanFreeze), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.ShowPermissionRiskIndicator), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.ShowLaunch), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.StatusTagLabel), changedProperties);

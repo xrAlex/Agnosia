@@ -38,8 +38,15 @@ public static class AndroidAppInventoryApi
             cancellationToken.ThrowIfCancellationRequested();
             if (!string.IsNullOrWhiteSpace(app.PackageName)) installedPackageNames.Add(app.PackageName);
 
-            if (TryCreateModel(context, packageManager, policyManager, admin, app, showAll, specialAccess) is
-                { } model) models.Add(model);
+            if (TryCreateModel(
+                    context,
+                    packageManager,
+                    policyManager,
+                    admin,
+                    app,
+                    showAll,
+                    specialAccess) is { } model)
+                models.Add(model);
         }
 
         AndroidAppIconResolver.PruneMemoryIconCache(installedPackageNames);
@@ -64,6 +71,7 @@ public static class AndroidAppInventoryApi
                           AndroidSystemApi.GetInstalledApplicationFlags())
                       ?? packageManager.GetApplicationInfo(packageName, PackageInfoFlags.MatchDisabledComponents);
             cancellationToken.ThrowIfCancellationRequested();
+            if (AndroidWorkProfilePackageClassifier.IsSystemApp(app)) return null;
 
             return AndroidAppIconResolver.ResolveAppIconPng(
                 context,
@@ -90,6 +98,10 @@ public static class AndroidAppInventoryApi
 
         try
         {
+            var app = TryGetApplicationInfo(packageManager, packageName,
+                AndroidSystemApi.GetInstalledApplicationFlags());
+            if (app is not null && AndroidWorkProfilePackageClassifier.IsSystemApp(app)) return null;
+
             return TryGetPackageIdentity(packageManager, packageName, out var identity)
                    && AndroidAppIconResolver.TryLoadCachedAppIconPng(context, packageName, identity, out var cachedIcon)
                 ? cachedIcon
@@ -133,7 +145,8 @@ public static class AndroidAppInventoryApi
                 isHidden,
                 isInstalled,
                 identity,
-                permissionRisk);
+                permissionRisk,
+                loadIcon: false);
         }
 
         if (!TryGetPackageInventoryDetails(
@@ -153,7 +166,8 @@ public static class AndroidAppInventoryApi
             isHidden,
             isInstalled,
             packageIdentity,
-            permissionRisk);
+            permissionRisk,
+            loadIcon: true);
     }
 
     private static AppServiceModel CreateModel(
@@ -165,7 +179,8 @@ public static class AndroidAppInventoryApi
         bool isHidden,
         bool isInstalled,
         PackageIdentity packageIdentity,
-        AppPermissionRiskAnalysis permissionRisk)
+        AppPermissionRiskAnalysis permissionRisk,
+        bool loadIcon)
     {
         return new AppServiceModel
         {
@@ -186,13 +201,15 @@ public static class AndroidAppInventoryApi
             PermissionRiskScoreBreakdown = permissionRisk.ScoreBreakdown,
             ManifestPermissions = permissionRisk.ManifestPermissions.ToArray(),
             RuntimePermissions = permissionRisk.RuntimePermissions.ToArray(),
-            IconPng = AndroidAppIconResolver.TryLoadCachedAppIconPng(
-                context,
-                packageName,
-                packageIdentity,
-                out var cachedIcon)
-                ? cachedIcon
-                : AndroidAppIconWarmupQueue.TryLoadCachedOrQueue(context, packageManager, packageName)
+            IconPng = loadIcon
+                ? AndroidAppIconResolver.TryLoadCachedAppIconPng(
+                    context,
+                    packageName,
+                    packageIdentity,
+                    out var cachedIcon)
+                    ? cachedIcon
+                    : AndroidAppIconWarmupQueue.TryLoadCachedOrQueue(context, packageManager, packageName)
+                : null
         };
     }
 

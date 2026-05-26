@@ -166,7 +166,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     public bool CanUninstall => !Snapshot.IsSystem;
 
-    public bool CanFreeze => Profile == ProfileKind.Work;
+    public bool CanFreeze => Profile == ProfileKind.Work && !Snapshot.IsSystem;
 
     public bool ShowLaunch => Snapshot.CanLaunch || Profile == ProfileKind.Work;
 
@@ -361,9 +361,11 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
         if (previous.IsSystem != snapshot.IsSystem)
         {
+            ResetIcon();
             OnPropertyChanged(nameof(CanClone));
             OnPropertyChanged(nameof(CanMoveToWork));
             OnPropertyChanged(nameof(CanUninstall));
+            OnPropertyChanged(nameof(CanFreeze));
             OnPropertyChanged(nameof(ShowPermissionRiskIndicator));
             OnPropertyChanged(nameof(CanRevokeRuntimePermissions));
         }
@@ -383,6 +385,12 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
     public void RequestIconLoad()
     {
         if (_disposed || _iconLoadRequested) return;
+
+        if (ShouldSkipIconLoad(Snapshot))
+        {
+            _iconLoadRequested = true;
+            return;
+        }
 
         _iconLoadRequested = true;
         _iconLoadAttempts++;
@@ -590,5 +598,10 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         {
             return null;
         }
+    }
+
+    private static bool ShouldSkipIconLoad(AppSnapshot snapshot)
+    {
+        return snapshot.IsSystem;
     }
 }

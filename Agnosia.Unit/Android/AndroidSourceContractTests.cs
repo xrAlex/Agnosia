@@ -80,11 +80,27 @@ public sealed class AndroidSourceContractTests
         var gatewaySource = File.ReadAllText(
             RepositoryPaths.Get("Agnosia.Android.Api", "Gateways", "AndroidProfileCommandGateway.cs"));
 
+        Assert.Contains("if (app.IsSystem) return null;", gatewaySource, StringComparison.Ordinal);
+        Assert.Contains("app is { Profile: ProfileKind.Work, IsSystem: false }", gatewaySource, StringComparison.Ordinal);
         Assert.Contains("new Intent(AgnosiaActions.QueryAppIcons)", gatewaySource, StringComparison.Ordinal);
         Assert.Contains("AndroidCommandContract.ExtraPackages", gatewaySource, StringComparison.Ordinal);
         Assert.Contains("AndroidCommandContract.ResultIconsBundle", gatewaySource, StringComparison.Ordinal);
         Assert.Contains("new AppItemKey(ProfileKind.Work, packageName)", gatewaySource, StringComparison.Ordinal);
         Assert.DoesNotContain("icons[app.PackageName] = app.IconPng", gatewaySource, StringComparison.Ordinal);
+    }
+
+    // Проверяет, что системные иконки не грузятся ни для одного профиля.
+    [Fact]
+    public void System_app_icons_are_disabled_globally()
+    {
+        var inventorySource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Packages", "AndroidAppInventoryApi.cs"));
+        var gatewaySource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Gateways", "AndroidProfileCommandGateway.cs"));
+
+        Assert.Contains("AndroidWorkProfilePackageClassifier.IsSystemApp(app)) return null;", inventorySource, StringComparison.Ordinal);
+        Assert.Contains("loadIcon: false", inventorySource, StringComparison.Ordinal);
+        Assert.Contains("app is { Profile: ProfileKind.Personal, IsSystem: false }", gatewaySource, StringComparison.Ordinal);
     }
 
     private static string[] ReadIntentFilterActionNames(params string[] relativeSourcePaths)
