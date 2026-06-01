@@ -25,6 +25,7 @@
         <Compile Include="Permissions\AppPermissionRiskCatalog.Rules.cs"/>
         <Compile Include="Permissions\AppPermissionRiskInput.cs"/>
         <Compile Include="Platform\AndroidPackageAccessPolicy.cs"/>
+        <Compile Include="Platform\AppInventoryPayloadPager.cs"/>
         <Compile Include="Platform\AppServiceModel.cs"/>
         <Compile Include="Storage\AndroidSettingsContract.cs"/>
         <Compile Include="Storage\StorageKeys.cs"/>

@@ -19,7 +19,14 @@ public static class AndroidCommandContract
     public const string ExtraShortcutToken = "shortcutToken";
     public const string ExtraTrigger = "trigger";
     public const string ExtraReplacementAuthKey = "replacement_auth_key";
+    public const string ExtraQueryOffset = "query_offset";
+    public const string ExtraQueryLimit = "query_limit";
+    public const string ExtraQueryMaxJsonBytes = "query_max_json_bytes";
+    public const string ExtraQueryPageToken = "query_page_token";
     public const string ResultAppsJson = "apps_json";
+    public const string ResultNextQueryOffset = "next_query_offset";
+    public const string ResultQueryHasMore = "query_has_more";
+    public const string ResultQueryTotalCount = "query_total_count";
     public const string ResultIconPng = "icon_png";
     public const string ResultIconsBundle = "icons_bundle";
     public const string ResultLogsJson = "logs_json";

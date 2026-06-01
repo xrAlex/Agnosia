@@ -5,7 +5,9 @@ using Agnosia.Android.Api.Packages;
 using Agnosia.Android.Api.Permissions;
 using Agnosia.Android.Api.Platform;
 using Android.App;
+using Android.App.Admin;
 using Android.Content;
+using Android.Content.PM;
 using Android.OS;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 using OperationCanceledException = System.OperationCanceledException;
@@ -14,6 +16,12 @@ namespace Agnosia.Android.Activities;
 
 public sealed partial class DummyActivity
 {
+    private const int DefaultQueryAppsPageLimit = 100;
+    private const int DefaultQueryAppsMaxJsonBytes = 512 * 1024;
+    private static readonly TimeSpan QueryAppsCacheTtl = TimeSpan.FromSeconds(60);
+    private static readonly Lock QueryAppsCacheSync = new();
+    private static readonly Dictionary<string, CachedAppInventoryQuery> QueryAppsCache = [];
+
     private async Task ActionQueryAppsAsync(CancellationToken cancellationToken)
     {
         var intent = Intent;
@@ -31,21 +39,16 @@ public sealed partial class DummyActivity
             var admin = _isProfileOwner && policyManager is not null
                 ? AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType)
                 : null;
-            var models = await Task.Run(() => AndroidAppInventoryApi.QueryInstalledApps(
-                this,
-                packageManager,
-                policyManager,
-                admin,
-                showAll,
-                cancellationToken), cancellationToken);
+            var inventory = await GetOrCreateCachedAppInventoryQueryAsync(
+                    showAll,
+                    intent.GetStringExtra(AndroidCommandContract.ExtraQueryPageToken),
+                    packageManager,
+                    policyManager,
+                    admin,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
-            var result = new Intent();
-            result.PutExtra(AndroidCommandContract.ResultAppsJson, JsonSerializer.Serialize(models));
-
-            if (admin is not null && policyManager is not null)
-                result.PutExtra(AndroidCommandContract.ResultInteractionPackages,
-                    AndroidPolicyApi.GetCrossProfilePackages(policyManager, admin));
-
+            var result = CreateQueryAppsResult(intent, inventory);
             FinishWithResult(Result.Ok, result);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -57,6 +60,122 @@ public sealed partial class DummyActivity
             Log.Warn(LogTag, $"Failed to query apps: {exception}");
             FinishWithResult(Result.Canceled);
         }
+    }
+
+    private async Task<CachedAppInventoryQuery> GetOrCreateCachedAppInventoryQueryAsync(
+        bool showAll,
+        string? pageToken,
+        PackageManager packageManager,
+        DevicePolicyManager? policyManager,
+        ComponentName? admin,
+        CancellationToken cancellationToken)
+    {
+        if (TryGetCachedAppInventoryQuery(pageToken, showAll, out var cachedQuery))
+            return cachedQuery;
+
+        var models = await Task.Run(() => AndroidAppInventoryApi.QueryInstalledApps(
+            this,
+            packageManager,
+            policyManager,
+            admin,
+            showAll,
+            cancellationToken,
+            AppInventoryQueryOptions.WorkList), cancellationToken).ConfigureAwait(false);
+
+        var interactionPackages = admin is not null && policyManager is not null
+            ? AndroidPolicyApi.GetCrossProfilePackages(policyManager, admin)
+            : [];
+        var query = new CachedAppInventoryQuery(
+            showAll,
+            DateTimeOffset.UtcNow,
+            models,
+            interactionPackages);
+        CacheAppInventoryQuery(pageToken, query);
+        return query;
+    }
+
+    private static Intent CreateQueryAppsResult(
+        Intent request,
+        CachedAppInventoryQuery inventory)
+    {
+        var result = new Intent();
+        if (!IsPagedQuery(request))
+        {
+            result.PutExtra(AndroidCommandContract.ResultAppsJson, JsonSerializer.Serialize(inventory.Apps));
+            result.PutExtra(AndroidCommandContract.ResultInteractionPackages, inventory.InteractionPackages);
+            return result;
+        }
+
+        var page = AppInventoryPayloadPager.CreatePage(
+            inventory.Apps,
+            request.GetIntExtra(AndroidCommandContract.ExtraQueryOffset, 0),
+            request.GetIntExtra(AndroidCommandContract.ExtraQueryLimit, DefaultQueryAppsPageLimit),
+            request.GetIntExtra(AndroidCommandContract.ExtraQueryMaxJsonBytes, DefaultQueryAppsMaxJsonBytes));
+
+        result.PutExtra(AndroidCommandContract.ResultAppsJson, page.Json);
+        result.PutExtra(AndroidCommandContract.ResultNextQueryOffset, page.NextOffset);
+        result.PutExtra(AndroidCommandContract.ResultQueryHasMore, page.HasMore);
+        result.PutExtra(AndroidCommandContract.ResultQueryTotalCount, page.TotalCount);
+
+        if (page.Offset == 0)
+            result.PutExtra(AndroidCommandContract.ResultInteractionPackages, inventory.InteractionPackages);
+
+        Log.Debug(
+            LogTag,
+            $"Query apps page prepared. offset={page.Offset}, nextOffset={page.NextOffset}, hasMore={page.HasMore}, pageCount={page.Apps.Count}, totalCount={page.TotalCount}, jsonBytes={page.JsonUtf8Bytes}.");
+        return result;
+    }
+
+    private static bool IsPagedQuery(Intent request)
+    {
+        return request.HasExtra(AndroidCommandContract.ExtraQueryPageToken)
+               || request.HasExtra(AndroidCommandContract.ExtraQueryOffset)
+               || request.HasExtra(AndroidCommandContract.ExtraQueryLimit)
+               || request.HasExtra(AndroidCommandContract.ExtraQueryMaxJsonBytes);
+    }
+
+    private static bool TryGetCachedAppInventoryQuery(
+        string? pageToken,
+        bool showAll,
+        out CachedAppInventoryQuery query)
+    {
+        query = null!;
+        if (string.IsNullOrWhiteSpace(pageToken)) return false;
+
+        var now = DateTimeOffset.UtcNow;
+        lock (QueryAppsCacheSync)
+        {
+            PruneExpiredAppInventoryQueries(now);
+            if (!QueryAppsCache.TryGetValue(pageToken, out var cached)
+                || cached.ShowAll != showAll)
+            {
+                QueryAppsCache.Remove(pageToken);
+                return false;
+            }
+
+            query = cached;
+            return true;
+        }
+    }
+
+    private static void CacheAppInventoryQuery(
+        string? pageToken,
+        CachedAppInventoryQuery query)
+    {
+        if (string.IsNullOrWhiteSpace(pageToken)) return;
+
+        lock (QueryAppsCacheSync)
+        {
+            PruneExpiredAppInventoryQueries(DateTimeOffset.UtcNow);
+            QueryAppsCache[pageToken] = query;
+        }
+    }
+
+    private static void PruneExpiredAppInventoryQueries(DateTimeOffset now)
+    {
+        foreach (var (key, query) in QueryAppsCache.ToArray())
+            if (now - query.CachedAt > QueryAppsCacheTtl)
+                QueryAppsCache.Remove(key);
     }
 
     private async Task ActionQueryAppIconAsync(CancellationToken cancellationToken)
@@ -205,4 +324,10 @@ public sealed partial class DummyActivity
         if (AndroidPackageApi.TryOpenUnknownSourcesSettings(this, LogTag, FinishWithError))
             FinishWithSuccessMessage("Включите установку APK из Agnosia в рабочем профиле.");
     }
+
+    private sealed record CachedAppInventoryQuery(
+        bool ShowAll,
+        DateTimeOffset CachedAt,
+        IReadOnlyList<AppServiceModel> Apps,
+        string[] InteractionPackages);
 }

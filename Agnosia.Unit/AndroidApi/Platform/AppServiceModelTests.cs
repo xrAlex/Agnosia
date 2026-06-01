@@ -20,6 +20,32 @@ public sealed class AppServiceModelTests
         AssertEquivalent(model, result);
     }
 
+    // Проверяет компактный DTO для системных приложений в work-list inventory.
+    [Fact]
+    public void App_inventory_item_round_trips_without_system_apk_paths()
+    {
+        var model = new AppServiceModel
+        {
+            PackageName = "org.example.system",
+            Label = "System Example",
+            SourceDirectory = null,
+            SplitApks = [],
+            IconPng = null,
+            IsSystem = true,
+            IsHidden = false,
+            CanLaunch = true,
+            IsInstalled = true
+        };
+
+        var json = JsonSerializer.Serialize(new[] { model });
+        var roundTrip = JsonSerializer.Deserialize<AppServiceModel[]>(json);
+
+        var result = Assert.Single(roundTrip ?? []);
+        Assert.Null(result.SourceDirectory);
+        Assert.Empty(result.SplitApks);
+        AssertEquivalent(model, result);
+    }
+
     private static AppServiceModel FullInventoryModel()
     {
         return new AppServiceModel

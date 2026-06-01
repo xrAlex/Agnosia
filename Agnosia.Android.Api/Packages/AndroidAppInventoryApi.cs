@@ -27,8 +27,10 @@ public static class AndroidAppInventoryApi
         DevicePolicyManager? policyManager,
         ComponentName? admin,
         bool showAll,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        AppInventoryQueryOptions? options = null)
     {
+        options ??= AppInventoryQueryOptions.Full;
         var apps = packageManager.GetInstalledApplications(AndroidSystemApi.GetInstalledApplicationFlags());
         var models = new List<AppServiceModel>(apps.Count);
         var installedPackageNames = new HashSet<string>(StringComparer.Ordinal);
@@ -45,7 +47,8 @@ public static class AndroidAppInventoryApi
                     admin,
                     app,
                     showAll,
-                    specialAccess) is { } model)
+                    specialAccess,
+                    options) is { } model)
                 models.Add(model);
         }
 
@@ -122,7 +125,8 @@ public static class AndroidAppInventoryApi
         ComponentName? admin,
         ApplicationInfo app,
         bool showAll,
-        SpecialAccessSnapshot specialAccess)
+        SpecialAccessSnapshot specialAccess,
+        AppInventoryQueryOptions options)
     {
         if (!TryGetPackageName(context, app, out var packageName)) return null;
 
@@ -146,7 +150,8 @@ public static class AndroidAppInventoryApi
                 isInstalled,
                 identity,
                 permissionRisk,
-                loadIcon: false);
+                loadIcon: false,
+                includeApkPaths: options.IncludeSystemApkPaths);
         }
 
         if (!TryGetPackageInventoryDetails(
@@ -167,7 +172,8 @@ public static class AndroidAppInventoryApi
             isInstalled,
             packageIdentity,
             permissionRisk,
-            loadIcon: true);
+            loadIcon: options.IncludeInlineIcons,
+            includeApkPaths: true);
     }
 
     private static AppServiceModel CreateModel(
@@ -180,14 +186,15 @@ public static class AndroidAppInventoryApi
         bool isInstalled,
         PackageIdentity packageIdentity,
         AppPermissionRiskAnalysis permissionRisk,
-        bool loadIcon)
+        bool loadIcon,
+        bool includeApkPaths)
     {
         return new AppServiceModel
         {
             PackageName = packageName,
             Label = packageManager.GetApplicationLabel(app),
-            SourceDirectory = app.SourceDir,
-            SplitApks = app.SplitSourceDirs?.ToArray() ?? [],
+            SourceDirectory = includeApkPaths ? app.SourceDir : null,
+            SplitApks = includeApkPaths ? app.SplitSourceDirs?.ToArray() ?? [] : [],
             IsSystem = isSystem,
             IsHidden = isHidden,
             CanLaunch = packageManager.GetLaunchIntentForPackage(packageName) is not null,
@@ -555,4 +562,13 @@ public static class AndroidAppInventoryApi
             return NotificationListenerPackages.Contains(packageName);
         }
     }
+}
+
+public sealed record AppInventoryQueryOptions(
+    bool IncludeInlineIcons,
+    bool IncludeSystemApkPaths)
+{
+    public static AppInventoryQueryOptions Full { get; } = new(true, true);
+
+    public static AppInventoryQueryOptions WorkList { get; } = new(false, false);
 }
