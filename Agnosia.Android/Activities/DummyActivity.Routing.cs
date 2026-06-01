@@ -74,6 +74,12 @@ public sealed partial class DummyActivity
                 case AgnosiaActions.RequestPackageInstallAccess:
                     ActionRequestPackageInstallAccess();
                     break;
+                case AgnosiaActions.QueryAllFilesAccess:
+                    ActionQueryAllFilesAccess();
+                    break;
+                case AgnosiaActions.RequestAllFilesAccess:
+                    ActionRequestAllFilesAccess();
+                    break;
                 case AgnosiaActions.InstallPackage:
                     ActionInstallPackage();
                     break;
@@ -101,6 +107,10 @@ public sealed partial class DummyActivity
                     break;
                 case AgnosiaActions.SetCrossProfileInteraction:
                     ActionSetCrossProfileInteraction();
+                    break;
+                case AgnosiaActions.StartFileShuttleParentToWork:
+                case AgnosiaActions.StartFileShuttleWorkToParent:
+                    ActionStartFileShuttle();
                     break;
                 case AgnosiaActions.SynchronizePreference:
                     ActionSynchronizePreference();

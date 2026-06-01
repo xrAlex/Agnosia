@@ -34,6 +34,7 @@ public sealed class AndroidManifestContractTests
                 "android.permission.RECEIVE_BOOT_COMPLETED",
                 "android.permission.REQUEST_INSTALL_PACKAGES",
                 "android.permission.REQUEST_DELETE_PACKAGES",
+                "android.permission.MANAGE_EXTERNAL_STORAGE",
                 "android.permission.POST_NOTIFICATIONS",
                 "android.permission.SYSTEM_ALERT_WINDOW"
             ]);
@@ -81,6 +82,36 @@ public sealed class AndroidManifestContractTests
         Assert.Contains("[Property(\"android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("[MetaData(\"android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE\"", source,
             StringComparison.Ordinal);
+    }
+
+    // Проверяет source-contract для DocumentsProvider, который попадает в итоговый manifest через C# attributes.
+    [Fact]
+    public void File_shuttle_documents_provider_contract_is_declared_in_source()
+    {
+        var source = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Files", "AgnosiaCrossProfileDocumentsProvider.cs"));
+
+        Assert.Contains("[ContentProvider(", source, StringComparison.Ordinal);
+        Assert.Contains("Name = AgnosiaFileShuttleContract.ProviderComponentName", source, StringComparison.Ordinal);
+        Assert.Contains("Exported = true", source, StringComparison.Ordinal);
+        Assert.Contains("Enabled = false", source, StringComparison.Ordinal);
+        Assert.Contains("GrantUriPermissions = true", source, StringComparison.Ordinal);
+        Assert.Contains("Permission = Manifest.Permission.ManageDocuments", source, StringComparison.Ordinal);
+        Assert.Contains("android.content.action.DOCUMENTS_PROVIDER", source, StringComparison.Ordinal);
+    }
+
+    // Проверяет source-contract для локального bound service File Shuttle.
+    [Fact]
+    public void File_shuttle_service_contract_is_declared_in_source()
+    {
+        var source = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Files", "AgnosiaFileShuttleService.cs"));
+
+        Assert.Contains("[Service(", source, StringComparison.Ordinal);
+        Assert.Contains("Name = \"com.agnosia.app.AgnosiaFileShuttleService\"", source, StringComparison.Ordinal);
+        Assert.Contains("Exported = false", source, StringComparison.Ordinal);
+        Assert.Contains("public override IBinder? OnBind", source, StringComparison.Ordinal);
+        Assert.Contains("return _messenger?.Binder", source, StringComparison.Ordinal);
     }
 
     private static XDocument ReadManifest()

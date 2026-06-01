@@ -6,4 +6,6 @@ public interface ISettingsPlatformService
 {
     Task<OperationResult> SaveSettingsAsync(AppSettingsSnapshot settings,
         CancellationToken cancellationToken = default);
+
+    Task<OperationResult> OpenDocumentsUiAsync(CancellationToken cancellationToken = default);
 }

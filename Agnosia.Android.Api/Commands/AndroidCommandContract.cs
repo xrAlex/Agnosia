@@ -2,6 +2,9 @@ namespace Agnosia.Android.Api.Commands;
 
 public static class AndroidCommandContract
 {
+    public const string FileShuttleDocumentsProviderComponent =
+        "com.agnosia.app.AgnosiaCrossProfileDocumentsProvider";
+
     public const string ExtraPackage = "package";
     public const string ExtraPackages = "packages";
     public const string ExtraPermissions = "permissions";
@@ -11,6 +14,7 @@ public static class AndroidCommandContract
     public const string ExtraShowAll = "show_all";
     public const string ExtraPreferenceName = "name";
     public const string ExtraPreferenceBoolean = "boolean";
+    public const string ExtraFileShuttleCallbackMessenger = "file_shuttle_callback_messenger";
     public const string ExtraLaunchPackageName = "packageName";
     public const string ExtraLaunchDisplayName = "displayName";
     public const string ExtraShortcutTargetActivity = "targetActivity";
@@ -33,6 +37,7 @@ public static class AndroidCommandContract
     public const string ResultInteractionPackages = "interaction_packages";
     public const string ResultUsageStatsAccess = "usage_stats_access";
     public const string ResultPackageInstallAccess = "package_install_access";
+    public const string ResultAllFilesAccess = "all_files_access";
     public const string ResultMessage = "message";
     public const string ResultProfileOwnerCheckPerformed = "profile_owner_check_performed";
     public const string ResultIsProfileOwner = "is_profile_owner";

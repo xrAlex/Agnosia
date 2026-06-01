@@ -10,11 +10,12 @@ namespace Agnosia.Android.Infrastructure;
 
 internal static class AndroidStartup
 {
-    public static void ConfigurePrimaryProfileServices()
+    public static void ConfigurePrimaryProfileServices(Context context)
     {
         ServiceRegistry.SuppressPrimaryUiStartup = false;
         ServiceRegistry.PlatformBridge = AndroidPlatformBridge.Instance;
         ServiceRegistry.InitialTheme = AndroidSettingsStore.LoadAppTheme(LocalStorageManager.Instance);
+        AgnosiaUtilities.ApplyCrossProfileFileShuttleComponentState(context);
     }
 
     public static void SuppressPrimaryUiStartup()

@@ -7,5 +7,7 @@ public enum PermissionKind
     Notifications,
     VpnControl,
     PackageInstall,
+    PersonalAllFiles,
+    WorkAllFiles,
     Overlay
 }

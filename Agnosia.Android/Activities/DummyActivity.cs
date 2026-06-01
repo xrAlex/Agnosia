@@ -6,6 +6,7 @@ using Agnosia.Android.Api.Packages;
 using Agnosia.Android.Api.Permissions;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Api.Storage;
+using Agnosia.Android.Files;
 using Agnosia.Android.Infrastructure;
 using Agnosia.Android.Receivers;
 using Agnosia.Android.Services;
@@ -39,6 +40,8 @@ namespace Agnosia.Android.Activities;
     AgnosiaActions.RequestUsageStatsAccess,
     AgnosiaActions.QueryPackageInstallAccess,
     AgnosiaActions.RequestPackageInstallAccess,
+    AgnosiaActions.QueryAllFilesAccess,
+    AgnosiaActions.RequestAllFilesAccess,
     AgnosiaActions.InstallPackage,
     AgnosiaActions.UninstallPackage,
     AgnosiaActions.FreezePackage,
@@ -48,6 +51,8 @@ namespace Agnosia.Android.Activities;
     AgnosiaActions.CreateHiddenShortcut,
     AgnosiaActions.UnfreezeAndLaunch,
     AgnosiaActions.SetCrossProfileInteraction,
+    AgnosiaActions.StartFileShuttleParentToWork,
+    AgnosiaActions.StartFileShuttleWorkToParent,
     AgnosiaActions.SynchronizePreference,
     AgnosiaActions.WorkAppFrozen,
     AgnosiaActions.PackageInstallerCallback
@@ -103,6 +108,7 @@ public sealed partial class DummyActivity : Activity
     protected override void OnDestroy()
     {
         _destroyCancellation.Cancel();
+        CloseFileShuttleConnections();
         PackageInstallerCallbackCoordinator.UnregisterActive(this);
         _destroyCancellation.Dispose();
         base.OnDestroy();

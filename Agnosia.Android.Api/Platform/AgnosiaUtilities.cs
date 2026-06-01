@@ -163,6 +163,7 @@ public static class AgnosiaUtilities
         bool enableProfile = false)
     {
         DisableLauncherActivity(context, launcherActivityName);
+        ApplyCrossProfileFileShuttleComponentState(context);
         EnsureCrossProfileCommandActionsRegistered();
 
         if (AndroidSystemApi.GetDevicePolicyManager(context) is not { } manager) return;
@@ -178,6 +179,28 @@ public static class AgnosiaUtilities
 
         AndroidPolicyApi.ApplyCrossProfileContactsPolicy(manager, admin, true);
         AndroidPolicyApi.TryEnsureRequiredCrossProfilePackages(manager, admin, nameof(AgnosiaUtilities));
+    }
+
+    public static void ApplyCrossProfileFileShuttleComponentState(Context context)
+    {
+        if (context.PackageManager is not { } packageManager
+            || string.IsNullOrWhiteSpace(context.PackageName))
+            return;
+
+        var component = new ComponentName(
+            context.PackageName,
+            AndroidCommandContract.FileShuttleDocumentsProviderComponent);
+        var enabled = LocalStorageManager.Instance.GetBoolean(StorageKeys.CrossProfileFileShuttleEnabled);
+        var state = enabled
+            ? ComponentEnabledState.Enabled
+            : ComponentEnabledState.Disabled;
+
+        if (packageManager.GetComponentEnabledSetting(component) == state) return;
+
+        packageManager.SetComponentEnabledSetting(
+            component,
+            state,
+            ComponentEnableOption.DontKillApp);
     }
 
     public static void EnforceUserRestrictions(Context context, Type adminReceiverType)

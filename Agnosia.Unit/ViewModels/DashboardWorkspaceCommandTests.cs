@@ -64,6 +64,8 @@ public sealed class DashboardWorkspaceCommandTests
         PermissionKind.Notifications,
         PermissionKind.UsageStats,
         PermissionKind.PackageInstall,
+        PermissionKind.PersonalAllFiles,
+        PermissionKind.WorkAllFiles,
         PermissionKind.Overlay
     };
 

@@ -317,6 +317,17 @@ public static class AndroidProfileCommandGateway
             cancellationToken);
     }
 
+    internal static Task<bool> QueryWorkAllFilesAccessAsync(
+        AndroidActivityCommandGateway commandRunner,
+        CancellationToken cancellationToken)
+    {
+        return QueryWorkBooleanAsync(
+            commandRunner,
+            AgnosiaActions.QueryAllFilesAccess,
+            AndroidCommandContract.ResultAllFilesAccess,
+            cancellationToken);
+    }
+
     internal static Task<OperationResult> EnableSystemAppInWorkProfileAsync(
         AndroidActivityCommandGateway commandRunner,
         string packageName,

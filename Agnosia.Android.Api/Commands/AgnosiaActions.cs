@@ -14,6 +14,8 @@ public static class AgnosiaActions
     public const string RequestUsageStatsAccess = "agnosia.action.REQUEST_USAGE_STATS_ACCESS";
     public const string QueryPackageInstallAccess = "agnosia.action.QUERY_PACKAGE_INSTALL_ACCESS";
     public const string RequestPackageInstallAccess = "agnosia.action.REQUEST_PACKAGE_INSTALL_ACCESS";
+    public const string QueryAllFilesAccess = "agnosia.action.QUERY_ALL_FILES_ACCESS";
+    public const string RequestAllFilesAccess = "agnosia.action.REQUEST_ALL_FILES_ACCESS";
     public const string InstallPackage = "agnosia.action.INSTALL_PACKAGE";
     public const string UninstallPackage = "agnosia.action.UNINSTALL_PACKAGE";
     public const string FreezePackage = "agnosia.action.FREEZE_PACKAGE";
@@ -26,6 +28,8 @@ public static class AgnosiaActions
     public const string LaunchAppProxy = "agnosia.action.LAUNCH_APP_PROXY";
     public const string ShortcutPinned = "agnosia.action.SHORTCUT_PINNED";
     public const string SetCrossProfileInteraction = "agnosia.action.SET_CROSS_PROFILE_INTERACTION";
+    public const string StartFileShuttleParentToWork = "agnosia.action.START_FILE_SHUTTLE_PARENT_TO_WORK";
+    public const string StartFileShuttleWorkToParent = "agnosia.action.START_FILE_SHUTTLE_WORK_TO_PARENT";
     public const string SynchronizePreference = "agnosia.action.SYNCHRONIZE_PREFERENCE";
     public const string WorkAppFrozen = "agnosia.action.WORK_APP_FROZEN";
     public const string PackageInstallerCallback = "agnosia.action.PACKAGEINSTALLER_CALLBACK";
@@ -43,6 +47,8 @@ public static class AgnosiaActions
         RequestUsageStatsAccess,
         QueryPackageInstallAccess,
         RequestPackageInstallAccess,
+        QueryAllFilesAccess,
+        RequestAllFilesAccess,
         InstallPackage,
         UninstallPackage,
         FreezePackage,
@@ -53,12 +59,14 @@ public static class AgnosiaActions
         CreateHiddenShortcut,
         LaunchAppProxy,
         SetCrossProfileInteraction,
+        StartFileShuttleParentToWork,
         SynchronizePreference
     ];
 
     public static readonly string[] ManagedToParentCommandActions =
     [
         WorkAppFrozen,
+        StartFileShuttleWorkToParent,
         FinalizeProvision
     ];
 
@@ -76,6 +84,8 @@ public static class AgnosiaActions
         RequestUsageStatsAccess,
         QueryPackageInstallAccess,
         RequestPackageInstallAccess,
+        QueryAllFilesAccess,
+        RequestAllFilesAccess,
         InstallPackage,
         UninstallPackage,
         FreezePackage,
@@ -86,6 +96,8 @@ public static class AgnosiaActions
         UnfreezeAndLaunch,
         LaunchAppProxy,
         SetCrossProfileInteraction,
+        StartFileShuttleParentToWork,
+        StartFileShuttleWorkToParent,
         SynchronizePreference,
         WorkAppFrozen,
         PackageInstallerCallback

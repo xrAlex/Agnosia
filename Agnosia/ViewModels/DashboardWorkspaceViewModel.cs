@@ -36,6 +36,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private readonly IPermissionPlatformService _permissionService;
     private readonly IOnboardingPlatformService _onboardingService;
     private readonly IAppCommandService _appCommandService;
+    private readonly ISettingsPlatformService _settingsService;
     private readonly IAppEventLogService _eventLogService;
     private readonly Func<Action, DispatcherPriority, ValueTask> _invokeOnUiThreadAsync;
     private readonly Func<TimeSpan, CancellationToken, Task> _delayAsync;
@@ -174,6 +175,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     [ObservableProperty]
     public partial bool DisableVpnBeforeWorkLaunch { get; set; }
+
+    [ObservableProperty]
+    public partial bool CrossProfileFileShuttleEnabled { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsVpnAfterFreezeClientPickerVisible))]
@@ -463,6 +467,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     partial void OnDisableVpnBeforeWorkLaunchChanged(bool value) => QueueSettingsSave();
 
+    partial void OnCrossProfileFileShuttleEnabledChanged(bool value) => QueueSettingsSave();
+
     partial void OnEnableVpnAfterWorkFreezeChanged(bool value) => QueueSettingsSave();
 
     partial void OnVpnAfterWorkFreezeClientChanged(VpnAutomationClientKind value)
@@ -521,6 +527,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         _permissionService = permissionService ?? throw new ArgumentNullException(nameof(permissionService));
         _onboardingService = onboardingService ?? throw new ArgumentNullException(nameof(onboardingService));
         _appCommandService = appCommandService ?? throw new ArgumentNullException(nameof(appCommandService));
+        _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _eventLogService = eventLogService ?? throw new ArgumentNullException(nameof(eventLogService));
         _invokeOnUiThreadAsync = invokeOnUiThreadAsync ?? InvokeOnAvaloniaUiThreadAsync;
         _delayAsync = delayAsync ?? Task.Delay;
@@ -529,7 +536,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             exception => ReportErrorOnUiThreadAsync(exception, "FilterUpdate"),
             _delayAsync);
         _settingsSaveCoordinator = new DashboardSettingsSaveCoordinator(
-            settingsService ?? throw new ArgumentNullException(nameof(settingsService)),
+            _settingsService,
             TimeSpan.FromMilliseconds(SettingsSaveDelayMs),
             () => !_isApplyingSnapshot && HasLoadedSnapshot,
             () => !IsBusy && !_isOperationInProgress && HasLoadedSnapshot,
@@ -704,6 +711,30 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     {
         await ReloadPermissionsAsync();
         IsPermissionsWindowOpen = true;
+    }
+
+    [RelayCommand]
+    private async Task OpenDocumentsUiAsync()
+    {
+        if (!TryBeginOperation()) return;
+
+        try
+        {
+            var result = await _settingsService.OpenDocumentsUiAsync();
+            StatusIsError = !result.Succeeded;
+            StatusMessage = string.IsNullOrWhiteSpace(result.Message)
+                ? "DocumentsUiOpened"
+                : result.Message;
+        }
+        catch (Exception ex)
+        {
+            StatusIsError = true;
+            StatusMessage = ResolveExceptionMessage(ex, "DocumentsUiOpenFailed");
+        }
+        finally
+        {
+            EndOperation();
+        }
     }
 
     [RelayCommand]
@@ -1076,6 +1107,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
             ShowAllApps = snapshot.Settings.ShowAllApps;
             DisableVpnBeforeWorkLaunch = snapshot.Settings.DisableVpnBeforeWorkLaunch;
+            CrossProfileFileShuttleEnabled = snapshot.Settings.CrossProfileFileShuttleEnabled;
             EnableVpnAfterWorkFreeze = snapshot.Settings.EnableVpnAfterWorkFreeze;
             VpnAfterWorkFreezeClient = snapshot.Settings.VpnAfterWorkFreezeClient;
             TunguskaAutomationToken = snapshot.Settings.TunguskaAutomationToken;
@@ -1258,6 +1290,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         return kind is PermissionKind.Notifications
             or PermissionKind.UsageStats
             or PermissionKind.PackageInstall
+            or PermissionKind.PersonalAllFiles
+            or PermissionKind.WorkAllFiles
             or PermissionKind.Overlay;
     }
 
@@ -1303,6 +1337,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         return new AppSettingsSnapshot(
             ShowAllApps,
             DisableVpnBeforeWorkLaunch,
+            CrossProfileFileShuttleEnabled,
             LoggingEnabled,
             SelectedTheme,
             EnableVpnAfterWorkFreeze,

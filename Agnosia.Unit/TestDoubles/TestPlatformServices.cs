@@ -91,6 +91,8 @@ public sealed class TestPlatformServices :
     public List<AppSettingsSnapshot> SavedSettings { get; } = [];
 
     public Func<AppSettingsSnapshot, CancellationToken, Task<OperationResult>>? SaveSettingsHandler { get; set; }
+    public int OpenDocumentsUiRequests { get; private set; }
+    public Func<CancellationToken, Task<OperationResult>>? OpenDocumentsUiHandler { get; set; }
 
     public Task<DashboardSnapshot> LoadDashboardProfileAsync(CancellationToken cancellationToken = default)
     {
@@ -276,6 +278,15 @@ public sealed class TestPlatformServices :
         return SaveSettingsHandler is null
             ? Task.FromResult(DefaultOperationResult)
             : SaveSettingsHandler(settings, cancellationToken);
+    }
+
+    public Task<OperationResult> OpenDocumentsUiAsync(CancellationToken cancellationToken = default)
+    {
+        OpenDocumentsUiRequests++;
+
+        return OpenDocumentsUiHandler is null
+            ? Task.FromResult(DefaultOperationResult)
+            : OpenDocumentsUiHandler(cancellationToken);
     }
 }
 

@@ -65,4 +65,17 @@ public sealed class AgnosiaActionsTests
         Assert.All(actions, action => Assert.StartsWith("agnosia.action.", action));
         StringConstantContract.AssertUniqueValues(actions);
     }
+
+    // Проверяет, что Binder/Messenger callback не входит в HMAC payload.
+    [Fact]
+    public void File_shuttle_callback_messenger_extra_is_not_signed()
+    {
+        var source = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Platform", "AuthenticationUtility.cs"));
+
+        Assert.Contains(
+            "AndroidCommandContract.ExtraFileShuttleCallbackMessenger",
+            source,
+            StringComparison.Ordinal);
+    }
 }

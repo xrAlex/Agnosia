@@ -11,7 +11,7 @@ using Uri = Android.Net.Uri;
 
 namespace Agnosia.Android.Api.Permissions;
 
-internal static class AndroidPermissionApi
+public static class AndroidPermissionApi
 {
     private const string LogTag = "AgnosiaPermissions";
     private const int NotificationPermissionRequestCode = 0x57C32;
@@ -60,7 +60,7 @@ internal static class AndroidPermissionApi
         }
     }
 
-    public static async Task<OperationResult> RequestVpnControlAsync(
+    internal static async Task<OperationResult> RequestVpnControlAsync(
         AndroidActivityCommandGateway activityCommands,
         CancellationToken cancellationToken)
     {
@@ -100,6 +100,47 @@ internal static class AndroidPermissionApi
         }
     }
 
+    public static bool HasAllFilesAccess(Context context)
+    {
+        try
+        {
+            return !OperatingSystem.IsAndroidVersionAtLeast(30) || global::Android.OS.Environment.IsExternalStorageManager;
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn(LogTag, $"Failed to check all-files access: {exception}");
+            return false;
+        }
+    }
+
+    public static OperationResult OpenAllFilesAccessSettings(Activity activity)
+    {
+        try
+        {
+            var packageName = activity.PackageName;
+            if (string.IsNullOrWhiteSpace(packageName))
+                return OperationResult.Failure("Не удалось определить имя пакета приложения.");
+
+            var intent = new Intent(Settings.ActionManageAppAllFilesAccessPermission);
+            intent.SetData(Uri.FromParts("package", packageName, null));
+
+            if (!AndroidIntentApi.TryStartActivity(
+                    activity,
+                    intent,
+                    LogTag,
+                    "Android не смог открыть настройки доступа ко всем файлам.",
+                    out var error))
+                return OpenAllFilesAccessFallbackSettings(activity, error);
+
+            return OperationResult.Success("Включите доступ ко всем файлам для Agnosia.");
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn(LogTag, $"Failed to open all-files access settings: {exception}");
+            return OpenAllFilesAccessFallbackSettings(activity, "Android не смог открыть настройки доступа ко всем файлам.");
+        }
+    }
+
     public static OperationResult OpenAppDetailsSettings(Activity activity)
     {
         try
@@ -127,6 +168,21 @@ internal static class AndroidPermissionApi
         {
             Log.Warn(LogTag, $"Failed to open app details settings: {exception}");
             return OperationResult.Failure("Android не смог открыть страницу настроек приложения.");
+        }
+    }
+
+    private static OperationResult OpenAllFilesAccessFallbackSettings(Activity activity, string? originalError)
+    {
+        try
+        {
+            var intent = new Intent(Settings.ActionManageAllFilesAccessPermission);
+            activity.StartActivity(intent);
+            return OperationResult.Success("Откройте Agnosia в списке и включите доступ ко всем файлам.");
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn(LogTag, $"Failed to open fallback all-files access settings: {exception}");
+            return OperationResult.Failure(originalError ?? "Android не смог открыть настройки доступа ко всем файлам.");
         }
     }
 }

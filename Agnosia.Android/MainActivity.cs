@@ -74,7 +74,7 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
     private void InitializePrimaryProfileStartup()
     {
         AgnosiaRuntime.Initialize(this);
-        AndroidStartup.ConfigurePrimaryProfileServices();
+        AndroidStartup.ConfigurePrimaryProfileServices(this);
         AndroidPlatformBridge.Instance.AttachActivity(this);
         Current = this;
     }

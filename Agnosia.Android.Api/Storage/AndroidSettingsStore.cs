@@ -14,6 +14,7 @@ public static class AndroidSettingsStore
         return new AppSettingsSnapshot(
             storage.GetBoolean(StorageKeys.ShowAllApps),
             storage.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch),
+            storage.GetBoolean(StorageKeys.CrossProfileFileShuttleEnabled),
             storage.GetBoolean(StorageKeys.LoggingEnabled, true),
             LoadAppTheme(storage),
             storage.GetBoolean(StorageKeys.EnableVpnAfterWorkFreeze),
@@ -32,11 +33,14 @@ public static class AndroidSettingsStore
         var loggingChanged = storage.GetBoolean(StorageKeys.LoggingEnabled, true) != settings.LoggingEnabled;
         var disableVpnBeforeLaunchChanged = storage.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch) !=
                                             settings.DisableVpnBeforeWorkLaunch;
+        var fileShuttleChanged = storage.GetBoolean(StorageKeys.CrossProfileFileShuttleEnabled) !=
+                                 settings.CrossProfileFileShuttleEnabled;
         var vpnAfterFreezeClientChanged = LoadVpnAfterWorkFreezeClient(storage) != settings.VpnAfterWorkFreezeClient;
         var tunguskaToken = AndroidSettingsContract.NormalizeTunguskaAutomationToken(settings.TunguskaAutomationToken);
 
         storage.SetBoolean(StorageKeys.ShowAllApps, settings.ShowAllApps);
         storage.SetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch, settings.DisableVpnBeforeWorkLaunch);
+        storage.SetBoolean(StorageKeys.CrossProfileFileShuttleEnabled, settings.CrossProfileFileShuttleEnabled);
         storage.SetBoolean(StorageKeys.EnableVpnAfterWorkFreeze, settings.EnableVpnAfterWorkFreeze);
         storage.SetString(StorageKeys.VpnAfterWorkFreezeClient, settings.VpnAfterWorkFreezeClient.ToString());
         storage.SetString(StorageKeys.TunguskaAutomationToken, tunguskaToken);
@@ -44,6 +48,7 @@ public static class AndroidSettingsStore
         storage.SetString(StorageKeys.AppTheme, settings.Theme.ToString());
 
         if (loggingChanged && !settings.LoggingEnabled) AndroidAppLogArchive.Clear(activity);
+        if (fileShuttleChanged) AgnosiaUtilities.ApplyCrossProfileFileShuttleComponentState(activity);
 
         if (loggingChanged)
             await TrySyncBooleanSettingToWorkProfileAsync(activity, StorageKeys.LoggingEnabled, settings.LoggingEnabled,
@@ -52,6 +57,10 @@ public static class AndroidSettingsStore
         if (disableVpnBeforeLaunchChanged || settings.DisableVpnBeforeWorkLaunch)
             await TrySyncBooleanSettingToWorkProfileAsync(activity, StorageKeys.DisableVpnBeforeWorkLaunch,
                 settings.DisableVpnBeforeWorkLaunch, cancellationToken);
+
+        if (fileShuttleChanged || settings.CrossProfileFileShuttleEnabled)
+            await TrySyncBooleanSettingToWorkProfileAsync(activity, StorageKeys.CrossProfileFileShuttleEnabled,
+                settings.CrossProfileFileShuttleEnabled, cancellationToken);
 
         if (vpnAfterFreezeClientChanged)
             Log.Debug(LogTag, $"VPN after work freeze client changed: client={settings.VpnAfterWorkFreezeClient}.");

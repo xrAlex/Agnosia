@@ -160,4 +160,9 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
     {
         return AndroidOnlyFailureTask;
     }
+
+    public Task<OperationResult> OpenDocumentsUiAsync(CancellationToken cancellationToken = default)
+    {
+        return AndroidOnlyFailureTask;
+    }
 }

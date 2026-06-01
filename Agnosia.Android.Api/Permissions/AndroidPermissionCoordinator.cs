@@ -32,6 +32,9 @@ internal sealed class AndroidPermissionCoordinator(
         var workPackageInstallGranted = workProfileAvailable
                                         && await AndroidProfileCommandGateway.QueryWorkPackageInstallAccessAsync(
                                             commandRunner, cancellationToken);
+        var workAllFilesGranted = workProfileAvailable
+                                  && await AndroidProfileCommandGateway.QueryWorkAllFilesAccessAsync(
+                                      commandRunner, cancellationToken);
 
         return
         [
@@ -68,6 +71,24 @@ internal sealed class AndroidPermissionCoordinator(
                 "Рабочий профиль",
                 "Нужна для копирования пользовательских приложений в рабочий профиль через установщик APK",
                 workPackageInstallGranted,
+                workProfileAvailable,
+                "Получено",
+                "Открыть настройки"),
+            new PermissionSnapshot(
+                PermissionKind.PersonalAllFiles,
+                "Все файлы",
+                "Основной профиль",
+                "Нужно для File Shuttle, чтобы Agnosia могла отдавать выбранные файлы личного профиля через DocumentsUI",
+                AndroidPermissionApi.HasAllFilesAccess(activity),
+                true,
+                "Получено",
+                "Открыть настройки"),
+            new PermissionSnapshot(
+                PermissionKind.WorkAllFiles,
+                "Все файлы",
+                "Рабочий профиль",
+                "Нужно для File Shuttle, чтобы Agnosia могла отдавать выбранные файлы рабочего профиля через DocumentsUI",
+                workAllFilesGranted,
                 workProfileAvailable,
                 "Получено",
                 "Открыть настройки"),
@@ -134,6 +155,8 @@ internal sealed class AndroidPermissionCoordinator(
             PermissionKind.Notifications => AndroidPermissionApi.RequestNotificationPermission(activity),
             PermissionKind.VpnControl => await AndroidPermissionApi.RequestVpnControlAsync(commandRunner, cancellationToken),
             PermissionKind.PackageInstall => await RequestPackageInstallAccessAsync(cancellationToken),
+            PermissionKind.PersonalAllFiles => AndroidPermissionApi.OpenAllFilesAccessSettings(activity),
+            PermissionKind.WorkAllFiles => await RequestAllFilesAccessAsync(cancellationToken),
             PermissionKind.Overlay => AndroidPermissionApi.OpenAppDetailsSettings(activity),
             _ => OperationResult.Failure("Неизвестное разрешение.")
         };
@@ -171,6 +194,14 @@ internal sealed class AndroidPermissionCoordinator(
             AgnosiaActions.RequestPackageInstallAccess,
             cancellationToken,
             "Включите установку APK из Agnosia в рабочем профиле.");
+    }
+
+    private Task<OperationResult> RequestAllFilesAccessAsync(CancellationToken cancellationToken)
+    {
+        return RunWorkProfilePermissionRequestAsync(
+            AgnosiaActions.RequestAllFilesAccess,
+            cancellationToken,
+            "Включите доступ ко всем файлам для Agnosia в рабочем профиле.");
     }
 
     private Task<OperationResult> RunWorkProfilePermissionRequestAsync(

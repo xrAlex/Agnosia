@@ -41,6 +41,6 @@ public class AndroidApp : AvaloniaAndroidApplication<App>
             return;
         }
 
-        AndroidStartup.ConfigurePrimaryProfileServices();
+        AndroidStartup.ConfigurePrimaryProfileServices(this);
     }
 }

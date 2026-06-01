@@ -330,6 +330,29 @@ public sealed partial class DummyActivity
             FinishWithSuccessMessage("Включите установку APK из Agnosia в рабочем профиле.");
     }
 
+    private void ActionQueryAllFilesAccess()
+    {
+        var result = new Intent();
+        result.PutExtra(AndroidCommandContract.ResultAllFilesAccess,
+            AndroidPermissionApi.HasAllFilesAccess(this));
+        FinishWithResult(Result.Ok, result);
+    }
+
+    private void ActionRequestAllFilesAccess()
+    {
+        if (AndroidPermissionApi.HasAllFilesAccess(this))
+        {
+            FinishWithSuccessMessage("Доступ ко всем файлам уже включен.");
+            return;
+        }
+
+        var result = AndroidPermissionApi.OpenAllFilesAccessSettings(this);
+        if (result.Succeeded)
+            FinishWithSuccessMessage(result.Message);
+        else
+            FinishWithError(result.Message);
+    }
+
     private sealed record CachedAppInventoryQuery(
         bool ShowAll,
         DateTimeOffset CachedAt,
