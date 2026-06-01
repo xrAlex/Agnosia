@@ -4,6 +4,7 @@ using Agnosia.Android.Api.Logging;
 using Agnosia.Android.Api.Packages;
 using Agnosia.Android.Api.Permissions;
 using Agnosia.Android.Api.Platform;
+using Agnosia.Android.Api.Serialization;
 using Android.App;
 using Android.App.Admin;
 using Android.Content;
@@ -101,7 +102,9 @@ public sealed partial class DummyActivity
         var result = new Intent();
         if (!IsPagedQuery(request))
         {
-            result.PutExtra(AndroidCommandContract.ResultAppsJson, JsonSerializer.Serialize(inventory.Apps));
+            result.PutExtra(
+                AndroidCommandContract.ResultAppsJson,
+                JsonSerializer.Serialize(inventory.Apps.ToList(), AndroidApiJsonContext.Default.ListAppServiceModel));
             result.PutExtra(AndroidCommandContract.ResultInteractionPackages, inventory.InteractionPackages);
             return result;
         }
@@ -263,7 +266,9 @@ public sealed partial class DummyActivity
         var result = new Intent();
         result.PutExtra(
             AndroidCommandContract.ResultLogsJson,
-            JsonSerializer.Serialize(AndroidAppLogArchive.Load(this)));
+            JsonSerializer.Serialize(
+                AndroidAppLogArchive.Load(this).ToList(),
+                AndroidApiJsonContext.Default.ListAppLogEntry));
         FinishWithResult(Result.Ok, result);
     }
 

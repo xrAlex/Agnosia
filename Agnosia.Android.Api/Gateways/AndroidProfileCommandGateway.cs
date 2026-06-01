@@ -2,6 +2,7 @@ using System.Text.Json;
 using Agnosia.Android.Api.Commands;
 using Agnosia.Android.Api.Packages;
 using Agnosia.Android.Api.Platform;
+using Agnosia.Android.Api.Serialization;
 using Agnosia.Models;
 using Android.Content;
 using Android.OS;
@@ -141,7 +142,7 @@ public static class AndroidProfileCommandGateway
                 cancellationToken).ConfigureAwait(false);
             if (data is null) return null;
 
-            var pageApps = DeserializeResult<IReadOnlyList<AppServiceModel>>(
+            var pageApps = DeserializeAppServiceModelsResult(
                 data.GetStringExtra(AndroidCommandContract.ResultAppsJson),
                 $"work apps page {pageIndex}") ?? [];
             apps.AddRange(pageApps);
@@ -289,7 +290,7 @@ public static class AndroidProfileCommandGateway
             cancellationToken);
         if (data is null) return [];
 
-        return DeserializeResult<IReadOnlyList<AppLogEntry>>(
+        return DeserializeAppLogEntriesResult(
             data.GetStringExtra(AndroidCommandContract.ResultLogsJson),
             "work logs") ?? [];
     }
@@ -642,13 +643,28 @@ public static class AndroidProfileCommandGateway
         });
     }
 
-    private static T? DeserializeResult<T>(string? raw, string description)
+    private static List<AppServiceModel>? DeserializeAppServiceModelsResult(string? raw, string description)
     {
         if (string.IsNullOrWhiteSpace(raw)) return default;
 
         try
         {
-            return JsonSerializer.Deserialize<T>(raw);
+            return JsonSerializer.Deserialize(raw, AndroidApiJsonContext.Default.ListAppServiceModel);
+        }
+        catch (JsonException exception)
+        {
+            Log.Warn(LogTag, $"Failed to deserialize {description}: {exception.Message}");
+            return default;
+        }
+    }
+
+    private static List<AppLogEntry>? DeserializeAppLogEntriesResult(string? raw, string description)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return default;
+
+        try
+        {
+            return JsonSerializer.Deserialize(raw, AndroidApiJsonContext.Default.ListAppLogEntry);
         }
         catch (JsonException exception)
         {

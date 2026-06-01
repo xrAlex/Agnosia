@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Agnosia.Android.Api.Serialization;
 
 namespace Agnosia.Android.Api.Platform;
 
@@ -30,7 +31,7 @@ public static class AppInventoryPayloadPager
         for (var index = 0; index < maxItems; index++)
         {
             pageItems.Add(apps[safeOffset + index]);
-            var candidateJson = JsonSerializer.Serialize(pageItems);
+            var candidateJson = JsonSerializer.Serialize(pageItems, AndroidApiJsonContext.Default.ListAppServiceModel);
             var candidateBytes = Encoding.UTF8.GetByteCount(candidateJson);
 
             if (candidateBytes > effectiveMaxJsonBytes && pageItems.Count > 1)
@@ -49,7 +50,7 @@ public static class AppInventoryPayloadPager
         if (pageItems.Count == 0)
         {
             pageItems.Add(apps[safeOffset]);
-            json = JsonSerializer.Serialize(pageItems);
+            json = JsonSerializer.Serialize(pageItems, AndroidApiJsonContext.Default.ListAppServiceModel);
             jsonBytes = Encoding.UTF8.GetByteCount(json);
         }
 
@@ -71,7 +72,7 @@ public static class AppInventoryPayloadPager
         bool hasMore,
         int totalCount)
     {
-        var json = JsonSerializer.Serialize(apps);
+        var json = JsonSerializer.Serialize(apps.ToList(), AndroidApiJsonContext.Default.ListAppServiceModel);
         return new AppInventoryPayloadPage(
             apps,
             json,

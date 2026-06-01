@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Agnosia.Android.Api.Platform;
+using Agnosia.Android.Api.Serialization;
 using Agnosia.Android.Api.Storage;
 using Agnosia.Models;
 using Android.Content;
@@ -14,11 +15,6 @@ public static class AndroidAppLogArchive
     private static readonly Lock Sync = new();
     private static readonly TimeSpan FlushDelay = TimeSpan.FromSeconds(1);
     private static readonly List<AppLogEntry> PendingEntries = [];
-
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true
-    };
 
     private static Context? _flushContext;
     private static bool _flushScheduled;
@@ -135,7 +131,7 @@ public static class AndroidAppLogArchive
 
         try
         {
-            var entries = JsonSerializer.Deserialize<List<AppLogEntry>>(raw, JsonOptions) ?? [];
+            var entries = JsonSerializer.Deserialize(raw, AndroidApiJsonContext.Default.ListAppLogEntry) ?? [];
             Trim(entries);
             return entries;
         }
@@ -148,7 +144,9 @@ public static class AndroidAppLogArchive
 
     private static void SaveCore(List<AppLogEntry> entries)
     {
-        LocalStorageManager.Instance.SetString(StorageKeys.LogEntries, JsonSerializer.Serialize(entries, JsonOptions));
+        LocalStorageManager.Instance.SetString(
+            StorageKeys.LogEntries,
+            JsonSerializer.Serialize(entries, AndroidApiJsonContext.Default.ListAppLogEntry));
     }
 
     private static void Trim(List<AppLogEntry> entries)

@@ -1,5 +1,5 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
+using Agnosia.Android.Api.Serialization;
 #if AGNOSIA_ANDROID
 using Agnosia.Android.Api.Gateways;
 using Agnosia.Android.Api.Logging;
@@ -22,12 +22,6 @@ public sealed record AndroidAppLaunchResult(
     string Message,
     AndroidAppLaunchEvent[] Events)
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        Converters = { new JsonStringEnumConverter() },
-        PropertyNameCaseInsensitive = true
-    };
-
     public static AndroidAppLaunchResult CommandReceived(string? packageName, string? displayName)
     {
         var normalizedPackage = NormalizePackageName(packageName);
@@ -135,7 +129,7 @@ public sealed record AndroidAppLaunchResult(
 
     public string ToJson()
     {
-        return JsonSerializer.Serialize(this, JsonOptions);
+        return JsonSerializer.Serialize(this, AndroidAppLaunchJsonContext.Default.AndroidAppLaunchResult);
     }
 
 #if AGNOSIA_ANDROID
@@ -163,7 +157,7 @@ public sealed record AndroidAppLaunchResult(
 
         try
         {
-            result = JsonSerializer.Deserialize<AndroidAppLaunchResult>(raw, JsonOptions)
+            result = JsonSerializer.Deserialize(raw, AndroidAppLaunchJsonContext.Default.AndroidAppLaunchResult)
                      ?? CommandReceived(null, null);
             return true;
         }

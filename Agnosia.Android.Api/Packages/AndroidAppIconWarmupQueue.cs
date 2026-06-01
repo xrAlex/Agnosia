@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using Android.Content;
 using Android.Content.PM;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
@@ -9,7 +10,12 @@ public static class AndroidAppIconWarmupQueue
     private const string LogTag = "AgnosiaIconWarmup";
     private static readonly TimeSpan HungIconLogDelay = TimeSpan.FromSeconds(2);
     private static readonly Lock Sync = new();
-    private static readonly Queue<WarmupRequest> Pending = new();
+    private static readonly Channel<WarmupRequest> Pending = Channel.CreateUnbounded<WarmupRequest>(
+        new UnboundedChannelOptions
+        {
+            SingleReader = true,
+            SingleWriter = false
+        });
     private static readonly HashSet<string> InFlight = new(StringComparer.Ordinal);
     private static bool _processorRunning;
 
@@ -37,7 +43,7 @@ public static class AndroidAppIconWarmupQueue
         {
             if (!InFlight.Add(packageName)) return;
 
-            Pending.Enqueue(new WarmupRequest(appContext, packageManager, packageName));
+            Pending.Writer.TryWrite(new WarmupRequest(appContext, packageManager, packageName));
             if (_processorRunning) return;
 
             _processorRunning = true;
@@ -56,9 +62,9 @@ public static class AndroidAppIconWarmupQueue
     {
         lock (Sync)
         {
-            if (Pending.Count > 0)
+            if (Pending.Reader.TryRead(out var pendingRequest))
             {
-                request = Pending.Dequeue();
+                request = pendingRequest;
                 return true;
             }
 

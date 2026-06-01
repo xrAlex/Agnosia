@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agnosia.Android.Api.Commands;
 using Agnosia.Android.Api.Storage;
+using Agnosia.Android.Serialization;
 using Android.App;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
@@ -24,7 +25,7 @@ public sealed partial class HiddenAppSessionMonitorService
 
         LocalStorageManager.Instance.SetString(
             StorageKeys.HiddenAppActiveSession,
-            JsonSerializer.Serialize(session));
+            JsonSerializer.Serialize(session, AndroidJsonContext.Default.HiddenAppSessionState));
     }
 
     private static bool TryLoadPersistedSession(out HiddenAppSessionState session)
@@ -38,7 +39,8 @@ public sealed partial class HiddenAppSessionMonitorService
 
         try
         {
-            session = JsonSerializer.Deserialize<HiddenAppSessionState>(raw) ?? HiddenAppSessionState.Empty;
+            session = JsonSerializer.Deserialize(raw, AndroidJsonContext.Default.HiddenAppSessionState)
+                      ?? HiddenAppSessionState.Empty;
             return !string.IsNullOrWhiteSpace(session.PackageName) && session.TaskId >= 0;
         }
         catch (JsonException exception)
@@ -55,15 +57,16 @@ public sealed partial class HiddenAppSessionMonitorService
         return session.LaunchResult ?? AndroidAppLaunchResult.CommandReceived(session.PackageName, session.DisplayName);
     }
 
-    private sealed record HiddenAppSessionState(
-        string PackageName,
-        string DisplayName,
-        int TaskId,
-        long StartedAtUnixTimeMilliseconds = 0,
-        AndroidAppLaunchResult? LaunchResult = null)
-    {
-        public static HiddenAppSessionState Empty { get; } = new(string.Empty, string.Empty, -1);
+}
 
-        [JsonIgnore] public PendingIntent? ParentFrozenCallback { get; init; }
-    }
+internal sealed record HiddenAppSessionState(
+    string PackageName,
+    string DisplayName,
+    int TaskId,
+    long StartedAtUnixTimeMilliseconds = 0,
+    AndroidAppLaunchResult? LaunchResult = null)
+{
+    public static HiddenAppSessionState Empty { get; } = new(string.Empty, string.Empty, -1);
+
+    [JsonIgnore] public PendingIntent? ParentFrozenCallback { get; init; }
 }

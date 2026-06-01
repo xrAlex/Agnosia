@@ -6,6 +6,7 @@ using Agnosia.Android.Api.Gateways;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Api.Storage;
 using Agnosia.Android.Receivers;
+using Agnosia.Android.Serialization;
 using Android.Content;
 using Android.Content.PM;
 using Android.Graphics;
@@ -25,11 +26,6 @@ internal static class HiddenAppShortcutManager
     private const int ShortcutIconSizePixels = 192;
     private const int MetadataResolveAttempts = 12;
     private const int MetadataResolveDelayMilliseconds = 250;
-
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true
-    };
 
     public static async Task<HiddenAppShortcutBuildResult> BuildMetadataAsync(
         Context context,
@@ -271,7 +267,7 @@ internal static class HiddenAppShortcutManager
 
         try
         {
-            return JsonSerializer.Deserialize<HiddenAppShortcutMetadata>(raw, JsonOptions);
+            return JsonSerializer.Deserialize(raw, AndroidJsonContext.Default.HiddenAppShortcutMetadata);
         }
         catch (JsonException exception)
         {
@@ -283,7 +279,7 @@ internal static class HiddenAppShortcutManager
 
     private static void WriteMetadata(HiddenAppShortcutMetadata metadata)
     {
-        var raw = JsonSerializer.Serialize(metadata, JsonOptions);
+        var raw = JsonSerializer.Serialize(metadata, AndroidJsonContext.Default.HiddenAppShortcutMetadata);
         LocalStorageManager.Instance.SetString(GetStorageKey(metadata.TargetPackage), raw);
     }
 

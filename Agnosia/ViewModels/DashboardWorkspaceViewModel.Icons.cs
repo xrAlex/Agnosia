@@ -17,9 +17,9 @@ public partial class DashboardWorkspaceViewModel
         if (cancellationToken.IsCancellationRequested) return Task.FromCanceled<byte[]?>(cancellationToken);
 
         var pendingIconLoad = new PendingIconLoad(snapshot, cancellationToken);
-        lock (_iconBatchSync)
+        lock (_iconBatchProcessorSync)
         {
-            _pendingIconLoads.Add(pendingIconLoad);
+            _pendingIconLoads.Writer.TryWrite(pendingIconLoad);
             _iconBatchProcessor ??= ProcessIconLoadBatchesAsync();
         }
 
@@ -32,33 +32,27 @@ public partial class DashboardWorkspaceViewModel
         {
             await _delayAsync(TimeSpan.FromMilliseconds(IconBatchDelayMs), CancellationToken.None)
                 .ConfigureAwait(false);
-            PendingIconLoad[] pendingRequests;
-            lock (_iconBatchSync)
+            List<PendingIconLoad>? batch = null;
+            lock (_iconBatchProcessorSync)
             {
-                if (_pendingIconLoads.Count == 0)
+                while (_pendingIconLoads.Reader.TryRead(out var request))
+                {
+                    if (request.IsCompleted)
+                    {
+                        request.Dispose();
+                        continue;
+                    }
+
+                    batch ??= [];
+                    batch.Add(request);
+                }
+
+                if (batch is null)
                 {
                     _iconBatchProcessor = null;
                     return;
                 }
-
-                pendingRequests = _pendingIconLoads.ToArray();
-                _pendingIconLoads.Clear();
             }
-
-            List<PendingIconLoad>? batch = null;
-            foreach (var request in pendingRequests)
-            {
-                if (request.IsCompleted)
-                {
-                    request.Dispose();
-                    continue;
-                }
-
-                batch ??= new List<PendingIconLoad>(pendingRequests.Length);
-                batch.Add(request);
-            }
-
-            if (batch is null) continue;
 
             await LoadIconBatchAsync(batch).ConfigureAwait(false);
         }

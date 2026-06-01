@@ -27,6 +27,8 @@
         <Compile Include="Platform\AndroidPackageAccessPolicy.cs"/>
         <Compile Include="Platform\AppInventoryPayloadPager.cs"/>
         <Compile Include="Platform\AppServiceModel.cs"/>
+        <Compile Include="Serialization\AndroidApiJsonContext.cs"/>
+        <Compile Include="Serialization\AndroidAppLaunchJsonContext.cs"/>
         <Compile Include="Storage\AndroidSettingsContract.cs"/>
         <Compile Include="Storage\StorageKeys.cs"/>
     </ItemGroup>

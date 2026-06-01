@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Reflection;
+using System.Threading.Channels;
 using Agnosia.Infrastructure;
 using Agnosia.Models;
 using Agnosia.Platform;
@@ -41,9 +42,14 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private readonly DebouncedAsyncAction _searchRefreshDebouncer;
     private readonly DashboardSettingsSaveCoordinator _settingsSaveCoordinator;
     private readonly SemaphoreSlim _iconLoadGate = new(1, 1);
-    private readonly Lock _iconBatchSync = new();
+    private readonly Lock _iconBatchProcessorSync = new();
     private readonly Lock _permissionReloadSync = new();
-    private readonly List<PendingIconLoad> _pendingIconLoads = [];
+    private readonly Channel<PendingIconLoad> _pendingIconLoads = Channel.CreateUnbounded<PendingIconLoad>(
+        new UnboundedChannelOptions
+        {
+            SingleReader = true,
+            SingleWriter = false
+        });
     private readonly Dictionary<AppItemKey, AppItemViewModel> _appItemCache = [];
     private readonly ObservableCollection<PermissionItemViewModel> _permissionItems = [];
     private AppItemViewModel[] _visibleApps = [];
