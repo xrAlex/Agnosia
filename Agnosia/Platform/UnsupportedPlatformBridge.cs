@@ -19,6 +19,9 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
     private static readonly Task<IReadOnlyList<PermissionSnapshot>> EmptyPermissionsTask =
         Task.FromResult<IReadOnlyList<PermissionSnapshot>>([]);
 
+    private static readonly Task<IReadOnlyList<AgnosiaModuleSnapshot>> UnsupportedModulesTask =
+        Task.FromResult<IReadOnlyList<AgnosiaModuleSnapshot>>([AgnosiaModuleSnapshot.FileShuttleUnavailable]);
+
     private static readonly Task<OperationResult> AndroidOnlyFailureTask =
         Task.FromResult(OperationResult.Failure(AndroidOnlyMessage));
 
@@ -162,6 +165,19 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
     }
 
     public Task<OperationResult> OpenDocumentsUiAsync(CancellationToken cancellationToken = default)
+    {
+        return AndroidOnlyFailureTask;
+    }
+
+    public Task<IReadOnlyList<AgnosiaModuleSnapshot>> LoadModulesAsync(CancellationToken cancellationToken = default)
+    {
+        return UnsupportedModulesTask;
+    }
+
+    public Task<OperationResult> SetModuleEnabledAsync(
+        AgnosiaModuleKind module,
+        bool enabled,
+        CancellationToken cancellationToken = default)
     {
         return AndroidOnlyFailureTask;
     }

@@ -4,5 +4,6 @@ public enum DashboardSection
 {
     Overview,
     Apps,
+    Modules,
     Settings
 }

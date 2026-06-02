@@ -243,7 +243,7 @@
                         </StackPanel>
                     </Border>
 
-                    <views:PermissionListView Items="{Binding PermissionItems}" />
+                    <views:PermissionListView Items="{Binding OnboardingPermissionItems}" />
                 </StackPanel>
 
                 <StackPanel IsVisible="{Binding IsOnboardingFinalStep}"
@@ -333,7 +333,7 @@
                         VerticalAlignment="Center"
                         IsVisible="{Binding IsOnboardingPermissionsStep}">
                     <TextBlock Classes="tag-label"
-                               Text="{Binding PermissionSummary, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.Permission.'}" />
+                               Text="{Binding OnboardingPermissionSummary, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.Permission.'}" />
                 </Border>
 
                 <Button Classes="primary"

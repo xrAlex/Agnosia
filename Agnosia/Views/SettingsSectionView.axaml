@@ -145,40 +145,6 @@
                               ColumnSpacing="14">
                             <Border Classes="icon-tile">
                                 <PathIcon Classes="section-icon centered"
-                                          Data="{StaticResource IconFilesGeometry}" />
-                            </Border>
-                            <StackPanel Grid.Column="1"
-                                        MinWidth="0"
-                                        Spacing="4">
-                                <TextBlock Classes="section-title compact"
-                                           Text="File Shuttle" />
-                                <TextBlock Classes="page-caption"
-                                           Text="Разрешить доступ DocumentsUI к файлам рабочего и основного профиля для передачи данных" />
-                            </StackPanel>
-                            <ToggleSwitch Grid.Column="2"
-                                          VerticalAlignment="Center"
-                                          IsChecked="{Binding CrossProfileFileShuttleEnabled}" />
-                        </Grid>
-
-                        <Button Classes="compact-action"
-                                HorizontalAlignment="Stretch"
-                                Command="{Binding OpenDocumentsUiCommand}">
-                            <Grid ColumnDefinitions="Auto,*"
-                                  ColumnSpacing="8">
-                                <PathIcon Classes="button-icon"
-                                          Data="{StaticResource IconFilesGeometry}" />
-                                <TextBlock Grid.Column="1"
-                                           Classes="button-label"
-                                           Text="Открыть Files" />
-                            </Grid>
-                        </Button>
-
-                        <Border Classes="divider" />
-
-                        <Grid ColumnDefinitions="Auto,*,Auto"
-                              ColumnSpacing="14">
-                            <Border Classes="icon-tile">
-                                <PathIcon Classes="section-icon centered"
                                           Data="{StaticResource IconVpnOffGeometry}" />
                             </Border>
                             <StackPanel Grid.Column="1"

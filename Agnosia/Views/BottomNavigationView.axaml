@@ -6,7 +6,7 @@
     <Border Classes="bottom-nav"
             HorizontalAlignment="Stretch">
         <Grid HorizontalAlignment="Stretch"
-              ColumnDefinitions="*,*,*"
+              ColumnDefinitions="*,*,*,*"
               ColumnSpacing="8">
             <Button Grid.Column="0"
                     Classes="nav"
@@ -20,7 +20,7 @@
                               Data="{StaticResource IconOverviewGeometry}" />
                     <TextBlock Classes="nav-label"
                                HorizontalAlignment="Center"
-                               Text="Главная" />
+                               Text="Обзор" />
                 </StackPanel>
             </Button>
 
@@ -42,6 +42,23 @@
             </Button>
 
             <Button Grid.Column="2"
+                    Classes="nav"
+                    HorizontalAlignment="Stretch"
+                    Classes.active="{Binding IsModulesSectionSelected}"
+                    Command="{Binding OpenModulesSectionCommand}"
+                    IsEnabled="{Binding CanOpenModulesSection}">
+                <StackPanel HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="4">
+                    <PathIcon Classes="nav-icon"
+                              Data="{StaticResource IconModulesGeometry}" />
+                    <TextBlock Classes="nav-label"
+                               HorizontalAlignment="Center"
+                               Text="Модули" />
+                </StackPanel>
+            </Button>
+
+            <Button Grid.Column="3"
                     Classes="nav"
                     HorizontalAlignment="Stretch"
                     Classes.active="{Binding IsSettingsSectionSelected}"

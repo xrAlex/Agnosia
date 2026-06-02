@@ -1,0 +1,170 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Agnosia.ViewModels"
+             mc:Ignorable="d"
+             x:Class="Agnosia.Views.ModuleDetailsOverlayView"
+             x:DataType="vm:DashboardWorkspaceViewModel"
+             Classes="overlay-view"
+             IsVisible="{Binding IsModuleDetailsOpen}">
+    <Design.DataContext>
+        <vm:DashboardWorkspaceViewModel />
+    </Design.DataContext>
+
+    <Border Background="{StaticResource AppOverlayScrimBrush}">
+        <Grid Classes="overlay-root">
+            <ContentControl Content="{Binding SelectedModule}"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                <ContentControl.DataTemplates>
+                    <DataTemplate x:DataType="vm:AgnosiaModuleViewModel">
+                        <Border Classes="surface-card module-dialog">
+                            <Grid RowDefinitions="Auto,*,Auto"
+                                  RowSpacing="14">
+                                <Grid RowDefinitions="Auto,Auto"
+                                      ColumnDefinitions="Auto,*,Auto"
+                                      ColumnSpacing="12"
+                                      RowSpacing="8">
+                                    <Border Classes="icon-tile large">
+                                        <PathIcon Classes="section-icon centered"
+                                                  Data="{StaticResource IconModulesGeometry}" />
+                                    </Border>
+
+                                    <StackPanel Grid.Column="1"
+                                                MinWidth="0"
+                                                Spacing="4"
+                                                VerticalAlignment="Center">
+                                        <TextBlock Classes="section-title"
+                                                   Text="{Binding Title}" />
+                                        <WrapPanel Orientation="Horizontal">
+                                            <Border Classes="tag-chip dense"
+                                                    Margin="0,0,8,6">
+                                                <TextBlock Classes="tag-label"
+                                                           Text="{Binding StatusText}" />
+                                            </Border>
+                                        </WrapPanel>
+                                    </StackPanel>
+
+                                    <Button Grid.Column="2"
+                                            Classes="icon-button"
+                                            ToolTip.Tip="Закрыть"
+                                            Command="{Binding CloseCommand}">
+                                        <PathIcon Classes="action-icon"
+                                                  Data="{StaticResource IconCloseGeometry}" />
+                                    </Button>
+
+                                    <TextBlock Grid.Row="1"
+                                               Grid.ColumnSpan="3"
+                                               Classes="page-caption"
+                                               Text="{Binding FullDescription}" />
+                                </Grid>
+
+                                <ScrollViewer Grid.Row="1"
+                                              HorizontalScrollBarVisibility="Disabled"
+                                              VerticalScrollBarVisibility="Auto">
+                                    <StackPanel Spacing="12">
+                                        <Grid ColumnDefinitions="*,Auto"
+                                              ColumnSpacing="12">
+                                            <StackPanel MinWidth="0"
+                                                        Spacing="3">
+                                                <TextBlock Classes="app-dialog-setting-title"
+                                                           Text="Включить модуль" />
+                                                <TextBlock Classes="app-dialog-setting-caption"
+                                                           Text="Активация доступна после выполнения требований" />
+                                            </StackPanel>
+                                            <ToggleSwitch Grid.Column="1"
+                                                          VerticalAlignment="Center"
+                                                          IsChecked="{Binding IsEnabled, Mode=OneWay}"
+                                                          IsEnabled="{Binding CanToggle}"
+                                                          Command="{Binding ToggleEnabledCommand}" />
+                                        </Grid>
+
+                                        <Border Classes="divider" />
+
+                                        <TextBlock Classes="group-title"
+                                                   Text="Требования" />
+
+                                        <ItemsControl ItemsSource="{Binding Requirements}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Vertical" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:AgnosiaModuleRequirementViewModel">
+                                                    <Border Classes="surface-card compact list-card">
+                                                        <Grid ColumnDefinitions="Auto,*"
+                                                              RowDefinitions="Auto,Auto,Auto"
+                                                              ColumnSpacing="12"
+                                                              RowSpacing="8">
+                                                            <Border Classes="icon-tile permission-icon"
+                                                                    Classes.granted="{Binding IsSatisfied}">
+                                                                <PathIcon Classes="section-icon centered"
+                                                                          Data="{StaticResource IconCheckGeometry}" />
+                                                            </Border>
+
+                                                            <StackPanel Grid.Column="1"
+                                                                        MinWidth="0"
+                                                                        Spacing="4">
+                                                                <TextBlock Classes="section-title compact"
+                                                                           Text="{Binding Title}" />
+                                                                <Border Classes="tag-chip dense"
+                                                                        HorizontalAlignment="Left">
+                                                                    <TextBlock Classes="tag-label"
+                                                                               Text="{Binding StatusLabel}" />
+                                                                </Border>
+                                                            </StackPanel>
+
+                                                            <TextBlock Grid.Row="1"
+                                                                       Grid.ColumnSpan="2"
+                                                                       Classes="page-caption"
+                                                                       Text="{Binding Description}" />
+
+                                                            <Button Grid.Row="2"
+                                                                    Grid.ColumnSpan="2"
+                                                                    Classes="compact-action"
+                                                                    HorizontalAlignment="Left"
+                                                                    Command="{Binding RequestCommand}"
+                                                                    IsVisible="{Binding CanRequest}">
+                                                                <TextBlock Classes="button-label"
+                                                                           Text="{Binding ActionLabel}" />
+                                                            </Button>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </ScrollViewer>
+
+                                <WrapPanel Grid.Row="2"
+                                           Orientation="Horizontal">
+                                    <Button Classes="primary"
+                                            Margin="0,0,10,0"
+                                            IsVisible="{Binding IsFileShuttle}"
+                                            IsEnabled="{Binding CanOpenDocumentsUi}"
+                                            Command="{Binding OpenDocumentsUiCommand}">
+                                        <StackPanel Orientation="Horizontal"
+                                                    Spacing="8">
+                                            <PathIcon Classes="button-icon"
+                                                      Data="{StaticResource IconFilesGeometry}" />
+                                            <TextBlock Classes="button-label"
+                                                       Text="Открыть Files" />
+                                        </StackPanel>
+                                    </Button>
+
+                                    <Button Classes="compact-action"
+                                            Command="{Binding CloseCommand}">
+                                        <TextBlock Classes="button-label"
+                                                   Text="Закрыть" />
+                                    </Button>
+                                </WrapPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ContentControl.DataTemplates>
+            </ContentControl>
+        </Grid>
+    </Border>
+</UserControl>

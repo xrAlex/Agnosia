@@ -27,6 +27,7 @@
         <Grid Grid.Row="1">
             <views:OverviewSectionView IsVisible="{Binding IsOverviewSectionSelected}" />
             <views:AppsSectionView IsVisible="{Binding IsAppsSectionSelected}" />
+            <views:ModulesSectionView IsVisible="{Binding IsModulesSectionSelected}" />
             <views:SettingsSectionView IsVisible="{Binding IsSettingsSectionSelected}" />
         </Grid>
 
@@ -42,6 +43,8 @@
         <views:LogOverlayView Grid.Row="0" Grid.RowSpan="3" />
 
         <views:PermissionsOverlayView Grid.Row="0" Grid.RowSpan="3" />
+
+        <views:ModuleDetailsOverlayView Grid.Row="0" Grid.RowSpan="3" />
 
         <views:AppControlOverlayView Grid.Row="0" Grid.RowSpan="3" />
 

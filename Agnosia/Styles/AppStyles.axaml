@@ -130,6 +130,14 @@
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
+    <Style Selector="Border.module-dialog">
+        <Setter Property="MinWidth" Value="320" />
+        <Setter Property="MaxWidth" Value="620" />
+        <Setter Property="MaxHeight" Value="720" />
+        <Setter Property="Padding" Value="16" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
     <Style Selector="Grid.overlay-root">
         <Setter Property="Margin" Value="18" />
     </Style>

@@ -116,6 +116,19 @@ public sealed class AndroidSourceContractTests
         Assert.Contains("app is { Profile: ProfileKind.Personal, IsSystem: false }", gatewaySource, StringComparison.Ordinal);
     }
 
+    // Проверяет, что File Shuttle module управляет старым storage key и provider component.
+    [Fact]
+    public void File_shuttle_module_uses_existing_storage_and_provider_contracts()
+    {
+        var coordinatorSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Modules", "AndroidModuleCoordinator.cs"));
+
+        Assert.Contains("StorageKeys.CrossProfileFileShuttleEnabled", coordinatorSource, StringComparison.Ordinal);
+        Assert.Contains("AgnosiaUtilities.ApplyCrossProfileFileShuttleComponentState(activity)", coordinatorSource, StringComparison.Ordinal);
+        Assert.Contains("SettingsManager.Instance.SyncBooleanSettingAsync", coordinatorSource, StringComparison.Ordinal);
+        Assert.Contains("AndroidCommandContract.FileShuttleDocumentsProviderComponent", coordinatorSource, StringComparison.Ordinal);
+    }
+
     private static string[] ReadIntentFilterActionNames(params string[] relativeSourcePaths)
     {
         var names = new HashSet<string>(StringComparer.Ordinal);

@@ -363,6 +363,34 @@ public sealed class DashboardWorkspaceCommandTests
         Assert.Equal("CompletionRejected", viewModel.StatusMessage);
     }
 
+    // Проверяет, что модульные all-files permissions не попадают в onboarding.
+    [Fact]
+    public async Task Onboarding_permissions_exclude_file_shuttle_all_files_permissions()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            OnboardingCompleted = false,
+            Permissions =
+            [
+                .. TestSnapshots.RequiredOnboardingPermissions(granted: true),
+                TestSnapshots.RequiredPermission(PermissionKind.PersonalAllFiles),
+                TestSnapshots.RequiredPermission(PermissionKind.WorkAllFiles)
+            ]
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+
+        await viewModel.EnsureInitializedAsync();
+        await viewModel.StartOnboardingCommand.ExecuteAsync(null);
+
+        Assert.Contains(viewModel.PermissionItems, item => item.Kind == PermissionKind.PersonalAllFiles);
+        Assert.Contains(viewModel.PermissionItems, item => item.Kind == PermissionKind.WorkAllFiles);
+        Assert.DoesNotContain(viewModel.OnboardingPermissionItems, item => item.Kind == PermissionKind.PersonalAllFiles);
+        Assert.DoesNotContain(viewModel.OnboardingPermissionItems, item => item.Kind == PermissionKind.WorkAllFiles);
+        Assert.True(viewModel.AreOnboardingPermissionsGranted);
+        Assert.Equal("GrantedCount|6|6", viewModel.OnboardingPermissionSummary);
+    }
+
     private static AppItemViewModel CreatePersonalApp(DashboardWorkspaceViewModel owner)
     {
         return TestWorkspaceFactory.CreateApp(

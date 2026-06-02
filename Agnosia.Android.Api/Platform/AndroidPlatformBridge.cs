@@ -1,6 +1,7 @@
 using Agnosia.Android.Api.Commands;
 using Agnosia.Android.Api.Dashboard;
 using Agnosia.Android.Api.Gateways;
+using Agnosia.Android.Api.Modules;
 using Agnosia.Android.Api.Permissions;
 using Agnosia.Android.Api.Storage;
 using Agnosia.Models;
@@ -25,6 +26,7 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
     private readonly AndroidDashboardReader _dashboardReader;
     private readonly AndroidPermissionCoordinator _permissionCoordinator;
     private readonly AndroidAppCommandCoordinator _appCommandCoordinator;
+    private readonly AndroidModuleCoordinator _moduleCoordinator;
     private WeakReference<IAndroidActivityHost>? _activityHostReference;
 
     public static AndroidPlatformBridge Instance { get; } = new();
@@ -35,6 +37,9 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         _dashboardReader = new AndroidDashboardReader(_commandRunner);
         _permissionCoordinator = new AndroidPermissionCoordinator(_commandRunner, StartProvisioningAsync);
         _appCommandCoordinator = new AndroidAppCommandCoordinator(
+            _commandRunner,
+            _permissionCoordinator);
+        _moduleCoordinator = new AndroidModuleCoordinator(
             _commandRunner,
             _permissionCoordinator);
     }
@@ -301,6 +306,19 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
             out var error)
             ? OperationResult.Success("Открываем системный файловый интерфейс.")
             : OperationResult.Failure(error ?? "Android не смог открыть системный файловый интерфейс."));
+    }
+
+    public Task<IReadOnlyList<AgnosiaModuleSnapshot>> LoadModulesAsync(CancellationToken cancellationToken = default)
+    {
+        return _moduleCoordinator.LoadModulesAsync(cancellationToken);
+    }
+
+    public Task<OperationResult> SetModuleEnabledAsync(
+        AgnosiaModuleKind module,
+        bool enabled,
+        CancellationToken cancellationToken = default)
+    {
+        return _moduleCoordinator.SetModuleEnabledAsync(module, enabled, cancellationToken);
     }
 
     public string GetDeviceInfoString()

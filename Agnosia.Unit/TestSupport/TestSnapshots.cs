@@ -106,4 +106,41 @@ internal static class TestSnapshots
             grantedLabel,
             requestLabel);
     }
+
+    public static AgnosiaModuleSnapshot FileShuttleModule(
+        bool isEnabled = false,
+        AgnosiaModuleState state = AgnosiaModuleState.Disabled,
+        IReadOnlyList<AgnosiaModuleRequirement>? requirements = null,
+        bool canSetEnabled = true)
+    {
+        return new AgnosiaModuleSnapshot(
+            AgnosiaModuleKind.FileShuttle,
+            "File Shuttle",
+            "Short file shuttle description",
+            "Full file shuttle description",
+            isEnabled,
+            state,
+            requirements ?? [],
+            state switch
+            {
+                AgnosiaModuleState.Enabled => "Включён",
+                AgnosiaModuleState.PartiallyEnabled => "Требует разрешений",
+                AgnosiaModuleState.Unavailable => "Недоступен",
+                _ => "Выключен"
+            },
+            canSetEnabled);
+    }
+
+    public static AgnosiaModuleRequirement ModuleRequirement(
+        PermissionKind? permissionKind,
+        bool isSatisfied,
+        string title = "Requirement")
+    {
+        return new AgnosiaModuleRequirement(
+            title,
+            $"{title} description",
+            isSatisfied,
+            permissionKind,
+            "Request");
+    }
 }

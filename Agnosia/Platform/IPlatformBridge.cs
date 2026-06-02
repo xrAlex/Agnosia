@@ -6,4 +6,5 @@ public interface IPlatformBridge :
     IPermissionPlatformService,
     IOnboardingPlatformService,
     IAppCommandService,
-    ISettingsPlatformService;
+    ISettingsPlatformService,
+    IModulePlatformService;

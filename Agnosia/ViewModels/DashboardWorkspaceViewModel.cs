@@ -37,6 +37,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private readonly IOnboardingPlatformService _onboardingService;
     private readonly IAppCommandService _appCommandService;
     private readonly ISettingsPlatformService _settingsService;
+    private readonly IModulePlatformService _moduleService;
     private readonly IAppEventLogService _eventLogService;
     private readonly Func<Action, DispatcherPriority, ValueTask> _invokeOnUiThreadAsync;
     private readonly Func<TimeSpan, CancellationToken, Task> _delayAsync;
@@ -52,7 +53,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             SingleWriter = false
         });
     private readonly Dictionary<AppItemKey, AppItemViewModel> _appItemCache = [];
+    private readonly Dictionary<AgnosiaModuleKind, AgnosiaModuleViewModel> _moduleItemCache = [];
     private readonly ObservableCollection<PermissionItemViewModel> _permissionItems = [];
+    private readonly ObservableCollection<AgnosiaModuleViewModel> _moduleItems = [];
     private AppItemViewModel[] _visibleApps = [];
     private AppItemViewModel[] _personalApps = [];
     private AppItemViewModel[] _workApps = [];
@@ -74,6 +77,11 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public ReadOnlyObservableCollection<PermissionItemViewModel> PermissionItems { get; }
 
+    public IReadOnlyList<PermissionItemViewModel> OnboardingPermissionItems =>
+        _permissionItems.Where(item => IsRequiredOnboardingPermission(item.Kind)).ToArray();
+
+    public ReadOnlyObservableCollection<AgnosiaModuleViewModel> Modules { get; }
+
     public IReadOnlyList<VpnAutomationClientOptionViewModel> VpnAfterFreezeClientOptions { get; }
 
     public string AppVersion => GetAppVersion();
@@ -84,6 +92,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsEmptyStateVisible))]
     [NotifyPropertyChangedFor(nameof(IsAppInventoryProgressVisible))]
     [NotifyPropertyChangedFor(nameof(CanOpenAppsSection))]
+    [NotifyPropertyChangedFor(nameof(CanOpenModulesSection))]
     [NotifyPropertyChangedFor(nameof(CanOpenSettingsSection))]
     [NotifyPropertyChangedFor(nameof(OverviewHeadline))]
     [NotifyPropertyChangedFor(nameof(OverallStatusText))]
@@ -93,6 +102,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsOverviewSectionSelected))]
     [NotifyPropertyChangedFor(nameof(IsAppsSectionSelected))]
+    [NotifyPropertyChangedFor(nameof(IsModulesSectionSelected))]
     [NotifyPropertyChangedFor(nameof(IsSettingsSectionSelected))]
     private partial DashboardSection SelectedSection { get; set; } = DashboardSection.Overview;
 
@@ -112,6 +122,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsAppInventoryProgressVisible))]
     [NotifyPropertyChangedFor(nameof(CanStartProvisioning))]
     [NotifyPropertyChangedFor(nameof(CanOpenAppsSection))]
+    [NotifyPropertyChangedFor(nameof(CanOpenModulesSection))]
     [NotifyPropertyChangedFor(nameof(CanOpenSettingsSection))]
     [NotifyPropertyChangedFor(nameof(OverviewHeadline))]
     [NotifyPropertyChangedFor(nameof(OverallStatusText))]
@@ -124,6 +135,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsEmptyStateVisible))]
     [NotifyPropertyChangedFor(nameof(IsAppInventoryProgressVisible))]
     [NotifyPropertyChangedFor(nameof(CanOpenAppsSection))]
+    [NotifyPropertyChangedFor(nameof(CanOpenModulesSection))]
     [NotifyPropertyChangedFor(nameof(CanOpenSettingsSection))]
     [NotifyPropertyChangedFor(nameof(WorkProfileStatusText))]
     [NotifyPropertyChangedFor(nameof(OverviewHeadline))]
@@ -198,6 +210,12 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     [ObservableProperty]
     public partial bool IsPermissionsWindowOpen { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsModuleDetailsOpen { get; set; }
+
+    [ObservableProperty]
+    public partial AgnosiaModuleViewModel? SelectedModule { get; set; }
 
     [ObservableProperty]
     public partial bool IsAppControlWindowOpen { get; set; }
@@ -293,6 +311,17 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             ? "NotChecked"
             : $"GrantedCount|{_permissionItems.Count(item => item.IsGranted)}|{_permissionItems.Count}";
 
+    public string OnboardingPermissionSummary
+    {
+        get
+        {
+            var items = OnboardingPermissionItems;
+            return items.Count == 0
+                ? "NotChecked"
+                : $"GrantedCount|{items.Count(item => item.IsGranted)}|{items.Count}";
+        }
+    }
+
     public bool AreOnboardingPermissionsGranted =>
         RequiredOnboardingPermissionKinds.All(kind =>
             _permissionItems.Any(item => item.Kind == kind && item.IsGranted));
@@ -385,11 +414,17 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public bool IsAppsSectionSelected => SelectedSection == DashboardSection.Apps;
 
+    public bool IsModulesSectionSelected => SelectedSection == DashboardSection.Modules;
+
     public bool IsSettingsSectionSelected => SelectedSection == DashboardSection.Settings;
 
     public bool CanOpenAppsSection => IsDashboardVisible;
 
+    public bool CanOpenModulesSection => IsDashboardVisible;
+
     public bool CanOpenSettingsSection => IsDashboardVisible;
+
+    public bool HasModules => _moduleItems.Count > 0;
 
     public bool IsEmptyStateVisible =>
         IsDashboardVisible && HasLoadedInventory && !IsInventoryLoading && _visibleApps.Length == 0;
@@ -506,6 +541,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             platformBridge,
             platformBridge,
             platformBridge,
+            platformBridge,
             new BoundedAppEventLogService())
     {
     }
@@ -517,6 +553,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         IOnboardingPlatformService onboardingService,
         IAppCommandService appCommandService,
         ISettingsPlatformService settingsService,
+        IModulePlatformService moduleService,
         IAppEventLogService eventLogService,
         Func<Action, DispatcherPriority, ValueTask>? invokeOnUiThreadAsync = null,
         Func<TimeSpan, CancellationToken, Task>? delayAsync = null)
@@ -528,6 +565,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         _onboardingService = onboardingService ?? throw new ArgumentNullException(nameof(onboardingService));
         _appCommandService = appCommandService ?? throw new ArgumentNullException(nameof(appCommandService));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+        _moduleService = moduleService ?? throw new ArgumentNullException(nameof(moduleService));
         _eventLogService = eventLogService ?? throw new ArgumentNullException(nameof(eventLogService));
         _invokeOnUiThreadAsync = invokeOnUiThreadAsync ?? InvokeOnAvaloniaUiThreadAsync;
         _delayAsync = delayAsync ?? Task.Delay;
@@ -548,6 +586,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             ReportErrorOnUiThreadAsync,
             _delayAsync);
         PermissionItems = new ReadOnlyObservableCollection<PermissionItemViewModel>(_permissionItems);
+        Modules = new ReadOnlyObservableCollection<AgnosiaModuleViewModel>(_moduleItems);
         VpnAfterFreezeClientOptions = CreateVpnAfterFreezeClientOptions();
         SelectedProfile = ProfileKind.Personal;
     }
@@ -615,6 +654,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             TracePerf("RefreshProfile", profileStartedAt);
             _lastProfileSnapshot = profileSnapshot;
             ApplyProfileSnapshot(profileSnapshot);
+            await ReloadModulesAsync();
             HasLoadedSnapshot = true;
             StatusMessage = !string.IsNullOrWhiteSpace(profileSnapshot.StatusMessage)
                 ? profileSnapshot.StatusMessage
@@ -681,6 +721,12 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void OpenModulesSection()
+    {
+        if (CanOpenModulesSection) SelectedSection = DashboardSection.Modules;
+    }
+
+    [RelayCommand]
     private void OpenSettingsSection()
     {
         if (CanOpenSettingsSection) SelectedSection = DashboardSection.Settings;
@@ -716,6 +762,13 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [RelayCommand]
     private async Task OpenDocumentsUiAsync()
     {
+        if (SelectedModule?.CanOpenDocumentsUi != true)
+        {
+            StatusIsError = true;
+            StatusMessage = "Сначала включите File Shuttle.";
+            return;
+        }
+
         if (!TryBeginOperation()) return;
 
         try
@@ -741,7 +794,22 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private void ClosePermissions() => IsPermissionsWindowOpen = false;
 
     [RelayCommand]
+    private void CloseModuleDetails() => CloseModuleDetailsCore();
+
+    [RelayCommand]
     private void CloseAppControlWindow() => CloseAppControl();
+
+    internal void OpenModuleDetails(AgnosiaModuleViewModel module)
+    {
+        SelectedModule = module;
+        IsModuleDetailsOpen = true;
+    }
+
+    internal void CloseModuleDetailsCore()
+    {
+        IsModuleDetailsOpen = false;
+        SelectedModule = null;
+    }
 
     internal void OpenAppControl(AppItemViewModel app)
     {
@@ -1005,16 +1073,75 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             "RuntimePermissionsRevoked");
     }
 
-    internal async Task RequestPermissionAsync(PermissionItemViewModel permission)
+    internal async Task SetModuleEnabledAsync(AgnosiaModuleViewModel module, bool enabled)
     {
-        if (!permission.CanRequest || !TryBeginOperation()) return;
+        if (!TryBeginOperation()) return;
 
         try
         {
-            var refreshOnResume = ShouldRefreshPermissionOnResume(permission.Kind);
+            var result = await _moduleService.SetModuleEnabledAsync(module.Kind, enabled);
+            if (result.Succeeded)
+            {
+                await RefreshDashboardAsync(true);
+            }
+            else
+            {
+                await ReloadModulesAsync();
+            }
+
+            StatusIsError = !result.Succeeded;
+            StatusMessage = string.IsNullOrWhiteSpace(result.Message)
+                ? (enabled ? "ModuleEnabled" : "ModuleDisabled")
+                : result.Message;
+        }
+        catch (Exception ex)
+        {
+            StatusIsError = true;
+            StatusMessage = ResolveExceptionMessage(ex, "ModuleUpdateFailed");
+            await ReloadModulesAsync();
+        }
+        finally
+        {
+            try
+            {
+                await ReloadPlatformLogsAsync();
+            }
+            finally
+            {
+                EndOperation();
+                _settingsSaveCoordinator.TryStartQueued();
+            }
+        }
+    }
+
+    internal Task RequestModuleRequirementAsync(AgnosiaModuleRequirementViewModel requirement)
+    {
+        return requirement.PermissionKind is { } permissionKind
+            ? RequestPermissionKindAsync(permissionKind, requirement.CanRequest)
+            : Task.CompletedTask;
+    }
+
+    internal Task OpenDocumentsUiFromModuleAsync(AgnosiaModuleViewModel module)
+    {
+        SelectedModule = module;
+        return OpenDocumentsUiAsync();
+    }
+
+    internal async Task RequestPermissionAsync(PermissionItemViewModel permission)
+    {
+        await RequestPermissionKindAsync(permission.Kind, permission.CanRequest);
+    }
+
+    private async Task RequestPermissionKindAsync(PermissionKind kind, bool canRequest)
+    {
+        if (!canRequest || !TryBeginOperation()) return;
+
+        try
+        {
+            var refreshOnResume = ShouldRefreshPermissionOnResume(kind);
             if (refreshOnResume) _refreshPermissionsOnResume = true;
 
-            var result = await _permissionService.RequestPermissionAsync(permission.Kind);
+            var result = await _permissionService.RequestPermissionAsync(kind);
             StatusIsError = !result.Succeeded;
             StatusMessage = string.IsNullOrWhiteSpace(result.Message)
                 ? "PermissionRequestOpened"
@@ -1025,10 +1152,11 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
                 if (!result.Succeeded) _refreshPermissionsOnResume = false;
 
                 await ReloadPermissionsAsync();
+                await ReloadModulesAsync();
                 await CompleteOnboardingIfReadyAsync();
             }
 
-            if (permission.Kind == PermissionKind.WorkProfile) StartOnboardingMonitorIfNeeded();
+            if (kind == PermissionKind.WorkProfile) StartOnboardingMonitorIfNeeded();
         }
         catch (Exception ex)
         {
@@ -1406,6 +1534,49 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }
     }
 
+    private async Task ReloadModulesAsync()
+    {
+        var snapshots = await _moduleService.LoadModulesAsync();
+
+        await InvokeOnUiThreadActionAsync(() => ApplyModuleSnapshots(snapshots), DispatcherPriority.Background);
+    }
+
+    private void ApplyModuleSnapshots(IReadOnlyList<AgnosiaModuleSnapshot> snapshots)
+    {
+        var selectedKind = SelectedModule?.Kind;
+        var retainedKinds = new HashSet<AgnosiaModuleKind>();
+
+        _moduleItems.Clear();
+        foreach (var snapshot in snapshots)
+        {
+            retainedKinds.Add(snapshot.Kind);
+            if (!_moduleItemCache.TryGetValue(snapshot.Kind, out var module))
+            {
+                module = new AgnosiaModuleViewModel(this, snapshot);
+                _moduleItemCache[snapshot.Kind] = module;
+            }
+            else
+            {
+                module.ApplySnapshot(snapshot);
+            }
+
+            _moduleItems.Add(module);
+        }
+
+        DisposeStaleModuleItems(retainedKinds);
+
+        if (selectedKind is { } kind && _moduleItemCache.TryGetValue(kind, out var selectedModule))
+        {
+            SelectedModule = selectedModule;
+        }
+        else if (IsModuleDetailsOpen)
+        {
+            CloseModuleDetailsCore();
+        }
+
+        OnPropertyChanged(nameof(HasModules));
+    }
+
     private async Task ReloadPermissionsCoreAsync()
     {
         var snapshots = await _permissionService.LoadPermissionsAsync();
@@ -1416,6 +1587,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             foreach (var snapshot in snapshots) _permissionItems.Add(new PermissionItemViewModel(this, snapshot));
 
             OnPropertyChanged(nameof(PermissionSummary));
+            OnPropertyChanged(nameof(OnboardingPermissionItems));
+            OnPropertyChanged(nameof(OnboardingPermissionSummary));
             OnPropertyChanged(nameof(AreOnboardingPermissionsGranted));
             OnPropertyChanged(nameof(IsOnboardingPermissionsStep));
             OnPropertyChanged(nameof(OnboardingStepLabel));
@@ -1425,12 +1598,13 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private async Task RefreshPermissionsAfterResumeAsync()
     {
         if (!_initialized
-            || (!IsPermissionsWindowOpen && !IsOnboardingPermissionsStep))
+            || (!IsPermissionsWindowOpen && !IsOnboardingPermissionsStep && !IsModuleDetailsOpen))
             return;
 
         try
         {
             await ReloadPermissionsAsync();
+            await ReloadModulesAsync();
             await CompleteOnboardingIfReadyAsync();
         }
         catch (Exception ex)
@@ -1518,6 +1692,27 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
             staleApp.Dispose();
             _appItemCache.Remove(staleKey);
+        }
+    }
+
+    private void DisposeStaleModuleItems(HashSet<AgnosiaModuleKind> retainedKinds)
+    {
+        List<AgnosiaModuleKind>? staleKinds = null;
+        foreach (var kind in _moduleItemCache.Keys)
+        {
+            if (retainedKinds.Contains(kind)) continue;
+
+            staleKinds ??= [];
+            staleKinds.Add(kind);
+        }
+
+        if (staleKinds is null) return;
+
+        foreach (var staleKind in staleKinds)
+        {
+            if (SelectedModule?.Kind == staleKind) CloseModuleDetailsCore();
+
+            _moduleItemCache.Remove(staleKind);
         }
     }
 

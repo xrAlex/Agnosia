@@ -13,7 +13,8 @@ public sealed class TestPlatformServices :
     IPermissionPlatformService,
     IOnboardingPlatformService,
     IAppCommandService,
-    ISettingsPlatformService
+    ISettingsPlatformService,
+    IModulePlatformService
 {
     public DashboardSnapshot DashboardProfile { get; set; } = DashboardSnapshot.Unsupported;
 
@@ -22,6 +23,9 @@ public sealed class TestPlatformServices :
     public IReadOnlyList<AppLogEntry> RecentLogs { get; set; } = [];
 
     public IReadOnlyList<PermissionSnapshot> Permissions { get; set; } = [];
+
+    public IReadOnlyList<AgnosiaModuleSnapshot> Modules { get; set; } =
+        [AgnosiaModuleSnapshot.FileShuttleUnavailable];
 
     public bool OnboardingCompleted { get; set; } = true;
 
@@ -93,6 +97,9 @@ public sealed class TestPlatformServices :
     public Func<AppSettingsSnapshot, CancellationToken, Task<OperationResult>>? SaveSettingsHandler { get; set; }
     public int OpenDocumentsUiRequests { get; private set; }
     public Func<CancellationToken, Task<OperationResult>>? OpenDocumentsUiHandler { get; set; }
+    public int ModuleLoadCount { get; private set; }
+    public List<(AgnosiaModuleKind Module, bool Enabled)> SetModuleEnabledRequests { get; } = [];
+    public Func<AgnosiaModuleKind, bool, CancellationToken, Task<OperationResult>>? SetModuleEnabledHandler { get; set; }
 
     public Task<DashboardSnapshot> LoadDashboardProfileAsync(CancellationToken cancellationToken = default)
     {
@@ -288,6 +295,25 @@ public sealed class TestPlatformServices :
             ? Task.FromResult(DefaultOperationResult)
             : OpenDocumentsUiHandler(cancellationToken);
     }
+
+    public Task<IReadOnlyList<AgnosiaModuleSnapshot>> LoadModulesAsync(CancellationToken cancellationToken = default)
+    {
+        ModuleLoadCount++;
+
+        return Task.FromResult(Modules);
+    }
+
+    public Task<OperationResult> SetModuleEnabledAsync(
+        AgnosiaModuleKind module,
+        bool enabled,
+        CancellationToken cancellationToken = default)
+    {
+        SetModuleEnabledRequests.Add((module, enabled));
+
+        return SetModuleEnabledHandler is null
+            ? Task.FromResult(DefaultOperationResult)
+            : SetModuleEnabledHandler(module, enabled, cancellationToken);
+    }
 }
 
 internal static class TestWorkspaceFactory
@@ -299,6 +325,7 @@ internal static class TestWorkspaceFactory
         services ??= new TestPlatformServices();
 
         return new DashboardWorkspaceViewModel(
+            services,
             services,
             services,
             services,

@@ -1,0 +1,70 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Agnosia.ViewModels"
+             mc:Ignorable="d"
+             x:Class="Agnosia.Views.ModulesSectionView"
+             x:DataType="vm:DashboardWorkspaceViewModel">
+    <Design.DataContext>
+        <vm:DashboardWorkspaceViewModel />
+    </Design.DataContext>
+
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Classes="content-root">
+            <TextBlock Classes="page-title"
+                       Text="Модули" />
+
+            <StackPanel IsVisible="{Binding IsDashboardVisible}"
+                        Spacing="12">
+                <TextBlock Classes="group-title"
+                           Text="Доступные модули" />
+
+                <ItemsControl ItemsSource="{Binding Modules}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Vertical" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:AgnosiaModuleViewModel">
+                            <Button Classes="app-card-button"
+                                    Command="{Binding OpenCommand}">
+                                <Border Classes="surface-card compact list-card">
+                                    <Grid ColumnDefinitions="Auto,*,Auto"
+                                          ColumnSpacing="14">
+                                        <Border Classes="icon-tile">
+                                            <PathIcon Classes="section-icon centered"
+                                                      Data="{StaticResource IconModulesGeometry}" />
+                                        </Border>
+
+                                        <StackPanel Grid.Column="1"
+                                                    MinWidth="0"
+                                                    Spacing="5">
+                                            <TextBlock Classes="section-title compact"
+                                                       Text="{Binding Title}" />
+                                            <TextBlock Classes="page-caption"
+                                                       Text="{Binding ShortDescription}" />
+                                            <WrapPanel Orientation="Horizontal">
+                                                <Border Classes="tag-chip dense"
+                                                        Margin="0,0,8,6">
+                                                    <TextBlock Classes="tag-label"
+                                                               Text="{Binding StatusText}" />
+                                                </Border>
+                                            </WrapPanel>
+                                        </StackPanel>
+
+                                        <ToggleSwitch Grid.Column="2"
+                                                      VerticalAlignment="Center"
+                                                      IsHitTestVisible="False"
+                                                      IsChecked="{Binding IsEnabled, Mode=OneWay}" />
+                                    </Grid>
+                                </Border>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
