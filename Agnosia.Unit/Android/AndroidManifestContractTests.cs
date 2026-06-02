@@ -28,6 +28,7 @@ public sealed class AndroidManifestContractTests
             permissions,
             [
                 "android.permission.FOREGROUND_SERVICE",
+                "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
                 "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
                 "android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED",
                 "android.permission.PACKAGE_USAGE_STATS",
@@ -110,8 +111,32 @@ public sealed class AndroidManifestContractTests
         Assert.Contains("[Service(", source, StringComparison.Ordinal);
         Assert.Contains("Name = \"com.agnosia.app.AgnosiaFileShuttleService\"", source, StringComparison.Ordinal);
         Assert.Contains("Exported = false", source, StringComparison.Ordinal);
+        Assert.Contains("ForegroundServiceType = ForegroundService.TypeDataSync", source, StringComparison.Ordinal);
+        Assert.Contains("context.StartService(intent)", source, StringComparison.Ordinal);
+        Assert.Contains("StartForeground(NotificationId, notification, ForegroundService.TypeDataSync)", source,
+            StringComparison.Ordinal);
         Assert.Contains("public override IBinder? OnBind", source, StringComparison.Ordinal);
         Assert.Contains("return _messenger?.Binder", source, StringComparison.Ordinal);
+    }
+
+    // Проверяет, что cross-profile File Shuttle стартует через PendingIntent с BAL opt-in.
+    [Fact]
+    public void File_shuttle_cross_profile_start_uses_pending_intent_bal_opt_in()
+    {
+        var clientSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Files", "AgnosiaFileShuttleMessengerClient.cs"));
+        var pendingIntentSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Packages", "AndroidPendingIntentApi.cs"));
+
+        Assert.Contains("CreateBackgroundActivityStartPendingIntent", clientSource, StringComparison.Ordinal);
+        Assert.Contains("CreateSenderBackgroundActivityStartOptions", clientSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("_context.StartActivity(intent)", clientSource, StringComparison.Ordinal);
+        Assert.Contains("PendingIntent.GetActivity", pendingIntentSource, StringComparison.Ordinal);
+        Assert.Contains("SetPendingIntentBackgroundActivityStartMode", pendingIntentSource, StringComparison.Ordinal);
+        Assert.Contains(
+            "SetPendingIntentCreatorBackgroundActivityStartMode",
+            pendingIntentSource,
+            StringComparison.Ordinal);
     }
 
     private static XDocument ReadManifest()

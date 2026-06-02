@@ -15,6 +15,7 @@
 | VPN-сценарии | Может временно отключить активный VPN перед запуском рабочего приложения и вернуть его после заморозки. |
 | Анализ разрешений | Показывает риск по комбинациям разрешений, специальных доступов и runtime-состояний. |
 | Диагностика | Ведёт ограниченный журнал событий и показывает состояние рабочего профиля. |
+| File Shuttle | Даёт DocumentsUI SAF-доступ к файлам второго профиля через системные content URI. |
 
 ## Архитектура
 
@@ -204,6 +205,64 @@ Result Intent → ViewModel обновляет состояние
 | Локальные | `PackageInstallerCallback` | Обработка callback-ов внутри текущего профиля без cross-profile маршрута. |
 
 `AndroidActivityCommandGateway` отвечает за общий lifecycle команд: подписывает intent, переносит его в нужный профиль через cross-profile forwarder, запускает `DummyActivity` через `StartActivityForResult` и переводит `Result.Ok`/`Result.Canceled` в `OperationResult`. Обычные команды ждут ответ до 30 секунд, установка пакетов - до 3 минут. Если `MainActivity` временно не resumed, запросы складываются в небольшую очередь; устаревшие запросы иконок могут быть отброшены, чтобы не перегружать Activity-result канал.
+
+## File Shuttle
+
+File Shuttle - это SAF-мост для передачи файлов между личным и рабочим профилем через системный `DocumentsUI`. Он не выдаёт сторонним файловым менеджерам прямой доступ к чужому `/storage`: Android по-прежнему держит разные storage areas для personal/work профилей, а доступ происходит только через `content://` URI и операции `DocumentsProvider`.
+
+Фича выключена по умолчанию. Для работы нужны:
+
+| Условие | Зачем нужно |
+| --- | --- |
+| `CrossProfileFileShuttleEnabled` | Пользователь явно включает мост в настройках Agnosia. |
+| `MANAGE_EXTERNAL_STORAGE` в обоих профилях | Локальный сервис каждого профиля может читать и отдавать файлы своего external storage. |
+| Включённый provider-компонент | `AgnosiaUtilities.ApplyCrossProfileFileShuttleComponentState(...)` включает `AgnosiaCrossProfileDocumentsProvider` только когда тумблер активен. |
+| Зарегистрированные cross-profile actions | `START_FILE_SHUTTLE_PARENT_TO_WORK` и `START_FILE_SHUTTLE_WORK_TO_PARENT` позволяют provider-у подключиться к агенту второго профиля. |
+
+Основные компоненты:
+
+| Компонент | Профиль | Роль |
+| --- | --- | --- |
+| `AgnosiaCrossProfileDocumentsProvider` | Текущий профиль, где открыт DocumentsUI | Публикует root второго профиля, отвечает на SAF-запросы `query`, `open`, `create`, `delete`, `isChild`, thumbnail. |
+| `AgnosiaFileShuttleMessengerClient` | Текущий профиль | Поднимает cross-profile bridge, держит callback `Messenger`, отправляет requests и ждёт responses с timeout. |
+| `DummyActivity.ActionStartFileShuttle` | Второй профиль | Проверяет HMAC, направление action, тумблер и all-files permission, затем привязывается к локальному service. |
+| `AgnosiaFileShuttleService` | Второй профиль | Bound foreground service, который работает только внутри canonical `Environment.ExternalStorageDirectory` и возвращает метаданные, JSON-списки или `ParcelFileDescriptor`. |
+
+Поток запроса:
+
+```text
+DocumentsUI в профиле A
+   │ SAF вызывает provider Agnosia
+   ▼
+AgnosiaCrossProfileDocumentsProvider
+   │ создаёт callback Messenger
+   │ стартует DummyActivity в профиле B
+   ▼
+DummyActivity в профиле B
+   │ проверяет подпись и настройки
+   │ bindService(AgnosiaFileShuttleService)
+   ▼
+AgnosiaFileShuttleService в профиле B
+   │ возвращает service Messenger
+   ▼
+Provider в профиле A
+   │ отправляет loadFiles/openFile/createFile/deleteFile
+   ▼
+DocumentsUI получает SAF rows или ParcelFileDescriptor
+```
+
+IPC построен без `.aidl`: используются `Android.OS.Messenger`, `Message`, `Bundle` и `ParcelFileDescriptor`. Метаданные файлов передаются JSON-строками через source-generated `AgnosiaFileShuttleJsonContext`; файловые потоки и thumbnails передаются descriptor-ами в response bundle. Ошибки возвращаются строкой `ExtraError`, provider логирует их и отдаёт пустой cursor или `FileNotFoundException` там, где этого ожидает SAF.
+
+Запуск cross-profile bridge идёт через `PendingIntent`, а не прямой `Context.StartActivity(...)`. Это важно для Android 14/15/16 background activity launch rules: `AndroidPendingIntentApi.CreateBackgroundActivityStartPendingIntent(...)` задаёт creator-side `SetPendingIntentCreatorBackgroundActivityStartMode(...)`, а `PendingIntent.Send(...)` получает sender-side `SetPendingIntentBackgroundActivityStartMode(...)`. Без этого рабочий `DocumentsUI` может получить `BAL_BLOCK`, provider дождётся timeout и покажет пустой root.
+
+Границы безопасности:
+
+| Граница | Поведение |
+| --- | --- |
+| Путь | Service принимает только canonical пути внутри `Environment.ExternalStorageDirectory`; dummy root мапится на этот каталог. |
+| Профиль | Action должен соответствовать текущему профилю: parent-to-work выполняется только в work, work-to-parent - только в personal. |
+| Доступ | Если File Shuttle выключен или all-files permission не выдан в целевом профиле, bridge возвращает ошибку подключения. |
+| Публичный API | Наружу открыт только `DocumentsProvider` с `android.permission.MANAGE_DOCUMENTS`; прямой filesystem bridge не экспортируется. |
 
 ## Онбординг и разрешения
 
@@ -547,6 +606,7 @@ Android-проект собирается как APK с `ApplicationId` `com.agn
 | Версия Agnosia в рабочем профиле устарела | Личный профиль пытается переустановить актуальный APK в рабочий профиль и повторить owner-check. |
 | Activity-команда стартует, пока `MainActivity` не resumed | Запрос ставится в очередь, а устаревшие фоновые icon-запросы могут быть отменены. |
 | Transient VPN не смог отключить активный VPN | Запуск рабочего приложения отменяется, чтобы не обещать скрытие VPN-состояния. |
+| File Shuttle показывает пустой root | Проверяются `AgnosiaFileShuttleClient`, `AgnosiaDocumentsProvider`, `START_FILE_SHUTTLE_*`, `BAL_BLOCK`, timeout, `MANAGE_EXTERNAL_STORAGE` и состояние тумблера в обоих профилях. |
 
 ## Коротко о главном потоке
 

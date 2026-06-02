@@ -153,7 +153,7 @@
                                 <TextBlock Classes="section-title compact"
                                            Text="File Shuttle" />
                                 <TextBlock Classes="page-caption"
-                                           Text="Показывать файлы другого профиля в системном DocumentsUI через временный content-доступ" />
+                                           Text="Разрешить доступ DocumentsUI к файлам рабочего и основного профиля для передачи данных" />
                             </StackPanel>
                             <ToggleSwitch Grid.Column="2"
                                           VerticalAlignment="Center"

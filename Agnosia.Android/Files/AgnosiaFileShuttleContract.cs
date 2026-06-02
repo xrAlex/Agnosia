@@ -46,5 +46,5 @@ internal sealed record AgnosiaFileShuttleDocumentInfo(
     int Flags);
 
 [JsonSerializable(typeof(AgnosiaFileShuttleDocumentInfo))]
-[JsonSerializable(typeof(List<AgnosiaFileShuttleDocumentInfo>))]
+[JsonSerializable(typeof(AgnosiaFileShuttleDocumentInfo[]))]
 internal sealed partial class AgnosiaFileShuttleJsonContext : JsonSerializerContext;

@@ -76,7 +76,7 @@ internal sealed class AndroidPermissionCoordinator(
                 "Открыть настройки"),
             new PermissionSnapshot(
                 PermissionKind.PersonalAllFiles,
-                "Все файлы",
+                "Доступ к файлам",
                 "Основной профиль",
                 "Нужно для File Shuttle, чтобы Agnosia могла отдавать выбранные файлы личного профиля через DocumentsUI",
                 AndroidPermissionApi.HasAllFilesAccess(activity),
@@ -85,7 +85,7 @@ internal sealed class AndroidPermissionCoordinator(
                 "Открыть настройки"),
             new PermissionSnapshot(
                 PermissionKind.WorkAllFiles,
-                "Все файлы",
+                "Доступ к файлам",
                 "Рабочий профиль",
                 "Нужно для File Shuttle, чтобы Agnosia могла отдавать выбранные файлы рабочего профиля через DocumentsUI",
                 workAllFilesGranted,

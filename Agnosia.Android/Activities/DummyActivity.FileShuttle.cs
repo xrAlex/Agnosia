@@ -47,11 +47,11 @@ public sealed partial class DummyActivity
         try
         {
             AgnosiaFileShuttleService.EnsureStarted(this);
-            var connection = new FileShuttleServiceConnection(this, callback);
+            var connection = new FileShuttleServiceConnection(this, ApplicationContext ?? this, callback);
             AddFileShuttleConnection(connection);
 
             var intent = new Intent(this, typeof(AgnosiaFileShuttleService));
-            if (BindService(intent, connection, Bind.AutoCreate)) return;
+            if ((ApplicationContext ?? this).BindService(intent, connection, Bind.AutoCreate)) return;
 
             RemoveFileShuttleConnection(connection);
             SendFileShuttleConnectResult(callback, null, "Android не смог привязаться к File Shuttle service.");
@@ -89,6 +89,19 @@ public sealed partial class DummyActivity
         {
             FileShuttleConnections.Remove(connection);
         }
+    }
+
+    private static void RetainFileShuttleConnection(FileShuttleServiceConnection connection)
+    {
+        FileShuttleServiceConnection[] staleConnections;
+        lock (FileShuttleConnectionSync)
+        {
+            staleConnections = FileShuttleConnections
+                .Where(candidate => !ReferenceEquals(candidate, connection))
+                .ToArray();
+        }
+
+        foreach (var staleConnection in staleConnections) staleConnection.Disconnect();
     }
 
     private void CloseFileShuttleConnections()
@@ -130,15 +143,19 @@ public sealed partial class DummyActivity
 
     private sealed class FileShuttleServiceConnection(
         DummyActivity activity,
+        Context bindingContext,
         Messenger callback) : Java.Lang.Object, IServiceConnection
     {
+        private DummyActivity? _activity = activity;
+
         public bool IsFor(DummyActivity candidate)
         {
-            return ReferenceEquals(activity, candidate);
+            return ReferenceEquals(_activity, candidate);
         }
 
         public void OnServiceConnected(ComponentName? name, IBinder? service)
         {
+            var activityToFinish = _activity;
             try
             {
                 var serviceMessenger = service is null ? null : new Messenger(service);
@@ -146,11 +163,19 @@ public sealed partial class DummyActivity
                     callback,
                     serviceMessenger,
                     serviceMessenger is null ? "File Shuttle service не вернул Binder." : null);
+                if (serviceMessenger is not null)
+                {
+                    _activity = null;
+                    RetainFileShuttleConnection(this);
+                }
+                else
+                {
+                    Disconnect();
+                }
             }
             finally
             {
-                Disconnect();
-                activity.Finish();
+                activityToFinish?.Finish();
             }
         }
 
@@ -163,7 +188,7 @@ public sealed partial class DummyActivity
         {
             try
             {
-                activity.UnbindService(this);
+                bindingContext.UnbindService(this);
             }
             catch (Exception exception)
             {

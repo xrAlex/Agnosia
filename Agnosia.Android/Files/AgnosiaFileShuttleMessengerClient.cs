@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Agnosia.Android.Api.Commands;
+using Agnosia.Android.Api.Packages;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Infrastructure;
 using Android.Content;
@@ -15,8 +16,8 @@ namespace Agnosia.Android.Files;
 internal sealed class AgnosiaFileShuttleMessengerClient
 {
     private const string LogTag = "AgnosiaFileShuttleClient";
-    private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(10);
-    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(4);
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(8);
 
     private readonly Context _context;
     private readonly HandlerThread _handlerThread;
@@ -56,7 +57,7 @@ internal sealed class AgnosiaFileShuttleMessengerClient
             ? []
             : JsonSerializer.Deserialize(
                 json,
-                AgnosiaFileShuttleJsonContext.Default.ListAgnosiaFileShuttleDocumentInfo) ?? [];
+                AgnosiaFileShuttleJsonContext.Default.AgnosiaFileShuttleDocumentInfoArray) ?? [];
     }
 
     public ParcelFileDescriptor? OpenFile(string documentId, string mode)
@@ -110,41 +111,55 @@ internal sealed class AgnosiaFileShuttleMessengerClient
 
     private Bundle SendRequest(int what, Action<Bundle> configure)
     {
-        var remote = EnsureConnected();
-        var requestId = Interlocked.Increment(ref _nextRequestId);
-        var completion = new TaskCompletionSource<Bundle>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _pendingRequests[requestId] = completion;
-
-        try
+        Exception? lastException = null;
+        for (var attempt = 0; attempt < 2; attempt++)
         {
-            var data = new Bundle();
-            data.PutInt(AgnosiaFileShuttleContract.ExtraRequestId, requestId);
-            configure(data);
+            var requestId = Interlocked.Increment(ref _nextRequestId);
+            var completion = new TaskCompletionSource<Bundle>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _pendingRequests[requestId] = completion;
 
-            var message = Message.Obtain(null, what)
-                          ?? throw new InvalidOperationException("Android did not create a File Shuttle request message.");
-            message.ReplyTo = _callbackMessenger;
-            message.Data = data;
-            remote.Send(message);
+            try
+            {
+                var remote = EnsureConnected();
+                var data = new Bundle();
+                data.PutInt(AgnosiaFileShuttleContract.ExtraRequestId, requestId);
+                configure(data);
 
-            var response = WaitForResult(
-                completion.Task,
-                RequestTimeout,
-                "File Shuttle request timed out.");
-            var error = response.GetString(AgnosiaFileShuttleContract.ExtraError);
-            if (!string.IsNullOrWhiteSpace(error)) throw new InvalidOperationException(error);
+                var message = Message.Obtain(null, what)
+                              ?? throw new InvalidOperationException(
+                                  "Android did not create a File Shuttle request message.");
+                message.ReplyTo = _callbackMessenger;
+                message.Data = data;
+                remote.Send(message);
 
-            return response;
+                var response = WaitForResult(
+                    completion.Task,
+                    RequestTimeout,
+                    "File Shuttle request timed out.");
+                var error = response.GetString(AgnosiaFileShuttleContract.ExtraError);
+                if (!string.IsNullOrWhiteSpace(error)) throw new InvalidOperationException(error);
+
+                return response;
+            }
+            catch (RemoteException exception)
+            {
+                lastException = exception;
+                ClearRemoteMessenger();
+            }
+            catch (TimeoutException exception)
+            {
+                lastException = exception;
+                ClearRemoteMessenger();
+                Log.Warn(LogTag, $"File Shuttle request timed out. what={what}, attempt={attempt + 1}.");
+                throw;
+            }
+            finally
+            {
+                _pendingRequests.TryRemove(requestId, out _);
+            }
         }
-        catch (RemoteException)
-        {
-            ClearRemoteMessenger();
-            throw;
-        }
-        finally
-        {
-            _pendingRequests.TryRemove(requestId, out _);
-        }
+
+        throw lastException ?? new TimeoutException("File Shuttle request timed out.");
     }
 
     private Messenger EnsureConnected()
@@ -187,7 +202,19 @@ internal sealed class AgnosiaFileShuttleMessengerClient
             intent.AddFlags(ActivityFlags.NewTask);
             intent.PutExtra(AndroidCommandContract.ExtraFileShuttleCallbackMessenger, _callbackMessenger);
             AgnosiaUtilities.TransferIntentToProfile(_context, intent);
-            _context.StartActivity(intent);
+
+            var pendingIntent = AndroidPendingIntentApi.CreateBackgroundActivityStartPendingIntent(
+                _context,
+                intent,
+                action);
+            pendingIntent.Send(
+                _context,
+                Result.Ok,
+                null,
+                null,
+                null,
+                null,
+                AndroidPendingIntentApi.CreateSenderBackgroundActivityStartOptions());
         }
         catch (Exception exception)
         {

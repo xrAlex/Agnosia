@@ -1,6 +1,8 @@
 using System.Text.Json;
+using Agnosia.Android.Api.Notifications;
 using Android.App;
 using Android.Content;
+using Android.Content.PM;
 using Android.OS;
 using Android.Provider;
 using Android.Webkit;
@@ -13,10 +15,15 @@ namespace Agnosia.Android.Files;
 
 [Service(
     Name = "com.agnosia.app.AgnosiaFileShuttleService",
-    Exported = false)]
+    Exported = false,
+    ForegroundServiceType = ForegroundService.TypeDataSync)]
 public sealed class AgnosiaFileShuttleService : Service
 {
     private const string LogTag = "AgnosiaFileShuttle";
+    private const int NotificationId = 4037;
+    private const string NotificationChannelId = "agnosia_file_shuttle";
+    private const string NotificationChannelName = "File Shuttle";
+    private const string NotificationChannelDescription = "Передача файлов между личным и рабочим профилями.";
     private static readonly TimeSpan IdleStopDelay = TimeSpan.FromSeconds(30);
 
     private HandlerThread? _handlerThread;
@@ -32,6 +39,7 @@ public sealed class AgnosiaFileShuttleService : Service
         _handlerThread.Start();
         _handler = new FileShuttleHandler(_handlerThread.Looper!, this);
         _messenger = new Messenger(_handler);
+        StartForegroundServiceNotification();
         ResetIdleStop();
     }
 
@@ -59,6 +67,28 @@ public sealed class AgnosiaFileShuttleService : Service
     {
         var intent = new Intent(context, typeof(AgnosiaFileShuttleService));
         context.StartService(intent);
+    }
+
+    private void StartForegroundServiceNotification()
+    {
+        var smallIcon = ApplicationInfo?.Icon ?? Resource.Mipmap.ic_launcher;
+        var notification = AndroidNotificationApi.BuildNotification(
+            this,
+            NotificationChannelId,
+            NotificationChannelName,
+            NotificationChannelDescription,
+            "Agnosia File Shuttle",
+            "DocumentsUI разрешен доступ к передаче файлов между профилями.",
+            smallIcon,
+            minimized: true);
+
+        if (OperatingSystem.IsAndroidVersionAtLeast(34))
+        {
+            StartForeground(NotificationId, notification, ForegroundService.TypeDataSync);
+            return;
+        }
+
+        StartForeground(NotificationId, notification);
     }
 
     private void ResetIdleStop()
@@ -124,9 +154,9 @@ public sealed class AgnosiaFileShuttleService : Service
             case AgnosiaFileShuttleContract.MessageLoadFiles:
                 response.PutString(
                     AgnosiaFileShuttleContract.ExtraFileListJson,
-                    JsonSerializer.Serialize(
-                        LoadFiles(request.GetString(AgnosiaFileShuttleContract.ExtraPath)),
-                        AgnosiaFileShuttleJsonContext.Default.ListAgnosiaFileShuttleDocumentInfo));
+                        JsonSerializer.Serialize(
+                            LoadFiles(request.GetString(AgnosiaFileShuttleContract.ExtraPath)),
+                            AgnosiaFileShuttleJsonContext.Default.AgnosiaFileShuttleDocumentInfoArray));
                 return null;
 
             case AgnosiaFileShuttleContract.MessageOpenFile:

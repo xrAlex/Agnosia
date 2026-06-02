@@ -78,6 +78,12 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
 
         try
         {
+            if (string.Equals(documentId, AgnosiaFileShuttleContract.DummyRoot, StringComparison.Ordinal))
+            {
+                IncludeFile(cursor, CreateRootDocumentInfo());
+                return cursor;
+            }
+
             if (TryGetReadyClient(out var client)
                 && client.LoadFileMeta(documentId) is { } info)
                 IncludeFile(cursor, info);
@@ -261,5 +267,16 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
         row.Add(DocumentsContract.Document.ColumnMimeType, info.MimeType);
         row.Add(DocumentsContract.Document.ColumnSize, info.Size);
         row.Add(DocumentsContract.Document.ColumnLastModified, info.LastModified);
+    }
+
+    private AgnosiaFileShuttleDocumentInfo CreateRootDocumentInfo()
+    {
+        return new AgnosiaFileShuttleDocumentInfo(
+            AgnosiaFileShuttleContract.DummyRoot,
+            GetRootTitle(),
+            DocumentsContract.Document.MimeTypeDir,
+            0,
+            DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            (int)DocumentContractFlags.DirSupportsCreate);
     }
 }

@@ -59,6 +59,21 @@ public static class AndroidPendingIntentApi
                ?? throw new InvalidOperationException("Android could not create a PendingIntent for PackageInstaller.");
     }
 
+    public static PendingIntent CreateBackgroundActivityStartPendingIntent(
+        Context context,
+        Intent intent,
+        string action)
+    {
+        return PendingIntent.GetActivity(
+                   context,
+                   GetStableRequestCode(action, "background_activity_start"),
+                   intent,
+                   PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable,
+                   CreateCreatorBackgroundActivityStartOptions())
+               ?? throw new InvalidOperationException(
+                   "Android could not create a PendingIntent for background activity start.");
+    }
+
     private static PendingIntentFlags GetPackageInstallerFlag()
     {
         return AndroidApiLevel.IsAtLeastS()
@@ -74,6 +89,17 @@ public static class AndroidPendingIntentApi
                       ?? throw new InvalidOperationException(
                           "Android could not create ActivityOptions for sending the work-app frozen callback.");
         options.SetPendingIntentBackgroundActivityStartMode(GetAllowedBackgroundActivityStartMode());
+        return options.ToBundle();
+    }
+
+    public static Bundle? CreateCreatorBackgroundActivityStartOptions()
+    {
+        if (!AndroidApiLevel.IsAtLeastUpsideDownCake()) return null;
+
+        var options = ActivityOptions.MakeBasic()
+                      ?? throw new InvalidOperationException(
+                          "Android could not create ActivityOptions for creating a background activity PendingIntent.");
+        options.SetPendingIntentCreatorBackgroundActivityStartMode(GetAllowedBackgroundActivityStartMode());
         return options.ToBundle();
     }
 
