@@ -20,7 +20,11 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
         Task.FromResult<IReadOnlyList<PermissionSnapshot>>([]);
 
     private static readonly Task<IReadOnlyList<AgnosiaModuleSnapshot>> UnsupportedModulesTask =
-        Task.FromResult<IReadOnlyList<AgnosiaModuleSnapshot>>([AgnosiaModuleSnapshot.FileShuttleUnavailable]);
+        Task.FromResult<IReadOnlyList<AgnosiaModuleSnapshot>>(
+            [
+                AgnosiaModuleSnapshot.FileShuttleUnavailable,
+                AgnosiaModuleSnapshot.VpnGuardUnavailable
+            ]);
 
     private static readonly Task<OperationResult> AndroidOnlyFailureTask =
         Task.FromResult(OperationResult.Failure(AndroidOnlyMessage));

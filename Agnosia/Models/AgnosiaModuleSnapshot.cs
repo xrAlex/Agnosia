@@ -21,4 +21,15 @@ public sealed record AgnosiaModuleSnapshot(
         [],
         "Недоступен",
         false);
+
+    public static AgnosiaModuleSnapshot VpnGuardUnavailable { get; } = new(
+        AgnosiaModuleKind.VpnGuard,
+        "VPN Guard",
+        "Временное отключение VPN перед запуском рабочего приложения и возврат после заморозки.",
+        "VPN Guard управляет VPN-сценарием вокруг скрытых рабочих приложений: перед запуском временно освобождает VPN-слот, а после заморозки отправляет команду выбранному VPN-клиенту.",
+        false,
+        AgnosiaModuleState.Unavailable,
+        [],
+        "Недоступен",
+        false);
 }

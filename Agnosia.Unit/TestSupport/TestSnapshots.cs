@@ -79,9 +79,7 @@ internal static class TestSnapshots
             PermissionKind.WorkProfile,
             PermissionKind.UsageStats,
             PermissionKind.Notifications,
-            PermissionKind.VpnControl,
-            PermissionKind.PackageInstall,
-            PermissionKind.Overlay
+            PermissionKind.PackageInstall
         ];
 
         return requiredKinds
@@ -125,6 +123,30 @@ internal static class TestSnapshots
             {
                 AgnosiaModuleState.Enabled => "Включён",
                 AgnosiaModuleState.PartiallyEnabled => "Требует разрешений",
+                AgnosiaModuleState.Unavailable => "Недоступен",
+                _ => "Выключен"
+            },
+            canSetEnabled);
+    }
+
+    public static AgnosiaModuleSnapshot VpnGuardModule(
+        bool isEnabled = false,
+        AgnosiaModuleState state = AgnosiaModuleState.Disabled,
+        IReadOnlyList<AgnosiaModuleRequirement>? requirements = null,
+        bool canSetEnabled = true)
+    {
+        return new AgnosiaModuleSnapshot(
+            AgnosiaModuleKind.VpnGuard,
+            "VPN Guard",
+            "Short VPN Guard description",
+            "Full VPN Guard description",
+            isEnabled,
+            state,
+            requirements ?? [],
+            state switch
+            {
+                AgnosiaModuleState.Enabled => "Включён",
+                AgnosiaModuleState.PartiallyEnabled => "Частично включён",
                 AgnosiaModuleState.Unavailable => "Недоступен",
                 _ => "Выключен"
             },

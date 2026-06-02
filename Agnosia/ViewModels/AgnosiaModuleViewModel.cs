@@ -35,9 +35,24 @@ public sealed partial class AgnosiaModuleViewModel : ObservableObject
 
     public bool IsFileShuttle => Kind == AgnosiaModuleKind.FileShuttle;
 
+    public bool IsVpnGuard => Kind == AgnosiaModuleKind.VpnGuard;
+
     public bool CanOpenDocumentsUi => IsFileShuttle && State == AgnosiaModuleState.Enabled;
 
     public bool HasMissingRequirements => _requirements.Any(requirement => !requirement.IsSatisfied);
+
+    public IReadOnlyList<VpnAutomationClientOptionViewModel> VpnAfterFreezeClientOptions =>
+        _owner.VpnAfterFreezeClientOptions;
+
+    public bool IsToggleOnlyVpnAfterFreezeWarningVisible => _owner.IsToggleOnlyVpnAfterFreezeWarningVisible;
+
+    public bool IsTunguskaAutomationTokenVisible => _owner.IsTunguskaAutomationTokenVisible;
+
+    public string TunguskaAutomationToken
+    {
+        get => _owner.TunguskaAutomationToken;
+        set => _owner.TunguskaAutomationToken = value;
+    }
 
     public ReadOnlyObservableCollection<AgnosiaModuleRequirementViewModel> Requirements { get; }
 
@@ -59,6 +74,15 @@ public sealed partial class AgnosiaModuleViewModel : ObservableObject
         OnPropertyChanged(string.Empty);
         ToggleEnabledCommand.NotifyCanExecuteChanged();
         OpenDocumentsUiCommand.NotifyCanExecuteChanged();
+    }
+
+    internal void NotifyVpnSettingsChanged()
+    {
+        if (!IsVpnGuard) return;
+
+        OnPropertyChanged(nameof(IsToggleOnlyVpnAfterFreezeWarningVisible));
+        OnPropertyChanged(nameof(IsTunguskaAutomationTokenVisible));
+        OnPropertyChanged(nameof(TunguskaAutomationToken));
     }
 
     [RelayCommand]

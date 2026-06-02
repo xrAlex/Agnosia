@@ -129,6 +129,21 @@ public sealed class AndroidSourceContractTests
         Assert.Contains("AndroidCommandContract.FileShuttleDocumentsProviderComponent", coordinatorSource, StringComparison.Ordinal);
     }
 
+    // Проверяет, что VPN Guard module управляет существующими storage-флагами VPN-сценария.
+    [Fact]
+    public void Vpn_guard_module_uses_existing_vpn_storage_contracts()
+    {
+        var coordinatorSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Modules", "AndroidModuleCoordinator.cs"));
+
+        Assert.Contains("AgnosiaModuleKind.VpnGuard", coordinatorSource, StringComparison.Ordinal);
+        Assert.Contains("StorageKeys.DisableVpnBeforeWorkLaunch", coordinatorSource, StringComparison.Ordinal);
+        Assert.Contains("StorageKeys.EnableVpnAfterWorkFreeze", coordinatorSource, StringComparison.Ordinal);
+        Assert.Contains("StorageKeys.HaveActiveVpnSession", coordinatorSource, StringComparison.Ordinal);
+        Assert.Contains("PermissionKind.VpnControl", coordinatorSource, StringComparison.Ordinal);
+        Assert.Contains("PermissionKind.Overlay", coordinatorSource, StringComparison.Ordinal);
+    }
+
     private static string[] ReadIntentFilterActionNames(params string[] relativeSourcePaths)
     {
         var names = new HashSet<string>(StringComparer.Ordinal);

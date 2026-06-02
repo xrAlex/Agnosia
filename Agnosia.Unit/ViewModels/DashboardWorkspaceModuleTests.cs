@@ -143,6 +143,71 @@ public sealed class DashboardWorkspaceModuleTests
     }
 
     [Fact]
+    public async Task Vpn_guard_module_toggle_updates_module_state()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            Modules = [TestSnapshots.VpnGuardModule(canSetEnabled: true)]
+        };
+        services.SetModuleEnabledHandler = (module, enabled, _) =>
+        {
+            services.Modules =
+            [
+                TestSnapshots.VpnGuardModule(
+                    enabled,
+                    enabled ? AgnosiaModuleState.Enabled : AgnosiaModuleState.Disabled,
+                    canSetEnabled: true)
+            ];
+
+            return Task.FromResult(OperationResult.Success(enabled ? "VPN Guard включён." : "VPN Guard выключен."));
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+
+        await viewModel.EnsureInitializedAsync();
+        var vpnGuard = viewModel.Modules.Single();
+
+        await vpnGuard.ToggleEnabledCommand.ExecuteAsync(null);
+
+        Assert.Equal([(AgnosiaModuleKind.VpnGuard, true)], services.SetModuleEnabledRequests);
+        Assert.False(viewModel.StatusIsError);
+        Assert.Equal("VPN Guard включён.", viewModel.StatusMessage);
+        Assert.True(viewModel.Modules.Single().IsEnabled);
+        Assert.Equal(AgnosiaModuleState.Enabled, viewModel.Modules.Single().State);
+    }
+
+    [Fact]
+    public async Task Vpn_guard_module_exposes_vpn_client_settings()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(
+                settings: AppSettingsSnapshot.Default with { EnableVpnAfterWorkFreeze = true }),
+            Modules = [TestSnapshots.VpnGuardModule(true, AgnosiaModuleState.Enabled)]
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+
+        await viewModel.EnsureInitializedAsync();
+        var vpnGuard = viewModel.Modules.Single();
+        vpnGuard.OpenCommand.Execute(null);
+
+        Assert.True(vpnGuard.IsVpnGuard);
+        Assert.Equal(viewModel.VpnAfterFreezeClientOptions.Count, vpnGuard.VpnAfterFreezeClientOptions.Count);
+
+        vpnGuard.VpnAfterFreezeClientOptions.Single(option => option.Kind == VpnAutomationClientKind.Happ)
+            .SelectCommand.Execute(null);
+
+        Assert.True(vpnGuard.IsToggleOnlyVpnAfterFreezeWarningVisible);
+
+        vpnGuard.VpnAfterFreezeClientOptions.Single(option => option.Kind == VpnAutomationClientKind.Tunguska)
+            .SelectCommand.Execute(null);
+        vpnGuard.TunguskaAutomationToken = "module-token";
+
+        Assert.True(vpnGuard.IsTunguskaAutomationTokenVisible);
+        Assert.Equal("module-token", viewModel.TunguskaAutomationToken);
+    }
+
+    [Fact]
     public async Task Documents_ui_command_is_available_only_when_file_shuttle_is_enabled()
     {
         var services = new TestPlatformServices

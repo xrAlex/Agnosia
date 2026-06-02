@@ -82,6 +82,66 @@
 
                                         <Border Classes="divider" />
 
+                                        <StackPanel IsVisible="{Binding IsVpnGuard}"
+                                                    Spacing="12">
+                                            <TextBlock Classes="group-title"
+                                                       Text="Настройки VPN Guard" />
+
+                                            <Grid ColumnDefinitions="Auto,*"
+                                                  ColumnSpacing="12">
+                                                <Border Classes="icon-tile">
+                                                    <PathIcon Classes="section-icon centered"
+                                                              Data="{StaticResource IconVpnOffGeometry}" />
+                                                </Border>
+                                                <StackPanel Grid.Column="1"
+                                                            MinWidth="0"
+                                                            Spacing="4">
+                                                    <TextBlock Classes="section-title compact"
+                                                               Text="VPN-клиент после заморозки" />
+                                                    <TextBlock Classes="page-caption"
+                                                               Text="Команда запуска отправляется выбранному клиенту после скрытия рабочего приложения" />
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <ItemsControl ItemsSource="{Binding VpnAfterFreezeClientOptions}"
+                                                          HorizontalAlignment="Center">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <UniformGrid Columns="2" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:VpnAutomationClientOptionViewModel">
+                                                        <Button MinWidth="100"
+                                                                Margin="5"
+                                                                Classes="segment-chip"
+                                                                Classes.selected="{Binding IsSelected}"
+                                                                Command="{Binding SelectCommand}">
+                                                            <TextBlock Classes="button-label"
+                                                                       Text="{Binding DisplayName}" />
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                            <Border Classes="tag-chip accent"
+                                                    IsVisible="{Binding IsToggleOnlyVpnAfterFreezeWarningVisible}">
+                                                <TextBlock Classes="page-caption"
+                                                           Text="Выбранный клиент поддерживает только toggle-команду: если VPN уже включен, она может выключить подключение." />
+                                            </Border>
+
+                                            <StackPanel IsVisible="{Binding IsTunguskaAutomationTokenVisible}"
+                                                        Spacing="6">
+                                                <TextBlock Classes="page-caption"
+                                                           Text="Токен Tunguska Automation" />
+                                                <TextBox PlaceholderText="automation_token"
+                                                         PasswordChar="*"
+                                                         Text="{Binding TunguskaAutomationToken}" />
+                                            </StackPanel>
+
+                                            <Border Classes="divider" />
+                                        </StackPanel>
+
                                         <TextBlock Classes="group-title"
                                                    Text="Требования" />
 

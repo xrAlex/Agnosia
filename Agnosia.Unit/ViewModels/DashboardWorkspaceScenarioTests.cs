@@ -114,7 +114,6 @@ public sealed class DashboardWorkspaceScenarioTests
         Assert.True(viewModel.DisableVpnBeforeWorkLaunch);
         Assert.True(viewModel.EnableVpnAfterWorkFreeze);
         Assert.Equal("unit-token", viewModel.TunguskaAutomationToken);
-        Assert.True(viewModel.IsVpnAfterFreezeClientPickerVisible);
         Assert.True(IsVpnAfterFreezeClientSelected(viewModel, VpnAutomationClientKind.Tunguska));
         Assert.True(viewModel.IsTunguskaAutomationTokenVisible);
         Assert.False(viewModel.IsToggleOnlyVpnAfterFreezeWarningVisible);

@@ -2,5 +2,6 @@ namespace Agnosia.Models;
 
 public enum AgnosiaModuleKind
 {
-    FileShuttle
+    FileShuttle,
+    VpnGuard
 }

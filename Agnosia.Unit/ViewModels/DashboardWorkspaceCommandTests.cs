@@ -363,9 +363,9 @@ public sealed class DashboardWorkspaceCommandTests
         Assert.Equal("CompletionRejected", viewModel.StatusMessage);
     }
 
-    // Проверяет, что модульные all-files permissions не попадают в onboarding.
+    // Проверяет, что модульные permissions не попадают в onboarding.
     [Fact]
-    public async Task Onboarding_permissions_exclude_file_shuttle_all_files_permissions()
+    public async Task Onboarding_permissions_exclude_module_permissions()
     {
         var services = new TestPlatformServices
         {
@@ -375,7 +375,9 @@ public sealed class DashboardWorkspaceCommandTests
             [
                 .. TestSnapshots.RequiredOnboardingPermissions(granted: true),
                 TestSnapshots.RequiredPermission(PermissionKind.PersonalAllFiles),
-                TestSnapshots.RequiredPermission(PermissionKind.WorkAllFiles)
+                TestSnapshots.RequiredPermission(PermissionKind.WorkAllFiles),
+                TestSnapshots.RequiredPermission(PermissionKind.VpnControl),
+                TestSnapshots.RequiredPermission(PermissionKind.Overlay)
             ]
         };
         var viewModel = TestWorkspaceFactory.Create(services);
@@ -385,10 +387,14 @@ public sealed class DashboardWorkspaceCommandTests
 
         Assert.Contains(viewModel.PermissionItems, item => item.Kind == PermissionKind.PersonalAllFiles);
         Assert.Contains(viewModel.PermissionItems, item => item.Kind == PermissionKind.WorkAllFiles);
+        Assert.Contains(viewModel.PermissionItems, item => item.Kind == PermissionKind.VpnControl);
+        Assert.Contains(viewModel.PermissionItems, item => item.Kind == PermissionKind.Overlay);
         Assert.DoesNotContain(viewModel.OnboardingPermissionItems, item => item.Kind == PermissionKind.PersonalAllFiles);
         Assert.DoesNotContain(viewModel.OnboardingPermissionItems, item => item.Kind == PermissionKind.WorkAllFiles);
+        Assert.DoesNotContain(viewModel.OnboardingPermissionItems, item => item.Kind == PermissionKind.VpnControl);
+        Assert.DoesNotContain(viewModel.OnboardingPermissionItems, item => item.Kind == PermissionKind.Overlay);
         Assert.True(viewModel.AreOnboardingPermissionsGranted);
-        Assert.Equal("GrantedCount|6|6", viewModel.OnboardingPermissionSummary);
+        Assert.Equal("GrantedCount|4|4", viewModel.OnboardingPermissionSummary);
     }
 
     private static AppItemViewModel CreatePersonalApp(DashboardWorkspaceViewModel owner)

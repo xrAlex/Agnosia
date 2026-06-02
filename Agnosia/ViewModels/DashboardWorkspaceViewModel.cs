@@ -26,9 +26,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         PermissionKind.WorkProfile,
         PermissionKind.UsageStats,
         PermissionKind.Notifications,
-        PermissionKind.VpnControl,
-        PermissionKind.PackageInstall,
-        PermissionKind.Overlay
+        PermissionKind.PackageInstall
     ];
 
     private readonly IDashboardPlatformService _dashboardService;
@@ -192,7 +190,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     public partial bool CrossProfileFileShuttleEnabled { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsVpnAfterFreezeClientPickerVisible))]
     [NotifyPropertyChangedFor(nameof(IsToggleOnlyVpnAfterFreezeWarningVisible))]
     [NotifyPropertyChangedFor(nameof(IsTunguskaAutomationTokenVisible))]
     public partial bool EnableVpnAfterWorkFreeze { get; set; }
@@ -437,8 +434,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public bool IsLightThemeSelected => SelectedTheme == AppThemeKind.Light;
 
-    public bool IsVpnAfterFreezeClientPickerVisible => EnableVpnAfterWorkFreeze;
-
     public bool IsToggleOnlyVpnAfterFreezeWarningVisible =>
         EnableVpnAfterWorkFreeze
         && (VpnAfterWorkFreezeClient == VpnAutomationClientKind.Happ
@@ -509,11 +504,16 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     partial void OnVpnAfterWorkFreezeClientChanged(VpnAutomationClientKind value)
     {
         foreach (var option in VpnAfterFreezeClientOptions) option.NotifySelectionChanged();
+        SelectedModule?.NotifyVpnSettingsChanged();
 
         QueueSettingsSave();
     }
 
-    partial void OnTunguskaAutomationTokenChanged(string value) => QueueSettingsSave();
+    partial void OnTunguskaAutomationTokenChanged(string value)
+    {
+        SelectedModule?.NotifyVpnSettingsChanged();
+        QueueSettingsSave();
+    }
 
     partial void OnOnboardingCompletedChanged(bool value)
     {
