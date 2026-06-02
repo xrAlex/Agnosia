@@ -9,6 +9,8 @@ namespace Agnosia.Android;
 [Application]
 public class AndroidApp : AvaloniaAndroidApplication<App>
 {
+    private const string FileShuttleDocumentsProcessSuffix = ":file_shuttle_documents";
+
     protected AndroidApp(nint javaReference, JniHandleOwnership transfer)
         : base(javaReference, transfer)
     {
@@ -16,6 +18,12 @@ public class AndroidApp : AvaloniaAndroidApplication<App>
 
     public override void OnCreate()
     {
+        if (IsFileShuttleDocumentsProcess())
+        {
+            AgnosiaRuntime.Initialize(this);
+            return;
+        }
+
         InitializePlatformServices();
         base.OnCreate();
     }
@@ -42,5 +50,11 @@ public class AndroidApp : AvaloniaAndroidApplication<App>
         }
 
         AndroidStartup.ConfigurePrimaryProfileServices(this);
+    }
+
+    private static bool IsFileShuttleDocumentsProcess()
+    {
+        var processName = global::Android.App.Application.ProcessName;
+        return processName?.EndsWith(FileShuttleDocumentsProcessSuffix, StringComparison.Ordinal) == true;
     }
 }

@@ -7,6 +7,7 @@ using Agnosia.Android.Infrastructure;
 using Agnosia.Android.Receivers;
 using Agnosia.Android.Services;
 using Agnosia.Infrastructure;
+using Agnosia.Android.Api.Storage;
 using Android.Content;
 using Android.Content.PM;
 using Android.OS;
@@ -88,6 +89,7 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
                 await Task.Delay(100);
 
                 RunOnUiThread(ApplyPreferredDisplayMode);
+                await AndroidSettingsStore.SyncFileShuttleSettingToWorkProfileIfEnabledAsync(this);
 
                 if (!AgnosiaUtilities.IsProfileOwner(this)) return;
 

@@ -15,6 +15,7 @@ namespace Agnosia.Android.Files;
 [ContentProvider(
     [AgnosiaFileShuttleContract.Authority],
     Name = AgnosiaFileShuttleContract.ProviderComponentName,
+    Process = AgnosiaFileShuttleContract.ProviderProcessName,
     Exported = true,
     Enabled = false,
     GrantUriPermissions = true,

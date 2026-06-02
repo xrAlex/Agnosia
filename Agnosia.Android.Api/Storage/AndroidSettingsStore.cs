@@ -79,6 +79,20 @@ public static class AndroidSettingsStore
             storage.GetString(StorageKeys.VpnAfterWorkFreezeClient));
     }
 
+    public static Task SyncFileShuttleSettingToWorkProfileIfEnabledAsync(
+        Activity activity,
+        CancellationToken cancellationToken = default)
+    {
+        AgnosiaRuntime.Initialize(activity);
+        return LocalStorageManager.Instance.GetBoolean(StorageKeys.CrossProfileFileShuttleEnabled)
+            ? TrySyncBooleanSettingToWorkProfileAsync(
+                activity,
+                StorageKeys.CrossProfileFileShuttleEnabled,
+                true,
+                cancellationToken)
+            : Task.CompletedTask;
+    }
+
     private static async Task TrySyncBooleanSettingToWorkProfileAsync(
         Activity activity,
         string name,

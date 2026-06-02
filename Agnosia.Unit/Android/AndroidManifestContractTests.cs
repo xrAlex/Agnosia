@@ -94,6 +94,7 @@ public sealed class AndroidManifestContractTests
 
         Assert.Contains("[ContentProvider(", source, StringComparison.Ordinal);
         Assert.Contains("Name = AgnosiaFileShuttleContract.ProviderComponentName", source, StringComparison.Ordinal);
+        Assert.Contains("Process = AgnosiaFileShuttleContract.ProviderProcessName", source, StringComparison.Ordinal);
         Assert.Contains("Exported = true", source, StringComparison.Ordinal);
         Assert.Contains("Enabled = false", source, StringComparison.Ordinal);
         Assert.Contains("GrantUriPermissions = true", source, StringComparison.Ordinal);
@@ -136,6 +137,25 @@ public sealed class AndroidManifestContractTests
         Assert.Contains(
             "SetPendingIntentCreatorBackgroundActivityStartMode",
             pendingIntentSource,
+            StringComparison.Ordinal);
+    }
+
+    // Проверяет, что DocumentsProvider не стартует внутри тяжёлого Avalonia UI process.
+    [Fact]
+    public void File_shuttle_documents_process_uses_lightweight_application_startup()
+    {
+        var contractSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Files", "AgnosiaFileShuttleContract.cs"));
+        var applicationSource = File.ReadAllText(RepositoryPaths.Get("Agnosia.Android", "AndroidApp.cs"));
+        var mainActivitySource = File.ReadAllText(RepositoryPaths.Get("Agnosia.Android", "MainActivity.cs"));
+
+        Assert.Contains("ProviderProcessName = \":file_shuttle_documents\"", contractSource, StringComparison.Ordinal);
+        Assert.Contains("IsFileShuttleDocumentsProcess()", applicationSource, StringComparison.Ordinal);
+        Assert.Contains("AgnosiaRuntime.Initialize(this);", applicationSource, StringComparison.Ordinal);
+        Assert.Contains("return;", applicationSource, StringComparison.Ordinal);
+        Assert.Contains(
+            "SyncFileShuttleSettingToWorkProfileIfEnabledAsync",
+            mainActivitySource,
             StringComparison.Ordinal);
     }
 

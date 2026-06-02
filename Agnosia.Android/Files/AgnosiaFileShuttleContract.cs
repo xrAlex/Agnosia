@@ -7,6 +7,7 @@ internal static class AgnosiaFileShuttleContract
 {
     public const string Authority = "com.agnosia.app.documents";
     public const string ProviderComponentName = AndroidCommandContract.FileShuttleDocumentsProviderComponent;
+    public const string ProviderProcessName = ":file_shuttle_documents";
     public const string DummyRoot = "/agnosia_storage_root/";
 
     public const int MessageConnectResult = 1;
