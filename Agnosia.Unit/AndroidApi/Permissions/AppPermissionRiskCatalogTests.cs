@@ -36,26 +36,75 @@ public sealed class AppPermissionRiskCatalogTests
     }
 
     [Fact]
-    public void Classify_returns_dangerous_for_declared_location_network_combination()
+    public void Analyze_keeps_manifest_only_runtime_sensitive_permissions_safe()
     {
-        var result = AppPermissionRiskCatalog.Classify([
-            "android.permission.ACCESS_FINE_LOCATION",
+        var cameraResult = AppPermissionRiskCatalog.Analyze([
+            "android.permission.CAMERA",
+            "android.permission.INTERNET"
+        ]);
+        var microphoneResult = AppPermissionRiskCatalog.Analyze([
+            "android.permission.RECORD_AUDIO",
+            "android.permission.INTERNET"
+        ]);
+        var contactsResult = AppPermissionRiskCatalog.Analyze([
+            "android.permission.READ_CONTACTS",
             "android.permission.INTERNET"
         ]);
 
-        Assert.Equal(AppPermissionRiskLevel.Dangerous, result);
+        Assert.Equal(AppPermissionRiskLevel.Safe, cameraResult.Level);
+        Assert.Equal(AppPermissionRiskLevel.Safe, microphoneResult.Level);
+        Assert.Equal(AppPermissionRiskLevel.Safe, contactsResult.Level);
     }
 
     [Fact]
-    public void Classify_returns_critical_for_background_location_network_combination()
+    public void Analyze_flags_granted_runtime_sensitive_permission_without_network()
+    {
+        var result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
+            ["android.permission.CAMERA"],
+            GrantedPermissions: ["android.permission.CAMERA"]));
+
+        Assert.Equal(AppPermissionRiskLevel.Dangerous, result.Level);
+        Assert.Equal(["SU-CAM-01"], result.MatchedRuleIds);
+    }
+
+    [Fact]
+    public void Analyze_treats_allowed_appop_as_confirmed_runtime_access()
+    {
+        var result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
+            ["android.permission.RECORD_AUDIO"],
+            IsMicrophoneAppOpAllowed: true));
+
+        Assert.Equal(AppPermissionRiskLevel.Dangerous, result.Level);
+        Assert.Equal(["SU-MIC-01"], result.MatchedRuleIds);
+    }
+
+    [Fact]
+    public void Classify_returns_safe_for_manifest_only_location_network_combination()
     {
         var result = AppPermissionRiskCatalog.Classify([
             "android.permission.ACCESS_FINE_LOCATION",
-            "android.permission.ACCESS_BACKGROUND_LOCATION",
             "android.permission.INTERNET"
         ]);
 
-        Assert.Equal(AppPermissionRiskLevel.Critical, result);
+        Assert.Equal(AppPermissionRiskLevel.Safe, result);
+    }
+
+    [Fact]
+    public void Analyze_returns_critical_for_granted_background_location_network_combination()
+    {
+        var result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
+            [
+                "android.permission.ACCESS_FINE_LOCATION",
+                "android.permission.ACCESS_BACKGROUND_LOCATION",
+                "android.permission.INTERNET"
+            ],
+            GrantedPermissions:
+            [
+                "android.permission.ACCESS_FINE_LOCATION",
+                "android.permission.ACCESS_BACKGROUND_LOCATION"
+            ]));
+
+        Assert.Equal(AppPermissionRiskLevel.Critical, result.Level);
     }
 
     [Fact]
@@ -68,7 +117,8 @@ public sealed class AppPermissionRiskCatalogTests
                 "android.permission.CAMERA",
                 "android.permission.INTERNET"
             ],
-            ForegroundServiceTypes: ["camera"]));
+            ForegroundServiceTypes: ["camera"],
+            GrantedPermissions: ["android.permission.CAMERA"]));
 
         Assert.Equal(AppPermissionRiskLevel.Critical, result.Level);
         Assert.Equal(
@@ -80,14 +130,21 @@ public sealed class AppPermissionRiskCatalogTests
     }
 
     [Fact]
-    public void Analyze_flags_legacy_read_external_storage_on_supported_sdks()
+    public void Analyze_flags_granted_legacy_read_external_storage_on_supported_sdks()
     {
-        var android12Result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
+        var manifestOnlyResult = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
             [
                 "android.permission.READ_EXTERNAL_STORAGE",
                 "android.permission.INTERNET"
             ],
             DeviceSdkVersion: 32));
+        var android12Result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
+            [
+                "android.permission.READ_EXTERNAL_STORAGE",
+                "android.permission.INTERNET"
+            ],
+            DeviceSdkVersion: 32,
+            GrantedPermissions: ["android.permission.READ_EXTERNAL_STORAGE"]));
         var android13Result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
             [
                 "android.permission.READ_EXTERNAL_STORAGE",
@@ -95,12 +152,13 @@ public sealed class AppPermissionRiskCatalogTests
             ],
             DeviceSdkVersion: 33));
 
+        Assert.Equal(AppPermissionRiskLevel.Safe, manifestOnlyResult.Level);
         Assert.Equal(AppPermissionRiskLevel.Dangerous, android12Result.Level);
         Assert.Equal(AppPermissionRiskLevel.Safe, android13Result.Level);
     }
 
     [Fact]
-    public void Analyze_flags_declared_granular_media_permissions_as_dangerous()
+    public void Analyze_keeps_manifest_only_granular_media_permissions_safe()
     {
         var result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
             [
@@ -108,6 +166,20 @@ public sealed class AppPermissionRiskCatalogTests
                 "android.permission.INTERNET"
             ],
             DeviceSdkVersion: 33));
+
+        Assert.Equal(AppPermissionRiskLevel.Safe, result.Level);
+    }
+
+    [Fact]
+    public void Analyze_flags_granted_granular_media_permissions_as_dangerous()
+    {
+        var result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
+            [
+                "android.permission.READ_MEDIA_IMAGES",
+                "android.permission.INTERNET"
+            ],
+            DeviceSdkVersion: 33,
+            GrantedPermissions: ["android.permission.READ_MEDIA_IMAGES"]));
 
         Assert.Equal(AppPermissionRiskLevel.Dangerous, result.Level);
     }
@@ -135,8 +207,8 @@ public sealed class AppPermissionRiskCatalogTests
                 "SU-MEDIA-LOC-IMG-01"
             ],
             result.MatchedRuleIds);
-        Assert.Equal(12, result.Score);
-        Assert.Equal(12, result.RawScore);
+        Assert.Equal(13, result.Score);
+        Assert.Equal(13, result.RawScore);
         Assert.Equal(AppPermissionRiskConfidence.High, result.Confidence);
     }
 
@@ -154,7 +226,7 @@ public sealed class AppPermissionRiskCatalogTests
     }
 
     [Fact]
-    public void Analyze_keeps_media_projection_declaration_dangerous_without_observed_capture()
+    public void Analyze_keeps_media_projection_declaration_safe_without_observed_capture()
     {
         var result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
             [
@@ -164,8 +236,8 @@ public sealed class AppPermissionRiskCatalogTests
             DeviceSdkVersion: 34,
             ForegroundServiceTypes: ["mediaProjection"]));
 
-        Assert.Equal(AppPermissionRiskLevel.Dangerous, result.Level);
-        Assert.Contains("SU-SCR-FGS-01", result.MatchedRuleIds);
+        Assert.Equal(AppPermissionRiskLevel.Safe, result.Level);
+        Assert.DoesNotContain("SU-SCR-FGS-01", result.MatchedRuleIds);
         Assert.DoesNotContain("CR-SCR-01", result.MatchedRuleIds);
     }
 
@@ -194,7 +266,8 @@ public sealed class AppPermissionRiskCatalogTests
                 "android.permission.INTERNET"
             ],
             DeviceSdkVersion: 32,
-            ForegroundServiceTypes: ["microphone"]));
+            ForegroundServiceTypes: ["microphone"],
+            GrantedPermissions: ["android.permission.RECORD_AUDIO"]));
 
         Assert.Equal(AppPermissionRiskLevel.Critical, result.Level);
     }
@@ -208,7 +281,8 @@ public sealed class AppPermissionRiskCatalogTests
                 "android.permission.FOREGROUND_SERVICE_MICROPHONE",
                 "android.permission.INTERNET"
             ],
-            DeviceSdkVersion: 34));
+            DeviceSdkVersion: 34,
+            GrantedPermissions: ["android.permission.RECORD_AUDIO"]));
 
         Assert.Equal(AppPermissionRiskLevel.Critical, result.Level);
         Assert.Equal(
@@ -291,6 +365,12 @@ public sealed class AppPermissionRiskCatalogTests
                 "android.permission.ACCESS_COARSE_LOCATION",
                 "android.permission.ACCESS_BACKGROUND_LOCATION",
                 "android.permission.INTERNET"
+            ],
+            GrantedPermissions:
+            [
+                "android.permission.ACCESS_FINE_LOCATION",
+                "android.permission.ACCESS_COARSE_LOCATION",
+                "android.permission.ACCESS_BACKGROUND_LOCATION"
             ]));
 
         Assert.Equal(AppPermissionRiskLevel.Critical, result.Level);
@@ -308,9 +388,9 @@ public sealed class AppPermissionRiskCatalogTests
                 "CR-LOC-BG-02"
             ],
             result.MatchedRuleIds);
-        Assert.Equal(7, result.Score);
-        Assert.Equal(13, result.RawScore);
-        Assert.Equal(AppPermissionRiskConfidence.Medium, result.Confidence);
+        Assert.Equal(8, result.Score);
+        Assert.Equal(15, result.RawScore);
+        Assert.Equal(AppPermissionRiskConfidence.High, result.Confidence);
     }
 
     [Fact]
@@ -329,8 +409,8 @@ public sealed class AppPermissionRiskCatalogTests
             ]));
 
         Assert.Equal(AppPermissionRiskLevel.Dangerous, result.Level);
-        Assert.Equal(5, result.Score);
-        Assert.Equal(9, result.RawScore);
+        Assert.Equal(7, result.Score);
+        Assert.Equal(13, result.RawScore);
     }
 
     [Fact]
@@ -355,7 +435,7 @@ public sealed class AppPermissionRiskCatalogTests
     }
 
     [Fact]
-    public void Analyze_does_not_treat_unknown_runtime_grant_state_as_denied()
+    public void Analyze_treats_unknown_runtime_grant_state_as_unconfirmed()
     {
         var result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
             [
@@ -366,14 +446,9 @@ public sealed class AppPermissionRiskCatalogTests
             DeviceSdkVersion: 34,
             GrantedPermissions: ["android.permission.CAMERA"]));
 
-        Assert.Equal(AppPermissionRiskLevel.Critical, result.Level);
-        Assert.Equal(
-            [
-                "CR-MIC-FGS-14-01",
-                "SU-MIC-01"
-            ],
-            result.MatchedRuleIds);
-        Assert.Equal(AppPermissionRiskConfidence.High, result.Confidence);
+        Assert.Equal(AppPermissionRiskLevel.Safe, result.Level);
+        Assert.Empty(result.MatchedRuleIds);
+        Assert.Equal(AppPermissionRiskConfidence.None, result.Confidence);
     }
 
     [Fact]
@@ -425,7 +500,7 @@ public sealed class AppPermissionRiskCatalogTests
     }
 
     [Fact]
-    public void Analyze_flags_requested_only_legacy_write_external_storage_on_legacy_targets()
+    public void Analyze_flags_granted_legacy_write_external_storage_on_legacy_targets()
     {
         var legacyTargetResult = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
             [
@@ -433,14 +508,16 @@ public sealed class AppPermissionRiskCatalogTests
                 "android.permission.INTERNET"
             ],
             DeviceSdkVersion: 32,
-            TargetSdkVersion: 29));
+            TargetSdkVersion: 29,
+            GrantedPermissions: ["android.permission.WRITE_EXTERNAL_STORAGE"]));
         var modernTargetResult = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
             [
                 "android.permission.WRITE_EXTERNAL_STORAGE",
                 "android.permission.INTERNET"
             ],
             DeviceSdkVersion: 32,
-            TargetSdkVersion: 30));
+            TargetSdkVersion: 30,
+            GrantedPermissions: ["android.permission.WRITE_EXTERNAL_STORAGE"]));
 
         Assert.Equal(AppPermissionRiskLevel.Dangerous, legacyTargetResult.Level);
         Assert.Equal(AppPermissionRiskLevel.Safe, modernTargetResult.Level);
@@ -471,7 +548,8 @@ public sealed class AppPermissionRiskCatalogTests
                 "android.permission.INTERNET"
             ],
             DeviceSdkVersion: 36,
-            TargetSdkVersion: 36));
+            TargetSdkVersion: 36,
+            GrantedPermissions: ["android.permission.NEARBY_WIFI_DEVICES"]));
 
         Assert.Equal(AppPermissionRiskLevel.Dangerous, result.Level);
     }
@@ -485,7 +563,8 @@ public sealed class AppPermissionRiskCatalogTests
                 "android.permission.INTERNET"
             ],
             DeviceSdkVersion: 37,
-            TargetSdkVersion: 37));
+            TargetSdkVersion: 37,
+            GrantedPermissions: ["android.permission.ACCESS_LOCAL_NETWORK"]));
 
         Assert.Equal(AppPermissionRiskLevel.Dangerous, result.Level);
         Assert.Equal(
@@ -504,7 +583,8 @@ public sealed class AppPermissionRiskCatalogTests
                 "android.permission.ACCESS_LOCAL_NETWORK"
             ],
             DeviceSdkVersion: 37,
-            TargetSdkVersion: 37));
+            TargetSdkVersion: 37,
+            GrantedPermissions: ["android.permission.ACCESS_LOCAL_NETWORK"]));
 
         Assert.Equal(AppPermissionRiskLevel.Dangerous, result.Level);
         Assert.Equal(["SU-LAN-17-01"], result.MatchedRuleIds);
@@ -560,7 +640,7 @@ public sealed class AppPermissionRiskCatalogTests
     }
 
     [Fact]
-    public void Analyze_applies_camera_boot_persistence_to_android_14_targets()
+    public void Analyze_reports_camera_boot_persistence_as_critical_when_camera_is_confirmed()
     {
         var android14TargetResult = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
             [
@@ -570,7 +650,8 @@ public sealed class AppPermissionRiskCatalogTests
             ],
             DeviceSdkVersion: 34,
             TargetSdkVersion: 34,
-            ForegroundServiceTypes: ["camera"]));
+            ForegroundServiceTypes: ["camera"],
+            GrantedPermissions: ["android.permission.CAMERA"]));
         var android15TargetResult = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
             [
                 "android.permission.CAMERA",
@@ -579,11 +660,12 @@ public sealed class AppPermissionRiskCatalogTests
             ],
             DeviceSdkVersion: 35,
             TargetSdkVersion: 35,
-            ForegroundServiceTypes: ["camera"]));
+            ForegroundServiceTypes: ["camera"],
+            GrantedPermissions: ["android.permission.CAMERA"]));
 
         Assert.Equal(AppPermissionRiskLevel.Critical, android14TargetResult.Level);
         Assert.Contains("CR-CAM-PERSIST-01", android14TargetResult.MatchedRuleIds);
-        Assert.Equal(AppPermissionRiskLevel.Dangerous, android15TargetResult.Level);
+        Assert.Equal(AppPermissionRiskLevel.Critical, android15TargetResult.Level);
         Assert.DoesNotContain("CR-CAM-PERSIST-01", android15TargetResult.MatchedRuleIds);
     }
 
@@ -596,7 +678,8 @@ public sealed class AppPermissionRiskCatalogTests
                 "android.permission.INTERNET"
             ],
             DeviceSdkVersion: 37,
-            TargetSdkVersion: 36));
+            TargetSdkVersion: 36,
+            GrantedPermissions: ["android.permission.ACCESS_LOCAL_NETWORK"]));
 
         Assert.Equal(AppPermissionRiskLevel.Safe, result.Level);
     }

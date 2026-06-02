@@ -515,7 +515,11 @@ public static partial class AppPermissionRiskCatalog
             || HasUsageStatsAccess
             || IsVpnControlEnabled
             || IsAssistantScreenContentEnabled
-            || IsMediaProjectionActive;
+            || IsMediaProjectionActive
+            || IsCameraAppOpAllowed == true
+            || IsMicrophoneAppOpAllowed == true
+            || IsFineLocationAppOpAllowed == true
+            || IsCoarseLocationAppOpAllowed == true;
 
         public int DangerousScoreThreshold => BaseDangerousScoreThreshold;
 
@@ -610,7 +614,11 @@ public static partial class AppPermissionRiskCatalog
 
             if (IsBlockedByAppOp(permission)) return false;
 
-            return GetGrantStatus(permission) != PermissionGrantStatus.Denied;
+            if (IsRuntimeSensitivePermission(permission))
+                return GetGrantStatus(permission) == PermissionGrantStatus.Granted
+                       || IsAllowedByAppOp(permission);
+
+            return true;
         }
 
         public bool HasEffectivePermissionPrefix(string prefix)
@@ -703,6 +711,18 @@ public static partial class AppPermissionRiskCatalog
                 RecordAudio => IsMicrophoneAppOpAllowed == false,
                 AccessFineLocation => IsFineLocationAppOpAllowed == false,
                 AccessCoarseLocation => IsCoarseLocationAppOpAllowed == false,
+                _ => false
+            };
+        }
+
+        private bool IsAllowedByAppOp(string permission)
+        {
+            return permission switch
+            {
+                Camera => IsCameraAppOpAllowed == true,
+                RecordAudio => IsMicrophoneAppOpAllowed == true,
+                AccessFineLocation => IsFineLocationAppOpAllowed == true,
+                AccessCoarseLocation => IsCoarseLocationAppOpAllowed == true,
                 _ => false
             };
         }
