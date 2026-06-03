@@ -41,7 +41,8 @@ internal static class TestSnapshots
         IReadOnlyList<string>? matchedPermissionRiskRuleIds = null,
         AppPermissionRiskScoreBreakdown? permissionRiskScoreBreakdown = null,
         IReadOnlyList<string>? manifestPermissions = null,
-        IReadOnlyList<string>? runtimePermissions = null)
+        IReadOnlyList<string>? runtimePermissions = null,
+        bool permissionRiskAvailable = true)
     {
         return new AppSnapshot(
             packageName,
@@ -59,7 +60,8 @@ internal static class TestSnapshots
             MatchedPermissionRiskRuleIds: matchedPermissionRiskRuleIds,
             PermissionRiskScoreBreakdown: permissionRiskScoreBreakdown,
             ManifestPermissions: manifestPermissions,
-            RuntimePermissions: runtimePermissions);
+            RuntimePermissions: runtimePermissions,
+            PermissionRiskAvailable: permissionRiskAvailable);
     }
 
     public static PermissionSnapshot GrantedPermission(PermissionKind kind)
@@ -150,6 +152,23 @@ internal static class TestSnapshots
                 AgnosiaModuleState.Unavailable => "Недоступен",
                 _ => "Выключен"
             },
+            canSetEnabled);
+    }
+
+    public static AgnosiaModuleSnapshot RiskEngineModule(
+        bool isEnabled = true,
+        AgnosiaModuleState state = AgnosiaModuleState.Enabled,
+        bool canSetEnabled = true)
+    {
+        return new AgnosiaModuleSnapshot(
+            AgnosiaModuleKind.RiskEngine,
+            "Risk Engine",
+            "Short Risk Engine description",
+            "Full Risk Engine description",
+            isEnabled,
+            state,
+            [],
+            state == AgnosiaModuleState.Enabled ? "Включён" : "Выключен",
             canSetEnabled);
     }
 

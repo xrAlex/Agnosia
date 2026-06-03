@@ -37,6 +37,8 @@ public sealed partial class AgnosiaModuleViewModel : ObservableObject
 
     public bool IsVpnGuard => Kind == AgnosiaModuleKind.VpnGuard;
 
+    public bool IsRiskEngine => Kind == AgnosiaModuleKind.RiskEngine;
+
     public bool CanOpenDocumentsUi => IsFileShuttle && State == AgnosiaModuleState.Enabled;
 
     public bool HasMissingRequirements => _requirements.Any(requirement => !requirement.IsSatisfied);

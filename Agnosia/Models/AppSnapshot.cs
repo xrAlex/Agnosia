@@ -20,4 +20,5 @@ public sealed record AppSnapshot(
     AppPermissionRiskConfidence PermissionRiskConfidence = AppPermissionRiskConfidence.None,
     AppPermissionRiskScoreBreakdown? PermissionRiskScoreBreakdown = null,
     IReadOnlyList<string>? ManifestPermissions = null,
-    IReadOnlyList<string>? RuntimePermissions = null);
+    IReadOnlyList<string>? RuntimePermissions = null,
+    bool PermissionRiskAvailable = true);

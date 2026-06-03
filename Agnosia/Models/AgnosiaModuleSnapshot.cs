@@ -32,4 +32,15 @@ public sealed record AgnosiaModuleSnapshot(
         [],
         "Недоступен",
         false);
+
+    public static AgnosiaModuleSnapshot RiskEngineUnavailable { get; } = new(
+        AgnosiaModuleKind.RiskEngine,
+        "Risk Engine",
+        "Анализ риска приложений по разрешениям, специальным доступам и runtime-состояниям.",
+        "Risk Engine оценивает приложения по комбинациям разрешений, специальных доступов и runtime-состояний, чтобы подсветить опасные конфигурации в каталоге.",
+        false,
+        AgnosiaModuleState.Unavailable,
+        [],
+        "Недоступен",
+        false);
 }

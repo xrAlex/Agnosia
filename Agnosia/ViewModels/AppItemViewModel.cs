@@ -100,7 +100,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     public bool IsPermissionRiskCritical => PermissionRiskLevel == AppPermissionRiskLevel.Critical;
 
-    public bool ShowPermissionRiskIndicator => !Snapshot.IsSystem;
+    public bool ShowPermissionRiskIndicator => Snapshot.PermissionRiskAvailable && !Snapshot.IsSystem;
 
     public string PermissionRiskTooltip => PermissionRiskLevel switch
     {
@@ -310,6 +310,13 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(PermissionRiskSummaryText));
             OnPropertyChanged(nameof(PermissionRiskReasons));
             OnPropertyChanged(nameof(HasPermissionRiskReasons));
+        }
+
+        if (previous.PermissionRiskAvailable != snapshot.PermissionRiskAvailable)
+        {
+            OnPropertyChanged(nameof(ShowPermissionRiskIndicator));
+            OnPropertyChanged(nameof(PermissionRiskTooltip));
+            OnPropertyChanged(nameof(PermissionRiskSummaryText));
         }
 
         if (!StringListsEqual(previous.RiskyPermissions, snapshot.RiskyPermissions))

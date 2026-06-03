@@ -26,7 +26,8 @@ internal sealed class AndroidModuleCoordinator(
         return
         [
             CreateFileShuttleSnapshot(activity, permissions),
-            CreateVpnGuardSnapshot(permissions)
+            CreateVpnGuardSnapshot(permissions),
+            CreateRiskEngineSnapshot()
         ];
     }
 
@@ -39,6 +40,7 @@ internal sealed class AndroidModuleCoordinator(
         {
             AgnosiaModuleKind.FileShuttle => await SetFileShuttleEnabledAsync(enabled, cancellationToken),
             AgnosiaModuleKind.VpnGuard => await SetVpnGuardEnabledAsync(enabled, cancellationToken),
+            AgnosiaModuleKind.RiskEngine => await SetRiskEngineEnabledAsync(enabled, cancellationToken),
             _ => OperationResult.Failure("Неизвестный модуль.")
         };
     }
@@ -180,6 +182,47 @@ internal sealed class AndroidModuleCoordinator(
             isFullyEnabled || !missingActivationRequirements);
     }
 
+    private async Task<OperationResult> SetRiskEngineEnabledAsync(
+        bool enabled,
+        CancellationToken cancellationToken)
+    {
+        var activity = commandRunner.CurrentActivity;
+        AgnosiaRuntime.Initialize(activity);
+
+        var storage = LocalStorageManager.Instance;
+        storage.SetBoolean(StorageKeys.RiskEngineEnabled, enabled);
+
+        var syncResult = await TrySyncBooleanSettingAsync(
+            activity,
+            StorageKeys.RiskEngineEnabled,
+            enabled,
+            "Risk Engine",
+            cancellationToken);
+        if (!syncResult.Succeeded) return syncResult;
+
+        return OperationResult.Success(enabled ? "Risk Engine включён." : "Risk Engine выключен.");
+    }
+
+    private static AgnosiaModuleSnapshot CreateRiskEngineSnapshot()
+    {
+        var isEnabled = LocalStorageManager.Instance.GetBoolean(StorageKeys.RiskEngineEnabled, true);
+        var state = isEnabled ? AgnosiaModuleState.Enabled : AgnosiaModuleState.Disabled;
+
+        return new AgnosiaModuleSnapshot(
+            AgnosiaModuleKind.RiskEngine,
+            "Risk Engine",
+            "Анализ риска приложений по разрешениям, специальным доступам и runtime-состояниям.",
+            """
+            Risk Engine оценивает приложения по комбинациям manifest-разрешений, runtime-доступов, специальных системных доступов и target SDK.
+            Когда модуль выключен, каталог приложений не считает и не показывает риск по разрешениям.
+            """,
+            isEnabled,
+            state,
+            [],
+            GetEnabledStatusText(state),
+            true);
+    }
+
     private static AgnosiaModuleRequirement[] GetActivationRequirements(
         IReadOnlyList<PermissionSnapshot> permissions)
     {
@@ -303,6 +346,11 @@ internal sealed class AndroidModuleCoordinator(
             AgnosiaModuleState.Unavailable => "Недоступен",
             _ => "Выключен"
         };
+    }
+
+    private static string GetEnabledStatusText(AgnosiaModuleState state)
+    {
+        return state == AgnosiaModuleState.Enabled ? "Включён" : "Выключен";
     }
 
     private static bool IsFileShuttleProviderEnabled(Context context)

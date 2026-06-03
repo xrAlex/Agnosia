@@ -177,6 +177,39 @@ public sealed class DashboardWorkspaceModuleTests
     }
 
     [Fact]
+    public async Task Risk_engine_module_toggle_updates_module_state()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            Modules = [TestSnapshots.RiskEngineModule()]
+        };
+        services.SetModuleEnabledHandler = (module, enabled, _) =>
+        {
+            services.Modules =
+            [
+                TestSnapshots.RiskEngineModule(
+                    enabled,
+                    enabled ? AgnosiaModuleState.Enabled : AgnosiaModuleState.Disabled)
+            ];
+
+            return Task.FromResult(OperationResult.Success(enabled ? "Risk Engine включён." : "Risk Engine выключен."));
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+
+        await viewModel.EnsureInitializedAsync();
+        var riskEngine = viewModel.Modules.Single();
+
+        await riskEngine.ToggleEnabledCommand.ExecuteAsync(null);
+
+        Assert.Equal([(AgnosiaModuleKind.RiskEngine, false)], services.SetModuleEnabledRequests);
+        Assert.False(viewModel.StatusIsError);
+        Assert.Equal("Risk Engine выключен.", viewModel.StatusMessage);
+        Assert.False(viewModel.Modules.Single().IsEnabled);
+        Assert.Equal(AgnosiaModuleState.Disabled, viewModel.Modules.Single().State);
+    }
+
+    [Fact]
     public async Task Vpn_guard_module_exposes_vpn_client_settings()
     {
         var services = new TestPlatformServices

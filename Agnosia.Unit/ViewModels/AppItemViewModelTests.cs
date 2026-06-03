@@ -149,6 +149,17 @@ public sealed class AppItemViewModelTests
     }
 
     [Fact]
+    public void Permission_risk_indicator_is_hidden_when_risk_engine_is_unavailable()
+    {
+        var app = CreateApp(TestSnapshots.App(
+            ProfileKind.Personal,
+            permissionRiskAvailable: false));
+
+        Assert.True(app.IsPermissionRiskSafe);
+        Assert.False(app.ShowPermissionRiskIndicator);
+    }
+
+    [Fact]
     public void Permission_risk_details_are_composed_from_snapshot_evidence()
     {
         var app = CreateApp(TestSnapshots.App(

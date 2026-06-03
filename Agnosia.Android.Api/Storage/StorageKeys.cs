@@ -12,6 +12,7 @@ public static class StorageKeys
     public const string ShowAllApps = "show_all_apps";
     public const string DisableVpnBeforeWorkLaunch = "disable_vpn_before_work_launch";
     public const string CrossProfileFileShuttleEnabled = "cross_profile_file_shuttle_enabled";
+    public const string RiskEngineEnabled = "risk_engine_enabled";
     public const string EnableVpnAfterWorkFreeze = "enable_vpn_after_work_freeze";
     public const string VpnAfterWorkFreezeClient = "vpn_after_work_freeze_client";
     public const string TunguskaAutomationToken = "tunguska_automation_token";

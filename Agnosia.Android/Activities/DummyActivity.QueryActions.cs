@@ -5,6 +5,7 @@ using Agnosia.Android.Api.Packages;
 using Agnosia.Android.Api.Permissions;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Api.Serialization;
+using Agnosia.Android.Api.Storage;
 using Android.App;
 using Android.App.Admin;
 using Android.Content;
@@ -36,12 +37,14 @@ public sealed partial class DummyActivity
         try
         {
             var showAll = intent.GetBooleanExtra(AndroidCommandContract.ExtraShowAll, false);
+            var isRiskEngineEnabled = LocalStorageManager.Instance.GetBoolean(StorageKeys.RiskEngineEnabled, true);
             var policyManager = _policyManager;
             var admin = _isProfileOwner && policyManager is not null
                 ? AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType)
                 : null;
             var inventory = await GetOrCreateCachedAppInventoryQueryAsync(
                     showAll,
+                    isRiskEngineEnabled,
                     intent.GetStringExtra(AndroidCommandContract.ExtraQueryPageToken),
                     packageManager,
                     policyManager,
@@ -65,13 +68,14 @@ public sealed partial class DummyActivity
 
     private async Task<CachedAppInventoryQuery> GetOrCreateCachedAppInventoryQueryAsync(
         bool showAll,
+        bool isRiskEngineEnabled,
         string? pageToken,
         PackageManager packageManager,
         DevicePolicyManager? policyManager,
         ComponentName? admin,
         CancellationToken cancellationToken)
     {
-        if (TryGetCachedAppInventoryQuery(pageToken, showAll, out var cachedQuery))
+        if (TryGetCachedAppInventoryQuery(pageToken, showAll, isRiskEngineEnabled, out var cachedQuery))
             return cachedQuery;
 
         var models = await Task.Run(() => AndroidAppInventoryApi.QueryInstalledApps(
@@ -88,6 +92,7 @@ public sealed partial class DummyActivity
             : [];
         var query = new CachedAppInventoryQuery(
             showAll,
+            isRiskEngineEnabled,
             DateTimeOffset.UtcNow,
             models,
             interactionPackages);
@@ -140,6 +145,7 @@ public sealed partial class DummyActivity
     private static bool TryGetCachedAppInventoryQuery(
         string? pageToken,
         bool showAll,
+        bool isRiskEngineEnabled,
         out CachedAppInventoryQuery query)
     {
         query = null!;
@@ -150,7 +156,8 @@ public sealed partial class DummyActivity
         {
             PruneExpiredAppInventoryQueries(now);
             if (!QueryAppsCache.TryGetValue(pageToken, out var cached)
-                || cached.ShowAll != showAll)
+                || cached.ShowAll != showAll
+                || cached.RiskEngineEnabled != isRiskEngineEnabled)
             {
                 QueryAppsCache.Remove(pageToken);
                 return false;
@@ -355,6 +362,7 @@ public sealed partial class DummyActivity
 
     private sealed record CachedAppInventoryQuery(
         bool ShowAll,
+        bool RiskEngineEnabled,
         DateTimeOffset CachedAt,
         IReadOnlyList<AppServiceModel> Apps,
         string[] InteractionPackages);

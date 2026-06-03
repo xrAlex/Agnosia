@@ -1,5 +1,6 @@
 using Agnosia.Android.Api.Permissions;
 using Agnosia.Android.Api.Platform;
+using Agnosia.Android.Api.Storage;
 using Agnosia.Models;
 using Android.App;
 using Android.App.Admin;
@@ -31,10 +32,11 @@ public static class AndroidAppInventoryApi
         AppInventoryQueryOptions? options = null)
     {
         options ??= AppInventoryQueryOptions.Full;
+        var isRiskEngineEnabled = LocalStorageManager.Instance.GetBoolean(StorageKeys.RiskEngineEnabled, true);
         var apps = packageManager.GetInstalledApplications(AndroidSystemApi.GetInstalledApplicationFlags());
         var models = new List<AppServiceModel>(apps.Count);
         var installedPackageNames = new HashSet<string>(StringComparer.Ordinal);
-        var specialAccess = ReadSpecialAccessSnapshot(context);
+        var specialAccess = isRiskEngineEnabled ? ReadSpecialAccessSnapshot(context) : SpecialAccessSnapshot.Empty;
         foreach (var app in apps)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -48,6 +50,7 @@ public static class AndroidAppInventoryApi
                     app,
                     showAll,
                     specialAccess,
+                    isRiskEngineEnabled,
                     options) is { } model)
                 models.Add(model);
         }
@@ -126,6 +129,7 @@ public static class AndroidAppInventoryApi
         ApplicationInfo app,
         bool showAll,
         SpecialAccessSnapshot specialAccess,
+        bool isRiskEngineEnabled,
         AppInventoryQueryOptions options)
     {
         if (!TryGetPackageName(context, app, out var packageName)) return null;
@@ -150,17 +154,26 @@ public static class AndroidAppInventoryApi
                 isInstalled,
                 identity,
                 permissionRisk,
+                permissionRiskAvailable: true,
                 loadIcon: false,
                 includeApkPaths: options.IncludeSystemApkPaths);
         }
 
-        if (!TryGetPackageInventoryDetails(
-                context,
-                packageManager,
-                packageName,
-                specialAccess,
-                out var packageIdentity,
-                out permissionRisk)) return null;
+        PackageIdentity packageIdentity;
+        if (isRiskEngineEnabled)
+        {
+            if (!TryGetPackageInventoryDetails(
+                    context,
+                    packageManager,
+                    packageName,
+                    specialAccess,
+                    out packageIdentity,
+                    out permissionRisk)) return null;
+        }
+        else if (!TryGetPackageIdentity(packageManager, packageName, out packageIdentity))
+        {
+            return null;
+        }
 
         return CreateModel(
             context,
@@ -172,6 +185,7 @@ public static class AndroidAppInventoryApi
             isInstalled,
             packageIdentity,
             permissionRisk,
+            isRiskEngineEnabled,
             loadIcon: options.IncludeInlineIcons,
             includeApkPaths: true);
     }
@@ -186,6 +200,7 @@ public static class AndroidAppInventoryApi
         bool isInstalled,
         PackageIdentity packageIdentity,
         AppPermissionRiskAnalysis permissionRisk,
+        bool permissionRiskAvailable,
         bool loadIcon,
         bool includeApkPaths)
     {
@@ -199,6 +214,7 @@ public static class AndroidAppInventoryApi
             IsHidden = isHidden,
             CanLaunch = packageManager.GetLaunchIntentForPackage(packageName) is not null,
             IsInstalled = isInstalled,
+            PermissionRiskAvailable = permissionRiskAvailable,
             PermissionRiskLevel = permissionRisk.Level,
             RiskyPermissions = permissionRisk.RiskyPermissions.ToArray(),
             MatchedPermissionRiskRuleIds = permissionRisk.MatchedRuleIds.ToArray(),
@@ -552,6 +568,10 @@ public static class AndroidAppInventoryApi
         HashSet<string> AccessibilityServicePackages,
         HashSet<string> NotificationListenerPackages)
     {
+        public static SpecialAccessSnapshot Empty { get; } = new(
+            new HashSet<string>(StringComparer.Ordinal),
+            new HashSet<string>(StringComparer.Ordinal));
+
         public bool HasAccessibilityService(string packageName)
         {
             return AccessibilityServicePackages.Contains(packageName);

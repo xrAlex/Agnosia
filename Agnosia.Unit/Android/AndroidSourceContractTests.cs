@@ -144,6 +144,27 @@ public sealed class AndroidSourceContractTests
         Assert.Contains("PermissionKind.Overlay", coordinatorSource, StringComparison.Ordinal);
     }
 
+    // Проверяет, что Risk Engine module управляет анализом риска и синхронизируется в рабочий профиль.
+    [Fact]
+    public void Risk_engine_module_uses_risk_storage_and_inventory_contracts()
+    {
+        var coordinatorSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Modules", "AndroidModuleCoordinator.cs"));
+        var inventorySource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Packages", "AndroidAppInventoryApi.cs"));
+        var dummyQuerySource = ReadAndroidSource("Activities\\DummyActivity.QueryActions.cs");
+
+        Assert.Contains("AgnosiaModuleKind.RiskEngine", coordinatorSource, StringComparison.Ordinal);
+        Assert.Contains("StorageKeys.RiskEngineEnabled", coordinatorSource, StringComparison.Ordinal);
+        Assert.Contains("SettingsManager.Instance.SyncBooleanSettingAsync", coordinatorSource, StringComparison.Ordinal);
+        Assert.Contains("LocalStorageManager.Instance.GetBoolean(StorageKeys.RiskEngineEnabled, true)", coordinatorSource, StringComparison.Ordinal);
+        Assert.Contains("LocalStorageManager.Instance.GetBoolean(StorageKeys.RiskEngineEnabled, true)", inventorySource, StringComparison.Ordinal);
+        Assert.Contains("PermissionRiskAvailable = permissionRiskAvailable", inventorySource, StringComparison.Ordinal);
+        Assert.Contains("AppPermissionRiskCatalog.Analyze", inventorySource, StringComparison.Ordinal);
+        Assert.Contains("SpecialAccessSnapshot.Empty", inventorySource, StringComparison.Ordinal);
+        Assert.Contains("cached.RiskEngineEnabled != isRiskEngineEnabled", dummyQuerySource, StringComparison.Ordinal);
+    }
+
     private static string[] ReadIntentFilterActionNames(params string[] relativeSourcePaths)
     {
         var names = new HashSet<string>(StringComparer.Ordinal);
