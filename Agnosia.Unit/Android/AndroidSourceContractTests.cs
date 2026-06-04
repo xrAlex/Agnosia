@@ -144,6 +144,49 @@ public sealed class AndroidSourceContractTests
         Assert.Contains("PermissionKind.Overlay", coordinatorSource, StringComparison.Ordinal);
     }
 
+    // Проверяет, что API orchestration не зависит напрямую от Android service component.
+    [Fact]
+    public void Vpn_guard_launch_uses_gateway_boundary_for_transient_service()
+    {
+        var appCommandSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Commands", "AndroidAppCommandCoordinator.cs"));
+        var coordinatorSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Vpn", "TransientVpnDisconnectCoordinator.cs"));
+        var gatewaySource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Gateways", "AndroidActivityCommandGateway.cs"));
+
+        Assert.Contains("TransientVpnDisconnectCoordinator.DisconnectActiveVpnAsync", appCommandSource,
+            StringComparison.Ordinal);
+        Assert.Contains("commandRunner.ShowVpnGuardOverlay()", appCommandSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("TransientVpnDisconnectService", appCommandSource, StringComparison.Ordinal);
+        Assert.Contains("activityCommands.DisconnectPreparedVpnAsync(cancellationToken)", coordinatorSource,
+            StringComparison.Ordinal);
+        Assert.Contains("host.DisconnectPreparedVpnAsync(cancellationToken)", gatewaySource, StringComparison.Ordinal);
+    }
+
+    // Проверяет, что shortcut launch включает overlay после успешного transient VPN disconnect.
+    [Fact]
+    public void Shortcut_vpn_launch_shows_overlay_after_successful_disconnect()
+    {
+        var proxySource = ReadAndroidSource("Activities\\ProxyActivity.cs");
+
+        Assert.Contains("TransientVpnDisconnectService.DisconnectPreparedVpnAsync(this)", proxySource,
+            StringComparison.Ordinal);
+        Assert.Contains("OverlayVpnService.ShowOverlay(this)", proxySource, StringComparison.Ordinal);
+    }
+
+    // Проверяет, что VPN restore и overlay cleanup связаны с событием WorkAppFrozen.
+    [Fact]
+    public void Work_app_frozen_handler_restores_vpn_and_hides_overlay_in_finally()
+    {
+        var handlerSource = ReadAndroidSource("Vpn\\WorkAppFrozenHandler.cs");
+
+        Assert.Contains("EnableConfiguredVpnAfterWorkFreezeAsync(context, trigger)", handlerSource,
+            StringComparison.Ordinal);
+        Assert.Contains("finally", handlerSource, StringComparison.Ordinal);
+        Assert.Contains("OverlayVpnService.HideOverlay(context)", handlerSource, StringComparison.Ordinal);
+    }
+
     // Проверяет, что Risk Engine module управляет анализом риска и синхронизируется в рабочий профиль.
     [Fact]
     public void Risk_engine_module_uses_risk_storage_and_inventory_contracts()

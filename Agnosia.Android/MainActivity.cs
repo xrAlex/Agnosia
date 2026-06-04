@@ -6,7 +6,9 @@ using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Infrastructure;
 using Agnosia.Android.Receivers;
 using Agnosia.Android.Services;
+using Agnosia.Android.Vpn;
 using Agnosia.Infrastructure;
+using Agnosia.Models;
 using Android.Content;
 using Android.Content.PM;
 using Android.OS;
@@ -254,6 +256,21 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         CancellationToken cancellationToken)
     {
         return StartForResultAsync(intent, cancellationToken);
+    }
+
+    Task<OperationResult> IAndroidActivityHost.DisconnectPreparedVpnAsync(CancellationToken cancellationToken)
+    {
+        return TransientVpnDisconnectService.DisconnectPreparedVpnAsync(this, cancellationToken);
+    }
+
+    void IAndroidActivityHost.ShowVpnGuardOverlay()
+    {
+        OverlayVpnService.ShowOverlay(this);
+    }
+
+    void IAndroidActivityHost.HideVpnGuardOverlay()
+    {
+        OverlayVpnService.HideOverlay(this);
     }
 
 }

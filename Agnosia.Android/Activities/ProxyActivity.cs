@@ -9,6 +9,7 @@ using Agnosia.Android.Infrastructure;
 using Agnosia.Android.Receivers;
 using Agnosia.Android.Services;
 using Agnosia.Android.Shortcuts;
+using Agnosia.Android.Vpn;
 using Android.App.Admin;
 using Android.Content;
 using Android.Content.PM;
@@ -345,6 +346,7 @@ public sealed class ProxyActivity : Activity
         }
 
         LocalStorageManager.Instance.SetBoolean(StorageKeys.HaveActiveVpnSession, true);
+        OverlayVpnService.ShowOverlay(this);
         _pendingVpnDisconnectRequest = null;
         ForwardLaunchToManagedProfile(request);
     }

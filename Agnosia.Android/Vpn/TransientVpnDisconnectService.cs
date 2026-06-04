@@ -1,14 +1,14 @@
-using Agnosia.Android.Api.Gateways;
 using Agnosia.Android.Api.Notifications;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Models;
+using Android.App;
 using Android.Content;
 using Android.Content.PM;
 using Android.Net;
 using Android.OS;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
-namespace Agnosia.Android.Api.Vpn;
+namespace Agnosia.Android.Vpn;
 
 [Service(
     Name = "com.agnosia.app.TransientVpnDisconnectService",
@@ -38,23 +38,6 @@ public sealed class TransientVpnDisconnectService : VpnService
 
     private ParcelFileDescriptor? _vpnInterface;
     private bool _completed;
-
-    internal static async Task<OperationResult> DisconnectActiveVpnAsync(
-        AndroidActivityCommandGateway activityCommands,
-        CancellationToken cancellationToken = default)
-    {
-        var activity = activityCommands.CurrentActivity;
-        var prepareIntent = Prepare(activity);
-        if (prepareIntent is null)
-            return await DisconnectPreparedVpnAsync(activity, cancellationToken);
-
-        var prepareResult =
-            await activityCommands.StartExternalActivityForResultAsync(prepareIntent, cancellationToken);
-        if (prepareResult.ResultCode != Result.Ok)
-            return OperationResult.Failure("Android не выдал Agnosia временное управление VPN.");
-
-        return await DisconnectPreparedVpnAsync(activity, cancellationToken);
-    }
 
     public static Task<OperationResult> DisconnectPreparedVpnAsync(
         Context context,

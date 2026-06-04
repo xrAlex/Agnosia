@@ -11,6 +11,7 @@ using Agnosia.Android.Infrastructure;
 using Agnosia.Android.Receivers;
 using Agnosia.Android.Services;
 using Agnosia.Android.Shortcuts;
+using Agnosia.Android.Vpn;
 using Android.App.Admin;
 using Android.Content;
 using Android.Content.PM;

@@ -276,7 +276,7 @@ internal sealed class AndroidAppCommandCoordinator(
 
         storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
         Log.Debug(LogTag, "Active VPN detected, starting transient VpnService.");
-        var disconnectResult = await TransientVpnDisconnectService.DisconnectActiveVpnAsync(
+        var disconnectResult = await TransientVpnDisconnectCoordinator.DisconnectActiveVpnAsync(
             commandRunner,
             cancellationToken);
         if (!disconnectResult.Succeeded)
@@ -291,6 +291,7 @@ internal sealed class AndroidAppCommandCoordinator(
                 "VPN все еще активен в личном профиле. Сторонний клиент мог сразу подключиться снова.");
 
         storage.SetBoolean(StorageKeys.HaveActiveVpnSession, true);
+        commandRunner.ShowVpnGuardOverlay();
         return OperationResult.Success("VPN отключен.");
     }
 

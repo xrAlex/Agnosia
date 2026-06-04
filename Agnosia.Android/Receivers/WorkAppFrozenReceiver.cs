@@ -1,7 +1,7 @@
 using Agnosia.Android.Api.Commands;
 using Agnosia.Android.Api.Gateways;
 using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Services;
+using Agnosia.Android.Vpn;
 using Android.Content;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 

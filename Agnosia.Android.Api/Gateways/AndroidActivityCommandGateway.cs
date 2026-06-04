@@ -53,6 +53,23 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
             packageName);
     }
 
+    public Task<OperationResult> DisconnectPreparedVpnAsync(CancellationToken cancellationToken)
+    {
+        var host = getActivityHost();
+        AgnosiaRuntime.Initialize(host.CurrentActivity);
+        return host.DisconnectPreparedVpnAsync(cancellationToken);
+    }
+
+    public void ShowVpnGuardOverlay()
+    {
+        getActivityHost().ShowVpnGuardOverlay();
+    }
+
+    public void HideVpnGuardOverlay()
+    {
+        getActivityHost().HideVpnGuardOverlay();
+    }
+
     public async Task<AndroidActivityResult> StartExternalActivityForResultAsync(
         Intent intent,
         CancellationToken cancellationToken)

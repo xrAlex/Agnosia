@@ -434,8 +434,14 @@ public sealed partial class HiddenAppSessionMonitorService : Service
 
             foreach (var appTask in appTasks)
             {
-                if (appTask.TaskInfo is not { } taskInfo || taskInfo.Id != session.TaskId)
+                if (appTask.TaskInfo is not { } taskInfo)
                     continue;
+
+                // .NET Android ref pack 36 exposes RecentTaskInfo.Id but not the non-deprecated taskId field.
+#pragma warning disable CA1422
+                var observedTaskId = taskInfo.Id;
+#pragma warning restore CA1422
+                if (observedTaskId != session.TaskId) continue;
 
                 var baseActivity = taskInfo.BaseActivity;
                 var topActivity = taskInfo.TopActivity;

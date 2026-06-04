@@ -1,3 +1,4 @@
+using Agnosia.Android.Api.Platform;
 using Android.Content;
 using Android.Graphics;
 using Android.OS;
@@ -7,14 +8,13 @@ using Exception = Java.Lang.Exception;
 using Extensions = Android.Runtime.Extensions;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
-namespace Agnosia.Android.Services;
+namespace Agnosia.Android.Vpn;
 
 [Service(Exported = false)]
 public sealed class OverlayVpnService : Service
 {
     private const string LogTag = "AgnosiaOverlayVpn";
     private const string ActionShowOverlay = "agnosia.action.SHOW_VPN_OVERLAY";
-    private const string ActionHideOverlay = "agnosia.action.HIDE_VPN_OVERLAY";
 
     private const int OverlaySizeDp = 24;
     private const int OverlayMarginDp = 8;
@@ -32,6 +32,17 @@ public sealed class OverlayVpnService : Service
     public OverlayVpnService()
     {
         _binder = new OverlayBinder(this);
+    }
+
+    public static void ShowOverlay(Context context)
+    {
+        var intent = new Intent(context, typeof(OverlayVpnService));
+        intent.SetAction(ActionShowOverlay);
+        AndroidServiceApi.TryStartService(
+            context.ApplicationContext ?? context,
+            intent,
+            LogTag,
+            "Android не смог показать overlay-индикатор VPN Guard.");
     }
 
     public static void HideOverlay(Context context)
@@ -65,15 +76,10 @@ public sealed class OverlayVpnService : Service
         {
             ShowOverlayWindow();
         }
-        else if (string.Equals(action, ActionHideOverlay, StringComparison.Ordinal))
+        else
         {
-            HideOverlayWindow();
             StopSelf(startId);
         }
-
-        if (!string.Equals(action, ActionShowOverlay, StringComparison.Ordinal)
-            && !string.Equals(action, ActionHideOverlay, StringComparison.Ordinal))
-            StopSelf(startId);
 
         return StartCommandResult.NotSticky;
     }

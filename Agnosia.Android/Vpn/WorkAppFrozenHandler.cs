@@ -3,7 +3,7 @@ using Agnosia.Models;
 using Android.Content;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
-namespace Agnosia.Android.Services;
+namespace Agnosia.Android.Vpn;
 
 internal static class WorkAppFrozenHandler
 {

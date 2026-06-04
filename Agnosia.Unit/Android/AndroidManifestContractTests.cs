@@ -139,6 +139,26 @@ public sealed class AndroidManifestContractTests
             StringComparison.Ordinal);
     }
 
+    // Проверяет, что VpnService component живет в Android-проекте и сохраняет Android VPN contract.
+    [Fact]
+    public void Transient_vpn_disconnect_service_contract_is_declared_in_android_project()
+    {
+        var source = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Vpn", "TransientVpnDisconnectService.cs"));
+
+        Assert.Contains("[Service(", source, StringComparison.Ordinal);
+        Assert.Contains("Name = \"com.agnosia.app.TransientVpnDisconnectService\"", source,
+            StringComparison.Ordinal);
+        Assert.Contains("Permission = \"android.permission.BIND_VPN_SERVICE\"", source, StringComparison.Ordinal);
+        Assert.Contains("ForegroundServiceType = ForegroundService.TypeSystemExempted", source,
+            StringComparison.Ordinal);
+        Assert.Contains("[IntentFilter([\"android.net.VpnService\"])]", source, StringComparison.Ordinal);
+        Assert.Contains("[MetaData(\"android.net.VpnService.SUPPORTS_ALWAYS_ON\", Value = \"false\")]", source,
+            StringComparison.Ordinal);
+        Assert.False(File.Exists(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Vpn", "TransientVpnDisconnectService.cs")));
+    }
+
     private static XDocument ReadManifest()
     {
         return XDocument.Load(RepositoryPaths.Get("Agnosia.Android", "Properties", "AndroidManifest.xml"));

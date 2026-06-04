@@ -1,3 +1,4 @@
+using Agnosia.Models;
 using Android.Content;
 
 namespace Agnosia.Android.Api.Gateways;
@@ -13,6 +14,12 @@ public interface IAndroidActivityHost
     Type WorkAppFrozenReceiverType { get; }
 
     Task<AndroidActivityResult> StartForResultAsync(Intent intent, CancellationToken cancellationToken = default);
+
+    Task<OperationResult> DisconnectPreparedVpnAsync(CancellationToken cancellationToken = default);
+
+    void ShowVpnGuardOverlay();
+
+    void HideVpnGuardOverlay();
 }
 
 public readonly record struct AndroidActivityResult(Result ResultCode, Intent? Data);
