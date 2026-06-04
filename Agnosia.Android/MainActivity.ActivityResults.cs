@@ -1,5 +1,4 @@
 using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Gateways;
 using Android.Content;
 using Android.OS;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;

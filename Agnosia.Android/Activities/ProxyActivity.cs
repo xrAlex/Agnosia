@@ -1,5 +1,4 @@
 using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Gateways;
 using Agnosia.Android.Api.Packages;
 using Agnosia.Android.Api.Permissions;
 using Agnosia.Android.Api.Platform;
@@ -378,12 +377,12 @@ public sealed class ProxyActivity : Activity
                     request.DisplayName);
                 proxyIntent.PutExtra(
                     AndroidCommandContract.ExtraParentFrozenCallback,
-                    AndroidPendingIntentApi.CreateWorkAppFrozenBroadcastPendingIntent(
+                    AgnosiaPendingIntentFactory.CreateWorkAppFrozenBroadcastPendingIntent(
                         this,
                         typeof(WorkAppFrozenReceiver),
                         request.PackageName));
                 proxyIntent.AddFlags(ActivityFlags.NewTask);
-                if (AndroidIntentApi.TryTransferToProfileAndStartActivity(
+                if (AgnosiaUtilities.TryTransferToProfileAndStartActivity(
                         this,
                         proxyIntent,
                         LogTag,

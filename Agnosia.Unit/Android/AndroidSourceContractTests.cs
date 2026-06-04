@@ -91,7 +91,7 @@ public sealed class AndroidSourceContractTests
     public void Work_profile_batch_icon_loading_uses_query_app_icons_command()
     {
         var gatewaySource = File.ReadAllText(
-            RepositoryPaths.Get("Agnosia.Android.Api", "Gateways", "AndroidProfileCommandGateway.cs"));
+            RepositoryPaths.Get("Agnosia.Android", "Gateways", "AndroidProfileCommandGateway.cs"));
 
         Assert.Contains("if (app.IsSystem) return null;", gatewaySource, StringComparison.Ordinal);
         Assert.Contains("app is { Profile: ProfileKind.Work, IsSystem: false }", gatewaySource, StringComparison.Ordinal);
@@ -107,9 +107,9 @@ public sealed class AndroidSourceContractTests
     public void System_app_icons_are_disabled_globally()
     {
         var inventorySource = File.ReadAllText(
-            RepositoryPaths.Get("Agnosia.Android.Api", "Packages", "AndroidAppInventoryApi.cs"));
+            RepositoryPaths.Get("Agnosia.Android", "Packages", "AndroidAppInventoryApi.cs"));
         var gatewaySource = File.ReadAllText(
-            RepositoryPaths.Get("Agnosia.Android.Api", "Gateways", "AndroidProfileCommandGateway.cs"));
+            RepositoryPaths.Get("Agnosia.Android", "Gateways", "AndroidProfileCommandGateway.cs"));
 
         Assert.Contains("AndroidWorkProfilePackageClassifier.IsSystemApp(app)) return null;", inventorySource, StringComparison.Ordinal);
         Assert.Contains("loadIcon: false", inventorySource, StringComparison.Ordinal);
@@ -121,7 +121,7 @@ public sealed class AndroidSourceContractTests
     public void File_shuttle_module_uses_existing_storage_and_provider_contracts()
     {
         var coordinatorSource = File.ReadAllText(
-            RepositoryPaths.Get("Agnosia.Android.Api", "Modules", "AndroidModuleCoordinator.cs"));
+            RepositoryPaths.Get("Agnosia.Android", "Modules", "AndroidModuleCoordinator.cs"));
 
         Assert.Contains("StorageKeys.CrossProfileFileShuttleEnabled", coordinatorSource, StringComparison.Ordinal);
         Assert.Contains("AgnosiaUtilities.ApplyCrossProfileFileShuttleComponentState(activity)", coordinatorSource, StringComparison.Ordinal);
@@ -134,7 +134,7 @@ public sealed class AndroidSourceContractTests
     public void Vpn_guard_module_uses_existing_vpn_storage_contracts()
     {
         var coordinatorSource = File.ReadAllText(
-            RepositoryPaths.Get("Agnosia.Android.Api", "Modules", "AndroidModuleCoordinator.cs"));
+            RepositoryPaths.Get("Agnosia.Android", "Modules", "AndroidModuleCoordinator.cs"));
 
         Assert.Contains("AgnosiaModuleKind.VpnGuard", coordinatorSource, StringComparison.Ordinal);
         Assert.Contains("StorageKeys.DisableVpnBeforeWorkLaunch", coordinatorSource, StringComparison.Ordinal);
@@ -149,11 +149,11 @@ public sealed class AndroidSourceContractTests
     public void Vpn_guard_launch_uses_gateway_boundary_for_transient_service()
     {
         var appCommandSource = File.ReadAllText(
-            RepositoryPaths.Get("Agnosia.Android.Api", "Commands", "AndroidAppCommandCoordinator.cs"));
+            RepositoryPaths.Get("Agnosia.Android", "Commands", "AndroidAppCommandCoordinator.cs"));
         var coordinatorSource = File.ReadAllText(
-            RepositoryPaths.Get("Agnosia.Android.Api", "Vpn", "TransientVpnDisconnectCoordinator.cs"));
+            RepositoryPaths.Get("Agnosia.Android", "Vpn", "TransientVpnDisconnectCoordinator.cs"));
         var gatewaySource = File.ReadAllText(
-            RepositoryPaths.Get("Agnosia.Android.Api", "Gateways", "AndroidActivityCommandGateway.cs"));
+            RepositoryPaths.Get("Agnosia.Android", "Gateways", "AndroidActivityCommandGateway.cs"));
 
         Assert.Contains("TransientVpnDisconnectCoordinator.DisconnectActiveVpnAsync", appCommandSource,
             StringComparison.Ordinal);
@@ -192,9 +192,9 @@ public sealed class AndroidSourceContractTests
     public void Risk_engine_module_uses_risk_storage_and_inventory_contracts()
     {
         var coordinatorSource = File.ReadAllText(
-            RepositoryPaths.Get("Agnosia.Android.Api", "Modules", "AndroidModuleCoordinator.cs"));
+            RepositoryPaths.Get("Agnosia.Android", "Modules", "AndroidModuleCoordinator.cs"));
         var inventorySource = File.ReadAllText(
-            RepositoryPaths.Get("Agnosia.Android.Api", "Packages", "AndroidAppInventoryApi.cs"));
+            RepositoryPaths.Get("Agnosia.Android", "Packages", "AndroidAppInventoryApi.cs"));
         var dummyQuerySource = ReadAndroidSource("Activities\\DummyActivity.QueryActions.cs");
 
         Assert.Contains("AgnosiaModuleKind.RiskEngine", coordinatorSource, StringComparison.Ordinal);

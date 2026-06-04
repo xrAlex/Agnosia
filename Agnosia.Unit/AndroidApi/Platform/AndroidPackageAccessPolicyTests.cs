@@ -1,4 +1,4 @@
-using Agnosia.Android.Api.Platform;
+using Agnosia.Android.Platform;
 using Xunit;
 
 namespace Agnosia.Unit.AndroidApi.Platform;

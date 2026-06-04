@@ -1,8 +1,8 @@
 using System.Text.Json;
 using Agnosia.Android.Api.Serialization;
 #if AGNOSIA_ANDROID
-using Agnosia.Android.Api.Gateways;
 using Agnosia.Android.Api.Logging;
+using Android.App;
 using Android.Content;
 using Agnosia.Models;
 using ActivityNotFoundException = Android.Content.ActivityNotFoundException;

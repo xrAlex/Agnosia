@@ -1,7 +1,6 @@
 using System.Globalization;
 using Agnosia.Android.Activities;
 using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Gateways;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Infrastructure;
 using Agnosia.Android.Receivers;

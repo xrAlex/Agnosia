@@ -48,7 +48,7 @@ public sealed class AgnosiaActionsTests
     public void Recovery_target_resolution_requires_android_cross_profile_forwarder()
     {
         var source = File.ReadAllText(
-            RepositoryPaths.Get("Agnosia.Android.Api", "Platform", "AgnosiaUtilities.cs"));
+            RepositoryPaths.Get("Agnosia.Android", "Platform", "AgnosiaUtilities.cs"));
 
         Assert.Contains("AndroidSystemApi.IsCrossProfileIntentForwarder(activity)", source, StringComparison.Ordinal);
         Assert.DoesNotContain("fallback", source, StringComparison.OrdinalIgnoreCase);
@@ -71,7 +71,7 @@ public sealed class AgnosiaActionsTests
     public void File_shuttle_callback_messenger_extra_is_not_signed()
     {
         var source = File.ReadAllText(
-            RepositoryPaths.Get("Agnosia.Android.Api", "Platform", "AuthenticationUtility.cs"));
+            RepositoryPaths.Get("Agnosia.Android", "Platform", "AuthenticationUtility.cs"));
 
         Assert.Contains(
             "AndroidCommandContract.ExtraFileShuttleCallbackMessenger",

@@ -1,4 +1,4 @@
-using Agnosia.Android.Api.Permissions;
+using Agnosia.Android.Permissions;
 using Agnosia.Models;
 using Xunit;
 

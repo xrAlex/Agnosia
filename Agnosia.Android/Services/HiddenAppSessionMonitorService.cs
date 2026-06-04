@@ -3,7 +3,6 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using _Microsoft.Android.Resource.Designer;
 using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Gateways;
 using Agnosia.Android.Api.Notifications;
 using Agnosia.Android.Api.Packages;
 using Agnosia.Android.Api.Permissions;

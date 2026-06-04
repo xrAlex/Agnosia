@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Agnosia.Android.Activities;
 using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Gateways;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Api.Storage;
 using Agnosia.Android.Receivers;

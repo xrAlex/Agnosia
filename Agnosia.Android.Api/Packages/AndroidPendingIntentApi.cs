@@ -1,37 +1,12 @@
 using System.Runtime.Versioning;
 using Agnosia.Android.Api.Commands;
 using Agnosia.Android.Api.Internal;
-using Agnosia.Android.Api.Platform;
 using Android.Content;
-using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Api.Packages;
 
 public static class AndroidPendingIntentApi
 {
-    private const string LogTag = "AgnosiaPendingIntent";
-
-    public static PendingIntent CreateWorkAppFrozenBroadcastPendingIntent(Context context, Type receiverType,
-        string packageName)
-    {
-        var intent = new Intent(context, receiverType);
-        intent.SetAction(AgnosiaActions.WorkAppFrozen);
-        intent.PutExtra(AndroidCommandContract.ExtraTrigger, $"pending_intent_callback:{packageName}");
-        AuthenticationUtility.SignWorkAppFrozenCallback(intent, packageName);
-
-        Log.Debug(
-            LogTag,
-            $"Creating work-app frozen broadcast pending intent. package={packageName}.");
-
-        return PendingIntent.GetBroadcast(
-                   context,
-                   GetStableRequestCode(AgnosiaActions.WorkAppFrozen, packageName),
-                   intent,
-                   PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable)
-               ?? throw new InvalidOperationException(
-                   "Android could not create a PendingIntent for the work-app frozen callback.");
-    }
-
     public static PendingIntent CreatePackageInstallerCallbackPendingIntent(
         Context context,
         Type receiverType,

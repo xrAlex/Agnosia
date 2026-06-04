@@ -25,26 +25,4 @@ public static class AndroidIntentApi
             return false;
         }
     }
-
-    public static bool TryTransferToProfileAndStartActivity(
-        Context context,
-        Intent intent,
-        string logTag,
-        string errorMessage,
-        out string? error)
-    {
-        try
-        {
-            AgnosiaUtilities.TransferIntentToProfile(context, intent);
-            context.StartActivity(intent);
-            error = null;
-            return true;
-        }
-        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
-        {
-            Log.Warn(logTag, $"{errorMessage} Details: {exception}");
-            error = errorMessage;
-            return false;
-        }
-    }
 }

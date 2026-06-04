@@ -7,6 +7,8 @@ namespace Agnosia.Android.Api.Platform;
 
 public static class AndroidProvisioningApi
 {
+    public const string ProvisioningAuthKeyExtra = "agnosia.provisioning.auth_key";
+
     public static bool CanStartManagedProfileProvisioning(DevicePolicyManager policyManager)
     {
         return policyManager.IsProvisioningAllowed(DevicePolicyManager.ActionProvisionManagedProfile);
@@ -21,15 +23,14 @@ public static class AndroidProvisioningApi
         intent.PutExtra(DevicePolicyManager.ExtraProvisioningSkipEncryption, true);
 
         var adminExtras = new PersistableBundle();
-        adminExtras.PutString(AuthenticationUtility.ProvisioningAuthKeyExtra, authKey);
+        adminExtras.PutString(ProvisioningAuthKeyExtra, authKey);
         intent.PutExtra(DevicePolicyManager.ExtraProvisioningAdminExtrasBundle, adminExtras);
     }
 
-    public static bool TryStoreProvisioningAuthKey(Intent? intent)
+    public static string? GetProvisioningAuthKey(Intent? intent)
     {
         var adminExtras = GetProvisioningAdminExtras(intent);
-        return AuthenticationUtility.TryStoreProvisioningKey(
-            adminExtras?.GetString(AuthenticationUtility.ProvisioningAuthKeyExtra));
+        return adminExtras?.GetString(ProvisioningAuthKeyExtra);
     }
 
     public static UserHandle? GetManagedProfileUserHandle(Intent? intent)

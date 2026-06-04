@@ -31,7 +31,7 @@ public static class AndroidPolicyApi
 
     public static string[] GetCrossProfilePackages(DevicePolicyManager manager, ComponentName admin)
     {
-        return AndroidPackageAccessPolicy.ApplyRequiredCrossProfilePackages(manager.GetCrossProfilePackages(admin));
+        return manager.GetCrossProfilePackages(admin).ToArray();
     }
 
     public static bool TryEnableSystemApp(
@@ -124,9 +124,7 @@ public static class AndroidPolicyApi
     {
         try
         {
-            manager.SetCrossProfilePackages(
-                admin,
-                AndroidPackageAccessPolicy.ApplyRequiredCrossProfilePackages(packages));
+            manager.SetCrossProfilePackages(admin, packages);
             return true;
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
@@ -242,29 +240,6 @@ public static class AndroidPolicyApi
     private readonly record struct RuntimePermissionRevokeConfirmation(
         bool Confirmed,
         PermissionGrantState PolicyState);
-
-    public static bool TryEnsureRequiredCrossProfilePackages(
-        DevicePolicyManager manager,
-        ComponentName admin,
-        string logTag)
-    {
-        try
-        {
-            var current = manager.GetCrossProfilePackages(admin).ToArray();
-            var required = AndroidPackageAccessPolicy.ApplyRequiredCrossProfilePackages(current);
-            if (current.Length == required.Length
-                && current.ToHashSet(StringComparer.Ordinal).SetEquals(required))
-                return true;
-
-            manager.SetCrossProfilePackages(admin, required);
-            return true;
-        }
-        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
-        {
-            Log.Warn(logTag, $"Failed to enforce required cross-profile package policy: {exception}");
-            return false;
-        }
-    }
 
     [UnsupportedOSPlatform("android34.0")]
     private static void SetCrossProfileContactsSearchDisabled(DevicePolicyManager manager, ComponentName admin,

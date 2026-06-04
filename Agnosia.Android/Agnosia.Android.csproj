@@ -1,23 +1,27 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <OutputType>Exe</OutputType>
-        <TargetFramework>net10.0-android</TargetFramework>
-        <SupportedOSPlatformVersion>31</SupportedOSPlatformVersion>
+        <TargetFrameworks>net10.0;net10.0-android</TargetFrameworks>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <LangVersion>14.0</LangVersion>
         <RootNamespace>Agnosia.Android</RootNamespace>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-android'">
+        <OutputType>Exe</OutputType>
+        <SupportedOSPlatformVersion>31</SupportedOSPlatformVersion>
         <ApplicationId>com.agnosia.app</ApplicationId>
         <AndroidPackageFormat>apk</AndroidPackageFormat>
         <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
+        <DefineConstants>$(DefineConstants);AGNOSIA_ANDROID</DefineConstants>
     </PropertyGroup>
 
-    <PropertyGroup Condition="'$(AgnosiaAndroidPackageVariant)' == 'universal'">
+    <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-android' and '$(AgnosiaAndroidPackageVariant)' == 'universal'">
         <!-- Release universal APK should include 32-bit and 64-bit Android ABIs. -->
         <RuntimeIdentifiers>android-arm;android-arm64;android-x86;android-x64</RuntimeIdentifiers>
     </PropertyGroup>
 
-    <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-android' and '$(Configuration)' == 'Debug'">
         <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
         <!-- The app runs in both personal and work profiles; the Android debug transport uses a fixed localhost port. -->
         <Optimize>true</Optimize>
@@ -26,9 +30,17 @@
         <AndroidEnableMarshalMethods>false</AndroidEnableMarshalMethods>
     </PropertyGroup>
 
-    <ItemGroup>
+    <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-android'">
         <PackageReference Include="Avalonia.Android"/>
         <PackageReference Include="Xamarin.AndroidX.Core.SplashScreen"/>
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+        <Compile Remove="**\*.cs"/>
+        <Compile Include="Permissions\AppPermissionRiskCatalog.cs"/>
+        <Compile Include="Permissions\AppPermissionRiskCatalog.Rules.cs"/>
+        <Compile Include="Permissions\AppPermissionRiskInput.cs"/>
+        <Compile Include="Platform\AndroidPackageAccessPolicy.cs"/>
     </ItemGroup>
 
     <ItemGroup>

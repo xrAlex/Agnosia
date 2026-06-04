@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Gateways;
 using Agnosia.Android.Api.Logging;
 using Agnosia.Android.Api.Packages;
 using Agnosia.Android.Api.Permissions;
@@ -708,7 +707,7 @@ public sealed partial class DummyActivity : Activity
             launchRequest.PutExtra("packageName", packageName);
             if (!string.IsNullOrWhiteSpace(displayName)) launchRequest.PutExtra("displayName", displayName);
 
-            if (!AndroidIntentApi.TryTransferToProfileAndStartActivity(
+            if (!AgnosiaUtilities.TryTransferToProfileAndStartActivity(
                     this,
                     launchRequest,
                     LogTag,

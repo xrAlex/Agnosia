@@ -31,22 +31,21 @@
                                │
 ┌──────────────────────────────▼─────────────────────────────┐
 │ Agnosia.Android.Api                                         │
-│ Платформенная логика Android                                │
+│ Android API wrappers и wire-контракты                       │
 │                                                            │
-│ AndroidPlatformBridge                                       │
-│ ├─ AndroidDashboardReader                                   │
-│ ├─ AndroidPermissionCoordinator                             │
-│ ├─ AndroidAppCommandCoordinator                             │
-│ ├─ AndroidProfileCommandGateway / ActivityCommandGateway    │
-│ ├─ AndroidProvisioningApi / AndroidPolicyApi                │
-│ ├─ AndroidVpnApi / AndroidVpnAutomationApi                  │
-│ └─ AppPermissionRiskCatalog                                 │
+│ AgnosiaActions / AndroidCommandContract                     │
+│ ├─ AppServiceModel / AppInventoryPayloadPager               │
+│ ├─ AndroidIntentApi / AndroidPolicyApi                      │
+│ ├─ AndroidProvisioningApi / AndroidPackageApi               │
+│ ├─ AndroidPermissionApi / AndroidVpnApi                     │
+│ └─ StorageKeys / AndroidSettingsContract                    │
 └──────────────────────────────┬─────────────────────────────┘
                                │
 ┌──────────────────────────────▼─────────────────────────────┐
 │ Agnosia.Android                                             │
-│ Android entry point, Activity, Service, Receiver            │
+│ Android bridge, orchestration, services, receivers          │
 │                                                            │
+│ AndroidPlatformBridge, Dashboard/Permission/App coordinators│
 │ MainActivity, DummyActivity, ProxyActivity                  │
 │ OverlayVpnService, HiddenAppSessionMonitorService           │
 │ WorkProfileLockFreezeService, DeviceAdmin/Boot receivers    │
@@ -56,8 +55,8 @@
 | Проект | Target framework | Ответственность |
 | --- | --- | --- |
 | `Agnosia` | `net10.0` | UI на Avalonia, MVVM, модели, общий журнал, состояние экрана и команд. |
-| `Agnosia.Android.Api` | `net10.0;net10.0-android` | Общие контракты команд и Android-реализация bridge-слоя. Для `net10.0` собираются только переносимые модели и правила. |
-| `Agnosia.Android` | `net10.0-android` | Запуск приложения, Android-компоненты, манифест, сервисы, receiver-ы и профильные Activity. |
+| `Agnosia.Android.Api` | `net10.0;net10.0-android` | Общие контракты команд, переносимые DTO и тонкие Android API wrappers без сервисов и бизнес-логики. |
+| `Agnosia.Android` | `net10.0;net10.0-android` | Android-реализация bridge-слоя, orchestration, локальное хранение, сервисы, receiver-ы и профильные Activity. |
 | `Agnosia.Unit` | `net10.0` | Unit-тесты view model, командных контрактов, риск-анализа и state machine. |
 
 Ключевой контракт приложения - `IPlatformBridge`. Он объединяет шесть сервисных интерфейсов:

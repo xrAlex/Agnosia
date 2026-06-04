@@ -21,10 +21,6 @@
         <Compile Include="Commands\AgnosiaActions.cs"/>
         <Compile Include="Commands\AndroidCommandContract.cs"/>
         <Compile Include="Commands\AndroidAppLaunchResult.cs"/>
-        <Compile Include="Permissions\AppPermissionRiskCatalog.cs"/>
-        <Compile Include="Permissions\AppPermissionRiskCatalog.Rules.cs"/>
-        <Compile Include="Permissions\AppPermissionRiskInput.cs"/>
-        <Compile Include="Platform\AndroidPackageAccessPolicy.cs"/>
         <Compile Include="Platform\AppInventoryPayloadPager.cs"/>
         <Compile Include="Platform\AppServiceModel.cs"/>
         <Compile Include="Serialization\AndroidApiJsonContext.cs"/>

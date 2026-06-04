@@ -1,4 +1,3 @@
-using Agnosia.Android.Api.Gateways;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Models;
 using Android;
@@ -58,33 +57,6 @@ public static class AndroidPermissionApi
             Log.Warn(LogTag, $"Failed to check VPN preparation state: {exception}");
             return false;
         }
-    }
-
-    internal static async Task<OperationResult> RequestVpnControlAsync(
-        AndroidActivityCommandGateway activityCommands,
-        CancellationToken cancellationToken)
-    {
-        var activity = activityCommands.CurrentActivity;
-        Intent? prepareIntent;
-        try
-        {
-            prepareIntent = VpnService.Prepare(activity);
-        }
-        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
-        {
-            Log.Warn(LogTag, $"Failed to prepare VPN permission request: {exception}");
-            return OperationResult.Failure("Android не смог открыть запрос доступа к VPN.");
-        }
-
-        if (prepareIntent is null) return OperationResult.Success("VPN-доступ уже подготовлен.");
-
-        var result = await activityCommands.StartExternalActivityForResultAsync(prepareIntent, cancellationToken);
-        var error = AndroidActivityResultApi.ExtractError(result);
-        if (!string.IsNullOrWhiteSpace(error)) return OperationResult.Failure(error);
-
-        return result.ResultCode == Result.Ok
-            ? OperationResult.Success("VPN-доступ подготовлен.")
-            : OperationResult.Failure("Android не выдал доступ к VPN.");
     }
 
     public static bool HasOverlayPermission(Context context)

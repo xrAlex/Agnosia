@@ -38,7 +38,7 @@ public sealed class AgnosiaDeviceAdminReceiver : DeviceAdminReceiver
                 return;
             }
 
-            if (!AndroidProvisioningApi.TryStoreProvisioningAuthKey(intent))
+            if (!AuthenticationUtility.TryStoreProvisioningAuthKey(intent))
             {
                 Log.Warn(LogTag, "Profile provisioning completed without a valid Agnosia authentication key.");
                 return;
@@ -59,7 +59,7 @@ public sealed class AgnosiaDeviceAdminReceiver : DeviceAdminReceiver
     {
         var intent = new Intent(AgnosiaActions.FinalizeProvision);
         intent.AddFlags(ActivityFlags.NewTask);
-        if (!AndroidIntentApi.TryTransferToProfileAndStartActivity(
+        if (!AgnosiaUtilities.TryTransferToProfileAndStartActivity(
                 context,
                 intent,
                 LogTag,

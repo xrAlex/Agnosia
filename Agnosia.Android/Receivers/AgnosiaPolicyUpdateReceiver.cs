@@ -22,7 +22,7 @@ public sealed class AgnosiaPolicyUpdateReceiver : BroadcastReceiver
 
     public override void OnReceive(Context? context, Intent? intent)
     {
-        if (context is not null) global::Agnosia.Android.Api.Platform.AgnosiaRuntime.Initialize(context);
+        if (context is not null) global::Agnosia.Android.Platform.AgnosiaRuntime.Initialize(context);
 
         Log.Info(
             LogTag,

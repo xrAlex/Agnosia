@@ -5,7 +5,12 @@ namespace Agnosia.Android.Api.Logging;
 
 public static class AgnosiaLog
 {
-    private const string InternalTag = "AgnosiaLogBridge";
+    private static Action<AppLogLevel, string, string>? _sink;
+
+    public static void SetSink(Action<AppLogLevel, string, string>? sink)
+    {
+        _sink = sink;
+    }
 
     public static void Debug(string tag, string message)
     {
@@ -36,15 +41,6 @@ public static class AgnosiaLog
         androidLogWriter(tag, message);
 
         if (level == AppLogLevel.Debug) return;
-
-        try
-        {
-            var context = Application.Context;
-            AndroidAppLogArchive.Append(context, level, tag, message);
-        }
-        catch (Exception exception)
-        {
-            Log.Warn(InternalTag, $"Failed to save the record into the UI journal: {exception.Message}");
-        }
+        _sink?.Invoke(level, tag, message);
     }
 }

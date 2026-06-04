@@ -3,7 +3,7 @@ using System.Runtime.Versioning;
 namespace Agnosia.Android.Api.Internal;
 
 [SupportedOSPlatform("android30.0")]
-internal static class AndroidApiLevel
+public static class AndroidApiLevel
 {
     [SupportedOSPlatformGuard("android31.0")]
     public static bool IsAtLeastS()
