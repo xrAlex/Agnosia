@@ -1,0 +1,42 @@
+using Agnosia.Android.Api.Platform;
+using System.Text.Json;
+using Agnosia.Android.Api.Serialization;
+using Agnosia.Models;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
+
+namespace Agnosia.Android.Gateways;
+
+internal static class AndroidProfileCommandJson
+{
+    private const string LogTag = "AgnosiaProfileCommand";
+
+    public static List<AppServiceModel>? DeserializeAppServiceModelsResult(string? raw, string description)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return default;
+
+        try
+        {
+            return JsonSerializer.Deserialize(raw, AndroidApiJsonContext.Default.ListAppServiceModel);
+        }
+        catch (JsonException exception)
+        {
+            Log.Warn(LogTag, $"Failed to deserialize {description}: {exception.Message}");
+            return default;
+        }
+    }
+
+    public static List<AppLogEntry>? DeserializeAppLogEntriesResult(string? raw, string description)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return default;
+
+        try
+        {
+            return JsonSerializer.Deserialize(raw, AndroidApiJsonContext.Default.ListAppLogEntry);
+        }
+        catch (JsonException exception)
+        {
+            Log.Warn(LogTag, $"Failed to deserialize {description}: {exception.Message}");
+            return default;
+        }
+    }
+}

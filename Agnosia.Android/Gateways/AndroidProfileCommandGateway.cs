@@ -1,8 +1,6 @@
-using System.Text.Json;
 using Agnosia.Android.Api.Commands;
 using Agnosia.Android.Api.Packages;
 using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Api.Serialization;
 using Agnosia.Models;
 using Android.Content;
 using Android.OS;
@@ -15,12 +13,6 @@ public static class AndroidProfileCommandGateway
     private const string LogTag = "AgnosiaProfileCommand";
     public const string ExtraTrigger = AndroidCommandContract.ExtraTrigger;
     private static readonly TimeSpan ProfilePingTimeout = TimeSpan.FromSeconds(10);
-    private static readonly TimeSpan BooleanQueryCacheTtl = TimeSpan.FromSeconds(5);
-    private const int QueryAppsPageLimit = 100;
-    private const int QueryAppsMaxJsonBytes = 512 * 1024;
-    private const int QueryAppsMaxPages = 100;
-    private static readonly Lock BooleanQueryCacheSync = new();
-    private static readonly Dictionary<string, CachedBooleanQuery> BooleanQueryCache = [];
 
     internal static async Task<bool> CanReachWorkProfileAsync(
         AndroidActivityCommandGateway commandRunner,
@@ -113,63 +105,8 @@ public static class AndroidProfileCommandGateway
             return await QueryLocalAppsAsync(commandRunner.CurrentActivity, showAll, cancellationToken)
                 .ConfigureAwait(false);
 
-        return await QueryWorkAppsPagedAsync(commandRunner, showAll, cancellationToken).ConfigureAwait(false);
-    }
-
-    private static async Task<ProfileAppsQueryResult?> QueryWorkAppsPagedAsync(
-        AndroidActivityCommandGateway commandRunner,
-        bool showAll,
-        CancellationToken cancellationToken)
-    {
-        var apps = new List<AppServiceModel>();
-        IReadOnlyList<string> interactionPackages = [];
-        var pageToken = Guid.NewGuid().ToString("N");
-        var offset = 0;
-
-        for (var pageIndex = 0; pageIndex < QueryAppsMaxPages; pageIndex++)
-        {
-            var intent = new Intent(AgnosiaActions.QueryApps);
-            intent.PutExtra(AndroidCommandContract.ExtraShowAll, showAll);
-            intent.PutExtra(AndroidCommandContract.ExtraQueryPageToken, pageToken);
-            intent.PutExtra(AndroidCommandContract.ExtraQueryOffset, offset);
-            intent.PutExtra(AndroidCommandContract.ExtraQueryLimit, QueryAppsPageLimit);
-            intent.PutExtra(AndroidCommandContract.ExtraQueryMaxJsonBytes, QueryAppsMaxJsonBytes);
-
-            var data = await StartCommandForDataAsync(
-                commandRunner,
-                intent,
-                $"Failed to query work apps page {pageIndex} through the profile activity command.",
-                cancellationToken).ConfigureAwait(false);
-            if (data is null) return null;
-
-            var pageApps = DeserializeAppServiceModelsResult(
-                data.GetStringExtra(AndroidCommandContract.ResultAppsJson),
-                $"work apps page {pageIndex}") ?? [];
-            apps.AddRange(pageApps);
-
-            if (offset == 0)
-                interactionPackages =
-                    data.GetStringArrayExtra(AndroidCommandContract.ResultInteractionPackages) ?? [];
-
-            var hasMore = data.GetBooleanExtra(AndroidCommandContract.ResultQueryHasMore, false);
-            var nextOffset = data.GetIntExtra(AndroidCommandContract.ResultNextQueryOffset, offset + pageApps.Count);
-            if (!hasMore) return new ProfileAppsQueryResult(apps, interactionPackages);
-
-            if (nextOffset <= offset)
-            {
-                Log.Warn(
-                    LogTag,
-                    $"Work apps paging stopped because next offset did not advance. page={pageIndex}, offset={offset}, nextOffset={nextOffset}, pageCount={pageApps.Count}.");
-                return null;
-            }
-
-            offset = nextOffset;
-        }
-
-        Log.Warn(
-            LogTag,
-            $"Work apps paging stopped after reaching the page limit. pages={QueryAppsMaxPages}, loadedApps={apps.Count}.");
-        return null;
+        return await AndroidProfileAppsPager.QueryWorkAppsPagedAsync(commandRunner, showAll, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     internal static async Task<byte[]?> LoadAppIconAsync(
@@ -189,7 +126,7 @@ public static class AndroidProfileCommandGateway
 
         var intent = new Intent(AgnosiaActions.QueryAppIcon);
         intent.PutExtra(AndroidCommandContract.ExtraPackage, app.PackageName);
-        var data = await StartCommandForDataAsync(
+        var data = await AndroidProfileCommandTransport.StartForDataAsync(
                 commandRunner,
                 intent,
                 $"Failed to query work app icon for {app.PackageName}.",
@@ -249,7 +186,7 @@ public static class AndroidProfileCommandGateway
             {
                 var intent = new Intent(AgnosiaActions.QueryAppIcons);
                 intent.PutExtra(AndroidCommandContract.ExtraPackages, loadableWorkPackageNames);
-                var data = await StartCommandForDataAsync(
+                var data = await AndroidProfileCommandTransport.StartForDataAsync(
                         commandRunner,
                         intent,
                         "Failed to query work app icons through the profile activity command.",
@@ -269,7 +206,7 @@ public static class AndroidProfileCommandGateway
         AndroidActivityCommandGateway commandRunner,
         CancellationToken cancellationToken)
     {
-        var data = await StartCommandForDataAsync(
+        var data = await AndroidProfileCommandTransport.StartForDataAsync(
             commandRunner,
             new Intent(AgnosiaActions.QueryCrossProfilePackages),
             "Failed to query work cross-profile packages through the profile activity command.",
@@ -284,14 +221,14 @@ public static class AndroidProfileCommandGateway
         AndroidActivityCommandGateway commandRunner,
         CancellationToken cancellationToken)
     {
-        var data = await StartCommandForDataAsync(
+        var data = await AndroidProfileCommandTransport.StartForDataAsync(
             commandRunner,
             new Intent(AgnosiaActions.QueryLogs),
             "Failed to query work logs through the profile activity command.",
             cancellationToken);
         if (data is null) return [];
 
-        return DeserializeAppLogEntriesResult(
+        return AndroidProfileCommandJson.DeserializeAppLogEntriesResult(
             data.GetStringExtra(AndroidCommandContract.ResultLogsJson),
             "work logs") ?? [];
     }
@@ -477,7 +414,7 @@ public static class AndroidProfileCommandGateway
         string resultExtra,
         CancellationToken cancellationToken)
     {
-        if (TryGetCachedBooleanQuery(action, out var cachedValue)) return cachedValue;
+        if (AndroidProfileBooleanQueryCache.TryGet(action, out var cachedValue)) return cachedValue;
 
         var result = await commandRunner.StartActivityForResultAsync(
             new Intent(action),
@@ -485,7 +422,7 @@ public static class AndroidProfileCommandGateway
             cancellationToken);
         var value = result.ResultCode == Result.Ok
                     && result.Data?.GetBooleanExtra(resultExtra, false) == true;
-        SetCachedBooleanQuery(action, value);
+        AndroidProfileBooleanQueryCache.Set(action, value);
         return value;
     }
 
@@ -500,22 +437,6 @@ public static class AndroidProfileCommandGateway
             true,
             cancellationToken);
         return AndroidActivityResultApi.ToPackageOperationResult(result, successMessage);
-    }
-
-    private static async Task<Intent?> StartCommandForDataAsync(
-        AndroidActivityCommandGateway commandRunner,
-        Intent intent,
-        string failureLogMessage,
-        CancellationToken cancellationToken)
-    {
-        var result = await commandRunner.StartActivityForResultAsync(
-            intent,
-            true,
-            cancellationToken).ConfigureAwait(false);
-        if (TryGetResultData(result, out var data)) return data;
-
-        Log.Warn(LogTag, failureLogMessage);
-        return null;
     }
 
     private static Task<ProfileAppsQueryResult?> QueryLocalAppsAsync(
@@ -594,18 +515,6 @@ public static class AndroidProfileCommandGateway
         return intent;
     }
 
-    private static bool TryGetResultData(AndroidActivityResult result, out Intent data)
-    {
-        if (result.ResultCode == Result.Ok && result.Data is { } resultData)
-        {
-            data = resultData;
-            return true;
-        }
-
-        data = null!;
-        return false;
-    }
-
     private static OperationResult StartOtherProfileActivity(
         Context context,
         Intent intent,
@@ -655,62 +564,6 @@ public static class AndroidProfileCommandGateway
             }
         });
     }
-
-    private static List<AppServiceModel>? DeserializeAppServiceModelsResult(string? raw, string description)
-    {
-        if (string.IsNullOrWhiteSpace(raw)) return default;
-
-        try
-        {
-            return JsonSerializer.Deserialize(raw, AndroidApiJsonContext.Default.ListAppServiceModel);
-        }
-        catch (JsonException exception)
-        {
-            Log.Warn(LogTag, $"Failed to deserialize {description}: {exception.Message}");
-            return default;
-        }
-    }
-
-    private static List<AppLogEntry>? DeserializeAppLogEntriesResult(string? raw, string description)
-    {
-        if (string.IsNullOrWhiteSpace(raw)) return default;
-
-        try
-        {
-            return JsonSerializer.Deserialize(raw, AndroidApiJsonContext.Default.ListAppLogEntry);
-        }
-        catch (JsonException exception)
-        {
-            Log.Warn(LogTag, $"Failed to deserialize {description}: {exception.Message}");
-            return default;
-        }
-    }
-
-    private static bool TryGetCachedBooleanQuery(string action, out bool value)
-    {
-        lock (BooleanQueryCacheSync)
-        {
-            if (BooleanQueryCache.TryGetValue(action, out var cached)
-                && DateTimeOffset.UtcNow - cached.CachedAt <= BooleanQueryCacheTtl)
-            {
-                value = cached.Value;
-                return true;
-            }
-        }
-
-        value = false;
-        return false;
-    }
-
-    private static void SetCachedBooleanQuery(string action, bool value)
-    {
-        lock (BooleanQueryCacheSync)
-        {
-            BooleanQueryCache[action] = new CachedBooleanQuery(value, DateTimeOffset.UtcNow);
-        }
-    }
-
-    private sealed record CachedBooleanQuery(bool Value, DateTimeOffset CachedAt);
 
     private static WorkProfileOwnerCheckResult InterpretProfilePingResult(AndroidActivityResult result)
     {

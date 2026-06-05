@@ -1,29 +1,20 @@
-using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Permissions;
-using Agnosia.Android.Api.Storage;
 using Agnosia.Models;
 using Agnosia.Platform;
-using Android.App.Admin;
 using Android.Content;
 using Android.Content.PM;
 using Android.OS;
-using Android.Provider;
-using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Platform;
 
 public sealed class AndroidPlatformBridge : IPlatformBridge
 {
-    private const string LogTag = "AgnosiaPlatformBridge";
-    private const string ManagedProfileSettingsAction = "android.settings.MANAGED_PROFILE_SETTINGS";
-    private const int ProvisioningWarmupAttempts = 5;
-    private const int ProvisioningWarmupDelayMilliseconds = 2000;
-
     private readonly AndroidActivityCommandGateway _commandRunner;
     private readonly AndroidDashboardReader _dashboardReader;
     private readonly AndroidPermissionCoordinator _permissionCoordinator;
     private readonly AndroidAppCommandCoordinator _appCommandCoordinator;
     private readonly AndroidModuleCoordinator _moduleCoordinator;
+    private readonly AndroidProvisioningCoordinator _provisioningCoordinator;
+    private readonly AndroidSettingsCoordinator _settingsCoordinator;
     private WeakReference<IAndroidActivityHost>? _activityHostReference;
 
     public static AndroidPlatformBridge Instance { get; } = new();
@@ -31,8 +22,12 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
     private AndroidPlatformBridge()
     {
         _commandRunner = new AndroidActivityCommandGateway(GetActivityHost);
+        _provisioningCoordinator = new AndroidProvisioningCoordinator(_commandRunner, GetActivityHost);
+        _settingsCoordinator = new AndroidSettingsCoordinator(GetInitializedActivity);
         _dashboardReader = new AndroidDashboardReader(_commandRunner);
-        _permissionCoordinator = new AndroidPermissionCoordinator(_commandRunner, StartProvisioningAsync);
+        _permissionCoordinator = new AndroidPermissionCoordinator(
+            _commandRunner,
+            _provisioningCoordinator.StartProvisioningAsync);
         _appCommandCoordinator = new AndroidAppCommandCoordinator(
             _commandRunner,
             _permissionCoordinator);
@@ -125,122 +120,22 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
 
     public async Task<bool> LoadOnboardingCompletedAsync(CancellationToken cancellationToken = default)
     {
-        _ = GetInitializedActivity();
-        return await Task.FromResult(LocalStorageManager.Instance.GetBoolean(StorageKeys.OnboardingCompleted));
+        return await _settingsCoordinator.LoadOnboardingCompletedAsync(cancellationToken);
     }
 
     public Task<OperationResult> CompleteOnboardingAsync(CancellationToken cancellationToken = default)
     {
-        _ = GetInitializedActivity();
-        LocalStorageManager.Instance.SetBoolean(StorageKeys.OnboardingCompleted, true);
-        return Task.FromResult(OperationResult.Success("Первичная настройка завершена."));
+        return _settingsCoordinator.CompleteOnboardingAsync(cancellationToken);
     }
 
-    public async Task<OperationResult> StartProvisioningAsync(CancellationToken cancellationToken = default)
+    public Task<OperationResult> StartProvisioningAsync(CancellationToken cancellationToken = default)
     {
-        var host = GetActivityHost();
-        var activity = host.CurrentActivity;
-        AgnosiaRuntime.Initialize(activity);
-
-        if (AndroidSystemApi.GetDevicePolicyManager(activity) is not { } policyManager)
-            return OperationResult.Failure("На этом устройстве недоступны API политики устройства.");
-
-        if (!AndroidProvisioningApi.CanStartManagedProfileProvisioning(policyManager))
-            return CreateProvisioningBlockedResult(activity);
-
-        var authKey = PrepareProvisioningAuthentication();
-        var intent = CreateManagedProfileProvisioningIntent(activity, host.AdminReceiverType, authKey);
-        var result = await _commandRunner.StartExternalActivityForResultAsync(intent, cancellationToken);
-        return await CompleteProvisioningAsync(activity, result, cancellationToken);
-    }
-
-    private static OperationResult CreateProvisioningBlockedResult(Activity activity)
-    {
-        var diagnostics = AndroidWorkProfileDiagnosticsReader.Read(activity);
-        Log.Warn(LogTag, $"Managed profile provisioning blocked. {diagnostics.ToLogString()}.");
-
-        if (diagnostics.ManagedProfileExists)
-            return MarkProfileResetRequired(
-                "Android не разрешает создать новый рабочий профиль, потому что в системе уже есть другой или остаточный рабочий профиль. " +
-                "Если рабочий профиль виден в настройках Android, удалите его и повторите создание профиля Agnosia. " +
-                "Если Android больше не показывает рабочий профиль, перезагрузите устройство и попробуйте снова.");
-
-        return OperationResult.Failure(
-            "Android сейчас не разрешает создать рабочий профиль. Проверьте ограничения устройства и повторите попытку.");
-    }
-
-    private static string PrepareProvisioningAuthentication()
-    {
-        var authKey = AuthenticationUtility.CreateAndStoreKey();
-        AuthenticationUtility.Reset();
-        AgnosiaUtilities.MarkWorkProfileSetupStarted();
-        AuthenticationUtility.TryStoreProvisioningKey(authKey);
-        return authKey;
-    }
-
-    private static Intent CreateManagedProfileProvisioningIntent(
-        Activity activity,
-        Type adminReceiverType,
-        string authKey)
-    {
-        var intent = new Intent(DevicePolicyManager.ActionProvisionManagedProfile);
-        AndroidProvisioningApi.ConfigureManagedProfileProvisioningIntent(
-            intent,
-            AgnosiaUtilities.GetAdminComponent(activity, adminReceiverType),
-            authKey);
-        return intent;
-    }
-
-    private async Task<OperationResult> CompleteProvisioningAsync(
-        Activity activity,
-        AndroidActivityResult result,
-        CancellationToken cancellationToken)
-    {
-        if (result.ResultCode != Result.Ok)
-        {
-            if (AgnosiaUtilities.HasAssociatedProfile(activity))
-                return MarkProfileResetRequired(
-                    "Android создал рабочий профиль, но Agnosia не может подтвердить управление им. " +
-                    "Удалите рабочий профиль в настройках Android, затем создайте его заново через Agnosia.");
-
-            AgnosiaUtilities.ClearWorkProfileConfiguredState();
-            return OperationResult.Failure("Создание рабочего профиля отменено или отклонено Android.");
-        }
-
-        if (await WaitForWorkProfileAvailabilityAsync(cancellationToken))
-        {
-            AgnosiaUtilities.MarkWorkProfileReady();
-            return OperationResult.Success("Рабочий профиль подключен.");
-        }
-
-        if (AgnosiaUtilities.HasAssociatedProfile(activity))
-            return MarkProfileResetRequired(
-                "Рабочий профиль создан, но сейчас недоступен для Agnosia. " +
-                "Удалите рабочий профиль в настройках Android, затем создайте его заново через Agnosia.");
-
-        AgnosiaUtilities.ClearWorkProfileConfiguredState();
-        return OperationResult.Failure("Android не создал рабочий профиль. Запустите создание заново через Agnosia.");
+        return _provisioningCoordinator.StartProvisioningAsync(cancellationToken);
     }
 
     public async Task<OperationResult> OpenWorkProfileSettingsAsync(CancellationToken cancellationToken = default)
     {
-        var activity = GetInitializedActivity();
-
-        var intents = new[]
-        {
-            new Intent(ManagedProfileSettingsAction),
-            new Intent(Settings.ActionSyncSettings),
-            new Intent(Settings.ActionSettings)
-        };
-
-        foreach (var intent in intents)
-        {
-            var result = await TryOpenSettingsIntentAsync(activity, intent, cancellationToken);
-            if (!WasCanceledWithError(result))
-                return OperationResult.Success("Проверьте удаление рабочего профиля в настройках Android.");
-        }
-
-        return OperationResult.Failure("Android не смог открыть настройки устройства.");
+        return await _provisioningCoordinator.OpenWorkProfileSettingsAsync(cancellationToken);
     }
 
     public Task<OperationResult> CloneAsync(AppSnapshot app, CancellationToken cancellationToken = default)
@@ -283,26 +178,12 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
     public Task<OperationResult> SaveSettingsAsync(AppSettingsSnapshot settings,
         CancellationToken cancellationToken = default)
     {
-        var activity = GetInitializedActivity();
-        return AndroidSettingsStore.SaveAsync(activity, settings, cancellationToken);
+        return _settingsCoordinator.SaveSettingsAsync(settings, cancellationToken);
     }
 
     public Task<OperationResult> OpenDocumentsUiAsync(CancellationToken cancellationToken = default)
     {
-        if (cancellationToken.IsCancellationRequested) return Task.FromCanceled<OperationResult>(cancellationToken);
-
-        var activity = GetInitializedActivity();
-        var intent = new Intent(Intent.ActionView);
-        intent.SetDataAndType(null, "vnd.android.document/root");
-
-        return Task.FromResult(AndroidIntentApi.TryStartActivity(
-            activity,
-            intent,
-            LogTag,
-            "Android не смог открыть системный файловый интерфейс.",
-            out var error)
-            ? OperationResult.Success("Открываем системный файловый интерфейс.")
-            : OperationResult.Failure(error ?? "Android не смог открыть системный файловый интерфейс."));
+        return _settingsCoordinator.OpenDocumentsUiAsync(cancellationToken);
     }
 
     public Task<IReadOnlyList<AgnosiaModuleSnapshot>> LoadModulesAsync(CancellationToken cancellationToken = default)
@@ -346,31 +227,7 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
 
     public void NotifyManagedProfileProvisioned(Context context, Intent? intent)
     {
-        AgnosiaRuntime.Initialize(context);
-        AgnosiaUtilities.MarkManagedProfileProvisioned(context, intent);
-    }
-
-    private static OperationResult MarkProfileResetRequired(string message)
-    {
-        AgnosiaUtilities.MarkWorkProfileResetRequired();
-        return OperationResult.Failure(message);
-    }
-
-    private async Task<bool> WaitForWorkProfileAvailabilityAsync(
-        CancellationToken cancellationToken,
-        int attempts = ProvisioningWarmupAttempts,
-        int delayMilliseconds = ProvisioningWarmupDelayMilliseconds)
-    {
-        var activity = GetActivityHost().CurrentActivity;
-        for (var attempt = 0; attempt < attempts; attempt++)
-        {
-            if (AgnosiaUtilities.HasWorkProfileTarget(activity) &&
-                await _commandRunner.CanReachWorkProfileAsync(cancellationToken)) return true;
-
-            if (attempt < attempts - 1) await Task.Delay(delayMilliseconds, cancellationToken);
-        }
-
-        return false;
+        _provisioningCoordinator.NotifyManagedProfileProvisioned(context, intent);
     }
 
     private Activity GetInitializedActivity()
@@ -378,24 +235,6 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         var activity = GetActivityHost().CurrentActivity;
         AgnosiaRuntime.Initialize(activity);
         return activity;
-    }
-
-    private static bool WasCanceledWithError(AndroidActivityResult result)
-    {
-        return result.ResultCode == Result.Canceled
-               && !string.IsNullOrWhiteSpace(AndroidActivityResultApi.ExtractError(result));
-    }
-
-    private async Task<AndroidActivityResult> TryOpenSettingsIntentAsync(
-        Activity activity,
-        Intent intent,
-        CancellationToken cancellationToken)
-    {
-        if (activity.PackageManager is not { } packageManager
-            || intent.ResolveActivity(packageManager) is null)
-            return AndroidActivityResultApi.CreateCanceledResult("Android не нашёл подходящий экран настроек.");
-
-        return await _commandRunner.StartExternalActivityForResultAsync(intent, cancellationToken);
     }
 
     private bool TryGetActivityHost(out IAndroidActivityHost activityHost)
