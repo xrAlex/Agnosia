@@ -21,7 +21,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private const int IconBatchDelayMs = 60;
     private static readonly TimeSpan ResumeRefreshMinimumInterval = TimeSpan.FromSeconds(2);
     private const string StaleApkMessageMarker = "APK изменился";
-    private static readonly PermissionKind[] RequiredOnboardingPermissionKinds =
+    private static readonly PermissionKind[] AppPermissionKinds =
     [
         PermissionKind.WorkProfile,
         PermissionKind.UsageStats,
@@ -53,6 +53,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private readonly Dictionary<AppItemKey, AppItemViewModel> _appItemCache = [];
     private readonly Dictionary<AgnosiaModuleKind, AgnosiaModuleViewModel> _moduleItemCache = [];
     private readonly ObservableCollection<PermissionItemViewModel> _permissionItems = [];
+    private readonly ObservableCollection<PermissionItemViewModel> _settingsPermissionItems = [];
     private readonly ObservableCollection<AgnosiaModuleViewModel> _moduleItems = [];
     private AppItemViewModel[] _visibleApps = [];
     private AppItemViewModel[] _personalApps = [];
@@ -76,7 +77,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     public ReadOnlyObservableCollection<PermissionItemViewModel> PermissionItems { get; }
 
     public IReadOnlyList<PermissionItemViewModel> OnboardingPermissionItems =>
-        _permissionItems.Where(item => IsRequiredOnboardingPermission(item.Kind)).ToArray();
+        _permissionItems.Where(item => IsAppPermission(item.Kind)).ToArray();
 
     public ReadOnlyObservableCollection<AgnosiaModuleViewModel> Modules { get; }
 
@@ -304,9 +305,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     public string LogSummary => _eventLogService.Summary;
 
     public string PermissionSummary =>
-        _permissionItems.Count == 0
+        _settingsPermissionItems.Count == 0
             ? "NotChecked"
-            : $"GrantedCount|{_permissionItems.Count(item => item.IsGranted)}|{_permissionItems.Count}";
+            : $"GrantedCount|{_settingsPermissionItems.Count(item => item.IsGranted)}|{_settingsPermissionItems.Count}";
 
     public string OnboardingPermissionSummary
     {
@@ -320,7 +321,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     }
 
     public bool AreOnboardingPermissionsGranted =>
-        RequiredOnboardingPermissionKinds.All(kind =>
+        AppPermissionKinds.All(kind =>
             _permissionItems.Any(item => item.Kind == kind && item.IsGranted));
 
     public bool IsWorkProfileRecoveryVisible =>
@@ -585,7 +586,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             ResolveExceptionMessage,
             ReportErrorOnUiThreadAsync,
             _delayAsync);
-        PermissionItems = new ReadOnlyObservableCollection<PermissionItemViewModel>(_permissionItems);
+        PermissionItems = new ReadOnlyObservableCollection<PermissionItemViewModel>(_settingsPermissionItems);
         Modules = new ReadOnlyObservableCollection<AgnosiaModuleViewModel>(_moduleItems);
         VpnAfterFreezeClientOptions = CreateVpnAfterFreezeClientOptions();
         SelectedProfile = ProfileKind.Personal;
@@ -1408,9 +1409,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private static bool IsStaleInstallSourceMessage(string? message) => message?.Contains(StaleApkMessageMarker, StringComparison.Ordinal) == true;
 
-    private static bool IsRequiredOnboardingPermission(PermissionKind kind)
+    private static bool IsAppPermission(PermissionKind kind)
     {
-        return RequiredOnboardingPermissionKinds.Contains(kind);
+        return AppPermissionKinds.Contains(kind);
     }
 
     private static bool ShouldRefreshPermissionOnResume(PermissionKind kind)
@@ -1584,7 +1585,13 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         await InvokeOnUiThreadActionAsync(() =>
         {
             _permissionItems.Clear();
-            foreach (var snapshot in snapshots) _permissionItems.Add(new PermissionItemViewModel(this, snapshot));
+            _settingsPermissionItems.Clear();
+            foreach (var snapshot in snapshots)
+            {
+                var item = new PermissionItemViewModel(this, snapshot);
+                _permissionItems.Add(item);
+                if (IsAppPermission(snapshot.Kind)) _settingsPermissionItems.Add(item);
+            }
 
             OnPropertyChanged(nameof(PermissionSummary));
             OnPropertyChanged(nameof(OnboardingPermissionItems));

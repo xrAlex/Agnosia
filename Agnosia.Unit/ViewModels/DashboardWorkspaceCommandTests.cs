@@ -198,20 +198,20 @@ public sealed class DashboardWorkspaceCommandTests
         var services = new TestPlatformServices
         {
             DefaultOperationResult = OperationResult.Success("PermissionOpened"),
-            Permissions = [TestSnapshots.GrantedPermission(PermissionKind.VpnControl)]
+            Permissions = [TestSnapshots.GrantedPermission(PermissionKind.WorkProfile)]
         };
         var viewModel = TestWorkspaceFactory.Create(services);
         var permission = TestWorkspaceFactory.CreatePermission(
             viewModel,
-            TestSnapshots.RequiredPermission(PermissionKind.VpnControl));
+            TestSnapshots.RequiredPermission(PermissionKind.WorkProfile));
 
         await permission.RequestCommand.ExecuteAsync(null);
 
-        Assert.Equal([PermissionKind.VpnControl], services.PermissionRequests);
+        Assert.Equal([PermissionKind.WorkProfile], services.PermissionRequests);
         Assert.Equal(1, services.PermissionLoadCount);
         Assert.False(viewModel.StatusIsError);
         Assert.Equal("PermissionOpened", viewModel.StatusMessage);
-        Assert.Contains(viewModel.PermissionItems, item => item.Kind == PermissionKind.VpnControl && item.IsGranted);
+        Assert.Contains(viewModel.PermissionItems, item => item.Kind == PermissionKind.WorkProfile && item.IsGranted);
     }
 
     // Проверяет сброс resume flag после неуспешного запроса permission с отложенным refresh.
@@ -363,9 +363,9 @@ public sealed class DashboardWorkspaceCommandTests
         Assert.Equal("CompletionRejected", viewModel.StatusMessage);
     }
 
-    // Проверяет, что модульные permissions не попадают в onboarding.
+    // Проверяет, что модульные permissions не попадают в настройки и onboarding.
     [Fact]
-    public async Task Onboarding_permissions_exclude_module_permissions()
+    public async Task Settings_and_onboarding_permissions_exclude_module_permissions()
     {
         var services = new TestPlatformServices
         {
@@ -385,10 +385,21 @@ public sealed class DashboardWorkspaceCommandTests
         await viewModel.EnsureInitializedAsync();
         await viewModel.StartOnboardingCommand.ExecuteAsync(null);
 
-        Assert.Contains(viewModel.PermissionItems, item => item.Kind == PermissionKind.PersonalAllFiles);
-        Assert.Contains(viewModel.PermissionItems, item => item.Kind == PermissionKind.WorkAllFiles);
-        Assert.Contains(viewModel.PermissionItems, item => item.Kind == PermissionKind.VpnControl);
-        Assert.Contains(viewModel.PermissionItems, item => item.Kind == PermissionKind.Overlay);
+        Assert.Equal(
+            viewModel.OnboardingPermissionItems.Select(item => item.Kind),
+            viewModel.PermissionItems.Select(item => item.Kind));
+        Assert.Equal(
+            [
+                PermissionKind.WorkProfile,
+                PermissionKind.UsageStats,
+                PermissionKind.Notifications,
+                PermissionKind.PackageInstall
+            ],
+            viewModel.PermissionItems.Select(item => item.Kind));
+        Assert.DoesNotContain(viewModel.PermissionItems, item => item.Kind == PermissionKind.PersonalAllFiles);
+        Assert.DoesNotContain(viewModel.PermissionItems, item => item.Kind == PermissionKind.WorkAllFiles);
+        Assert.DoesNotContain(viewModel.PermissionItems, item => item.Kind == PermissionKind.VpnControl);
+        Assert.DoesNotContain(viewModel.PermissionItems, item => item.Kind == PermissionKind.Overlay);
         Assert.DoesNotContain(viewModel.OnboardingPermissionItems, item => item.Kind == PermissionKind.PersonalAllFiles);
         Assert.DoesNotContain(viewModel.OnboardingPermissionItems, item => item.Kind == PermissionKind.WorkAllFiles);
         Assert.DoesNotContain(viewModel.OnboardingPermissionItems, item => item.Kind == PermissionKind.VpnControl);
