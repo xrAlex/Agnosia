@@ -45,7 +45,8 @@
                                                        Text="{Binding Title}" />
                                             <TextBlock Classes="page-caption"
                                                        Text="{Binding ShortDescription}" />
-                                            <WrapPanel Orientation="Horizontal">
+                                            <WrapPanel Orientation="Horizontal"
+                                                       IsVisible="{Binding IsStatusTagVisible}">
                                                 <Border Classes="tag-chip dense"
                                                         Margin="0,0,8,6">
                                                     <TextBlock Classes="tag-label"

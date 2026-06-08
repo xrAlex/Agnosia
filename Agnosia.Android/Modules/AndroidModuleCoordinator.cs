@@ -101,10 +101,10 @@ internal sealed partial class AndroidModuleCoordinator(
         return new AgnosiaModuleSnapshot(
             AgnosiaModuleKind.FileShuttle,
             "File Shuttle",
-            "Передача файлов между личным и рабочим профилем через Files / DocumentsUI.",
+            "Передача файлов между личным и рабочим профилем через Android приложение Files.",
             """
-            File Shuttle открывает хранилище второго профиля в системном Files / DocumentsUI.
-            Он не делает чужой профиль обычной папкой: сторонние приложения получают только выбранные content:// URI через Storage Access Framework Android.
+            File Shuttle открывает хранилище второго профиля в системном Files.
+            Позволяет передавать файлы между профилями через стандартное приложение Files.
             """,
             isSettingEnabled,
             state,
@@ -171,7 +171,7 @@ internal sealed partial class AndroidModuleCoordinator(
             "VPN Guard",
             "Временное отключение VPN перед запуском рабочего приложения и возврат после заморозки.",
             """
-            VPN Guard объединяет два действия в один сценарий: перед запуском скрытого рабочего приложения Agnosia временно отключает активный VPN в личном профиле, а после заморозки приложения запускает выбранный VPN-клиент обратно.
+            Перед запуском приложения в рабочем  профиле Agnosia отключает VPN, а после заморозки приложения запускает выбранный VPN-клиент обратно.
             Клиент для восстановления выбирается в настройках.
             """,
             isFullyEnabled,
@@ -210,10 +210,9 @@ internal sealed partial class AndroidModuleCoordinator(
         return new AgnosiaModuleSnapshot(
             AgnosiaModuleKind.RiskEngine,
             "Risk Engine",
-            "Анализ риска приложений по разрешениям, специальным доступам и runtime-состояниям.",
+            "Анализ риска приложений по разрешениям, специальным доступам и runtime состояниям.",
             """
-            Risk Engine оценивает приложения по комбинациям manifest-разрешений, runtime-доступов, специальных системных доступов и target SDK.
-            Когда модуль выключен, каталог приложений не считает и не показывает риск по разрешениям.
+            Risk Engine оценивает приложения по возможным функциям слежки за пользователем, если модуль включен, то в карточке приложения появится индикатор отображающий уровень риска.
             """,
             isEnabled,
             state,
@@ -239,13 +238,13 @@ internal sealed partial class AndroidModuleCoordinator(
                 workProfile.RequestLabel),
             new AgnosiaModuleRequirement(
                 "Управление VPN",
-                "Позволяет Agnosia кратко занять VPN-слот Android и отключить активный VPN перед запуском рабочего приложения.",
+                "Позволяет Agnosia отключить активный VPN перед запуском рабочего приложения.",
                 vpnControl.IsGranted,
                 PermissionKind.VpnControl,
                 vpnControl.RequestLabel),
             new AgnosiaModuleRequirement(
                 "Overlay window",
-                "Позволяет VPN Guard показывать технический overlay-индикатор во время VPN-сценария.",
+                "Позволяет Agnosia запускать выбранный VPN клиент после заморозки приложения.",
                 overlay.IsGranted,
                 PermissionKind.Overlay,
                 overlay.RequestLabel)

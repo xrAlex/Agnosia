@@ -109,6 +109,54 @@ public sealed class DashboardWorkspaceModuleTests
     }
 
     [Fact]
+    public async Task Module_exposes_requirements_visibility()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            Modules = [TestSnapshots.FileShuttleModule()]
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+
+        await viewModel.EnsureInitializedAsync();
+        var module = viewModel.Modules.Single();
+
+        Assert.False(module.HasRequirements);
+
+        module.ApplySnapshot(TestSnapshots.FileShuttleModule(
+            requirements:
+            [
+                TestSnapshots.ModuleRequirement(PermissionKind.PersonalAllFiles, false)
+            ]));
+
+        Assert.True(module.HasRequirements);
+    }
+
+    [Fact]
+    public async Task Module_status_tag_is_visible_only_for_non_toggle_states()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            Modules = [TestSnapshots.FileShuttleModule()]
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+
+        await viewModel.EnsureInitializedAsync();
+        var module = viewModel.Modules.Single();
+
+        Assert.False(module.IsStatusTagVisible);
+
+        module.ApplySnapshot(TestSnapshots.FileShuttleModule(true, AgnosiaModuleState.Enabled));
+
+        Assert.False(module.IsStatusTagVisible);
+
+        module.ApplySnapshot(TestSnapshots.FileShuttleModule(false, AgnosiaModuleState.PartiallyEnabled));
+
+        Assert.True(module.IsStatusTagVisible);
+    }
+
+    [Fact]
     public async Task Module_toggle_success_updates_module_state()
     {
         var services = new TestPlatformServices

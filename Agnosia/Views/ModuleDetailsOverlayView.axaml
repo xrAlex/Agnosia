@@ -20,7 +20,7 @@
                 <ContentControl.DataTemplates>
                     <DataTemplate x:DataType="vm:AgnosiaModuleViewModel">
                         <Border Classes="surface-card module-dialog">
-                            <Grid RowDefinitions="Auto,*,Auto"
+                            <Grid RowDefinitions="Auto,Auto,*,Auto"
                                   RowSpacing="14">
                                 <Grid RowDefinitions="Auto,Auto"
                                       ColumnDefinitions="Auto,*,Auto"
@@ -37,7 +37,8 @@
                                                 VerticalAlignment="Center">
                                         <TextBlock Classes="section-title"
                                                    Text="{Binding Title}" />
-                                        <WrapPanel Orientation="Horizontal">
+                                        <WrapPanel Orientation="Horizontal"
+                                                   IsVisible="{Binding IsStatusTagVisible}">
                                             <Border Classes="tag-chip dense"
                                                     Margin="0,0,8,6">
                                                 <TextBlock Classes="tag-label"
@@ -60,26 +61,27 @@
                                                Text="{Binding FullDescription}" />
                                 </Grid>
 
-                                <ScrollViewer Grid.Row="1"
+                                <Grid Grid.Row="1"
+                                      ColumnDefinitions="*,Auto"
+                                      ColumnSpacing="12">
+                                    <StackPanel MinWidth="0"
+                                                Spacing="3">
+                                        <TextBlock Classes="app-dialog-setting-title"
+                                                   Text="Включить модуль" />
+                                        <TextBlock Classes="app-dialog-setting-caption"
+                                                   Text="Активация доступна после выполнения требований" />
+                                    </StackPanel>
+                                    <ToggleSwitch Grid.Column="1"
+                                                  VerticalAlignment="Center"
+                                                  IsChecked="{Binding IsEnabled, Mode=OneWay}"
+                                                  IsEnabled="{Binding CanToggle}"
+                                                  Command="{Binding ToggleEnabledCommand}" />
+                                </Grid>
+
+                                <ScrollViewer Grid.Row="2"
                                               HorizontalScrollBarVisibility="Disabled"
                                               VerticalScrollBarVisibility="Auto">
                                     <StackPanel Spacing="12">
-                                        <Grid ColumnDefinitions="*,Auto"
-                                              ColumnSpacing="12">
-                                            <StackPanel MinWidth="0"
-                                                        Spacing="3">
-                                                <TextBlock Classes="app-dialog-setting-title"
-                                                           Text="Включить модуль" />
-                                                <TextBlock Classes="app-dialog-setting-caption"
-                                                           Text="Активация доступна после выполнения требований" />
-                                            </StackPanel>
-                                            <ToggleSwitch Grid.Column="1"
-                                                          VerticalAlignment="Center"
-                                                          IsChecked="{Binding IsEnabled, Mode=OneWay}"
-                                                          IsEnabled="{Binding CanToggle}"
-                                                          Command="{Binding ToggleEnabledCommand}" />
-                                        </Grid>
-
                                         <Border Classes="divider" />
 
                                         <StackPanel IsVisible="{Binding IsVpnGuard}"
@@ -97,9 +99,9 @@
                                                             MinWidth="0"
                                                             Spacing="4">
                                                     <TextBlock Classes="section-title compact"
-                                                               Text="VPN-клиент после заморозки" />
+                                                               Text="VPN клиент" />
                                                     <TextBlock Classes="page-caption"
-                                                               Text="Команда запуска отправляется выбранному клиенту после скрытия рабочего приложения" />
+                                                               Text="Команда запуска отправится выбранному клиенту" />
                                                 </StackPanel>
                                             </Grid>
 
@@ -142,63 +144,66 @@
                                             <Border Classes="divider" />
                                         </StackPanel>
 
-                                        <TextBlock Classes="group-title"
-                                                   Text="Требования" />
+                                        <StackPanel IsVisible="{Binding HasRequirements}"
+                                                    Spacing="12">
+                                            <TextBlock Classes="group-title"
+                                                       Text="Требования" />
 
-                                        <ItemsControl ItemsSource="{Binding Requirements}">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <StackPanel Orientation="Vertical" />
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate x:DataType="vm:AgnosiaModuleRequirementViewModel">
-                                                    <Border Classes="surface-card compact list-card">
-                                                        <Grid ColumnDefinitions="Auto,*"
-                                                              RowDefinitions="Auto,Auto,Auto"
-                                                              ColumnSpacing="12"
-                                                              RowSpacing="8">
-                                                            <Border Classes="icon-tile permission-icon"
-                                                                    Classes.granted="{Binding IsSatisfied}">
-                                                                <PathIcon Classes="section-icon centered"
-                                                                          Data="{StaticResource IconCheckGeometry}" />
-                                                            </Border>
-
-                                                            <StackPanel Grid.Column="1"
-                                                                        MinWidth="0"
-                                                                        Spacing="4">
-                                                                <TextBlock Classes="section-title compact"
-                                                                           Text="{Binding Title}" />
-                                                                <Border Classes="tag-chip dense"
-                                                                        HorizontalAlignment="Left">
-                                                                    <TextBlock Classes="tag-label"
-                                                                               Text="{Binding StatusLabel}" />
+                                            <ItemsControl ItemsSource="{Binding Requirements}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Vertical" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:AgnosiaModuleRequirementViewModel">
+                                                        <Border Classes="surface-card compact list-card">
+                                                            <Grid ColumnDefinitions="Auto,*"
+                                                                  RowDefinitions="Auto,Auto,Auto"
+                                                                  ColumnSpacing="12"
+                                                                  RowSpacing="8">
+                                                                <Border Classes="icon-tile permission-icon"
+                                                                        Classes.granted="{Binding IsSatisfied}">
+                                                                    <PathIcon Classes="section-icon centered"
+                                                                              Data="{StaticResource IconCheckGeometry}" />
                                                                 </Border>
-                                                            </StackPanel>
 
-                                                            <TextBlock Grid.Row="1"
-                                                                       Grid.ColumnSpan="2"
-                                                                       Classes="page-caption"
-                                                                       Text="{Binding Description}" />
+                                                                <StackPanel Grid.Column="1"
+                                                                            MinWidth="0"
+                                                                            Spacing="4">
+                                                                    <TextBlock Classes="section-title compact"
+                                                                               Text="{Binding Title}" />
+                                                                    <Border Classes="tag-chip dense"
+                                                                            HorizontalAlignment="Left">
+                                                                        <TextBlock Classes="tag-label"
+                                                                                   Text="{Binding StatusLabel}" />
+                                                                    </Border>
+                                                                </StackPanel>
 
-                                                            <Button Grid.Row="2"
-                                                                    Grid.ColumnSpan="2"
-                                                                    Classes="compact-action"
-                                                                    HorizontalAlignment="Left"
-                                                                    Command="{Binding RequestCommand}"
-                                                                    IsVisible="{Binding CanRequest}">
-                                                                <TextBlock Classes="button-label"
-                                                                           Text="{Binding ActionLabel}" />
-                                                            </Button>
-                                                        </Grid>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
+                                                                <TextBlock Grid.Row="1"
+                                                                           Grid.ColumnSpan="2"
+                                                                           Classes="page-caption"
+                                                                           Text="{Binding Description}" />
+
+                                                                <Button Grid.Row="2"
+                                                                        Grid.ColumnSpan="2"
+                                                                        Classes="compact-action"
+                                                                        HorizontalAlignment="Left"
+                                                                        Command="{Binding RequestCommand}"
+                                                                        IsVisible="{Binding CanRequest}">
+                                                                    <TextBlock Classes="button-label"
+                                                                               Text="{Binding ActionLabel}" />
+                                                                </Button>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
                                     </StackPanel>
                                 </ScrollViewer>
 
-                                <WrapPanel Grid.Row="2"
+                                <WrapPanel Grid.Row="3"
                                            Orientation="Horizontal">
                                     <Button Classes="primary"
                                             Margin="0,0,10,0"
@@ -212,12 +217,6 @@
                                             <TextBlock Classes="button-label"
                                                        Text="Открыть Files" />
                                         </StackPanel>
-                                    </Button>
-
-                                    <Button Classes="compact-action"
-                                            Command="{Binding CloseCommand}">
-                                        <TextBlock Classes="button-label"
-                                                   Text="Закрыть" />
                                     </Button>
                                 </WrapPanel>
                             </Grid>

@@ -31,6 +31,9 @@ public sealed partial class AgnosiaModuleViewModel : ObservableObject
 
     public string StatusText { get; private set; } = string.Empty;
 
+    public bool IsStatusTagVisible =>
+        State is AgnosiaModuleState.PartiallyEnabled or AgnosiaModuleState.Unavailable;
+
     public bool CanToggle { get; private set; }
 
     public bool IsFileShuttle => Kind == AgnosiaModuleKind.FileShuttle;
@@ -40,6 +43,8 @@ public sealed partial class AgnosiaModuleViewModel : ObservableObject
     public bool IsRiskEngine => Kind == AgnosiaModuleKind.RiskEngine;
 
     public bool CanOpenDocumentsUi => IsFileShuttle && State == AgnosiaModuleState.Enabled;
+
+    public bool HasRequirements => _requirements.Count > 0;
 
     public bool HasMissingRequirements => _requirements.Any(requirement => !requirement.IsSatisfied);
 
