@@ -3,9 +3,10 @@ namespace Agnosia.Android.Shortcuts;
 internal sealed record HiddenAppLaunchRequest(
     string PackageName,
     string? TargetActivity,
-    string DisplayName)
+    string DisplayName,
+    bool IsSystem)
 {
-    public static HiddenAppLaunchRequest Empty { get; } = new(string.Empty, null, string.Empty);
+    public static HiddenAppLaunchRequest Empty { get; } = new(string.Empty, null, string.Empty, false);
 }
 
 internal sealed record ShortcutFreezePreparationResult(
@@ -51,8 +52,9 @@ internal sealed record HiddenAppShortcutMetadata(
     string? TargetActivity,
     string Label,
     string IconBase64,
-    string Token)
+    string Token,
+    bool IsSystem)
 {
     public static HiddenAppShortcutMetadata Empty { get; } =
-        new(string.Empty, string.Empty, null, string.Empty, string.Empty, string.Empty);
+        new(string.Empty, string.Empty, null, string.Empty, string.Empty, string.Empty, false);
 }

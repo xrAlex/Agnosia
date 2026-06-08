@@ -4,6 +4,7 @@ using Agnosia.Android.Activities;
 using Agnosia.Android.Api.Commands;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Api.Storage;
+using Agnosia.Android.Platform;
 using Agnosia.Android.Receivers;
 using Agnosia.Android.Serialization;
 using Android.Content;
@@ -29,11 +30,12 @@ internal static class HiddenAppShortcutManager
     public static async Task<HiddenAppShortcutBuildResult> BuildMetadataAsync(
         Context context,
         string packageName,
+        bool isSystem,
         CancellationToken cancellationToken = default)
     {
         for (var attempt = 1; attempt <= MetadataResolveAttempts; attempt++)
         {
-            if (TryBuildMetadataCore(context, packageName, out var metadata, out var error))
+            if (TryBuildMetadataCore(context, packageName, isSystem, out var metadata, out var error))
             {
                 if (attempt > 1)
                     Log.Info(LogTag, $"Shortcut metadata for {packageName} became available on attempt {attempt}.");
@@ -77,7 +79,9 @@ internal static class HiddenAppShortcutManager
                     "Android не смог обновить ярлык скрытого приложения.");
             }
 
-            return ShortcutFreezePreparationResult.Immediate("Приложение скрыто, ярлык обновлен.");
+            return metadata.IsSystem
+                ? ShortcutFreezePreparationResult.Immediate("Ярлык обновлен.")
+                : ShortcutFreezePreparationResult.Immediate("Приложение скрыто, ярлык обновлен.");
         }
 
         if (!shortcutManager.IsRequestPinShortcutSupported)
@@ -105,8 +109,9 @@ internal static class HiddenAppShortcutManager
         var requested = shortcutManager.RequestPinShortcut(shortcutInfo, callbackPendingIntent.IntentSender);
         Log.Info(LogTag, $"requestPinShortcut result for {metadata.ShortcutId}: requested={requested}.");
         return requested
-            ? ShortcutFreezePreparationResult.Deferred(
-                "Подтвердите добавление ярлыка на главный экран. После подтверждения приложение будет скрыто.")
+            ? ShortcutFreezePreparationResult.Deferred(metadata.IsSystem
+                ? "Подтвердите добавление ярлыка на главный экран."
+                : "Подтвердите добавление ярлыка на главный экран. После подтверждения приложение будет скрыто.")
             : ShortcutFreezePreparationResult.Failure("Лаунчер отклонил запрос на создание ярлыка.");
     }
 
@@ -117,6 +122,7 @@ internal static class HiddenAppShortcutManager
         intent.PutExtra(ExtraLabel, metadata.Label);
         intent.PutExtra(ExtraIconBase64, metadata.IconBase64);
         intent.PutExtra(ExtraShortcutToken, metadata.Token);
+        intent.PutExtra(AndroidCommandContract.ExtraIsSystem, metadata.IsSystem);
     }
 
     public static HiddenAppShortcutMetadata? TryReadMetadataFromIntent(Intent? intent)
@@ -140,7 +146,8 @@ internal static class HiddenAppShortcutManager
             intent.GetStringExtra(ExtraTargetActivity),
             label,
             iconBase64,
-            token);
+            token,
+            intent.GetBooleanExtra(AndroidCommandContract.ExtraIsSystem, false));
     }
 
     public static Intent CreateInternalLaunchIntent(string packageName,
@@ -158,6 +165,7 @@ internal static class HiddenAppShortcutManager
 
         var effectiveLabel = label ?? storedMetadata?.Label;
         if (!string.IsNullOrWhiteSpace(effectiveLabel)) intent.PutExtra(ExtraLabel, effectiveLabel);
+        intent.PutExtra(AndroidCommandContract.ExtraIsSystem, storedMetadata?.IsSystem == true);
 
         AuthenticationUtility.SignIntent(intent);
         return intent;
@@ -180,7 +188,8 @@ internal static class HiddenAppShortcutManager
             request = new HiddenAppLaunchRequest(
                 packageName,
                 intent.GetStringExtra(ExtraTargetActivity) ?? storedMetadata?.TargetActivity,
-                intent.GetStringExtra(ExtraLabel) ?? storedMetadata?.Label ?? packageName);
+                intent.GetStringExtra(ExtraLabel) ?? storedMetadata?.Label ?? packageName,
+                intent.GetBooleanExtra(AndroidCommandContract.ExtraIsSystem, storedMetadata?.IsSystem == true));
             return true;
         }
 
@@ -199,7 +208,8 @@ internal static class HiddenAppShortcutManager
         request = new HiddenAppLaunchRequest(
             pinnedMetadata.TargetPackage,
             pinnedMetadata.TargetActivity,
-            pinnedMetadata.Label);
+            pinnedMetadata.Label,
+            pinnedMetadata.IsSystem);
 
         return true;
     }
@@ -212,13 +222,21 @@ internal static class HiddenAppShortcutManager
             {
                 Log.Info(LogTag, $"Shortcut pin callback for {packageName} is being handled in the work profile.");
                 FreezeLocally(context, packageName);
-                Toast.MakeText(context, "Ярлык создан, приложение скрыто.", ToastLength.Short)?.Show();
+                Toast.MakeText(
+                    context,
+                    IsStoredSystemShortcut(context, packageName) ? "Ярлык создан." : "Ярлык создан, приложение скрыто.",
+                    ToastLength.Short)?.Show();
                 return;
             }
 
             Log.Info(LogTag, $"Shortcut pin callback for {packageName} is being forwarded to the work profile.");
             ForwardFreezeToManagedProfile(context, packageName);
-            Toast.MakeText(context, "Ярлык создан, приложение скрывается в рабочем профиле.", ToastLength.Short)
+            Toast.MakeText(
+                    context,
+                    IsStoredSystemShortcut(context, packageName)
+                        ? "Ярлык создан."
+                        : "Ярлык создан, приложение скрывается в рабочем профиле.",
+                    ToastLength.Short)
                 ?.Show();
         }
         catch (Exception exception)
@@ -230,6 +248,12 @@ internal static class HiddenAppShortcutManager
 
     private static void FreezeLocally(Context context, string packageName)
     {
+        if (IsStoredSystemShortcut(context, packageName))
+        {
+            Log.Info(LogTag, $"Skipping shortcut freeze for system work-profile app {packageName}.");
+            return;
+        }
+
         if (AndroidSystemApi.GetDevicePolicyManager(context) is not { } manager)
             throw new InvalidOperationException("Android did not provide DevicePolicyManager.");
 
@@ -246,6 +270,12 @@ internal static class HiddenAppShortcutManager
 
     private static void ForwardFreezeToManagedProfile(Context context, string packageName)
     {
+        if (IsStoredSystemShortcut(context, packageName))
+        {
+            Log.Info(LogTag, $"Skipping forwarded shortcut freeze for system app {packageName}.");
+            return;
+        }
+
         _ = Task.Run(() =>
         {
             var result = AndroidProfileCommandGateway.FreezePackageInWorkProfile(
@@ -282,7 +312,14 @@ internal static class HiddenAppShortcutManager
         LocalStorageManager.Instance.SetString(GetStorageKey(metadata.TargetPackage), raw);
     }
 
+    private static bool IsStoredSystemShortcut(Context context, string packageName)
+    {
+        return ReadMetadata(packageName)?.IsSystem == true
+               || AndroidWorkProfilePackageClassifier.IsSystemPackage(context.PackageManager, packageName);
+    }
+
     private static bool TryBuildMetadataCore(Context context, string packageName,
+        bool isSystem,
         out HiddenAppShortcutMetadata metadata, out string error)
     {
         var existing = ReadMetadata(packageName);
@@ -303,7 +340,8 @@ internal static class HiddenAppShortcutManager
             targetActivity,
             label,
             iconBase64,
-            existing?.Token ?? Convert.ToHexString(RandomNumberGenerator.GetBytes(16)));
+            existing?.Token ?? Convert.ToHexString(RandomNumberGenerator.GetBytes(16)),
+            isSystem || existing?.IsSystem == true);
         error = string.Empty;
         return true;
     }

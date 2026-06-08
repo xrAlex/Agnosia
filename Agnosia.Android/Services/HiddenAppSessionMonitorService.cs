@@ -9,6 +9,7 @@ using Agnosia.Android.Api.Permissions;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Api.Storage;
 using Agnosia.Android.Infrastructure;
+using Agnosia.Android.Platform;
 using Agnosia.Android.Receivers;
 using Agnosia.Services;
 using Android.App.Usage;
@@ -108,6 +109,14 @@ public sealed partial class HiddenAppSessionMonitorService : Service
                 Log.Warn(LogTag,
                     $"DevicePolicyManager unavailable, could not complete persisted hidden-app session for {session.PackageName} on screen lock.");
                 return false;
+            }
+
+            if (AndroidWorkProfilePackageClassifier.IsSystemPackage(context.PackageManager, session.PackageName))
+            {
+                Log.Info(LogTag,
+                    $"Skipping persisted screen-lock freeze for system work-profile app {session.PackageName}.");
+                PersistSession(null);
+                return true;
             }
 
             var admin = AgnosiaUtilities.GetAdminComponent(context, typeof(AgnosiaDeviceAdminReceiver));
@@ -507,6 +516,13 @@ public sealed partial class HiddenAppSessionMonitorService : Service
 
             var admin = _adminComponent ??=
                 AgnosiaUtilities.GetAdminComponent(this, typeof(AgnosiaDeviceAdminReceiver));
+            if (AndroidWorkProfilePackageClassifier.IsSystemPackage(PackageManager, session.PackageName))
+            {
+                Log.Info(LogTag,
+                    $"Skipping re-hide for system work-profile app {session.PackageName}. reason={reason}.");
+                return;
+            }
+
             var hiddenApplied = policyManager.SetApplicationHidden(admin, session.PackageName, true);
             if (!hiddenApplied && !policyManager.IsApplicationHidden(admin, session.PackageName))
             {

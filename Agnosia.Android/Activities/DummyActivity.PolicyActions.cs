@@ -1,5 +1,6 @@
 using Agnosia.Android.Api.Commands;
 using Agnosia.Android.Api.Permissions;
+using Agnosia.Android.Platform;
 using Android.App;
 using Android.Content.PM;
 using Exception = System.Exception;
@@ -17,6 +18,13 @@ public sealed partial class DummyActivity
             Log.Warn(LogTag,
                 $"Freeze package command rejected. package={packageName ?? "<none>"}, hidden={hidden}, isProfileOwner={_isProfileOwner}, hasPolicyManager={_policyManager is not null}.");
             FinishWithResult(Result.Canceled);
+            return;
+        }
+
+        if (hidden && AndroidWorkProfilePackageClassifier.IsSystemPackage(PackageManager, packageName))
+        {
+            Log.Info(LogTag, $"Ignoring freeze command for system work-profile app. package={packageName}.");
+            FinishWithSuccessMessage("Системные приложения рабочего профиля не замораживаются Agnosia.");
             return;
         }
 

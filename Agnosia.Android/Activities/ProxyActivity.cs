@@ -5,6 +5,7 @@ using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Api.Storage;
 using Agnosia.Android.Api.Vpn;
 using Agnosia.Android.Infrastructure;
+using Agnosia.Android.Platform;
 using Agnosia.Android.Receivers;
 using Agnosia.Android.Services;
 using Agnosia.Android.Shortcuts;
@@ -154,6 +155,13 @@ public sealed class ProxyActivity : Activity
             }
 
             var admin = AgnosiaUtilities.GetAdminComponent(this, typeof(AgnosiaDeviceAdminReceiver));
+            if (IsSystemWorkProfileRequest(request))
+            {
+                Log.Info(LogTag, $"Launching system work-profile app without hidden-session monitor. package={request.PackageName}.");
+                LaunchVisibleSystemPackage(request);
+                return;
+            }
+
             var launchResult = GetLaunchResult(request);
             if (!AndroidPolicyApi.TrySetApplicationHidden(
                     policyManager,
@@ -293,6 +301,14 @@ public sealed class ProxyActivity : Activity
     {
         try
         {
+            if (IsSystemWorkProfileRequest(request))
+            {
+                LocalStorageManager.Instance.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
+                Log.Debug(LogTag, $"Shortcut launch: skipping VPN Guard for system work-profile app {request.PackageName}.");
+                ForwardLaunchToManagedProfile(request, isSystem: true);
+                return;
+            }
+
             if (!LocalStorageManager.Instance.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch))
             {
                 LocalStorageManager.Instance.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
@@ -350,6 +366,43 @@ public sealed class ProxyActivity : Activity
         ForwardLaunchToManagedProfile(request);
     }
 
+    private void LaunchVisibleSystemPackage(HiddenAppLaunchRequest request)
+    {
+        var launchIntent = CreateLaunchIntent(request);
+        if (launchIntent is null)
+        {
+            FinishWithLaunchResult(
+                GetLaunchResult(request).Fail(
+                    AndroidAppLaunchStage.CommandReceived,
+                    AndroidAppLaunchIssueKind.MissingLauncherActivity,
+                    "system_work_app_launchIntent=null"),
+                true);
+            return;
+        }
+
+        RunOnUiThread(() =>
+        {
+            try
+            {
+                StartActivity(launchIntent);
+                FinishWithLaunchResult(
+                    GetLaunchResult(request).WithStage(
+                        AndroidAppLaunchStage.StartActivityAttempted,
+                        "system_work_app_direct_launch"),
+                    false);
+            }
+            catch (Exception exception)
+            {
+                FinishWithLaunchResult(
+                    GetLaunchResult(request).Fail(
+                        AndroidAppLaunchStage.StartActivityFailedWithException,
+                        AndroidAppLaunchResult.ClassifyStartActivityException(exception),
+                        exception.ToString()),
+                    true);
+            }
+        });
+    }
+
     private void RunInBackground(Func<Task> operation, string userFailureMessage)
     {
         _ = Task.Run(async () =>
@@ -366,7 +419,7 @@ public sealed class ProxyActivity : Activity
         });
     }
 
-    private void ForwardLaunchToManagedProfile(HiddenAppLaunchRequest request)
+    private void ForwardLaunchToManagedProfile(HiddenAppLaunchRequest request, bool isSystem = false)
     {
         RunOnUiThread(() =>
         {
@@ -375,12 +428,15 @@ public sealed class ProxyActivity : Activity
                 var proxyIntent = HiddenAppShortcutManager.CreateInternalLaunchIntent(request.PackageName,
                     request.TargetActivity,
                     request.DisplayName);
-                proxyIntent.PutExtra(
-                    AndroidCommandContract.ExtraParentFrozenCallback,
-                    AgnosiaPendingIntentFactory.CreateWorkAppFrozenBroadcastPendingIntent(
-                        this,
-                        typeof(WorkAppFrozenReceiver),
-                        request.PackageName));
+                var isSystemLaunch = isSystem || request.IsSystem;
+                proxyIntent.PutExtra(AndroidCommandContract.ExtraIsSystem, isSystemLaunch);
+                if (!isSystemLaunch)
+                    proxyIntent.PutExtra(
+                        AndroidCommandContract.ExtraParentFrozenCallback,
+                        AgnosiaPendingIntentFactory.CreateWorkAppFrozenBroadcastPendingIntent(
+                            this,
+                            typeof(WorkAppFrozenReceiver),
+                            request.PackageName));
                 proxyIntent.AddFlags(ActivityFlags.NewTask);
                 if (AgnosiaUtilities.TryTransferToProfileAndStartActivity(
                         this,
@@ -453,6 +509,9 @@ public sealed class ProxyActivity : Activity
                 || AndroidSystemApi.GetDevicePolicyManager(this) is not { } policyManager)
                 return launchResult;
 
+            if (IsSystemWorkProfileRequest(request))
+                return launchResult;
+
             var admin = AgnosiaUtilities.GetAdminComponent(this, typeof(AgnosiaDeviceAdminReceiver));
             if (AndroidPolicyApi.TrySetApplicationHidden(
                     policyManager,
@@ -498,6 +557,12 @@ public sealed class ProxyActivity : Activity
     {
         return (_launchResult ?? AndroidAppLaunchResult.CommandReceived(request.PackageName, request.DisplayName))
             .WithDisplayName(request.DisplayName);
+    }
+
+    private bool IsSystemWorkProfileRequest(HiddenAppLaunchRequest request)
+    {
+        return request.IsSystem
+               || AndroidWorkProfilePackageClassifier.IsSystemPackage(PackageManager, request.PackageName);
     }
 
     private void FinishWithLaunchResult(AndroidAppLaunchResult result, bool showToast)

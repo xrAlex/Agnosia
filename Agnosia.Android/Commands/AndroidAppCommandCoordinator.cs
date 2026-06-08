@@ -119,11 +119,14 @@ internal sealed class AndroidAppCommandCoordinator(
         bool hidden,
         CancellationToken cancellationToken)
     {
+        if (hidden && app is { Profile: ProfileKind.Work, IsSystem: true })
+            return OperationResult.Success("Системные приложения рабочего профиля не замораживаются Agnosia.");
+
         ShortcutPreparationResult? shortcutResult = null;
         if (hidden)
         {
             await permissionCoordinator.EnsureUsageStatsAccessRequestedAsync(cancellationToken);
-            shortcutResult = await PreparePinnedShortcutInParentAsync(app.PackageName, cancellationToken);
+            shortcutResult = await PreparePinnedShortcutInParentAsync(app.PackageName, app.IsSystem, cancellationToken);
             if (!shortcutResult.Succeeded || !shortcutResult.HideImmediately)
                 return new OperationResult(shortcutResult.Succeeded, shortcutResult.Message);
         }
@@ -143,13 +146,16 @@ internal sealed class AndroidAppCommandCoordinator(
         AppSnapshot app,
         CancellationToken cancellationToken)
     {
+        if (app.IsSystem)
+            return OperationResult.Success("Системное приложение включено в рабочем профиле без заморозки.");
+
         await permissionCoordinator.EnsureUsageStatsAccessRequestedAsync(cancellationToken);
         Log.Info(
             ActivityResultLogTag,
             $"Waiting for cloned work package to settle before hidden-shortcut preparation. package={app.PackageName}, delayMs={ClonedPackageSettleDelay.TotalMilliseconds:0}.");
         await Task.Delay(ClonedPackageSettleDelay, cancellationToken);
 
-        var shortcutResult = await PreparePinnedShortcutInParentAsync(app.PackageName, cancellationToken);
+        var shortcutResult = await PreparePinnedShortcutInParentAsync(app.PackageName, app.IsSystem, cancellationToken);
         if (!shortcutResult.Succeeded) return new OperationResult(false, shortcutResult.Message);
 
         var hideResult = await AndroidProfileCommandGateway.SetPackageHiddenInWorkProfileAsync(
@@ -169,6 +175,10 @@ internal sealed class AndroidAppCommandCoordinator(
             return Task.FromResult(
                 OperationResult.Failure("Политика устройства может скрывать только приложения рабочего профиля."));
 
+        if (app.IsSystem)
+            return Task.FromResult(
+                OperationResult.Success("Системные приложения рабочего профиля не замораживаются Agnosia."));
+
         return AndroidProfileCommandGateway.SetPackageHiddenInWorkProfileAsync(
             commandRunner,
             app.PackageName,
@@ -184,7 +194,7 @@ internal sealed class AndroidAppCommandCoordinator(
         if (app.Profile != ProfileKind.Work)
             return OperationResult.Failure("Ярлыки доступны только для приложений рабочего профиля.");
 
-        var shortcutResult = await PreparePinnedShortcutInParentAsync(app.PackageName, cancellationToken);
+        var shortcutResult = await PreparePinnedShortcutInParentAsync(app.PackageName, app.IsSystem, cancellationToken);
         if (!shortcutResult.Succeeded) return OperationResult.Failure(shortcutResult.Message);
 
         return string.IsNullOrWhiteSpace(shortcutResult.PreHideError)
@@ -216,15 +226,20 @@ internal sealed class AndroidAppCommandCoordinator(
             return OperationResult.Failure(error ?? "Android не смог открыть это приложение.");
         }
 
-        var vpnPreparationResult = await EnsurePersonalVpnDisabledBeforeWorkLaunchAsync(cancellationToken);
-        if (!vpnPreparationResult.Succeeded) return vpnPreparationResult;
+        if (!app.IsSystem)
+        {
+            var vpnPreparationResult = await EnsurePersonalVpnDisabledBeforeWorkLaunchAsync(cancellationToken);
+            if (!vpnPreparationResult.Succeeded) return vpnPreparationResult;
+        }
 
         var intent = new Intent(AgnosiaActions.UnfreezeAndLaunch);
         intent.PutExtra(AndroidCommandContract.ExtraLaunchPackageName, app.PackageName);
         intent.PutExtra(AndroidCommandContract.ExtraLaunchDisplayName, app.Label);
-        intent.PutExtra(
-            AndroidCommandContract.ExtraParentFrozenCallback,
-            commandRunner.CreateWorkAppFrozenCallbackPendingIntent(app.PackageName));
+        intent.PutExtra(AndroidCommandContract.ExtraIsSystem, app.IsSystem);
+        if (!app.IsSystem)
+            intent.PutExtra(
+                AndroidCommandContract.ExtraParentFrozenCallback,
+                commandRunner.CreateWorkAppFrozenCallbackPendingIntent(app.PackageName));
         return await commandRunner.RunVoidOperationAsync(intent, true, cancellationToken, "Открываем приложение.");
     }
 
@@ -295,10 +310,12 @@ internal sealed class AndroidAppCommandCoordinator(
 
     private async Task<ShortcutPreparationResult> PreparePinnedShortcutInParentAsync(
         string packageName,
+        bool isSystem,
         CancellationToken cancellationToken)
     {
         var prepareIntent = new Intent(AgnosiaActions.PrepareHiddenShortcut);
         prepareIntent.PutExtra(AndroidCommandContract.ExtraPackage, packageName);
+        prepareIntent.PutExtra(AndroidCommandContract.ExtraIsSystem, isSystem);
 
         var prepareResult = await commandRunner.StartActivityForResultAsync(prepareIntent, true, cancellationToken);
         if (prepareResult.ResultCode != Result.Ok || prepareResult.Data is null)
@@ -317,6 +334,9 @@ internal sealed class AndroidAppCommandCoordinator(
         var createIntent = new Intent(AgnosiaActions.CreateHiddenShortcut);
         foreach (var extraName in HiddenShortcutPayloadExtras)
             CopyExtraIfPresent(prepareResult.Data, createIntent, extraName);
+        createIntent.PutExtra(
+            AndroidCommandContract.ExtraIsSystem,
+            prepareResult.Data.GetBooleanExtra(AndroidCommandContract.ExtraIsSystem, false));
 
         var createResult = await commandRunner.StartActivityForResultAsync(createIntent, false, cancellationToken);
         if (createResult.ResultCode != Result.Ok)

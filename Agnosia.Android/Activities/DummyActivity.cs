@@ -7,6 +7,7 @@ using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Api.Storage;
 using Agnosia.Android.Files;
 using Agnosia.Android.Infrastructure;
+using Agnosia.Android.Platform;
 using Agnosia.Android.Receivers;
 using Agnosia.Android.Services;
 using Agnosia.Android.Shortcuts;
@@ -178,6 +179,8 @@ public sealed partial class DummyActivity : Activity
                 return;
             }
 
+            var isSystem = Intent?.GetBooleanExtra(AndroidCommandContract.ExtraIsSystem, false) == true
+                           || AndroidWorkProfilePackageClassifier.IsSystemPackage(PackageManager, packageName);
             Log.Debug(LogTag, $"Starting hidden shortcut preparation for {packageName}.");
             var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
 
@@ -208,6 +211,7 @@ public sealed partial class DummyActivity : Activity
                         () => HiddenAppShortcutManager.BuildMetadataAsync(
                             this,
                             packageName,
+                            isSystem,
                             cancellationToken),
                         cancellationToken);
                 }
@@ -228,14 +232,18 @@ public sealed partial class DummyActivity : Activity
                     return;
                 }
 
-                var hideError = await Task.Run(
-                    () => TryHidePackageAfterInstallAsync(admin, packageName, cancellationToken),
-                    cancellationToken);
+                var hideError = isSystem
+                    ? null
+                    : await Task.Run(
+                        () => TryHidePackageAfterInstallAsync(admin, packageName, cancellationToken),
+                        cancellationToken);
                 var preHideSucceeded = hideError is null;
                 if (preHideSucceeded)
                 {
                     restoreHiddenState = false;
-                    Log.Info(LogTag, $"Installed hidden app {packageName} was frozen before shortcut creation.");
+                    Log.Info(LogTag, isSystem
+                        ? $"System app {packageName} shortcut prepared without freezing."
+                        : $"Installed hidden app {packageName} was frozen before shortcut creation.");
                 }
                 else
                 {
@@ -451,11 +459,13 @@ public sealed partial class DummyActivity : Activity
             return;
         }
 
+        var isSystem = intent?.GetBooleanExtra(AndroidCommandContract.ExtraIsSystem, false) == true;
         if (!_isProfileOwner)
         {
             var launchRequest = new Intent(AgnosiaActions.UnfreezeAndLaunch);
             launchRequest.PutExtra("packageName", packageName);
             if (!string.IsNullOrWhiteSpace(displayName)) launchRequest.PutExtra("displayName", displayName);
+            launchRequest.PutExtra(AndroidCommandContract.ExtraIsSystem, isSystem);
 
             if (!AgnosiaUtilities.TryTransferToProfileAndStartActivity(
                     this,
@@ -479,6 +489,12 @@ public sealed partial class DummyActivity : Activity
 
         try
         {
+            if (isSystem || AndroidWorkProfilePackageClassifier.IsSystemPackage(PackageManager, packageName))
+            {
+                LaunchSystemWorkProfilePackage(packageName, displayName, launchResult);
+                return;
+            }
+
             var proxyIntent = HiddenAppShortcutManager.CreateInternalLaunchIntent(packageName, label: displayName);
             if (AndroidIntentExtras.ReadParentFrozenCallback(Intent) is { } parentFrozenCallback)
                 proxyIntent.PutExtra(AndroidCommandContract.ExtraParentFrozenCallback, parentFrozenCallback);
@@ -494,6 +510,45 @@ public sealed partial class DummyActivity : Activity
             Log.Error(LogTag, $"Failed to prepare proxy launch for {packageName}: {exception}");
             var failedResult = launchResult.Fail(
                 AndroidAppLaunchStage.CommandReceived,
+                AndroidAppLaunchResult.ClassifyStartActivityException(exception),
+                exception.ToString());
+            failedResult.Log(LogTag);
+            FinishWithResult(Result.Canceled, failedResult.ToIntent());
+        }
+    }
+
+    private void LaunchSystemWorkProfilePackage(
+        string packageName,
+        string? displayName,
+        AndroidAppLaunchResult launchResult)
+    {
+        var launchIntent = PackageManager?.GetLaunchIntentForPackage(packageName);
+        if (launchIntent is null)
+        {
+            var failedResult = launchResult.Fail(
+                AndroidAppLaunchStage.CommandReceived,
+                AndroidAppLaunchIssueKind.MissingLauncherActivity,
+                "system_work_app_launchIntent=null");
+            failedResult.Log(LogTag);
+            FinishWithResult(Result.Canceled, failedResult.ToIntent());
+            return;
+        }
+
+        launchIntent.AddFlags(ActivityFlags.NewTask | ActivityFlags.ResetTaskIfNeeded);
+        try
+        {
+            StartActivity(launchIntent);
+            var successResult = launchResult
+                .WithDisplayName(displayName)
+                .WithStage(AndroidAppLaunchStage.StartActivityAttempted, "system_work_app_direct_launch");
+            successResult.Log(LogTag);
+            FinishWithResult(Result.Ok, successResult.ToIntent());
+        }
+        catch (Exception exception)
+        {
+            Log.Error(LogTag, $"Failed to launch system work app {packageName}: {exception}");
+            var failedResult = launchResult.Fail(
+                AndroidAppLaunchStage.StartActivityFailedWithException,
                 AndroidAppLaunchResult.ClassifyStartActivityException(exception),
                 exception.ToString());
             failedResult.Log(LogTag);
