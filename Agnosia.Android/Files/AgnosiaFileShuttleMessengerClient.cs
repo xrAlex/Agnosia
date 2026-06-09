@@ -36,6 +36,22 @@ internal sealed class AgnosiaFileShuttleMessengerClient
         _callbackMessenger = new Messenger(new ResponseHandler(_handlerThread.Looper!, this));
     }
 
+    public bool IsConnected => _remoteMessenger is not null;
+
+    public void Preconnect()
+    {
+        try
+        {
+            _ = EnsureConnected();
+        }
+        catch (Exception exception)
+        {
+            throw new InvalidOperationException(
+                "File Shuttle не смог подключиться к другому профилю. Откройте Files через Agnosia и проверьте доступ ко всем файлам в обоих профилях.",
+                exception);
+        }
+    }
+
     public AgnosiaFileShuttleDocumentInfo? LoadFileMeta(string documentId)
     {
         var response = SendRequest(AgnosiaFileShuttleContract.MessageLoadFileMeta, data =>

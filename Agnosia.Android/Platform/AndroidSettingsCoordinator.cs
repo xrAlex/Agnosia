@@ -1,3 +1,4 @@
+using Agnosia.Android.Files;
 using Agnosia.Models;
 using Android.App;
 using Android.Content;
@@ -34,6 +35,15 @@ internal sealed class AndroidSettingsCoordinator(Func<Activity> getInitializedAc
         if (cancellationToken.IsCancellationRequested) return Task.FromCanceled<OperationResult>(cancellationToken);
 
         var activity = getInitializedActivity();
+        try
+        {
+            AgnosiaFileShuttleClientBroker.Preconnect(activity);
+        }
+        catch (Exception exception)
+        {
+            return Task.FromResult(OperationResult.Failure(exception.Message));
+        }
+
         var intent = new Intent(Intent.ActionView);
         intent.SetDataAndType(null, "vnd.android.document/root");
 

@@ -43,9 +43,6 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
         DocumentsContract.Document.ColumnLastModified
     ];
 
-    private readonly Lock _clientSync = new();
-    private AgnosiaFileShuttleMessengerClient? _client;
-
     public override bool OnCreate()
     {
         if (Context is not null) AgnosiaRuntime.Initialize(Context);
@@ -226,10 +223,7 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
     {
         if (Context is null) throw new InvalidOperationException("DocumentsProvider context is unavailable.");
 
-        lock (_clientSync)
-        {
-            return _client ??= new AgnosiaFileShuttleMessengerClient(Context);
-        }
+        return AgnosiaFileShuttleClientBroker.GetClient(Context);
     }
 
     private bool TryGetReadyClient(out AgnosiaFileShuttleMessengerClient client)
@@ -237,6 +231,8 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
         if (IsProviderReady())
         {
             client = GetClient();
+            if (!client.IsConnected)
+                Log.Warn(LogTag, "File Shuttle provider has no preconnected bridge; manual Files launches are best-effort on Android 14+ because background activity starts can be blocked.");
             return true;
         }
 

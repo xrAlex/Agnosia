@@ -222,8 +222,8 @@ File Shuttle - это SAF-мост для передачи файлов межд
 
 | Компонент | Профиль | Роль |
 | --- | --- | --- |
-| `AgnosiaCrossProfileDocumentsProvider` | Текущий профиль, где открыт DocumentsUI | Публикует root второго профиля, отвечает на SAF-запросы `query`, `open`, `create`, `delete`, `isChild`, thumbnail. |
-| `AgnosiaFileShuttleMessengerClient` | Текущий профиль | Поднимает cross-profile bridge, держит callback `Messenger`, отправляет requests и ждёт responses с timeout. |
+| `AgnosiaCrossProfileDocumentsProvider` | Текущий профиль, где открыт DocumentsUI | Публикует root второго профиля, отвечает на SAF-запросы `query`, `open`, `create`, `delete`, `isChild`, thumbnail и переиспользует process-wide bridge client. |
+| `AgnosiaFileShuttleClientBroker` / `AgnosiaFileShuttleMessengerClient` | Текущий профиль | Держит общий bridge client, поднимает cross-profile bridge, держит callback `Messenger`, отправляет requests и ждёт responses с timeout. |
 | `DummyActivity.ActionStartFileShuttle` | Второй профиль | Проверяет HMAC, направление action, тумблер и all-files permission, затем привязывается к локальному service. |
 | `AgnosiaFileShuttleService` | Второй профиль | Bound foreground service, который работает только внутри canonical `Environment.ExternalStorageDirectory` и возвращает метаданные, JSON-списки или `ParcelFileDescriptor`. |
 
@@ -252,7 +252,7 @@ DocumentsUI получает SAF rows или ParcelFileDescriptor
 
 IPC построен без `.aidl`: используются `Android.OS.Messenger`, `Message`, `Bundle` и `ParcelFileDescriptor`. Метаданные файлов передаются JSON-строками через source-generated `AgnosiaFileShuttleJsonContext`; файловые потоки и thumbnails передаются descriptor-ами в response bundle. Ошибки возвращаются строкой `ExtraError`, provider логирует их и отдаёт пустой cursor или `FileNotFoundException` там, где этого ожидает SAF.
 
-Запуск cross-profile bridge идёт через `PendingIntent`, а не прямой `Context.StartActivity(...)`. Это важно для Android 14/15/16 background activity launch rules: `AndroidPendingIntentApi.CreateBackgroundActivityStartPendingIntent(...)` задаёт creator-side `SetPendingIntentCreatorBackgroundActivityStartMode(...)`, а `PendingIntent.Send(...)` получает sender-side `SetPendingIntentBackgroundActivityStartMode(...)`. Без этого рабочий `DocumentsUI` может получить `BAL_BLOCK`, provider дождётся timeout и покажет пустой root.
+Запуск cross-profile bridge идёт через `PendingIntent`, а не прямой `Context.StartActivity(...)`. Это важно для Android 14/15/16 background activity launch rules: `AndroidPendingIntentApi.CreateBackgroundActivityStartPendingIntent(...)` задаёт creator-side `SetPendingIntentCreatorBackgroundActivityStartMode(...)`, а `PendingIntent.Send(...)` получает sender-side `SetPendingIntentBackgroundActivityStartMode(...)`. Перед открытием Files из Agnosia bridge preconnect выполняется из видимой `MainActivity`, после чего `DocumentsProvider` переиспользует общий client. Если Files открыт вручную, provider всё ещё пробует best-effort подключение, но Android может вернуть `BAL_BLOCK`, provider дождётся timeout и покажет пустой root.
 
 Границы безопасности:
 

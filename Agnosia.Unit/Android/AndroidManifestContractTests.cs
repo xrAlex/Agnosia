@@ -125,11 +125,27 @@ public sealed class AndroidManifestContractTests
     {
         var clientSource = File.ReadAllText(
             RepositoryPaths.Get("Agnosia.Android", "Files", "AgnosiaFileShuttleMessengerClient.cs"));
+        var brokerSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Files", "AgnosiaFileShuttleClientBroker.cs"));
+        var providerSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Files", "AgnosiaCrossProfileDocumentsProvider.cs"));
+        var settingsSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Platform", "AndroidSettingsCoordinator.cs"));
         var pendingIntentSource = File.ReadAllText(
             RepositoryPaths.Get("Agnosia.Android.Api", "Packages", "AndroidPendingIntentApi.cs"));
+        var preconnectIndex = settingsSource.IndexOf(
+            "AgnosiaFileShuttleClientBroker.Preconnect(activity)",
+            StringComparison.Ordinal);
+        var startDocumentsIndex = settingsSource.IndexOf("AndroidIntentApi.TryStartActivity", StringComparison.Ordinal);
 
         Assert.Contains("CreateBackgroundActivityStartPendingIntent", clientSource, StringComparison.Ordinal);
         Assert.Contains("CreateSenderBackgroundActivityStartOptions", clientSource, StringComparison.Ordinal);
+        Assert.Contains("public void Preconnect()", clientSource, StringComparison.Ordinal);
+        Assert.Contains("GetClient(Context context)", brokerSource, StringComparison.Ordinal);
+        Assert.Contains("_client ??= new AgnosiaFileShuttleMessengerClient(context)", brokerSource, StringComparison.Ordinal);
+        Assert.Contains("AgnosiaFileShuttleClientBroker.GetClient(Context)", providerSource, StringComparison.Ordinal);
+        Assert.Contains("manual Files launches are best-effort", providerSource, StringComparison.Ordinal);
+        Assert.InRange(preconnectIndex, 0, startDocumentsIndex - 1);
         Assert.DoesNotContain("_context.StartActivity(intent)", clientSource, StringComparison.Ordinal);
         Assert.Contains("PendingIntent.GetActivity", pendingIntentSource, StringComparison.Ordinal);
         Assert.Contains("SetPendingIntentBackgroundActivityStartMode", pendingIntentSource, StringComparison.Ordinal);
