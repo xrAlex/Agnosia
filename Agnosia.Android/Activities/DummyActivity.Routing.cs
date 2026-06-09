@@ -100,7 +100,8 @@ public sealed partial class DummyActivity
                     ActionFreezePackage(false);
                     break;
                 case AgnosiaActions.RevokeRuntimePermissions:
-                    ActionRevokeRuntimePermissions();
+                    RunAction(ActionRevokeRuntimePermissionsAsync,
+                        "Android не смог отозвать runtime-разрешения.");
                     break;
                 case AgnosiaActions.UnfreezeAndLaunch:
                     ActionUnfreezeAndLaunch();

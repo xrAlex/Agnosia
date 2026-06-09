@@ -5,6 +5,7 @@ using Agnosia.Android.Api.Storage;
 using Agnosia.Android.Api.Vpn;
 using Agnosia.Models;
 using Android.Content;
+using Android.Content.PM;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Commands;
@@ -44,15 +45,23 @@ internal sealed class AndroidAppCommandCoordinator(
             {
                 var sourceDirectory = app.SourceDirectory;
                 var splitApks = app.SplitApks.ToArray();
-                if (app.Profile == ProfileKind.Personal
-                    && !AndroidPackageApi.TryResolveInstalledPackageSource(
-                        commandRunner.CurrentActivity.PackageManager,
-                        app.PackageName,
-                        out sourceDirectory,
-                        out splitApks))
+                if (app.Profile == ProfileKind.Personal)
                 {
-                    sourceDirectory = null;
-                    splitApks = [];
+                    var sourceResolution = await ResolveInstalledPackageSourceAsync(
+                            commandRunner.CurrentActivity.PackageManager,
+                            app.PackageName,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    if (sourceResolution.Succeeded)
+                    {
+                        sourceDirectory = sourceResolution.SourceDirectory;
+                        splitApks = sourceResolution.SplitApks;
+                    }
+                    else
+                    {
+                        sourceDirectory = null;
+                        splitApks = [];
+                    }
                 }
 
                 intent.PutExtra(AndroidCommandContract.ExtraApk, sourceDirectory);
@@ -280,7 +289,7 @@ internal sealed class AndroidAppCommandCoordinator(
             return new OperationResult(true, string.Empty);
         }
 
-        if (!AndroidVpnApi.IsVpnActive(activity))
+        if (!await IsVpnActiveAsync(activity, cancellationToken).ConfigureAwait(false))
         {
             storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
             Log.Debug(LogTag, "No active VPN detected, continuing without the transient VPN service.");
@@ -299,7 +308,7 @@ internal sealed class AndroidAppCommandCoordinator(
         }
 
         activity = commandRunner.CurrentActivity;
-        if (AndroidVpnApi.IsVpnActive(activity))
+        if (await IsVpnActiveAsync(activity, cancellationToken).ConfigureAwait(false))
             return OperationResult.Failure(
                 "VPN все еще активен в личном профиле. Сторонний клиент мог сразу подключиться снова.");
 
@@ -363,6 +372,33 @@ internal sealed class AndroidAppCommandCoordinator(
         return intent;
     }
 
+    private static Task<PackageSourceResolution> ResolveInstalledPackageSourceAsync(
+        PackageManager? packageManager,
+        string packageName,
+        CancellationToken cancellationToken)
+    {
+        return Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return AndroidPackageApi.TryResolveInstalledPackageSource(
+                packageManager,
+                packageName,
+                out var sourceDirectory,
+                out var splitApks)
+                ? new PackageSourceResolution(true, sourceDirectory, splitApks)
+                : new PackageSourceResolution(false, null, []);
+        }, cancellationToken);
+    }
+
+    private static Task<bool> IsVpnActiveAsync(Context context, CancellationToken cancellationToken)
+    {
+        return Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return AndroidVpnApi.IsVpnActive(context);
+        }, cancellationToken);
+    }
+
     private static void CopyExtraIfPresent(Intent source, Intent target, string extraName)
     {
         var value = source.GetStringExtra(extraName);
@@ -387,4 +423,9 @@ internal sealed class AndroidAppCommandCoordinator(
             return new ShortcutPreparationResult(false, false, message);
         }
     }
+
+    private sealed record PackageSourceResolution(
+        bool Succeeded,
+        string? SourceDirectory,
+        string[] SplitApks);
 }

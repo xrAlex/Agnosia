@@ -3,6 +3,7 @@ using Agnosia.Android.Api.Packages;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Models;
 using Android.Content;
+using Android.Content.PM;
 using Android.OS;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
@@ -276,29 +277,30 @@ public static class AndroidProfileCommandGateway
         return RunWorkPackageOperationAsync(commandRunner, intent, successMessage, cancellationToken);
     }
 
-    internal static Task<OperationResult> UpdateAgnosiaInWorkProfileAsync(
+    internal static async Task<OperationResult> UpdateAgnosiaInWorkProfileAsync(
         AndroidActivityCommandGateway commandRunner,
         CancellationToken cancellationToken)
     {
         var activity = commandRunner.CurrentActivity;
-        if (!AndroidPackageApi.TryResolveInstalledPackageSource(
+        var sourceResolution = await ResolveInstalledPackageSourceAsync(
                 activity.PackageManager,
                 activity.PackageName,
-                out var sourceDirectory,
-                out var splitApks))
-            return Task.FromResult(OperationResult.Failure(
-                "Android не смог определить APK Agnosia для обновления рабочего профиля."));
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (!sourceResolution.Succeeded)
+            return OperationResult.Failure("Android не смог определить APK Agnosia для обновления рабочего профиля.");
 
         var intent = new Intent(AgnosiaActions.InstallPackage);
         intent.PutExtra(AndroidCommandContract.ExtraPackage, activity.PackageName);
         intent.PutExtra(AndroidCommandContract.ExtraIsSystem, false);
-        intent.PutExtra(AndroidCommandContract.ExtraApk, sourceDirectory);
-        intent.PutExtra(AndroidCommandContract.ExtraSplitApks, splitApks);
-        return commandRunner.RunPackageOperationAsync(
-            intent,
-            true,
-            cancellationToken,
-            "Agnosia обновлена в рабочем профиле.");
+        intent.PutExtra(AndroidCommandContract.ExtraApk, sourceResolution.SourceDirectory);
+        intent.PutExtra(AndroidCommandContract.ExtraSplitApks, sourceResolution.SplitApks);
+        return await commandRunner.RunPackageOperationAsync(
+                intent,
+                true,
+                cancellationToken,
+                "Agnosia обновлена в рабочем профиле.")
+            .ConfigureAwait(false);
     }
 
     internal static Task<OperationResult> HideSystemAppInWorkProfileAsync(
@@ -507,6 +509,24 @@ public static class AndroidProfileCommandGateway
         }, cancellationToken);
     }
 
+    private static Task<PackageSourceResolution> ResolveInstalledPackageSourceAsync(
+        PackageManager? packageManager,
+        string? packageName,
+        CancellationToken cancellationToken)
+    {
+        return Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return AndroidPackageApi.TryResolveInstalledPackageSource(
+                packageManager,
+                packageName,
+                out var sourceDirectory,
+                out var splitApks)
+                ? new PackageSourceResolution(true, sourceDirectory, splitApks)
+                : new PackageSourceResolution(false, null, []);
+        }, cancellationToken);
+    }
+
     private static Intent CreateSystemPackageIntent(string action, string packageName)
     {
         var intent = new Intent(action);
@@ -597,6 +617,11 @@ public static class AndroidProfileCommandGateway
                 ? $"profilePing=result:{result.ResultCode}"
                 : $"profilePing=result:{result.ResultCode}; error={error}");
     }
+
+    private sealed record PackageSourceResolution(
+        bool Succeeded,
+        string? SourceDirectory,
+        string[] SplitApks);
 }
 
 internal sealed record ProfileAppsQueryResult(

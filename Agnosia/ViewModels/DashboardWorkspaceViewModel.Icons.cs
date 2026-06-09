@@ -35,7 +35,8 @@ public partial class DashboardWorkspaceViewModel
             List<PendingIconLoad>? batch = null;
             lock (_iconBatchProcessorSync)
             {
-                while (_pendingIconLoads.Reader.TryRead(out var request))
+                while ((batch?.Count ?? 0) < MaxIconBatchSize
+                       && _pendingIconLoads.Reader.TryRead(out var request))
                 {
                     if (request.IsCompleted)
                     {

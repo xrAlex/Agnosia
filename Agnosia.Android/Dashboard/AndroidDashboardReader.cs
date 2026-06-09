@@ -2,6 +2,7 @@ using Agnosia.Android.Api.Logging;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Api.Storage;
 using Agnosia.Models;
+using Android.App;
 using Android.Content.PM;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
@@ -27,27 +28,23 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         var activity = commandRunner.CurrentActivity;
         AgnosiaRuntime.Initialize(activity);
 
-        var packageManager = activity.PackageManager;
-        var isSupported =
-            packageManager?.HasSystemFeature(PackageManager.FeatureDeviceAdmin) == true &&
-            packageManager.HasSystemFeature(PackageManager.FeatureManagedUsers);
+        var localState = await ReadDashboardProfileLocalStateAsync(activity, cancellationToken).ConfigureAwait(false);
+        if (!localState.IsSupported) return DashboardSnapshot.Unsupported;
 
-        if (!isSupported) return DashboardSnapshot.Unsupported;
-
-        var storage = LocalStorageManager.Instance;
-        var settings = AndroidSettingsStore.LoadSnapshot(storage);
-        var hadConfiguredWorkProfile = HasConfiguredWorkProfileSignal(storage);
-        var profileDiagnostics = AndroidWorkProfileDiagnosticsReader.Read(activity);
+        var settings = localState.Settings ?? AppSettingsSnapshot.Default;
+        var hadConfiguredWorkProfile = localState.HadConfiguredWorkProfile;
+        var profileDiagnostics = localState.ProfileDiagnostics
+                                 ?? throw new InvalidOperationException("Profile diagnostics were not loaded.");
         var ownerCheck = await ReadWorkProfileOwnerCheckAsync(
                 profileDiagnostics,
                 cancellationToken)
             .ConfigureAwait(false);
         var statusMessage = string.Empty;
-        if (hadConfiguredWorkProfile && ShouldUpdateWorkProfileApp(packageManager, activity.PackageName, ownerCheck))
+        if (hadConfiguredWorkProfile && ShouldUpdateWorkProfileApp(localState.LocalVersionCode, ownerCheck))
         {
             Log.Info(
                 LogTag,
-                $"Work profile Agnosia version mismatch; starting update. ownerCheck={ownerCheck.DiagnosticReason}; workVersionCode={ownerCheck.AppVersionCode}; localVersionCode={GetLocalVersionCode(packageManager, activity.PackageName)}.");
+                $"Work profile Agnosia version mismatch; starting update. ownerCheck={ownerCheck.DiagnosticReason}; workVersionCode={ownerCheck.AppVersionCode}; localVersionCode={localState.LocalVersionCode}.");
             statusMessage = "UpdatingWorkProfile";
             var updateResult = await AndroidProfileCommandGateway.UpdateAgnosiaInWorkProfileAsync(
                     commandRunner,
@@ -61,7 +58,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
                     ownerCheck.AppVersionCode,
                     ownerCheck.AppVersionName);
 
-            if (updateResult.Succeeded && ShouldUpdateWorkProfileApp(packageManager, activity.PackageName, ownerCheck))
+            if (updateResult.Succeeded && ShouldUpdateWorkProfileApp(localState.LocalVersionCode, ownerCheck))
                 ownerCheck = new WorkProfileOwnerCheckResult(
                     WorkProfileOwnerCheckKind.VersionUpdateFailed,
                     $"profileUpdate=stillMismatch; previous={ownerCheck.DiagnosticReason}",
@@ -147,10 +144,11 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         var activity = commandRunner.CurrentActivity;
         AgnosiaRuntime.Initialize(activity);
 
-        if (!LocalStorageManager.Instance.GetBoolean(StorageKeys.LoggingEnabled, true)) return [];
+        var localState = await ReadRecentLogLocalStateAsync(activity, cancellationToken).ConfigureAwait(false);
+        if (!localState.LoggingEnabled) return [];
 
-        var logs = AndroidAppLogArchive.Load(activity).ToList();
-        var profileDiagnostics = AndroidWorkProfileDiagnosticsReader.Read(activity);
+        var logs = localState.Logs.ToList();
+        var profileDiagnostics = localState.ProfileDiagnostics;
         if (CanAttemptWorkProfileOwnerCheck(profileDiagnostics)
             && (await AndroidProfileCommandGateway.CheckWorkProfileOwnerAsync(commandRunner, cancellationToken)
                 .ConfigureAwait(false)).Kind == WorkProfileOwnerCheckKind.AppIsProfileOwner)
@@ -166,6 +164,50 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             .Where(entry => seenIds.Add(entry.Id)));
 
         return mergedLogs;
+    }
+
+    private static Task<DashboardProfileLocalState> ReadDashboardProfileLocalStateAsync(
+        Activity activity,
+        CancellationToken cancellationToken)
+    {
+        return Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var packageManager = activity.PackageManager;
+            var isSupported =
+                packageManager?.HasSystemFeature(PackageManager.FeatureDeviceAdmin) == true &&
+                packageManager.HasSystemFeature(PackageManager.FeatureManagedUsers);
+
+            if (!isSupported) return new DashboardProfileLocalState(false, null, false, null, 0);
+
+            var storage = LocalStorageManager.Instance;
+            return new DashboardProfileLocalState(
+                true,
+                AndroidSettingsStore.LoadSnapshot(storage),
+                HasConfiguredWorkProfileSignal(storage),
+                AndroidWorkProfileDiagnosticsReader.Read(activity),
+                GetLocalVersionCode(packageManager, activity.PackageName));
+        }, cancellationToken);
+    }
+
+    private static Task<RecentLogLocalState> ReadRecentLogLocalStateAsync(
+        Activity activity,
+        CancellationToken cancellationToken)
+    {
+        return Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var loggingEnabled = LocalStorageManager.Instance.GetBoolean(StorageKeys.LoggingEnabled, true);
+            if (!loggingEnabled)
+                return new RecentLogLocalState(false, [], CreateEmptyWorkProfileDiagnostics());
+
+            return new RecentLogLocalState(
+                true,
+                AndroidAppLogArchive.Load(activity),
+                AndroidWorkProfileDiagnosticsReader.Read(activity));
+        }, cancellationToken);
     }
 
     private async Task<AppQueryResult> QueryAppsAsync(
@@ -258,15 +300,11 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
                && ownerCheck.Kind == WorkProfileOwnerCheckKind.TargetUnavailable;
     }
 
-    private static bool ShouldUpdateWorkProfileApp(
-        PackageManager? packageManager,
-        string? packageName,
-        WorkProfileOwnerCheckResult ownerCheck)
+    private static bool ShouldUpdateWorkProfileApp(long localVersionCode, WorkProfileOwnerCheckResult ownerCheck)
     {
         if (ownerCheck.Kind != WorkProfileOwnerCheckKind.AppIsProfileOwner)
             return false;
 
-        var localVersionCode = GetLocalVersionCode(packageManager, packageName);
         return localVersionCode > 0 && ownerCheck.AppVersionCode > 0 && ownerCheck.AppVersionCode != localVersionCode;
     }
 
@@ -332,6 +370,23 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
                $"ownerCheck={ownerCheck.Kind}; {ownerCheck.DiagnosticReason}";
     }
 
+    private static WorkProfileDiagnostics CreateEmptyWorkProfileDiagnostics()
+    {
+        return new WorkProfileDiagnostics(
+            false,
+            false,
+            null,
+            null,
+            null,
+            false,
+            null,
+            null,
+            null,
+            0,
+            0,
+            "notRead");
+    }
+
     private static AppSnapshot[] MapApps(
         IReadOnlyList<AppServiceModel> apps,
         ProfileKind profile,
@@ -374,4 +429,16 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
     {
         public static AppQueryResult Empty { get; } = new([], []);
     }
+
+    private sealed record DashboardProfileLocalState(
+        bool IsSupported,
+        AppSettingsSnapshot? Settings,
+        bool HadConfiguredWorkProfile,
+        WorkProfileDiagnostics? ProfileDiagnostics,
+        long LocalVersionCode);
+
+    private sealed record RecentLogLocalState(
+        bool LoggingEnabled,
+        IReadOnlyList<AppLogEntry> Logs,
+        WorkProfileDiagnostics ProfileDiagnostics);
 }

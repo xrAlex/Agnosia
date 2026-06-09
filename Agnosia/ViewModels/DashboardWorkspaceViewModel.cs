@@ -19,6 +19,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private const int SettingsSaveDelayMs = 350;
     private const int OnboardingMonitorDelayMs = 1500;
     private const int IconBatchDelayMs = 60;
+    private const int MaxIconBatchSize = 24;
     private static readonly TimeSpan ResumeRefreshMinimumInterval = TimeSpan.FromSeconds(2);
     private const string StaleApkMessageMarker = "APK изменился";
     private static readonly PermissionKind[] AppPermissionKinds =
@@ -1040,28 +1041,49 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     internal Task ToggleFrozenAsync(AppItemViewModel app)
     {
+        var hidden = !app.IsHidden;
         return RunAppOperationAsync(
             app,
-            snapshot => _appCommandService.SetFrozenAsync(snapshot, !snapshot.IsHidden),
-            app.IsHidden ? "Restored" : "Hidden");
+            snapshot => _appCommandService.SetFrozenAsync(snapshot, hidden),
+            app.IsHidden ? "Restored" : "Hidden",
+            refreshOnSuccess: false,
+            updateLocalSnapshot: snapshot => snapshot with { IsHidden = hidden });
     }
 
-    internal Task ForceFreezeAsync(AppItemViewModel app) => RunAppOperationAsync(app, snapshot => _appCommandService.ForceFreezeAsync(snapshot), "ForceHidden");
+    internal Task ForceFreezeAsync(AppItemViewModel app)
+    {
+        return RunAppOperationAsync(
+            app,
+            snapshot => _appCommandService.ForceFreezeAsync(snapshot),
+            "ForceHidden",
+            refreshOnSuccess: false,
+            updateLocalSnapshot: snapshot => snapshot with { IsHidden = true });
+    }
 
     internal Task CreateShortcutAsync(AppItemViewModel app)
     {
         return RunAppOperationAsync(app, snapshot => _appCommandService.CreateShortcutAsync(snapshot),
-            "ShortcutRequested");
+            "ShortcutRequested", refreshOnSuccess: false);
     }
 
-    internal Task LaunchAsync(AppItemViewModel app) => RunAppOperationAsync(app, snapshot => _appCommandService.LaunchAsync(snapshot), "Launching");
-
-    internal Task ToggleInteractionAccessAsync(AppItemViewModel app)
+    internal Task LaunchAsync(AppItemViewModel app)
     {
         return RunAppOperationAsync(
             app,
-            snapshot => _appCommandService.SetInteractionAccessAsync(snapshot, !snapshot.InteractionAllowed),
-            app.InteractionAllowed ? "InteractionDisabled" : "InteractionEnabled");
+            snapshot => _appCommandService.LaunchAsync(snapshot),
+            "Launching",
+            refreshOnSuccess: false);
+    }
+
+    internal Task ToggleInteractionAccessAsync(AppItemViewModel app)
+    {
+        var enabled = !app.InteractionAllowed;
+        return RunAppOperationAsync(
+            app,
+            snapshot => _appCommandService.SetInteractionAccessAsync(snapshot, enabled),
+            app.InteractionAllowed ? "InteractionDisabled" : "InteractionEnabled",
+            refreshOnSuccess: false,
+            updateLocalSnapshot: snapshot => snapshot with { InteractionAllowed = enabled });
     }
 
     internal Task RevokeRuntimePermissionsAsync(AppItemViewModel app)
@@ -1323,6 +1345,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private void SetVisibleApps(AppItemViewModel[] visibleApps)
     {
         var startedAt = Stopwatch.GetTimestamp();
+        CancelStaleVisibleIconLoads(visibleApps);
         _visibleApps = visibleApps;
         OnPropertyChanged(nameof(VisibleApps));
         OnPropertyChanged(nameof(IsEmptyStateVisible));
@@ -1334,9 +1357,18 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private Task RunAppOperationAsync(
         AppItemViewModel app,
         Func<AppSnapshot, Task<OperationResult>> operation,
-        string successFallback)
+        string successFallback,
+        bool refreshOnSuccess = true,
+        Func<AppSnapshot, AppSnapshot>? updateLocalSnapshot = null)
     {
-        return RunOperationAsync(() => operation(app.Snapshot), successFallback, false);
+        return RunOperationAsync(
+            () => operation(app.Snapshot),
+            successFallback,
+            false,
+            refreshOnSuccess: refreshOnSuccess,
+            applyLocalSuccess: updateLocalSnapshot is null
+                ? null
+                : () => ApplyLocalAppSnapshot(app, updateLocalSnapshot));
     }
 
     private void EnsureSelectedSectionIsAvailable()
@@ -1356,7 +1388,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         Func<Task<OperationResult>> operation,
         string successFallback,
         bool useBusyIndicator,
-        bool refreshOnFailure = false)
+        bool refreshOnFailure = false,
+        bool refreshOnSuccess = true,
+        Action? applyLocalSuccess = null)
     {
         if (!TryBeginOperation()) return;
 
@@ -1369,7 +1403,10 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             StatusMessage = string.IsNullOrWhiteSpace(result.Message) ? successFallback : result.Message;
 
             if (result.Succeeded)
-                await RefreshDashboardAsync(true);
+            {
+                applyLocalSuccess?.Invoke();
+                if (refreshOnSuccess) await RefreshDashboardAsync(true);
+            }
             else if (refreshOnFailure)
             {
                 await RefreshDashboardAsync(true);
@@ -1398,6 +1435,14 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
                 _settingsSaveCoordinator.TryStartQueued();
             }
         }
+    }
+
+    private void ApplyLocalAppSnapshot(
+        AppItemViewModel app,
+        Func<AppSnapshot, AppSnapshot> updateLocalSnapshot)
+    {
+        app.ApplySnapshot(updateLocalSnapshot(app.Snapshot));
+        NotifyOverviewMetricsChanged();
     }
 
     private async Task RefreshAfterStaleInstallSourceAsync(string statusMessage)
@@ -1726,6 +1771,18 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private void CancelVisibleIconLoads()
     {
         foreach (var app in _visibleApps) app.CancelIconLoad();
+    }
+
+    private void CancelStaleVisibleIconLoads(AppItemViewModel[] nextVisibleApps)
+    {
+        if (_visibleApps.Length == 0) return;
+
+        var nextVisibleKeys = nextVisibleApps
+            .Select(app => AppItemKey.FromSnapshot(app.Snapshot))
+            .ToHashSet();
+        foreach (var app in _visibleApps)
+            if (!nextVisibleKeys.Contains(AppItemKey.FromSnapshot(app.Snapshot)))
+                app.CancelIconLoad();
     }
 
     private void NotifyOverviewMetricsChanged()

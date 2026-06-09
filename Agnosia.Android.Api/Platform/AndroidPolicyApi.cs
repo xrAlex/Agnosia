@@ -134,30 +134,33 @@ public static class AndroidPolicyApi
         }
     }
 
-    public static bool TryDenyRuntimePermission(
+    public static async Task<(bool Succeeded, string? Error)> TryDenyRuntimePermissionAsync(
         DevicePolicyManager manager,
         PackageManager? packageManager,
         ComponentName admin,
         string packageName,
         string permission,
         string logTag,
-        out string? error)
+        CancellationToken cancellationToken = default)
     {
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             manager.SetPermissionGrantState(
                 admin,
                 packageName,
                 permission,
                 PermissionGrantState.Denied);
 
-            var confirmation = WaitForRuntimePermissionRevokeConfirmation(
-                manager,
-                packageManager,
-                admin,
-                packageName,
-                permission,
-                logTag);
+            var confirmation = await WaitForRuntimePermissionRevokeConfirmationAsync(
+                    manager,
+                    packageManager,
+                    admin,
+                    packageName,
+                    permission,
+                    logTag,
+                    cancellationToken)
+                .ConfigureAwait(false);
             if (confirmation.Confirmed)
             {
                 if (confirmation.PolicyState != PermissionGrantState.Denied)
@@ -165,37 +168,38 @@ public static class AndroidPolicyApi
                         logTag,
                         $"Permission is already denied by package state. package={packageName}, permission={permission}, policyState={confirmation.PolicyState}.");
 
-                error = null;
-                return true;
+                return (true, null);
             }
 
-            error = $"Android не подтвердил отзыв {permission} у {packageName}.";
+            var error = $"Android не подтвердил отзыв {permission} у {packageName}.";
             Log.Warn(
                 logTag,
                 $"Permission revoke was not confirmed. package={packageName}, permission={permission}, state={confirmation.PolicyState}.");
-            return false;
+            return (false, error);
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
-            error = $"Android не смог отозвать {permission} у {packageName}.";
+            var error = $"Android не смог отозвать {permission} у {packageName}.";
             Log.Warn(
                 logTag,
                 $"Failed to deny runtime permission. package={packageName}, permission={permission}, exception={exception.GetType().FullName}: {exception}");
-            return false;
+            return (false, error);
         }
     }
 
-    private static RuntimePermissionRevokeConfirmation WaitForRuntimePermissionRevokeConfirmation(
+    private static async Task<RuntimePermissionRevokeConfirmation> WaitForRuntimePermissionRevokeConfirmationAsync(
         DevicePolicyManager manager,
         PackageManager? packageManager,
         ComponentName admin,
         string packageName,
         string permission,
-        string logTag)
+        string logTag,
+        CancellationToken cancellationToken)
     {
         var currentState = PermissionGrantState.Default;
         for (var attempt = 1; attempt <= RuntimePermissionRevokeConfirmationAttempts; attempt++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             currentState = manager.GetPermissionGrantState(admin, packageName, permission);
             if (currentState == PermissionGrantState.Denied
                 || IsPermissionCurrentlyDenied(packageManager, packageName, permission, logTag))
@@ -209,7 +213,8 @@ public static class AndroidPolicyApi
             }
 
             if (attempt < RuntimePermissionRevokeConfirmationAttempts)
-                Thread.Sleep(RuntimePermissionRevokeConfirmationDelayMilliseconds);
+                await Task.Delay(RuntimePermissionRevokeConfirmationDelayMilliseconds, cancellationToken)
+                    .ConfigureAwait(false);
         }
 
         return new RuntimePermissionRevokeConfirmation(false, currentState);

@@ -43,7 +43,7 @@ public sealed partial class DummyActivity
             : "Приложение снова доступно в рабочем профиле.");
     }
 
-    private void ActionRevokeRuntimePermissions()
+    private async Task ActionRevokeRuntimePermissionsAsync(CancellationToken cancellationToken)
     {
         var packageName = Intent?.GetStringExtra(AndroidCommandContract.ExtraPackage);
         var permissions = Intent?.GetStringArrayExtra(AndroidCommandContract.ExtraPermissions) ?? [];
@@ -80,14 +80,16 @@ public sealed partial class DummyActivity
             if (string.IsNullOrWhiteSpace(permission)) continue;
 
             attemptedPermissions++;
-            if (!AndroidPolicyApi.TryDenyRuntimePermission(
+            var denyResult = await AndroidPolicyApi.TryDenyRuntimePermissionAsync(
                     _policyManager,
                     PackageManager,
                     admin,
                     packageName,
                     permission,
                     LogTag,
-                    out _))
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (!denyResult.Succeeded)
                 failedPermissions.Add(permission);
         }
 
