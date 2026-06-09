@@ -20,6 +20,8 @@
                               Data="{StaticResource IconOverviewGeometry}" />
                     <TextBlock Classes="nav-label"
                                HorizontalAlignment="Center"
+                               FontSize="10"
+                               TextWrapping="NoWrap"
                                Text="Обзор" />
                 </StackPanel>
             </Button>
@@ -37,6 +39,8 @@
                               Data="{StaticResource IconAppsGeometry}" />
                     <TextBlock Classes="nav-label"
                                HorizontalAlignment="Center"
+                               FontSize="10"
+                               TextWrapping="NoWrap"
                                Text="Приложения" />
                 </StackPanel>
             </Button>
@@ -54,6 +58,8 @@
                               Data="{StaticResource IconModulesGeometry}" />
                     <TextBlock Classes="nav-label"
                                HorizontalAlignment="Center"
+                               FontSize="10"
+                               TextWrapping="NoWrap"
                                Text="Модули" />
                 </StackPanel>
             </Button>
@@ -71,6 +77,8 @@
                               Data="{StaticResource IconSettingsGeometry}" />
                     <TextBlock Classes="nav-label"
                                HorizontalAlignment="Center"
+                               FontSize="10"
+                               TextWrapping="NoWrap"
                                Text="Настройки" />
                 </StackPanel>
             </Button>
