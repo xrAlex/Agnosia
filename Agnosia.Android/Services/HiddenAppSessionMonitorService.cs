@@ -20,7 +20,7 @@ using Exception = System.Exception;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 using Math = System.Math;
 using OperationCanceledException = System.OperationCanceledException;
-using Stopwatch = System.Diagnostics.Stopwatch;
+
 using StringBuilder = System.Text.StringBuilder;
 
 namespace Agnosia.Android.Services;
@@ -299,13 +299,11 @@ public sealed partial class HiddenAppSessionMonitorService : Service
         while (!cancellationToken.IsCancellationRequested)
         {
             var now = DateTimeOffset.UtcNow;
-            var pollStartedAt = Stopwatch.GetTimestamp();
             var observation = ObserveSession(session, startedAt, now);
-            var pollElapsedMs = Stopwatch.GetElapsedTime(pollStartedAt).TotalMilliseconds;
             var transition = stateMachine.MoveNext(now, IsDeviceInteractive(), observation);
             Log.Debug(
                 LogTag,
-                $"UsagePoll elapsedMs={pollElapsedMs:0.0}; package={session.PackageName}; foreground={observation.IsForeground}; inactive={observation.ConfirmedInactive}; delegated={observation.IsSystemDelegatedFlow}; statePhase={transition.Phase}; stateDecision={transition.DecisionReason}; stateAction={transition.Action}.");
+                $"package={session.PackageName}; foreground={observation.IsForeground}; inactive={observation.ConfirmedInactive}; delegated={observation.IsSystemDelegatedFlow}; statePhase={transition.Phase}; stateDecision={transition.DecisionReason}; stateAction={transition.Action}.");
             if (transition.TargetForegroundFirstSeen)
             {
                 Log.Debug(LogTag,

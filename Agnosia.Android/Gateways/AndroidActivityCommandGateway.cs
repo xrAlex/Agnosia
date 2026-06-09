@@ -4,7 +4,7 @@ using Agnosia.Android.Api.Platform;
 using Agnosia.Models;
 using Android.Content;
 using Java.Lang;
-using Stopwatch = System.Diagnostics.Stopwatch;
+
 using Exception = System.Exception;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
@@ -201,11 +201,10 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
         Log.Debug(
             ActivityResultLogTag,
             $"Starting local activity command. action={GetActionForLog(intent)}.");
-        var startedAt = Stopwatch.GetTimestamp();
         var result = await host.StartForResultAsync(intent, cancellationToken);
         Log.Debug(
             ActivityResultLogTag,
-            FormatActivityCommandCompleted("Local", intent, result, startedAt));
+            FormatActivityCommandCompleted("Local", intent, result));
         return result;
     }
 
@@ -223,11 +222,10 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
             Log.Debug(
                 ActivityResultLogTag,
                 $"Starting work-profile activity command. action={GetActionForLog(intent)}, timeoutMs={profileCommandTimeout.TotalMilliseconds:0}.");
-            var startedAt = Stopwatch.GetTimestamp();
             var result = await host.StartForResultAsync(intent, timeoutCancellation.Token);
             Log.Debug(
                 ActivityResultLogTag,
-                FormatActivityCommandCompleted("Work-profile", intent, result, startedAt));
+                FormatActivityCommandCompleted("Work-profile", intent, result));
             return result;
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -260,10 +258,9 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
     private static string FormatActivityCommandCompleted(
         string commandScope,
         Intent intent,
-        AndroidActivityResult result,
-        long startedAt)
+        AndroidActivityResult result)
     {
-        return $"{commandScope} activity command completed. action={GetActionForLog(intent)}, result={result.ResultCode}, elapsedMs={Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds:0}, error={AndroidActivityResultApi.ExtractError(result) ?? "<none>"}, message={AndroidActivityResultApi.ExtractMessage(result) ?? "<none>"}.";
+        return $"{commandScope} activity command completed. action={GetActionForLog(intent)}, result={result.ResultCode}, error={AndroidActivityResultApi.ExtractError(result) ?? "<none>"}, message={AndroidActivityResultApi.ExtractMessage(result) ?? "<none>"}.";
     }
 
     private static string GetActionForLog(Intent intent)

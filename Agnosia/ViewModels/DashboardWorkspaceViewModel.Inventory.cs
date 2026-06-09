@@ -1,6 +1,5 @@
 using Agnosia.Models;
 using Avalonia.Threading;
-using Stopwatch = System.Diagnostics.Stopwatch;
 
 namespace Agnosia.ViewModels;
 
@@ -69,14 +68,9 @@ public partial class DashboardWorkspaceViewModel
     {
         try
         {
-            var loadStartedAt = Stopwatch.GetTimestamp();
             var inventory = await _dashboardService
                 .LoadAppInventoryAsync(profileSnapshot, inventoryCancellation.Token)
                 .ConfigureAwait(false);
-            TracePerf(
-                "LoadInventory",
-                loadStartedAt,
-                $"personal={inventory.PersonalApps.Count}; work={inventory.WorkApps.Count}");
 
             await InvokeOnUiThreadActionAsync(() =>
             {

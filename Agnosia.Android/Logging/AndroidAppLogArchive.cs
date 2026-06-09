@@ -10,8 +10,6 @@ namespace Agnosia.Android.Logging;
 public static class AndroidAppLogArchive
 {
     private const int MaxEntries = 100;
-    private const string PerfLogTag = "AgnosiaPerf";
-
     private static readonly Lock Sync = new();
     private static readonly TimeSpan FlushDelay = TimeSpan.FromSeconds(1);
     private static readonly List<AppLogEntry> PendingEntries = [];
@@ -78,7 +76,7 @@ public static class AndroidAppLogArchive
         }
         catch (Exception exception)
         {
-            global::Android.Util.Log.Warn(PerfLogTag, $"LogAppend flush failed: {exception.Message}");
+            global::Android.Util.Log.Warn(nameof(AndroidAppLogArchive), $"LogAppend flush failed: {exception.Message}");
             lock (Sync)
             {
                 _flushScheduled = false;
@@ -113,14 +111,11 @@ public static class AndroidAppLogArchive
             return;
         }
 
-        var startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
         var entries = LoadCore();
         entries.AddRange(PendingEntries);
         PendingEntries.Clear();
         Trim(entries);
         SaveCore(entries);
-        var elapsedMs = System.Diagnostics.Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
-        global::Android.Util.Log.Debug(PerfLogTag, $"LogAppend flush elapsedMs={elapsedMs:0.0}; count={entries.Count}");
     }
 
     private static List<AppLogEntry> LoadCore()

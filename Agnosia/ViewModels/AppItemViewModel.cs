@@ -3,7 +3,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Stopwatch = System.Diagnostics.Stopwatch;
+
 using Trace = System.Diagnostics.Trace;
 
 namespace Agnosia.ViewModels;
@@ -418,7 +418,6 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     private async Task LoadIconAsync(CancellationTokenSource iconLoadCancellation)
     {
-        var startedAt = Stopwatch.GetTimestamp();
         Bitmap? decodedIcon = null;
         var iconLoaded = false;
         try
@@ -462,7 +461,6 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         }
         finally
         {
-            TracePerf("IconLoad", startedAt, $"profile={Snapshot.Profile}; package={Snapshot.PackageName}");
             if (!iconLoaded && !iconLoadCancellation.IsCancellationRequested)
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
@@ -540,12 +538,6 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         LaunchCommand.NotifyCanExecuteChanged();
         ToggleInteractionAccessCommand.NotifyCanExecuteChanged();
         RevokeRuntimePermissionsCommand.NotifyCanExecuteChanged();
-    }
-
-    private static void TracePerf(string operation, long startedAt, string detail)
-    {
-        var elapsedMs = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
-        Trace.WriteLine($"AgnosiaPerf {operation} elapsedMs={elapsedMs:0.0}; {detail}");
     }
 
     private static bool ByteArraysEqual(byte[]? left, byte[]? right)

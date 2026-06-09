@@ -8,7 +8,7 @@ using Agnosia.Services;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Stopwatch = System.Diagnostics.Stopwatch;
+
 using Trace = System.Diagnostics.Trace;
 
 namespace Agnosia.ViewModels;
@@ -644,7 +644,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         if (!allowDuringOperation && (IsBusy || _isOperationInProgress))
             return;
 
-        var refreshStartedAt = Stopwatch.GetTimestamp();
         CancelInventoryLoad(true);
         BeginBusy();
         StatusIsError = false;
@@ -652,9 +651,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
         try
         {
-            var profileStartedAt = Stopwatch.GetTimestamp();
             var profileSnapshot = await _dashboardService.LoadDashboardProfileAsync();
-            TracePerf("RefreshProfile", profileStartedAt);
             _lastProfileSnapshot = profileSnapshot;
             ApplyProfileSnapshot(profileSnapshot);
             await ReloadModulesAsync();
@@ -696,7 +693,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             {
                 EndBusy();
                 _settingsSaveCoordinator.TryStartQueued();
-                TracePerf("RefreshDashboard", refreshStartedAt);
             }
         }
     }
@@ -1283,7 +1279,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private void ApplyInventorySnapshot(DashboardAppInventorySnapshot snapshot)
     {
-        var startedAt = Stopwatch.GetTimestamp();
         var retainedKeys = new HashSet<AppItemKey>();
         _personalApps = UpdateAppItems(snapshot.PersonalApps, retainedKeys);
         _workApps = UpdateAppItems(snapshot.WorkApps, retainedKeys);
@@ -1294,10 +1289,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         NotifyOverviewMetricsChanged();
 
         RefreshVisibleApps();
-        TracePerf(
-            "ApplyInventory",
-            startedAt,
-            $"personal={_personalApps.Length}; work={_workApps.Length}; cached={_appItemCache.Count}");
     }
 
     private DashboardAppInventorySnapshot PreserveCurrentWorkAppsOnEmpty(
@@ -1345,12 +1336,10 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private void SetVisibleApps(AppItemViewModel[] visibleApps)
     {
-        var startedAt = Stopwatch.GetTimestamp();
         CancelStaleVisibleIconLoads(visibleApps);
         _visibleApps = visibleApps;
         OnPropertyChanged(nameof(VisibleApps));
         OnPropertyChanged(nameof(IsEmptyStateVisible));
-        TracePerf("SetVisibleApps", startedAt, $"count={visibleApps.Length}; profile={SelectedProfile}");
     }
 
     private void CancelPendingSearchRefresh() => _searchRefreshDebouncer.Cancel();
@@ -1578,10 +1567,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     {
         if (!LoggingEnabled || (!force && !IsLogWindowOpen)) return;
 
-        var startedAt = Stopwatch.GetTimestamp();
         var logs = await _platformEventLogReader.LoadRecentLogsAsync();
         ImportPlatformLogs(logs);
-        TracePerf("ReloadPlatformLogs", startedAt, $"count={logs.Count}");
     }
 
     private Task ReloadPermissionsAsync()
@@ -1807,10 +1794,4 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(InteractionAccessAppsCount));
     }
 
-    private static void TracePerf(string operation, long startedAt, string? detail = null)
-    {
-        var elapsedMs = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
-        var suffix = string.IsNullOrWhiteSpace(detail) ? string.Empty : $"; {detail}";
-        Trace.WriteLine($"AgnosiaPerf {operation} elapsedMs={elapsedMs:0.0}{suffix}");
-    }
 }

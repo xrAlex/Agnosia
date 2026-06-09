@@ -1,5 +1,4 @@
 using Agnosia.Models;
-using Stopwatch = System.Diagnostics.Stopwatch;
 
 namespace Agnosia.ViewModels;
 
@@ -62,14 +61,12 @@ public partial class DashboardWorkspaceViewModel
     private async Task LoadIconBatchAsync(IReadOnlyList<PendingIconLoad> batch)
     {
         var snapshots = GetDistinctIconSnapshots(batch);
-        var startedAt = Stopwatch.GetTimestamp();
 
         IReadOnlyDictionary<AppItemKey, byte[]?> icons;
         await _iconLoadGate.WaitAsync().ConfigureAwait(false);
         try
         {
             icons = await _dashboardService.LoadAppIconsAsync(snapshots).ConfigureAwait(false);
-            TracePerf("IconBatchLoad", startedAt, $"requested={snapshots.Length}; completed={icons.Count}");
         }
         catch (Exception exception)
         {
