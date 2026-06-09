@@ -13,6 +13,8 @@ namespace Agnosia.Android.Gateways;
 internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> getActivityHost)
 {
     private const string ActivityResultLogTag = "AgnosiaActivityResult";
+    private static readonly TimeSpan DefaultExternalActivityResultTimeout = TimeSpan.FromMinutes(2);
+    internal static readonly TimeSpan ProvisioningActivityResultTimeout = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan DefaultProfileCommandTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan InstallPackageProfileCommandTimeout = TimeSpan.FromMinutes(3);
 
@@ -71,17 +73,32 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
 
     public async Task<AndroidActivityResult> StartExternalActivityForResultAsync(
         Intent intent,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TimeSpan? timeout = null)
     {
+        var activityResultTimeout = timeout ?? DefaultExternalActivityResultTimeout;
+        using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCancellation.CancelAfter(activityResultTimeout);
+
         try
         {
             var host = getActivityHost();
             AgnosiaRuntime.Initialize(host.CurrentActivity);
-            return await host.StartForResultAsync(intent, cancellationToken);
+            Log.Debug(
+                ActivityResultLogTag,
+                $"Starting external activity for result. action={GetActionForLog(intent)}, timeoutMs={activityResultTimeout.TotalMilliseconds:0}.");
+            return await host.StartForResultAsync(intent, timeoutCancellation.Token);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (OperationCanceledException)
         {
-            throw;
+            Log.Warn(
+                ActivityResultLogTag,
+                $"Timed out waiting for external activity result. action={GetActionForLog(intent)}, timeoutMs={activityResultTimeout.TotalMilliseconds:0}.");
+            return AndroidActivityResultApi.CreateCanceledResult("Системный экран не вернул результат вовремя.");
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {

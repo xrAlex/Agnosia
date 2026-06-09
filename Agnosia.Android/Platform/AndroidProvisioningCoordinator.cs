@@ -30,7 +30,10 @@ internal sealed class AndroidProvisioningCoordinator(
 
         var authKey = PrepareProvisioningAuthentication();
         var intent = CreateManagedProfileProvisioningIntent(activity, host.AdminReceiverType, authKey);
-        var result = await commandRunner.StartExternalActivityForResultAsync(intent, cancellationToken);
+        var result = await commandRunner.StartExternalActivityForResultAsync(
+            intent,
+            cancellationToken,
+            AndroidActivityCommandGateway.ProvisioningActivityResultTimeout);
         return await CompleteProvisioningAsync(activity, result, cancellationToken);
     }
 
@@ -105,6 +108,9 @@ internal sealed class AndroidProvisioningCoordinator(
     {
         if (result.ResultCode != Result.Ok)
         {
+            var error = AndroidActivityResultApi.ExtractError(result);
+            if (!string.IsNullOrWhiteSpace(error)) return OperationResult.Failure(error);
+
             if (AgnosiaUtilities.HasAssociatedProfile(activity))
                 return MarkProfileResetRequired(
                     "Android создал рабочий профиль, но Agnosia не может подтвердить управление им. " +

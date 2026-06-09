@@ -68,6 +68,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private bool _isPreparingOnboardingPermissions;
     private bool _refreshPermissionsOnResume;
     private bool _inventoryLoadInProgress;
+    private int _busyScopeCount;
     private int _inventoryLoadGeneration;
     private CancellationTokenSource? _inventoryLoadCancellation;
     private CancellationTokenSource? _onboardingMonitorCancellation;
@@ -645,7 +646,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
         var refreshStartedAt = Stopwatch.GetTimestamp();
         CancelInventoryLoad(true);
-        IsBusy = true;
+        BeginBusy();
         StatusIsError = false;
         StatusMessage = "Updating";
 
@@ -693,7 +694,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             }
             finally
             {
-                IsBusy = false;
+                EndBusy();
                 _settingsSaveCoordinator.TryStartQueued();
                 TracePerf("RefreshDashboard", refreshStartedAt);
             }
@@ -914,7 +915,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     {
         if (!TryBeginOperation()) return;
 
-        IsBusy = true;
+        BeginBusy();
         try
         {
             var result = await _onboardingService.OpenWorkProfileSettingsAsync();
@@ -935,7 +936,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             }
             finally
             {
-                IsBusy = false;
+                EndBusy();
                 EndOperation();
                 _settingsSaveCoordinator.TryStartQueued();
             }
@@ -1394,7 +1395,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     {
         if (!TryBeginOperation()) return;
 
-        if (useBusyIndicator) IsBusy = true;
+        if (useBusyIndicator) BeginBusy();
 
         try
         {
@@ -1429,7 +1430,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             }
             finally
             {
-                if (useBusyIndicator) IsBusy = false;
+                if (useBusyIndicator) EndBusy();
 
                 EndOperation();
                 _settingsSaveCoordinator.TryStartQueued();
@@ -1476,6 +1477,20 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         return _invokeOnUiThreadAsync(
             action,
             priority == default ? DispatcherPriority.Background : priority);
+    }
+
+    private void BeginBusy()
+    {
+        _busyScopeCount++;
+        if (_busyScopeCount == 1) IsBusy = true;
+    }
+
+    private void EndBusy()
+    {
+        if (_busyScopeCount == 0) return;
+
+        _busyScopeCount--;
+        if (_busyScopeCount == 0) IsBusy = false;
     }
 
     private static async ValueTask InvokeOnAvaloniaUiThreadAsync(
