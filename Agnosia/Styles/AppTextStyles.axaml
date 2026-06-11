@@ -124,6 +124,14 @@
         <Setter Property="Foreground" Value="{StaticResource AppTextMutedBrush}" />
         <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
+    <Style Selector="TextBlock.module-status-title">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="{StaticResource AppTextPrimaryBrush}" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="MaxWidth" Value="128" />
+    </Style>
     <Style Selector="TextBlock.tag-label">
         <Setter Property="FontSize" Value="13" />
         <Setter Property="Foreground" Value="{StaticResource AppTextPrimaryBrush}" />

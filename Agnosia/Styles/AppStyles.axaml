@@ -207,8 +207,38 @@
         <Setter Property="Background" Value="{StaticResource AppBorderSoftBrush}" />
     </Style>
     <Style Selector="Border.metric-card">
-        <Setter Property="MinHeight" Value="154" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Border.metric-card.warning">
+        <Setter Property="BorderBrush" Value="{StaticResource AppRiskDangerousBrush}" />
+    </Style>
+    <Style Selector="Border.module-status-chip">
+        <Setter Property="Margin" Value="0,4,8,4" />
+        <Setter Property="Padding" Value="8,6" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Background" Value="{StaticResource AppSurfaceAltBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource AppBorderSoftBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Border.module-status-chip.enabled">
+        <Setter Property="BorderBrush" Value="{StaticResource AppAccentMutedBrush}" />
+    </Style>
+    <Style Selector="Border.module-status-indicator">
+        <Setter Property="Width" Value="22" />
+        <Setter Property="Height" Value="22" />
+        <Setter Property="CornerRadius" Value="11" />
+        <Setter Property="Background" Value="{StaticResource AppBorderBrush}" />
+    </Style>
+    <Style Selector="Border.module-status-indicator.enabled">
+        <Setter Property="Background" Value="{StaticResource AppBorderBrush}" />
+    </Style>
+    <Style Selector="Border.module-status-dot">
+        <Setter Property="Width" Value="8" />
+        <Setter Property="Height" Value="8" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Background" Value="{StaticResource AppTextPrimaryBrush}" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <Style Selector="Border.bottom-nav">
         <Setter Property="Background" Value="{StaticResource AppChromeBrush}" />

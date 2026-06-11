@@ -390,6 +390,23 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public int InteractionAccessAppsCount => _workApps.Count(app => app.InteractionAllowed);
 
+    public bool IsRiskSummaryVisible => RiskEngineModule?.IsEnabled == true;
+
+    public int RiskyAppsCount => CriticalRiskAppsCount;
+
+    public int CriticalRiskAppsCount => CountRiskyApps(AppPermissionRiskLevel.Critical);
+
+    public string RiskSummarySupportText => "Приложения которые могут следить за пользователем";
+
+    public bool IsPermissionWarningVisible =>
+        _settingsPermissionItems.Count > 0
+        && _settingsPermissionItems.Any(item => !item.IsGranted);
+
+    public string PermissionStateValue => $"{GrantedSettingsPermissionsCount}/{_settingsPermissionItems.Count}";
+
+    public string PermissionStateSupportText =>
+        $"Не выданы {MissingSettingsPermissionsCount}";
+
     public string LogOutput => _eventLogService.Output;
 
     public string LogOutputWithDeviceInfo
@@ -665,6 +682,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
             if (IsDashboardVisible)
             {
+                if (!allowDuringOperation) await ReloadPermissionsAsync();
                 StartInventoryLoad(
                     profileSnapshot,
                     showProgress: SelectedSection == DashboardSection.Apps);
@@ -1623,6 +1641,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }
 
         OnPropertyChanged(nameof(HasModules));
+        NotifyOverviewMetricsChanged();
     }
 
     private async Task ReloadPermissionsCoreAsync()
@@ -1646,6 +1665,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             OnPropertyChanged(nameof(AreOnboardingPermissionsGranted));
             OnPropertyChanged(nameof(IsOnboardingPermissionsStep));
             OnPropertyChanged(nameof(OnboardingStepLabel));
+            NotifyOverviewMetricsChanged();
         }, DispatcherPriority.Background);
     }
 
@@ -1792,6 +1812,35 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(TotalManagedAppsCount));
         OnPropertyChanged(nameof(HiddenWorkAppsCount));
         OnPropertyChanged(nameof(InteractionAccessAppsCount));
+        OnPropertyChanged(nameof(IsRiskSummaryVisible));
+        OnPropertyChanged(nameof(RiskyAppsCount));
+        OnPropertyChanged(nameof(CriticalRiskAppsCount));
+        OnPropertyChanged(nameof(RiskSummarySupportText));
+        OnPropertyChanged(nameof(IsPermissionWarningVisible));
+        OnPropertyChanged(nameof(PermissionStateValue));
+        OnPropertyChanged(nameof(PermissionStateSupportText));
     }
 
+    private AgnosiaModuleViewModel? RiskEngineModule =>
+        _moduleItems.FirstOrDefault(module => module.Kind == AgnosiaModuleKind.RiskEngine);
+
+    private int EnabledModulesCount =>
+        _moduleItems.Count(module => module.State == AgnosiaModuleState.Enabled);
+
+    private int ModulesRequiringAttentionCount =>
+        _moduleItems.Count(module => module.State is AgnosiaModuleState.PartiallyEnabled or AgnosiaModuleState.Unavailable);
+
+    private int GrantedSettingsPermissionsCount =>
+        _settingsPermissionItems.Count(item => item.IsGranted);
+
+    private int MissingSettingsPermissionsCount =>
+        _settingsPermissionItems.Count(item => !item.IsGranted);
+
+    private int CountRiskyApps(AppPermissionRiskLevel level)
+    {
+        return _personalApps.Concat(_workApps)
+            .Count(app =>
+                app.ShowPermissionRiskIndicator
+                && app.PermissionRiskLevel == level);
+    }
 }

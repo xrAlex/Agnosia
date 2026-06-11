@@ -27,6 +27,8 @@ public sealed partial class AgnosiaModuleViewModel : ObservableObject
 
     public bool IsEnabled { get; private set; }
 
+    public bool IsDisabled => !IsEnabled;
+
     public AgnosiaModuleState State { get; private set; }
 
     public string StatusText { get; private set; } = string.Empty;

@@ -235,7 +235,7 @@ public sealed class DashboardWorkspaceCommandTests
         viewModel.HandlePrimaryActivityResumed();
 
         Assert.Equal([PermissionKind.UsageStats], services.PermissionRequests);
-        Assert.Equal(1, services.PermissionLoadCount);
+        Assert.Equal(2, services.PermissionLoadCount);
         Assert.True(viewModel.StatusIsError);
         Assert.Equal("PermissionDenied", viewModel.StatusMessage);
     }
@@ -256,15 +256,16 @@ public sealed class DashboardWorkspaceCommandTests
         await viewModel.EnsureInitializedAsync();
         viewModel.IsPermissionsWindowOpen = true;
         var permission = TestWorkspaceFactory.CreatePermission(viewModel, TestSnapshots.RequiredPermission(kind));
+        var permissionLoadCountBeforeRequest = services.PermissionLoadCount;
 
         await permission.RequestCommand.ExecuteAsync(null);
 
-        Assert.Equal(0, services.PermissionLoadCount);
+        Assert.Equal(permissionLoadCountBeforeRequest, services.PermissionLoadCount);
 
         viewModel.HandlePrimaryActivityResumed();
 
         await AsyncAssert.EventuallyAsync(
-            () => services.PermissionLoadCount == 1,
+            () => services.PermissionLoadCount == permissionLoadCountBeforeRequest + 1,
             "Permission reload should happen after primary activity resume.");
     }
 
