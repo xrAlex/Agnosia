@@ -9,6 +9,7 @@ using Agnosia.Android.Platform;
 using Agnosia.Android.Receivers;
 using Agnosia.Android.Services;
 using Agnosia.Android.Shortcuts;
+using Agnosia.Android.Storage;
 using Agnosia.Android.Vpn;
 using Android.App.Admin;
 using Android.Content;
@@ -205,6 +206,8 @@ public sealed class ProxyActivity : Activity
                     true);
                 return;
             }
+
+            await RefreshLockdownForUnhiddenPackageAsync(policyManager, admin, request.PackageName);
 
             Intent? launchIntent = null;
             for (var attempt = 0; attempt < LaunchResolveAttempts; attempt++)
@@ -540,6 +543,55 @@ public sealed class ProxyActivity : Activity
         }
 
         return launchResult;
+    }
+
+    private async Task RefreshLockdownForUnhiddenPackageAsync(
+        DevicePolicyManager policyManager,
+        ComponentName admin,
+        string packageName)
+    {
+        if (!LockdownSettingsStore.IsEnabled()) return;
+        if (IsLockdownBlockedPackage(packageName)) return;
+        if (!await WaitForPackageVisibleToVpnPolicyAsync(packageName)) return;
+
+        var result = LockdownVpnController.RefreshPolicy(this, policyManager, admin);
+        if (!result.Succeeded)
+            Log.Warn(LogTag, $"Lockdown policy refresh after unhide failed for {packageName}: {result.Message}");
+    }
+
+    private static bool IsLockdownBlockedPackage(string packageName)
+    {
+        var blockedPackages = LockdownSettingsStore.LoadBlockedPackages();
+        return blockedPackages.Contains(packageName, StringComparer.Ordinal);
+    }
+
+    private async Task<bool> WaitForPackageVisibleToVpnPolicyAsync(string packageName)
+    {
+        for (var attempt = 0; attempt < LaunchResolveAttempts; attempt++)
+        {
+            if (IsPackageVisibleToVpnPolicy(packageName)) return true;
+            await Task.Delay(LaunchResolveDelayMilliseconds);
+        }
+
+        Log.Warn(
+            LogTag,
+            $"Lockdown policy refresh skipped because package is not visible after unhide. package={packageName}.");
+        return false;
+    }
+
+    private bool IsPackageVisibleToVpnPolicy(string packageName)
+    {
+        try
+        {
+            var packageInfo = PackageManager?.GetPackageInfo(packageName, PackageInfoFlags.MatchDisabledComponents);
+            return packageInfo?.ApplicationInfo is { } appInfo
+                   && (appInfo.Flags & ApplicationInfoFlags.Installed) != 0;
+        }
+        catch (Exception exception) when (exception is PackageManager.NameNotFoundException
+                                          || AndroidRecoverableException.IsMatch(exception))
+        {
+            return false;
+        }
     }
 
     private void ShowErrorAndFinish(string message)

@@ -33,6 +33,17 @@ public sealed record AgnosiaModuleSnapshot(
         "Недоступен",
         false);
 
+    public static AgnosiaModuleSnapshot LockdownUnavailable { get; } = new(
+        AgnosiaModuleKind.Lockdown,
+        "Lockdown",
+        "Блокировка интернета выбранным приложениям рабочего профиля.",
+        "Lockdown использует always-on VPN lockdown в рабочем профиле, чтобы выбранные приложения оставались без доступа к сети.",
+        false,
+        AgnosiaModuleState.Unavailable,
+        [],
+        "Недоступен",
+        false);
+
     public static AgnosiaModuleSnapshot RiskEngineUnavailable { get; } = new(
         AgnosiaModuleKind.RiskEngine,
         "Risk Engine",

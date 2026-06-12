@@ -392,6 +392,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public bool IsRiskSummaryVisible => RiskEngineModule?.IsEnabled == true;
 
+    internal bool IsLockdownModuleEnabled => LockdownModule?.IsEnabled == true;
+
     public int RiskyAppsCount => CriticalRiskAppsCount;
 
     public int CriticalRiskAppsCount => CountRiskyApps(AppPermissionRiskLevel.Critical);
@@ -1101,6 +1103,19 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             updateLocalSnapshot: snapshot => snapshot with { InteractionAllowed = enabled });
     }
 
+    internal Task ToggleInternetAccessAsync(AppItemViewModel app)
+    {
+        if (!app.CanToggleInternetAccess) return Task.CompletedTask;
+
+        var blocked = !app.IsInternetBlocked;
+        return RunAppOperationAsync(
+            app,
+            snapshot => _appCommandService.SetLockdownInternetAccessAsync(snapshot, blocked),
+            app.IsInternetBlocked ? "InternetUnblocked" : "InternetBlocked",
+            refreshOnSuccess: false,
+            updateLocalSnapshot: snapshot => snapshot with { IsInternetBlocked = blocked });
+    }
+
     internal Task RevokeRuntimePermissionsAsync(AppItemViewModel app)
     {
         if (!app.CanRevokeRuntimePermissions) return Task.CompletedTask;
@@ -1610,6 +1625,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private void ApplyModuleSnapshots(IReadOnlyList<AgnosiaModuleSnapshot> snapshots)
     {
         var selectedKind = SelectedModule?.Kind;
+        var wasLockdownModuleEnabled = IsLockdownModuleEnabled;
         var retainedKinds = new HashSet<AgnosiaModuleKind>();
 
         _moduleItems.Clear();
@@ -1641,6 +1657,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }
 
         OnPropertyChanged(nameof(HasModules));
+        if (wasLockdownModuleEnabled != IsLockdownModuleEnabled) NotifyLockdownModuleStateChanged();
         NotifyOverviewMetricsChanged();
     }
 
@@ -1823,6 +1840,15 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private AgnosiaModuleViewModel? RiskEngineModule =>
         _moduleItems.FirstOrDefault(module => module.Kind == AgnosiaModuleKind.RiskEngine);
+
+    private AgnosiaModuleViewModel? LockdownModule =>
+        _moduleItems.FirstOrDefault(module => module.Kind == AgnosiaModuleKind.Lockdown);
+
+    private void NotifyLockdownModuleStateChanged()
+    {
+        foreach (var app in _appItemCache.Values)
+            app.NotifyLockdownModuleStateChanged();
+    }
 
     private int EnabledModulesCount =>
         _moduleItems.Count(module => module.State == AgnosiaModuleState.Enabled);

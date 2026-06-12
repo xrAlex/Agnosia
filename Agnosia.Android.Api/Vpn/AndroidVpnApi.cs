@@ -15,24 +15,14 @@ public static class AndroidVpnApi
 
         try
         {
-            if (HasVpnTransport(connectivityManager, connectivityManager.ActiveNetwork))
+            var activeNetwork = connectivityManager.ActiveNetwork;
+            if (HasVpnTransport(connectivityManager, activeNetwork))
             {
-                Log.Debug(LogTag, "VPN detected via ActiveNetwork.");
+                Log.Debug(LogTag, $"VPN detected via ActiveNetwork: {activeNetwork}.");
                 return true;
             }
 
-#pragma warning disable CA1422
-            var networks = connectivityManager.GetAllNetworks();
-#pragma warning restore CA1422
-            foreach (var network in networks)
-            {
-                if (!HasVpnTransport(connectivityManager, network)) continue;
-
-                Log.Debug(LogTag, $"VPN detected among available networks: {network}.");
-                return true;
-            }
-
-            Log.Debug(LogTag, "No active VPN detected in ActiveNetwork or across all networks.");
+            Log.Debug(LogTag, "No VPN detected on the current default network.");
             return false;
         }
         catch (Exception exception)

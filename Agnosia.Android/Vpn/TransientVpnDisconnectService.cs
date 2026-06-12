@@ -15,8 +15,6 @@ namespace Agnosia.Android.Vpn;
     Permission = "android.permission.BIND_VPN_SERVICE",
     Exported = true,
     ForegroundServiceType = ForegroundService.TypeSystemExempted)]
-[IntentFilter(["android.net.VpnService"])]
-[MetaData("android.net.VpnService.SUPPORTS_ALWAYS_ON", Value = "false")]
 public sealed class TransientVpnDisconnectService : VpnService
 {
     private const string LogTag = "AgnosiaTransientVpn";

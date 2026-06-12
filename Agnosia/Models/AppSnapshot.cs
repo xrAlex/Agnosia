@@ -21,4 +21,5 @@ public sealed record AppSnapshot(
     AppPermissionRiskScoreBreakdown? PermissionRiskScoreBreakdown = null,
     IReadOnlyList<string>? ManifestPermissions = null,
     IReadOnlyList<string>? RuntimePermissions = null,
-    bool PermissionRiskAvailable = true);
+    bool PermissionRiskAvailable = true,
+    bool IsInternetBlocked = false);

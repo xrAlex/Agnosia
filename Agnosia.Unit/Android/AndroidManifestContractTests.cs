@@ -168,11 +168,35 @@ public sealed class AndroidManifestContractTests
         Assert.Contains("Permission = \"android.permission.BIND_VPN_SERVICE\"", source, StringComparison.Ordinal);
         Assert.Contains("ForegroundServiceType = ForegroundService.TypeSystemExempted", source,
             StringComparison.Ordinal);
-        Assert.Contains("[IntentFilter([\"android.net.VpnService\"])]", source, StringComparison.Ordinal);
-        Assert.Contains("[MetaData(\"android.net.VpnService.SUPPORTS_ALWAYS_ON\", Value = \"false\")]", source,
+        Assert.DoesNotContain("[IntentFilter([\"android.net.VpnService\"])]", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("android.net.VpnService.SUPPORTS_ALWAYS_ON", source,
             StringComparison.Ordinal);
         Assert.False(File.Exists(
             RepositoryPaths.Get("Agnosia.Android.Api", "Vpn", "TransientVpnDisconnectService.cs")));
+    }
+
+    [Fact]
+    public void Lockdown_vpn_service_contract_is_declared_in_android_project()
+    {
+        var source = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Vpn", "LockdownVpnService.cs"));
+        var startupSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Infrastructure", "AndroidStartup.cs"));
+
+        Assert.Contains("[Service(", source, StringComparison.Ordinal);
+        Assert.Contains("Name = \"com.agnosia.app.LockdownVpnService\"", source,
+            StringComparison.Ordinal);
+        Assert.Contains("Permission = \"android.permission.BIND_VPN_SERVICE\"", source, StringComparison.Ordinal);
+        Assert.Contains("ForegroundServiceType = ForegroundService.TypeSystemExempted", source,
+            StringComparison.Ordinal);
+        Assert.Contains("[IntentFilter([\"android.net.VpnService\"])]", source, StringComparison.Ordinal);
+        Assert.Contains("[MetaData(\"android.net.VpnService.SUPPORTS_ALWAYS_ON\", Value = \"true\")]", source,
+            StringComparison.Ordinal);
+        Assert.Contains("builder.AddDisallowedApplication(packageName)", source, StringComparison.Ordinal);
+        Assert.Contains("LockdownVpnController.EnsureEnabledPolicy(context", startupSource,
+            StringComparison.Ordinal);
+        Assert.False(File.Exists(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Vpn", "LockdownVpnService.cs")));
     }
 
     private static XDocument ReadManifest()

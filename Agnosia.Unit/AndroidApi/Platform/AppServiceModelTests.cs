@@ -59,6 +59,7 @@ public sealed class AppServiceModelTests
             IsHidden = true,
             CanLaunch = true,
             IsInstalled = true,
+            IsInternetBlocked = true,
             PermissionRiskAvailable = false,
             PermissionRiskLevel = AppPermissionRiskLevel.Dangerous,
             RiskyPermissions = ["android.permission.CAMERA"]
@@ -76,6 +77,7 @@ public sealed class AppServiceModelTests
         Assert.Equal(expected.IsHidden, actual.IsHidden);
         Assert.Equal(expected.CanLaunch, actual.CanLaunch);
         Assert.Equal(expected.IsInstalled, actual.IsInstalled);
+        Assert.Equal(expected.IsInternetBlocked, actual.IsInternetBlocked);
         Assert.Equal(expected.PermissionRiskAvailable, actual.PermissionRiskAvailable);
         Assert.Equal(expected.PermissionRiskLevel, actual.PermissionRiskLevel);
         Assert.Equal(expected.RiskyPermissions, actual.RiskyPermissions);

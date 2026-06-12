@@ -42,7 +42,8 @@ internal static class TestSnapshots
         AppPermissionRiskScoreBreakdown? permissionRiskScoreBreakdown = null,
         IReadOnlyList<string>? manifestPermissions = null,
         IReadOnlyList<string>? runtimePermissions = null,
-        bool permissionRiskAvailable = true)
+        bool permissionRiskAvailable = true,
+        bool isInternetBlocked = false)
     {
         return new AppSnapshot(
             packageName,
@@ -61,7 +62,8 @@ internal static class TestSnapshots
             PermissionRiskScoreBreakdown: permissionRiskScoreBreakdown,
             ManifestPermissions: manifestPermissions,
             RuntimePermissions: runtimePermissions,
-            PermissionRiskAvailable: permissionRiskAvailable);
+            PermissionRiskAvailable: permissionRiskAvailable,
+            IsInternetBlocked: isInternetBlocked);
     }
 
     public static PermissionSnapshot GrantedPermission(PermissionKind kind)
@@ -149,6 +151,29 @@ internal static class TestSnapshots
             {
                 AgnosiaModuleState.Enabled => "Включён",
                 AgnosiaModuleState.PartiallyEnabled => "Частично включён",
+                AgnosiaModuleState.Unavailable => "Недоступен",
+                _ => "Выключен"
+            },
+            canSetEnabled);
+    }
+
+    public static AgnosiaModuleSnapshot LockdownModule(
+        bool isEnabled = false,
+        AgnosiaModuleState state = AgnosiaModuleState.Disabled,
+        IReadOnlyList<AgnosiaModuleRequirement>? requirements = null,
+        bool canSetEnabled = true)
+    {
+        return new AgnosiaModuleSnapshot(
+            AgnosiaModuleKind.Lockdown,
+            "Lockdown",
+            "Short Lockdown description",
+            "Full Lockdown description",
+            isEnabled,
+            state,
+            requirements ?? [],
+            state switch
+            {
+                AgnosiaModuleState.Enabled => "Включён",
                 AgnosiaModuleState.Unavailable => "Недоступен",
                 _ => "Выключен"
             },

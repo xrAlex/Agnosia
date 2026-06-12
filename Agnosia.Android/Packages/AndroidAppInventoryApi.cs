@@ -1,6 +1,7 @@
 using Agnosia.Android.Api.Permissions;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Api.Storage;
+using Agnosia.Android.Storage;
 using Agnosia.Models;
 using Android.App;
 using Android.App.Admin;
@@ -36,6 +37,9 @@ public static class AndroidAppInventoryApi
         var apps = packageManager.GetInstalledApplications(AndroidSystemApi.GetInstalledApplicationFlags());
         var models = new List<AppServiceModel>(apps.Count);
         var installedPackageNames = new HashSet<string>(StringComparer.Ordinal);
+        var internetBlockedPackages = LockdownSettingsStore
+            .LoadBlockedPackages()
+            .ToHashSet(StringComparer.Ordinal);
         var specialAccess = isRiskEngineEnabled ? ReadSpecialAccessSnapshot(context) : SpecialAccessSnapshot.Empty;
         foreach (var app in apps)
         {
@@ -50,6 +54,7 @@ public static class AndroidAppInventoryApi
                     app,
                     showAll,
                     specialAccess,
+                    internetBlockedPackages,
                     isRiskEngineEnabled,
                     options) is { } model)
                 models.Add(model);
@@ -129,6 +134,7 @@ public static class AndroidAppInventoryApi
         ApplicationInfo app,
         bool showAll,
         SpecialAccessSnapshot specialAccess,
+        HashSet<string> internetBlockedPackages,
         bool isRiskEngineEnabled,
         AppInventoryQueryOptions options)
     {
@@ -154,6 +160,7 @@ public static class AndroidAppInventoryApi
                 isInstalled,
                 identity,
                 permissionRisk,
+                isInternetBlocked: false,
                 permissionRiskAvailable: true,
                 loadIcon: false,
                 includeApkPaths: options.IncludeSystemApkPaths);
@@ -185,6 +192,7 @@ public static class AndroidAppInventoryApi
             isInstalled,
             packageIdentity,
             permissionRisk,
+            internetBlockedPackages.Contains(packageName),
             isRiskEngineEnabled,
             loadIcon: options.IncludeInlineIcons,
             includeApkPaths: true);
@@ -200,6 +208,7 @@ public static class AndroidAppInventoryApi
         bool isInstalled,
         PackageIdentity packageIdentity,
         AppPermissionRiskAnalysis permissionRisk,
+        bool isInternetBlocked,
         bool permissionRiskAvailable,
         bool loadIcon,
         bool includeApkPaths)
@@ -214,6 +223,7 @@ public static class AndroidAppInventoryApi
             IsHidden = isHidden,
             CanLaunch = packageManager.GetLaunchIntentForPackage(packageName) is not null,
             IsInstalled = isInstalled,
+            IsInternetBlocked = isInternetBlocked,
             PermissionRiskAvailable = permissionRiskAvailable,
             PermissionRiskLevel = permissionRisk.Level,
             RiskyPermissions = permissionRisk.RiskyPermissions.ToArray(),

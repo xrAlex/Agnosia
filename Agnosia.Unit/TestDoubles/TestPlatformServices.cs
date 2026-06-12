@@ -56,6 +56,8 @@ public sealed class TestPlatformServices :
 
     public Func<AppSnapshot, CancellationToken, Task<OperationResult>>? LaunchHandler { get; set; }
 
+    public Func<AppSnapshot, bool, CancellationToken, Task<OperationResult>>? SetLockdownInternetAccessHandler { get; set; }
+
     public Func<AppSnapshot, CancellationToken, Task<OperationResult>>? RevokeRuntimePermissionsHandler { get; set; }
 
     public int DashboardProfileLoadCount { get; private set; }
@@ -87,6 +89,8 @@ public sealed class TestPlatformServices :
     public List<AppSnapshot> RevokeRuntimePermissionsRequests { get; } = [];
 
     public List<(AppSnapshot App, bool Enabled)> SetInteractionAccessRequests { get; } = [];
+
+    public List<(AppSnapshot App, bool Blocked)> SetLockdownInternetAccessRequests { get; } = [];
 
     public List<IReadOnlyList<AppSnapshot>> AppIconLoadRequests { get; } = [];
 
@@ -263,6 +267,18 @@ public sealed class TestPlatformServices :
         SetInteractionAccessRequests.Add((app, enabled));
 
         return Task.FromResult(DefaultOperationResult);
+    }
+
+    public Task<OperationResult> SetLockdownInternetAccessAsync(
+        AppSnapshot app,
+        bool blocked,
+        CancellationToken cancellationToken = default)
+    {
+        SetLockdownInternetAccessRequests.Add((app, blocked));
+
+        return SetLockdownInternetAccessHandler is null
+            ? Task.FromResult(DefaultOperationResult)
+            : SetLockdownInternetAccessHandler(app, blocked, cancellationToken);
     }
 
     public Task<OperationResult> RevokeRuntimePermissionsAsync(

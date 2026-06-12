@@ -188,6 +188,14 @@ public sealed partial class DummyActivity
                 QueryAppsCache.Remove(key);
     }
 
+    private static void ClearAppInventoryQueryCache()
+    {
+        lock (QueryAppsCacheSync)
+        {
+            QueryAppsCache.Clear();
+        }
+    }
+
     private async Task ActionQueryAppIconAsync(CancellationToken cancellationToken)
     {
         var intent = Intent;

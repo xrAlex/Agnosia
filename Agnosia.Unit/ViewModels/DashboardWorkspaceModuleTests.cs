@@ -225,6 +225,75 @@ public sealed class DashboardWorkspaceModuleTests
     }
 
     [Fact]
+    public async Task Lockdown_module_toggle_updates_module_state()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            Modules = [TestSnapshots.LockdownModule(canSetEnabled: true)]
+        };
+        services.SetModuleEnabledHandler = (module, enabled, _) =>
+        {
+            services.Modules =
+            [
+                TestSnapshots.LockdownModule(
+                    enabled,
+                    enabled ? AgnosiaModuleState.Enabled : AgnosiaModuleState.Disabled,
+                    canSetEnabled: true)
+            ];
+
+            return Task.FromResult(OperationResult.Success(enabled ? "Lockdown включён." : "Lockdown выключен."));
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+
+        await viewModel.EnsureInitializedAsync();
+        var lockdown = viewModel.Modules.Single();
+
+        await lockdown.ToggleEnabledCommand.ExecuteAsync(null);
+
+        Assert.Equal([(AgnosiaModuleKind.Lockdown, true)], services.SetModuleEnabledRequests);
+        Assert.False(viewModel.StatusIsError);
+        Assert.Equal("Lockdown включён.", viewModel.StatusMessage);
+        Assert.True(viewModel.Modules.Single().IsEnabled);
+        Assert.Equal(AgnosiaModuleState.Enabled, viewModel.Modules.Single().State);
+    }
+
+    [Fact]
+    public async Task Lockdown_toggle_updates_internet_control_visibility_for_loaded_work_apps()
+    {
+        var workApp = TestSnapshots.App(ProfileKind.Work);
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            AppInventory = new DashboardAppInventorySnapshot([], [workApp]),
+            Modules = [TestSnapshots.LockdownModule(canSetEnabled: true)]
+        };
+        services.SetModuleEnabledHandler = (_, enabled, _) =>
+        {
+            services.Modules =
+            [
+                TestSnapshots.LockdownModule(
+                    enabled,
+                    enabled ? AgnosiaModuleState.Enabled : AgnosiaModuleState.Disabled)
+            ];
+
+            return Task.FromResult(OperationResult.Success("Lockdown updated"));
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+
+        await viewModel.EnsureInitializedAsync();
+        viewModel.SelectWorkCommand.Execute(null);
+        var app = Assert.Single(viewModel.VisibleApps);
+
+        Assert.False(app.ShowInternetAccessControl);
+
+        await viewModel.Modules.Single().ToggleEnabledCommand.ExecuteAsync(null);
+
+        Assert.True(app.ShowInternetAccessControl);
+    }
+
+
+    [Fact]
     public async Task Risk_engine_module_toggle_updates_module_state()
     {
         var services = new TestPlatformServices

@@ -22,6 +22,8 @@ public sealed class AppServiceModel
 
     public bool IsInstalled { get; init; }
 
+    public bool IsInternetBlocked { get; init; }
+
     public bool PermissionRiskAvailable { get; init; } = true;
 
     public AppPermissionRiskLevel PermissionRiskLevel { get; init; } = AppPermissionRiskLevel.Safe;

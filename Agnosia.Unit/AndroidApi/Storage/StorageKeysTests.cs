@@ -11,6 +11,8 @@ public sealed class StorageKeysTests
         { nameof(StorageKeys.ShowAllApps), "show_all_apps" },
         { nameof(StorageKeys.DisableVpnBeforeWorkLaunch), "disable_vpn_before_work_launch" },
         { nameof(StorageKeys.CrossProfileFileShuttleEnabled), "cross_profile_file_shuttle_enabled" },
+        { nameof(StorageKeys.LockdownEnabled), "lockdown_enabled" },
+        { nameof(StorageKeys.LockdownBlockedPackages), "lockdown_blocked_packages" },
         { nameof(StorageKeys.EnableVpnAfterWorkFreeze), "enable_vpn_after_work_freeze" },
         { nameof(StorageKeys.VpnAfterWorkFreezeClient), "vpn_after_work_freeze_client" },
         { nameof(StorageKeys.TunguskaAutomationToken), "tunguska_automation_token" },

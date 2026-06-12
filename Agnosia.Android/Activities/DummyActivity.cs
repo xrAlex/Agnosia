@@ -48,6 +48,8 @@ namespace Agnosia.Android.Activities;
     AgnosiaActions.FreezePackage,
     AgnosiaActions.UnfreezePackage,
     AgnosiaActions.RevokeRuntimePermissions,
+    AgnosiaActions.SetLockdownEnabled,
+    AgnosiaActions.SetLockdownInternetAccess,
     AgnosiaActions.PrepareHiddenShortcut,
     AgnosiaActions.CreateHiddenShortcut,
     AgnosiaActions.UnfreezeAndLaunch,

@@ -2,6 +2,7 @@ using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Api.Storage;
 using Agnosia.Android.Receivers;
 using Agnosia.Android.Services;
+using Agnosia.Android.Vpn;
 using Agnosia.Infrastructure;
 using Android.Content;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
@@ -44,6 +45,7 @@ internal static class AndroidStartup
             MainActivity.LauncherActivityName,
             enableLauncher);
         AgnosiaUtilities.EnforceUserRestrictions(context, typeof(AgnosiaDeviceAdminReceiver));
+        LockdownVpnController.EnsureEnabledPolicy(context, typeof(AgnosiaDeviceAdminReceiver));
     }
 
     public static void EnforceWorkProfilePoliciesAndStartLockFreezeMonitor(

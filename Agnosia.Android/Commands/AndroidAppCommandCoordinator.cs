@@ -277,6 +277,24 @@ internal sealed class AndroidAppCommandCoordinator(
             cancellationToken);
     }
 
+    public Task<OperationResult> SetLockdownInternetAccessAsync(
+        AppSnapshot app,
+        bool blocked,
+        CancellationToken cancellationToken)
+    {
+        if (app.Profile != ProfileKind.Work)
+            return Task.FromResult(OperationResult.Failure("Lockdown доступен только для приложений рабочего профиля."));
+
+        if (app.IsSystem)
+            return Task.FromResult(OperationResult.Failure("Lockdown не применяется к системным приложениям рабочего профиля."));
+
+        return AndroidProfileCommandGateway.SetLockdownInternetAccessAsync(
+            commandRunner,
+            app.PackageName,
+            blocked,
+            cancellationToken);
+    }
+
     private async Task<OperationResult> EnsurePersonalVpnDisabledBeforeWorkLaunchAsync(
         CancellationToken cancellationToken)
     {

@@ -186,6 +186,23 @@
                                                           IsChecked="{Binding InteractionAllowed, Mode=OneWay}"
                                                           Command="{Binding ToggleInteractionAccessCommand}" />
                                         </Grid>
+
+                                        <Grid ColumnDefinitions="*,Auto"
+                                              IsVisible="{Binding ShowInternetAccessControl}"
+                                              ColumnSpacing="12">
+                                            <StackPanel MinWidth="0"
+                                                        Spacing="2">
+                                                <TextBlock Classes="app-dialog-setting-title"
+                                                           Text="{Binding InternetAccessLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}" />
+                                                <TextBlock Classes="app-dialog-setting-caption"
+                                                           Text="Lockdown VPN в рабочем профиле" />
+                                            </StackPanel>
+                                            <ToggleSwitch Grid.Column="1"
+                                                          VerticalAlignment="Center"
+                                                          IsChecked="{Binding IsInternetBlocked, Mode=OneWay}"
+                                                          IsEnabled="{Binding CanToggleInternetAccess}"
+                                                          Command="{Binding ToggleInternetAccessCommand}" />
+                                        </Grid>
                                     </StackPanel>
 
                                     <StackPanel Spacing="8"

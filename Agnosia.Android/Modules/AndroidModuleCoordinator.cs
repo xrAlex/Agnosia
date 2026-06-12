@@ -25,6 +25,7 @@ internal sealed partial class AndroidModuleCoordinator(
         return
         [
             CreateFileShuttleSnapshot(activity, permissions),
+            CreateLockdownSnapshot(permissions),
             CreateVpnGuardSnapshot(permissions),
             CreateRiskEngineSnapshot()
         ];
@@ -38,6 +39,7 @@ internal sealed partial class AndroidModuleCoordinator(
         return module switch
         {
             AgnosiaModuleKind.FileShuttle => await SetFileShuttleEnabledAsync(enabled, cancellationToken),
+            AgnosiaModuleKind.Lockdown => await SetLockdownEnabledAsync(enabled, cancellationToken),
             AgnosiaModuleKind.VpnGuard => await SetVpnGuardEnabledAsync(enabled, cancellationToken),
             AgnosiaModuleKind.RiskEngine => await SetRiskEngineEnabledAsync(enabled, cancellationToken),
             _ => OperationResult.Failure("Неизвестный модуль.")
@@ -179,6 +181,63 @@ internal sealed partial class AndroidModuleCoordinator(
             activationRequirements,
             GetVpnGuardStatusText(state),
             isFullyEnabled || !missingActivationRequirements);
+    }
+
+    private async Task<OperationResult> SetLockdownEnabledAsync(
+        bool enabled,
+        CancellationToken cancellationToken)
+    {
+        var activity = commandRunner.CurrentActivity;
+        AgnosiaRuntime.Initialize(activity);
+
+        if (enabled)
+        {
+            var permissions = await permissionCoordinator.LoadPermissionsAsync(cancellationToken);
+            var missingRequirements = GetLockdownActivationRequirements(permissions)
+                .Where(requirement => !requirement.IsSatisfied)
+                .ToArray();
+
+            if (missingRequirements.Length > 0)
+                return OperationResult.Failure("Сначала выполните требования Lockdown.");
+        }
+
+        if (!AgnosiaUtilities.HasWorkProfileTarget(activity))
+            return OperationResult.Failure("Рабочий профиль недоступен для настройки Lockdown.");
+
+        var result = await AndroidProfileCommandGateway.SetLockdownEnabledAsync(
+            commandRunner,
+            enabled,
+            cancellationToken);
+        if (!result.Succeeded) return result;
+
+        LocalStorageManager.Instance.SetBoolean(StorageKeys.LockdownEnabled, enabled);
+        return OperationResult.Success(enabled ? "Lockdown включён." : "Lockdown выключен.");
+    }
+
+    private static AgnosiaModuleSnapshot CreateLockdownSnapshot(
+        IReadOnlyList<PermissionSnapshot> permissions)
+    {
+        var storage = LocalStorageManager.Instance;
+        var isSettingEnabled = storage.GetBoolean(StorageKeys.LockdownEnabled);
+        var activationRequirements = GetLockdownActivationRequirements(permissions);
+        var workProfileAvailable = activationRequirements
+            .First(requirement => requirement.PermissionKind == PermissionKind.WorkProfile)
+            .IsSatisfied;
+        var state = ResolveLockdownState(isSettingEnabled, workProfileAvailable);
+
+        return new AgnosiaModuleSnapshot(
+            AgnosiaModuleKind.Lockdown,
+            "Lockdown",
+            "Блокировка интернета выбранным приложениям рабочего профиля.",
+            """
+            Lockdown включает always-on VPN с lockdown-режимом в рабочем профиле.
+            Выбранные приложения остаются внутри технического VPN без доступа к сети.
+            """,
+            isSettingEnabled,
+            state,
+            activationRequirements,
+            GetLockdownStatusText(state),
+            isSettingEnabled || workProfileAvailable);
     }
 
     private async Task<OperationResult> SetRiskEngineEnabledAsync(

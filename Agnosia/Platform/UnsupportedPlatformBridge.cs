@@ -23,6 +23,7 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
         Task.FromResult<IReadOnlyList<AgnosiaModuleSnapshot>>(
             [
                 AgnosiaModuleSnapshot.FileShuttleUnavailable,
+                AgnosiaModuleSnapshot.LockdownUnavailable,
                 AgnosiaModuleSnapshot.VpnGuardUnavailable,
                 AgnosiaModuleSnapshot.RiskEngineUnavailable
             ]);
@@ -151,6 +152,12 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
     }
 
     public Task<OperationResult> SetInteractionAccessAsync(AppSnapshot app, bool enabled,
+        CancellationToken cancellationToken = default)
+    {
+        return AndroidOnlyFailureTask;
+    }
+
+    public Task<OperationResult> SetLockdownInternetAccessAsync(AppSnapshot app, bool blocked,
         CancellationToken cancellationToken = default)
     {
         return AndroidOnlyFailureTask;

@@ -95,6 +95,8 @@
     <system:String x:Key="String.App.Action.Uninstall">Удалить</system:String>
     <system:String x:Key="String.App.Action.AllowInteraction">Разрешить обмен</system:String>
     <system:String x:Key="String.App.Action.DisallowInteraction">Обмен включён</system:String>
+    <system:String x:Key="String.App.Action.BlockInternet">Заблокировать интернет</system:String>
+    <system:String x:Key="String.App.Action.UnblockInternet">Интернет заблокирован</system:String>
 
     <system:String x:Key="String.App.Status.Isolated">Изолировано</system:String>
     <system:String x:Key="String.App.Status.NotInstalled">Не установлено</system:String>
@@ -107,5 +109,7 @@
     <system:String x:Key="String.App.Status.Launching">Открываем приложение.</system:String>
     <system:String x:Key="String.App.Status.InteractionDisabled">Межпрофильный обмен отключен.</system:String>
     <system:String x:Key="String.App.Status.InteractionEnabled">Межпрофильный обмен включен.</system:String>
+    <system:String x:Key="String.App.Status.InternetBlocked">Интернет приложения заблокирован.</system:String>
+    <system:String x:Key="String.App.Status.InternetUnblocked">Интернет приложения разблокирован.</system:String>
 
 </ResourceDictionary>

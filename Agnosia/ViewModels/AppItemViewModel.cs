@@ -55,6 +55,8 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     public bool InteractionAllowed => Snapshot.InteractionAllowed;
 
+    public bool IsInternetBlocked => Snapshot.IsInternetBlocked;
+
     public AppPermissionRiskLevel PermissionRiskLevel => Snapshot.PermissionRiskLevel;
 
     public IReadOnlyList<string> RiskyPermissions => Snapshot.RiskyPermissions ?? EmptyRiskyPermissions;
@@ -168,6 +170,10 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     public bool CanFreeze => Profile == ProfileKind.Work && !Snapshot.IsSystem;
 
+    public bool CanToggleInternetAccess => Profile == ProfileKind.Work && !Snapshot.IsSystem;
+
+    public bool ShowInternetAccessControl => CanToggleInternetAccess && _owner.IsLockdownModuleEnabled;
+
     public bool ShowLaunch => Snapshot.CanLaunch || Profile == ProfileKind.Work;
 
     public string LaunchLabel => Profile == ProfileKind.Work && IsHidden ? "UnfreezeAndOpen" : "Open";
@@ -185,6 +191,8 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
     public static string UninstallLabel => "Uninstall";
 
     public string InteractionLabel => InteractionAllowed ? "DisallowInteraction" : "AllowInteraction";
+
+    public string InternetAccessLabel => IsInternetBlocked ? "UnblockInternet" : "BlockInternet";
 
     [RelayCommand(CanExecute = nameof(CanClone))]
     private Task CloneAsync()
@@ -232,6 +240,12 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
     private Task ToggleInteractionAccessAsync()
     {
         return _owner.ToggleInteractionAccessAsync(this);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanToggleInternetAccess))]
+    private Task ToggleInternetAccessAsync()
+    {
+        return _owner.ToggleInternetAccessAsync(this);
     }
 
     [RelayCommand(CanExecute = nameof(CanRevokeRuntimePermissions))]
@@ -296,6 +310,12 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         {
             OnPropertyChanged(nameof(InteractionAllowed));
             OnPropertyChanged(nameof(InteractionLabel));
+        }
+
+        if (previous.IsInternetBlocked != snapshot.IsInternetBlocked)
+        {
+            OnPropertyChanged(nameof(IsInternetBlocked));
+            OnPropertyChanged(nameof(InternetAccessLabel));
         }
 
         if (previous.PermissionRiskLevel != snapshot.PermissionRiskLevel)
@@ -373,6 +393,8 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(CanMoveToWork));
             OnPropertyChanged(nameof(CanUninstall));
             OnPropertyChanged(nameof(CanFreeze));
+            OnPropertyChanged(nameof(CanToggleInternetAccess));
+            OnPropertyChanged(nameof(ShowInternetAccessControl));
             OnPropertyChanged(nameof(ShowPermissionRiskIndicator));
             OnPropertyChanged(nameof(CanRevokeRuntimePermissions));
         }
@@ -387,6 +409,11 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         }
 
         NotifyCommandStateChanged();
+    }
+
+    internal void NotifyLockdownModuleStateChanged()
+    {
+        OnPropertyChanged(nameof(ShowInternetAccessControl));
     }
 
     public void RequestIconLoad()
@@ -537,6 +564,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         CreateShortcutCommand.NotifyCanExecuteChanged();
         LaunchCommand.NotifyCanExecuteChanged();
         ToggleInteractionAccessCommand.NotifyCanExecuteChanged();
+        ToggleInternetAccessCommand.NotifyCanExecuteChanged();
         RevokeRuntimePermissionsCommand.NotifyCanExecuteChanged();
     }
 

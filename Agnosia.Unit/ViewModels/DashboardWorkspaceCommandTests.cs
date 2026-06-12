@@ -45,7 +45,13 @@ public sealed class DashboardWorkspaceCommandTests
             "Deleted",
             CreatePersonalApp,
             app => app.UninstallCommand.ExecuteAsync(null),
-            (services, exception) => services.UninstallHandler = (_, _) => Throw(exception))
+            (services, exception) => services.UninstallHandler = (_, _) => Throw(exception)),
+        new(
+            "ToggleInternetAccess",
+            "InternetBlocked",
+            CreateWorkApp,
+            app => app.ToggleInternetAccessCommand.ExecuteAsync(null),
+            (services, exception) => services.SetLockdownInternetAccessHandler = (_, _, _) => Throw(exception))
     ];
 
     public static TheoryData<AppCommandCase> AppCommandFallbacks
@@ -267,6 +273,24 @@ public sealed class DashboardWorkspaceCommandTests
         await AsyncAssert.EventuallyAsync(
             () => services.PermissionLoadCount == permissionLoadCountBeforeRequest + 1,
             "Permission reload should happen after primary activity resume.");
+    }
+
+    [Fact]
+    public async Task ToggleInternetAccessCommand_updates_local_snapshot_on_success()
+    {
+        var services = new TestPlatformServices();
+        var viewModel = TestWorkspaceFactory.Create(services);
+        var app = CreateWorkApp(viewModel);
+
+        await app.ToggleInternetAccessCommand.ExecuteAsync(null);
+
+        var request = Assert.Single(services.SetLockdownInternetAccessRequests);
+        Assert.Equal(app.PackageName, request.App.PackageName);
+        Assert.True(request.Blocked);
+        Assert.True(app.IsInternetBlocked);
+        Assert.Equal("UnblockInternet", app.InternetAccessLabel);
+        Assert.False(viewModel.StatusIsError);
+        Assert.Equal("Ok", viewModel.StatusMessage);
     }
 
     // Проверяет переход onboarding на финальный шаг, когда все обязательные permissions выданы.

@@ -69,6 +69,20 @@ public sealed class AppItemViewModelTests
         Assert.False(workSystem.CanRevokeRuntimePermissions);
     }
 
+    [Fact]
+    public void Internet_lockdown_toggle_is_available_only_for_non_system_work_apps()
+    {
+        var personal = CreateApp(TestSnapshots.App(ProfileKind.Personal));
+        var work = CreateApp(TestSnapshots.App(ProfileKind.Work));
+        var workSystem = CreateApp(TestSnapshots.App(ProfileKind.Work, isSystem: true));
+
+        Assert.False(personal.CanToggleInternetAccess);
+        Assert.True(work.CanToggleInternetAccess);
+        Assert.False(workSystem.CanToggleInternetAccess);
+        Assert.False(work.ShowInternetAccessControl);
+        Assert.Equal("BlockInternet", work.InternetAccessLabel);
+    }
+
     // Проверяет, что приложение рабочего профиля не получает межпрофильный обмен по умолчанию.
     [Fact]
     public void Work_app_defaults_interaction_access_to_disabled()
@@ -218,6 +232,7 @@ public sealed class AppItemViewModelTests
             canLaunch: false,
             isInstalled: false,
             interactionAllowed: false,
+            isInternetBlocked: true,
             permissionRiskLevel: AppPermissionRiskLevel.Dangerous,
             riskyPermissions: ["android.permission.INTERNET"]));
 
@@ -229,6 +244,8 @@ public sealed class AppItemViewModelTests
         Assert.False(app.ShowLaunch);
         Assert.Equal("NotInstalled", app.StatusTagLabel);
         Assert.Equal("AllowInteraction", app.InteractionLabel);
+        Assert.True(app.IsInternetBlocked);
+        Assert.Equal("UnblockInternet", app.InternetAccessLabel);
         Assert.Equal(AppPermissionRiskLevel.Dangerous, app.PermissionRiskLevel);
         Assert.True(app.IsPermissionRiskDangerous);
         Assert.True(app.HasRiskyPermissions);
@@ -242,6 +259,8 @@ public sealed class AppItemViewModelTests
         Assert.Contains(nameof(AppItemViewModel.ShowLaunch), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.StatusTagLabel), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.InteractionLabel), changedProperties);
+        Assert.Contains(nameof(AppItemViewModel.IsInternetBlocked), changedProperties);
+        Assert.Contains(nameof(AppItemViewModel.InternetAccessLabel), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.PermissionRiskLevel), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.IsPermissionRiskDangerous), changedProperties);
         Assert.Contains(nameof(AppItemViewModel.PermissionRiskTooltip), changedProperties);

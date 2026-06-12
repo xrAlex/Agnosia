@@ -367,6 +367,40 @@ public static class AndroidProfileCommandGateway
             : OperationResult.Failure("Android отклонил изменение межпрофильной политики.");
     }
 
+    internal static async Task<OperationResult> SetLockdownEnabledAsync(
+        AndroidActivityCommandGateway commandRunner,
+        bool enabled,
+        CancellationToken cancellationToken)
+    {
+        var intent = new Intent(AgnosiaActions.SetLockdownEnabled);
+        intent.PutExtra(AndroidCommandContract.ExtraPreferenceBoolean, enabled);
+        var result = await commandRunner.StartActivityForResultAsync(
+            intent,
+            true,
+            cancellationToken);
+        return AndroidActivityResultApi.ToVoidOperationResult(
+            result,
+            enabled ? "Lockdown включён." : "Lockdown выключен.");
+    }
+
+    internal static async Task<OperationResult> SetLockdownInternetAccessAsync(
+        AndroidActivityCommandGateway commandRunner,
+        string packageName,
+        bool blocked,
+        CancellationToken cancellationToken)
+    {
+        var intent = new Intent(AgnosiaActions.SetLockdownInternetAccess);
+        intent.PutExtra(AndroidCommandContract.ExtraPackage, packageName);
+        intent.PutExtra(AndroidCommandContract.ExtraInternetBlocked, blocked);
+        var result = await commandRunner.StartActivityForResultAsync(
+            intent,
+            true,
+            cancellationToken);
+        return AndroidActivityResultApi.ToVoidOperationResult(
+            result,
+            blocked ? "Интернет приложения заблокирован." : "Интернет приложения разблокирован.");
+    }
+
     public static Task<OperationResult> SynchronizeBooleanToWorkProfileAsync(
         Context context,
         string name,

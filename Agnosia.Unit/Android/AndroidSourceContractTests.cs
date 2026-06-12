@@ -164,6 +164,48 @@ public sealed class AndroidSourceContractTests
         Assert.Contains("host.DisconnectPreparedVpnAsync(cancellationToken)", gatewaySource, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Vpn_guard_detects_only_current_profile_default_vpn()
+    {
+        var vpnApiSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Vpn", "AndroidVpnApi.cs"));
+
+        Assert.Contains("connectivityManager.ActiveNetwork", vpnApiSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("connectivityManager.GetAllNetworks()", vpnApiSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Lockdown_module_uses_dpc_vpn_gateway_contracts()
+    {
+        var coordinatorSource = ReadAndroidSource("Modules\\AndroidModuleCoordinator.cs");
+        var gatewaySource = ReadAndroidSource("Gateways\\AndroidProfileCommandGateway.cs");
+        var dummyPolicySource = ReadAndroidSource("Activities\\DummyActivity.PolicyActions.cs");
+        var controllerSource = ReadAndroidSource("Vpn\\LockdownVpnController.cs");
+        var serviceSource = ReadAndroidSource("Vpn\\LockdownVpnService.cs");
+
+        Assert.Contains("AgnosiaModuleKind.Lockdown", coordinatorSource, StringComparison.Ordinal);
+        Assert.Contains("StorageKeys.LockdownEnabled", coordinatorSource, StringComparison.Ordinal);
+        Assert.Contains("SetLockdownEnabledAsync", gatewaySource, StringComparison.Ordinal);
+        Assert.Contains("SetLockdownInternetAccessAsync", gatewaySource, StringComparison.Ordinal);
+        Assert.Contains("ActionSetLockdownEnabled", dummyPolicySource, StringComparison.Ordinal);
+        Assert.Contains("ActionSetLockdownInternetAccess", dummyPolicySource, StringComparison.Ordinal);
+        Assert.Contains("LockdownSettingsStore.SetPackageBlocked(packageName, blocked)", dummyPolicySource,
+            StringComparison.Ordinal);
+        Assert.Contains("manager.SetAlwaysOnVpnPackage", controllerSource, StringComparison.Ordinal);
+        Assert.Contains("directNetworkAllowlist", controllerSource, StringComparison.Ordinal);
+        Assert.Contains("CreateDirectNetworkPackageAllowlist", controllerSource, StringComparison.Ordinal);
+        Assert.Contains("GetAlwaysOnVpnLockdownWhitelist", controllerSource, StringComparison.Ordinal);
+        Assert.Contains("manager.GetAlwaysOnVpnPackage(admin)", controllerSource, StringComparison.Ordinal);
+        Assert.Contains("manager.IsAlwaysOnVpnLockdownEnabled(admin)", controllerSource, StringComparison.Ordinal);
+        Assert.Contains("PackageInfoFlags.MatchDisabledComponents", controllerSource, StringComparison.Ordinal);
+        Assert.Contains("ApplicationInfoFlags.Installed", controllerSource, StringComparison.Ordinal);
+        Assert.Contains("skipping startup refresh", controllerSource, StringComparison.Ordinal);
+        Assert.Contains("LockdownVpnService.StartOrRefresh(context)", controllerSource, StringComparison.Ordinal);
+        Assert.Contains("AddRoute(\"0.0.0.0\", 0)", serviceSource, StringComparison.Ordinal);
+        Assert.Contains("builder.AddDisallowedApplication(packageName)", serviceSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("LockdownSettingsStore.SaveBlockedPackages", serviceSource, StringComparison.Ordinal);
+    }
+
     // Проверяет, что shortcut launch включает overlay после успешного transient VPN disconnect.
     [Fact]
     public void Shortcut_vpn_launch_shows_overlay_after_successful_disconnect()
@@ -173,6 +215,22 @@ public sealed class AndroidSourceContractTests
         Assert.Contains("TransientVpnDisconnectService.DisconnectPreparedVpnAsync(this)", proxySource,
             StringComparison.Ordinal);
         Assert.Contains("OverlayVpnService.ShowOverlay(this)", proxySource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Shortcut_launch_refreshes_lockdown_policy_after_unhide()
+    {
+        var proxySource = ReadAndroidSource("Activities\\ProxyActivity.cs");
+
+        Assert.Contains("RefreshLockdownForUnhiddenPackageAsync(policyManager, admin, request.PackageName)",
+            proxySource,
+            StringComparison.Ordinal);
+        Assert.Contains("WaitForPackageVisibleToVpnPolicyAsync(packageName)", proxySource,
+            StringComparison.Ordinal);
+        Assert.Contains("LockdownVpnController.RefreshPolicy(this, policyManager, admin)", proxySource,
+            StringComparison.Ordinal);
+        Assert.Contains("LockdownSettingsStore.LoadBlockedPackages()", proxySource, StringComparison.Ordinal);
+        Assert.Contains("IsPackageVisibleToVpnPolicy(packageName)", proxySource, StringComparison.Ordinal);
     }
 
     // Проверяет, что VPN restore и overlay cleanup связаны с событием WorkAppFrozen.

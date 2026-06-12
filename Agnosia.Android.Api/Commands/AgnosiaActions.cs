@@ -21,6 +21,8 @@ public static class AgnosiaActions
     public const string FreezePackage = "agnosia.action.FREEZE_PACKAGE";
     public const string UnfreezePackage = "agnosia.action.UNFREEZE_PACKAGE";
     public const string RevokeRuntimePermissions = "agnosia.action.REVOKE_RUNTIME_PERMISSIONS";
+    public const string SetLockdownEnabled = "agnosia.action.SET_LOCKDOWN_ENABLED";
+    public const string SetLockdownInternetAccess = "agnosia.action.SET_LOCKDOWN_INTERNET_ACCESS";
     public const string UnfreezeAndLaunch = "agnosia.action.UNFREEZE_AND_LAUNCH";
     public const string PrepareHiddenShortcut = "agnosia.action.PREPARE_HIDDEN_SHORTCUT";
     public const string CreateHiddenShortcut = "agnosia.action.CREATE_HIDDEN_SHORTCUT";
@@ -54,6 +56,8 @@ public static class AgnosiaActions
         FreezePackage,
         UnfreezePackage,
         RevokeRuntimePermissions,
+        SetLockdownEnabled,
+        SetLockdownInternetAccess,
         UnfreezeAndLaunch,
         PrepareHiddenShortcut,
         CreateHiddenShortcut,
@@ -91,6 +95,8 @@ public static class AgnosiaActions
         FreezePackage,
         UnfreezePackage,
         RevokeRuntimePermissions,
+        SetLockdownEnabled,
+        SetLockdownInternetAccess,
         PrepareHiddenShortcut,
         CreateHiddenShortcut,
         UnfreezeAndLaunch,

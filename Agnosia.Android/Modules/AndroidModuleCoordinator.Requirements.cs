@@ -34,6 +34,22 @@ internal sealed partial class AndroidModuleCoordinator
         ];
     }
 
+    private static AgnosiaModuleRequirement[] GetLockdownActivationRequirements(
+        IReadOnlyList<PermissionSnapshot> permissions)
+    {
+        var workProfile = GetPermission(permissions, PermissionKind.WorkProfile);
+
+        return
+        [
+            new AgnosiaModuleRequirement(
+                "Рабочий профиль",
+                "Нужен рабочий profile owner, чтобы Agnosia могла включить always-on VPN lockdown.",
+                workProfile.IsGranted,
+                PermissionKind.WorkProfile,
+                workProfile.RequestLabel)
+        ];
+    }
+
     private static PermissionSnapshot GetPermission(
         IReadOnlyList<PermissionSnapshot> permissions,
         PermissionKind kind)
@@ -77,6 +93,14 @@ internal sealed partial class AndroidModuleCoordinator
         return AgnosiaModuleState.Disabled;
     }
 
+    private static AgnosiaModuleState ResolveLockdownState(
+        bool isSettingEnabled,
+        bool workProfileAvailable)
+    {
+        if (!isSettingEnabled) return AgnosiaModuleState.Disabled;
+        return workProfileAvailable ? AgnosiaModuleState.Enabled : AgnosiaModuleState.Unavailable;
+    }
+
     private static string GetFileShuttleStatusText(AgnosiaModuleState state)
     {
         return state switch
@@ -94,6 +118,16 @@ internal sealed partial class AndroidModuleCoordinator
         {
             AgnosiaModuleState.Enabled => "Включён",
             AgnosiaModuleState.PartiallyEnabled => "Частично включён",
+            AgnosiaModuleState.Unavailable => "Недоступен",
+            _ => "Выключен"
+        };
+    }
+
+    private static string GetLockdownStatusText(AgnosiaModuleState state)
+    {
+        return state switch
+        {
+            AgnosiaModuleState.Enabled => "Включён",
             AgnosiaModuleState.Unavailable => "Недоступен",
             _ => "Выключен"
         };

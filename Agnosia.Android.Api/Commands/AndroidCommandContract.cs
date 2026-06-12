@@ -14,6 +14,7 @@ public static class AndroidCommandContract
     public const string ExtraShowAll = "show_all";
     public const string ExtraPreferenceName = "name";
     public const string ExtraPreferenceBoolean = "boolean";
+    public const string ExtraInternetBlocked = "internet_blocked";
     public const string ExtraFileShuttleCallbackMessenger = "file_shuttle_callback_messenger";
     public const string ExtraLaunchPackageName = "packageName";
     public const string ExtraLaunchDisplayName = "displayName";

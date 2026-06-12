@@ -1,6 +1,8 @@
 using Agnosia.Android.Api.Commands;
 using Agnosia.Android.Api.Permissions;
 using Agnosia.Android.Platform;
+using Agnosia.Android.Storage;
+using Agnosia.Android.Vpn;
 using Android.App;
 using Android.Content.PM;
 using Exception = System.Exception;
@@ -10,6 +12,67 @@ namespace Agnosia.Android.Activities;
 
 public sealed partial class DummyActivity
 {
+    private void ActionSetLockdownEnabled()
+    {
+        if (!_isProfileOwner || _policyManager is null)
+        {
+            Log.Warn(LogTag,
+                $"Lockdown toggle rejected. isProfileOwner={_isProfileOwner}, hasPolicyManager={_policyManager is not null}.");
+            FinishWithError("Lockdown доступен только в рабочем профиле Agnosia.");
+            return;
+        }
+
+        var enabled = Intent?.GetBooleanExtra(AndroidCommandContract.ExtraPreferenceBoolean, false) == true;
+        var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
+        var result = LockdownVpnController.SetEnabled(this, _policyManager, admin, enabled);
+        if (result.Succeeded)
+            FinishWithSuccessMessage(result.Message);
+        else
+            FinishWithError(result.Message);
+    }
+
+    private void ActionSetLockdownInternetAccess()
+    {
+        var packageName = Intent?.GetStringExtra(AndroidCommandContract.ExtraPackage);
+        var blocked = Intent?.GetBooleanExtra(AndroidCommandContract.ExtraInternetBlocked, false) == true;
+        if (!_isProfileOwner || _policyManager is null || string.IsNullOrWhiteSpace(packageName))
+        {
+            Log.Warn(LogTag,
+                $"Lockdown package toggle rejected. package={packageName ?? "<none>"}, blocked={blocked}, isProfileOwner={_isProfileOwner}, hasPolicyManager={_policyManager is not null}.");
+            FinishWithError("Android не смог изменить Lockdown для приложения рабочего профиля.");
+            return;
+        }
+
+        if (!LockdownSettingsStore.IsEnabled())
+        {
+            FinishWithError("Сначала включите модуль Lockdown.");
+            return;
+        }
+
+        if (AndroidWorkProfilePackageClassifier.IsSystemPackage(PackageManager, packageName))
+        {
+            FinishWithError("Lockdown не применяется к системным приложениям рабочего профиля.");
+            return;
+        }
+
+        var previousPackages = LockdownSettingsStore.LoadBlockedPackages();
+        LockdownSettingsStore.SetPackageBlocked(packageName, blocked);
+        ClearAppInventoryQueryCache();
+        var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
+        var refreshResult = LockdownVpnController.RefreshPolicy(this, _policyManager, admin);
+        if (!refreshResult.Succeeded)
+        {
+            LockdownSettingsStore.SaveBlockedPackages(previousPackages);
+            ClearAppInventoryQueryCache();
+            FinishWithError(refreshResult.Message);
+            return;
+        }
+
+        FinishWithSuccessMessage(blocked
+            ? "Интернет приложения заблокирован."
+            : "Интернет приложения разблокирован.");
+    }
+
     private void ActionFreezePackage(bool hidden)
     {
         var packageName = Intent?.GetStringExtra("package");

@@ -175,6 +175,12 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         return _appCommandCoordinator.SetInteractionAccessAsync(app, enabled, cancellationToken);
     }
 
+    public Task<OperationResult> SetLockdownInternetAccessAsync(AppSnapshot app, bool blocked,
+        CancellationToken cancellationToken = default)
+    {
+        return _appCommandCoordinator.SetLockdownInternetAccessAsync(app, blocked, cancellationToken);
+    }
+
     public Task<OperationResult> SaveSettingsAsync(AppSettingsSnapshot settings,
         CancellationToken cancellationToken = default)
     {
