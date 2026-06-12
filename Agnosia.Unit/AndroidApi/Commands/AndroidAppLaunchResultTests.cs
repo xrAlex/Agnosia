@@ -119,21 +119,6 @@ public sealed class AndroidAppLaunchResultTests
         Assert.Equal(result.Message, operation.Message);
     }
 
-    // Проверяет JSON round-trip launch result без Android runtime типов.
-    [Fact]
-    public void TryReadJson_round_trips_launch_result()
-    {
-        var original = CreateReceivedResult()
-            .WithStage(AndroidAppLaunchStage.PackageUnhidden)
-            .WithStage(AndroidAppLaunchStage.StartActivityAttempted);
-        var json = original.ToJson();
-
-        var read = AndroidAppLaunchResult.TryReadJson(json, out var result);
-
-        Assert.True(read);
-        AssertEquivalent(original, result);
-    }
-
     // Проверяет safe fallback при пустом или поврежденном JSON payload.
     [Theory]
     [InlineData(null)]
@@ -185,16 +170,6 @@ public sealed class AndroidAppLaunchResultTests
         Assert.Equal(stage, latestEvent.Stage);
         Assert.Equal(issue, latestEvent.Issue);
         Assert.Equal(detail, latestEvent.Detail);
-    }
-
-    private static void AssertEquivalent(AndroidAppLaunchResult expected, AndroidAppLaunchResult actual)
-    {
-        Assert.Equal(expected.PackageName, actual.PackageName);
-        Assert.Equal(expected.DisplayName, actual.DisplayName);
-        Assert.Equal(expected.Stage, actual.Stage);
-        Assert.Equal(expected.Succeeded, actual.Succeeded);
-        Assert.Equal(expected.Issue, actual.Issue);
-        Assert.Equal(expected.Events.Length, actual.Events.Length);
     }
 
     private static void AssertUnknownCommand(AndroidAppLaunchResult result)

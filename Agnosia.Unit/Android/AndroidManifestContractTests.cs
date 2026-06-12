@@ -1,5 +1,7 @@
+using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using Agnosia.Android.Api.Commands;
 using Agnosia.Unit.TestSupport;
 using Xunit;
 
@@ -8,6 +10,23 @@ namespace Agnosia.Unit.Android;
 public sealed class AndroidManifestContractTests
 {
     private static readonly XNamespace Android = "http://schemas.android.com/apk/res/android";
+
+    // Проверяет, что action-группы синхронизированы с IntentFilter Android-активностей.
+    [Fact]
+    public void Target_profile_activity_actions_are_declared_by_android_intent_filters()
+    {
+        var actionNamesByValue = NamesByValueOf(typeof(AgnosiaActions));
+        var expectedActionNames = AgnosiaActions.TargetProfileActivityActions
+            .Select(action => actionNamesByValue[action])
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        var intentFilterActionNames = ReadIntentFilterActionNames(
+            "Activities\\DummyActivity.cs",
+            "Activities\\ProxyActivity.cs");
+
+        Assert.Empty(expectedActionNames.Except(intentFilterActionNames, StringComparer.Ordinal));
+        Assert.Empty(intentFilterActionNames.Except(expectedActionNames, StringComparer.Ordinal));
+    }
 
     // Проверяет manifest requirements для managed profile и device admin сценариев.
     [Fact]
@@ -209,6 +228,11 @@ public sealed class AndroidManifestContractTests
         return File.ReadAllText(RepositoryPaths.Get("Agnosia.Android", "MainActivity.cs"));
     }
 
+    private static string ReadAndroidSource(string relativeSourcePath)
+    {
+        return File.ReadAllText(RepositoryPaths.Get("Agnosia.Android", relativeSourcePath));
+    }
+
     private static string ReadMainActivityName(string source)
     {
         return MatchRequired(source, @"\[Activity\([\s\S]*?Name\s*=\s*""(?<value>[^""]+)""");
@@ -247,5 +271,38 @@ public sealed class AndroidManifestContractTests
     private static void AssertContainsAll(HashSet<string> actual, string[] expected)
     {
         Assert.All(expected, value => Assert.Contains(value, actual));
+    }
+
+    private static Dictionary<string, string> NamesByValueOf(Type type)
+    {
+        return type.GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy)
+            .Where(field => field is { IsLiteral: true, IsInitOnly: false } && field.FieldType == typeof(string))
+            .Select(field => new
+            {
+                Name = field.Name,
+                Value = (string?)field.GetRawConstantValue() ?? string.Empty
+            })
+            .ToDictionary(pair => pair.Value, pair => pair.Name, StringComparer.Ordinal);
+    }
+
+    private static string[] ReadIntentFilterActionNames(params string[] relativeSourcePaths)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var relativeSourcePath in relativeSourcePaths)
+        {
+            var source = ReadAndroidSource(relativeSourcePath);
+            var filters = Regex.Matches(
+                source,
+                @"\[IntentFilter\((?<body>.*?)\)\]",
+                RegexOptions.Singleline);
+
+            foreach (Match filter in filters)
+            foreach (Match action in Regex.Matches(
+                         filter.Groups["body"].Value,
+                         @"AgnosiaActions\.(?<name>[A-Za-z0-9_]+)"))
+                names.Add(action.Groups["name"].Value);
+        }
+
+        return names.Order(StringComparer.Ordinal).ToArray();
     }
 }
