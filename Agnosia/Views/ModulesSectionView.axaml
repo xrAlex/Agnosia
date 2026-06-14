@@ -34,8 +34,20 @@
                                     <Grid ColumnDefinitions="Auto,*,Auto"
                                           ColumnSpacing="14">
                                         <Border Classes="icon-tile">
-                                            <PathIcon Classes="section-icon centered"
-                                                      Data="{StaticResource IconModulesGeometry}" />
+                                            <Grid>
+                                                <PathIcon Classes="section-icon centered"
+                                                          Data="{StaticResource IconFileShuttleGeometry}"
+                                                          IsVisible="{Binding IsFileShuttle}" />
+                                                <PathIcon Classes="section-icon centered"
+                                                          Data="{StaticResource IconLockdownGeometry}"
+                                                          IsVisible="{Binding IsLockdown}" />
+                                                <PathIcon Classes="section-icon centered"
+                                                          Data="{StaticResource IconVpnGuardGeometry}"
+                                                          IsVisible="{Binding IsVpnGuard}" />
+                                                <PathIcon Classes="section-icon centered"
+                                                          Data="{StaticResource IconRiskEngineGeometry}"
+                                                          IsVisible="{Binding IsRiskEngine}" />
+                                            </Grid>
                                         </Border>
 
                                         <StackPanel Grid.Column="1"

@@ -40,6 +40,8 @@ public sealed partial class AgnosiaModuleViewModel : ObservableObject
 
     public bool IsFileShuttle => Kind == AgnosiaModuleKind.FileShuttle;
 
+    public bool IsLockdown => Kind == AgnosiaModuleKind.Lockdown;
+
     public bool IsVpnGuard => Kind == AgnosiaModuleKind.VpnGuard;
 
     public bool IsRiskEngine => Kind == AgnosiaModuleKind.RiskEngine;

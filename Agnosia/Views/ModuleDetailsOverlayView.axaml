@@ -27,8 +27,20 @@
                                       ColumnSpacing="12"
                                       RowSpacing="8">
                                     <Border Classes="icon-tile large">
-                                        <PathIcon Classes="section-icon centered"
-                                                  Data="{StaticResource IconModulesGeometry}" />
+                                        <Grid>
+                                            <PathIcon Classes="section-icon centered"
+                                                      Data="{StaticResource IconFileShuttleGeometry}"
+                                                      IsVisible="{Binding IsFileShuttle}" />
+                                            <PathIcon Classes="section-icon centered"
+                                                      Data="{StaticResource IconLockdownGeometry}"
+                                                      IsVisible="{Binding IsLockdown}" />
+                                            <PathIcon Classes="section-icon centered"
+                                                      Data="{StaticResource IconVpnGuardGeometry}"
+                                                      IsVisible="{Binding IsVpnGuard}" />
+                                            <PathIcon Classes="section-icon centered"
+                                                      Data="{StaticResource IconRiskEngineGeometry}"
+                                                      IsVisible="{Binding IsRiskEngine}" />
+                                        </Grid>
                                     </Border>
 
                                     <StackPanel Grid.Column="1"
