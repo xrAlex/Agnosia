@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:Agnosia.Controls"
              xmlns:vm="using:Agnosia.ViewModels"
              mc:Ignorable="d"
              x:Class="Agnosia.Views.OverviewSectionView"
@@ -60,105 +61,102 @@
                     </StackPanel>
                 </Border>
 
-                <Grid ColumnDefinitions="*,*"
-                      ColumnSpacing="10">
-                    <StackPanel Spacing="10">
-                        <Border Classes="surface-card compact metric-card">
-                            <StackPanel Spacing="6">
-                                <TextBlock Classes="metric-label"
-                                           Text="Всего приложений" />
-                                <TextBlock Classes="metric-value"
-                                           Text="{Binding TotalManagedAppsCount}" />
-                                <TextBlock Classes="metric-support"
-                                           Text="Личный и рабочий каталог" />
-                            </StackPanel>
-                        </Border>
+                <controls:MasonryPanel ColumnSpacing="10"
+                                        MaxColumns="2"
+                                        MinColumnWidth="150"
+                                        RowSpacing="10">
+                    <Border Classes="surface-card compact metric-card">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="metric-label"
+                                       Text="Всего приложений" />
+                            <TextBlock Classes="metric-value"
+                                       Text="{Binding TotalManagedAppsCount}" />
+                            <TextBlock Classes="metric-support"
+                                       Text="Личный и рабочий каталог" />
+                        </StackPanel>
+                    </Border>
 
-                        <Border Classes="surface-card compact metric-card">
-                            <StackPanel Spacing="6">
-                                <TextBlock Classes="metric-label"
-                                           Text="Обмен данными" />
-                                <TextBlock Classes="metric-value"
-                                           Text="{Binding InteractionAccessAppsCount}" />
-                                <TextBlock Classes="metric-support"
-                                           Text="Пакеты которые могут обмениваться данными с основным профилем" />
-                            </StackPanel>
-                        </Border>
+                    <Border Classes="surface-card compact metric-card">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="metric-label"
+                                       Text="Изолированные приложения" />
+                            <TextBlock Classes="metric-value"
+                                       Text="{Binding HiddenWorkAppsCount}" />
+                            <TextBlock Classes="metric-support"
+                                       Text="Приложения которые находятся в рабочем профиле и заморожены" />
+                        </StackPanel>
+                    </Border>
 
-                        <Border Classes="surface-card compact metric-card">
-                            <StackPanel Spacing="6">
-                                <TextBlock Classes="metric-label"
-                                           Text="Статус модулей" />
-                                <ItemsControl ItemsSource="{Binding Modules}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <WrapPanel Orientation="Horizontal" />
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="vm:AgnosiaModuleViewModel">
-                                            <Border Classes="module-status-chip"
-                                                    Classes.enabled="{Binding IsEnabled}"
-                                                    ToolTip.Tip="{Binding StatusText}">
-                                                <Grid ColumnDefinitions="Auto,*"
-                                                      ColumnSpacing="7">
-                                                    <Border Classes="module-status-indicator"
-                                                            Classes.enabled="{Binding IsEnabled}">
-                                                        <Grid>
-                                                            <Border Classes="module-status-dot"
-                                                                    IsVisible="{Binding IsEnabled}" />
-                                                        </Grid>
-                                                    </Border>
-                                                    <TextBlock Grid.Column="1"
-                                                               Classes="module-status-title"
-                                                               Text="{Binding Title}" />
-                                                </Grid>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
+                    <Border Classes="surface-card compact metric-card">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="metric-label"
+                                       Text="Обмен данными" />
+                            <TextBlock Classes="metric-value"
+                                       Text="{Binding InteractionAccessAppsCount}" />
+                            <TextBlock Classes="metric-support"
+                                       Text="Пакеты которые могут обмениваться данными с основным профилем" />
+                        </StackPanel>
+                    </Border>
 
-                    <StackPanel Grid.Column="1"
-                                Spacing="10">
-                        <Border Classes="surface-card compact metric-card">
-                            <StackPanel Spacing="6">
-                                <TextBlock Classes="metric-label"
-                                           Text="Изолированные приложения" />
-                                <TextBlock Classes="metric-value"
-                                           Text="{Binding HiddenWorkAppsCount}" />
-                                <TextBlock Classes="metric-support"
-                                           Text="Приложения которые находятся в рабочем профиле и заморожены" />
-                            </StackPanel>
-                        </Border>
+                    <Border Classes="surface-card compact metric-card">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="metric-label"
+                                       Text="Статус модулей" />
+                            <ItemsControl ItemsSource="{Binding Modules}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:AgnosiaModuleViewModel">
+                                        <Border Classes="module-status-chip"
+                                                Classes.enabled="{Binding IsEnabled}"
+                                                ToolTip.Tip="{Binding StatusText}">
+                                            <Grid ColumnDefinitions="Auto,*"
+                                                  ColumnSpacing="7">
+                                                <Border Classes="module-status-indicator"
+                                                        Classes.enabled="{Binding IsEnabled}">
+                                                    <Grid>
+                                                        <Border Classes="module-status-dot"
+                                                                IsVisible="{Binding IsEnabled}" />
+                                                    </Grid>
+                                                </Border>
+                                                <TextBlock Grid.Column="1"
+                                                           Classes="module-status-title"
+                                                           Text="{Binding Title}" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
 
-                        <Border Classes="surface-card compact metric-card"
-                                IsVisible="{Binding IsRiskSummaryVisible}">
-                            <StackPanel Spacing="6">
-                                <TextBlock Classes="metric-label"
-                                           Text="Опасные приложения" />
-                                <TextBlock Classes="metric-value"
-                                           Text="{Binding CriticalRiskAppsCount}" />
-                                <TextBlock Classes="metric-support"
-                                           Text="{Binding RiskSummarySupportText}" />
-                            </StackPanel>
-                        </Border>
+                    <Border Classes="surface-card compact metric-card"
+                            IsVisible="{Binding IsRiskSummaryVisible}">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="metric-label"
+                                       Text="Опасные приложения" />
+                            <TextBlock Classes="metric-value"
+                                       Text="{Binding CriticalRiskAppsCount}" />
+                            <TextBlock Classes="metric-support"
+                                       Text="{Binding RiskSummarySupportText}" />
+                        </StackPanel>
+                    </Border>
 
-                        <Border Classes="surface-card compact metric-card warning"
-                                IsVisible="{Binding IsPermissionWarningVisible}">
-                            <StackPanel Spacing="6">
-                                <TextBlock Classes="metric-label"
-                                           Text="Состояние разрешений" />
-                                <TextBlock Classes="metric-value"
-                                           Text="{Binding PermissionStateValue}" />
-                                <TextBlock Classes="metric-support"
-                                           Text="{Binding PermissionStateSupportText}" />
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
-                </Grid>
+                    <Border Classes="surface-card compact metric-card warning"
+                            IsVisible="{Binding IsPermissionWarningVisible}">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="metric-label"
+                                       Text="Состояние разрешений" />
+                            <TextBlock Classes="metric-value"
+                                       Text="{Binding PermissionStateValue}" />
+                            <TextBlock Classes="metric-support"
+                                       Text="{Binding PermissionStateSupportText}" />
+                        </StackPanel>
+                    </Border>
+                </controls:MasonryPanel>
             </StackPanel>
         </StackPanel>
     </ScrollViewer>
