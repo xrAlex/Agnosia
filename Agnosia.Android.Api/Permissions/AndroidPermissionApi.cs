@@ -3,7 +3,6 @@ using Agnosia.Models;
 using Android;
 using Android.Content;
 using Android.Content.PM;
-using Android.Net;
 using Android.Provider;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 using Uri = Android.Net.Uri;
@@ -43,19 +42,6 @@ public static class AndroidPermissionApi
         {
             Log.Warn(LogTag, $"Failed to request notification permission: {exception}");
             return OperationResult.Failure("Android не смог открыть запрос разрешения на уведомления.");
-        }
-    }
-
-    public static bool IsVpnPrepared(Activity activity)
-    {
-        try
-        {
-            return VpnService.Prepare(activity) is null;
-        }
-        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
-        {
-            Log.Warn(LogTag, $"Failed to check VPN preparation state: {exception}");
-            return false;
         }
     }
 

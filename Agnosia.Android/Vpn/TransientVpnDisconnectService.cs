@@ -18,6 +18,7 @@ namespace Agnosia.Android.Vpn;
 public sealed class TransientVpnDisconnectService : VpnService
 {
     private const string LogTag = "AgnosiaTransientVpn";
+    private const string ActionVpnService = "android.net.VpnService";
     private const string ActionDisconnect = "agnosia.action.DISCONNECT_ACTIVE_VPN";
     private const int NotificationId = 0x57C41;
     private const string NotificationChannelId = "agnosia.transient-vpn";
@@ -141,7 +142,9 @@ public sealed class TransientVpnDisconnectService : VpnService
 
     public override IBinder? OnBind(Intent? intent)
     {
-        return null;
+        return string.Equals(intent?.Action, ActionVpnService, StringComparison.Ordinal)
+            ? base.OnBind(intent)
+            : null;
     }
 
     private async Task RunDisconnectAsync(int startId)

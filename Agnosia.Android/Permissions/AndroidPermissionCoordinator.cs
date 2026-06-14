@@ -62,7 +62,7 @@ internal sealed class AndroidPermissionCoordinator(
                 "Временное управление VPN",
                 "Основной профиль",
                 "Позволяет приложению управлять VPN-соединениями",
-                AndroidPermissionApi.IsVpnPrepared(activity),
+                LocalStorageManager.Instance.GetBoolean(StorageKeys.VpnControlPrepared),
                 true,
                 "Получено",
                 "Разрешить"),
@@ -192,6 +192,7 @@ internal sealed class AndroidPermissionCoordinator(
     private async Task<OperationResult> RequestVpnControlAsync(CancellationToken cancellationToken)
     {
         var activity = commandRunner.CurrentActivity;
+        var storage = LocalStorageManager.Instance;
         Intent? prepareIntent;
         try
         {
@@ -200,16 +201,28 @@ internal sealed class AndroidPermissionCoordinator(
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
             Log.Warn("AgnosiaPermissions", $"Failed to prepare VPN permission request: {exception}");
+            storage.SetBoolean(StorageKeys.VpnControlPrepared, false);
             return OperationResult.Failure("Android не смог открыть запрос доступа к VPN.");
         }
 
-        if (prepareIntent is null) return OperationResult.Success("VPN-доступ уже подготовлен.");
+        if (prepareIntent is null)
+        {
+            storage.SetBoolean(StorageKeys.VpnControlPrepared, true);
+            return OperationResult.Success("VPN-доступ уже подготовлен.");
+        }
 
         var result = await commandRunner.StartExternalActivityForResultAsync(prepareIntent, cancellationToken);
         var error = AndroidActivityResultApi.ExtractError(result);
-        if (!string.IsNullOrWhiteSpace(error)) return OperationResult.Failure(error);
+        if (!string.IsNullOrWhiteSpace(error))
+        {
+            storage.SetBoolean(StorageKeys.VpnControlPrepared, false);
+            return OperationResult.Failure(error);
+        }
 
-        return result.ResultCode == Result.Ok
+        var prepared = result.ResultCode == Result.Ok;
+        storage.SetBoolean(StorageKeys.VpnControlPrepared, prepared);
+
+        return prepared
             ? OperationResult.Success("VPN-доступ подготовлен.")
             : OperationResult.Failure("Android не выдал доступ к VPN.");
     }

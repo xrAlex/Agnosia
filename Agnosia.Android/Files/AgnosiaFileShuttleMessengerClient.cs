@@ -52,10 +52,16 @@ internal sealed class AgnosiaFileShuttleMessengerClient
         }
     }
 
-    public AgnosiaFileShuttleDocumentInfo? LoadFileMeta(string documentId)
+    public AgnosiaFileShuttleDocumentInfo? LoadFileMeta(
+        string documentId,
+        TimeSpan? requestTimeout = null,
+        bool requireConnected = false)
     {
-        var response = SendRequest(AgnosiaFileShuttleContract.MessageLoadFileMeta, data =>
-            data.PutString(AgnosiaFileShuttleContract.ExtraPath, documentId));
+        var response = SendRequest(
+            AgnosiaFileShuttleContract.MessageLoadFileMeta,
+            data => data.PutString(AgnosiaFileShuttleContract.ExtraPath, documentId),
+            requestTimeout ?? RequestTimeout,
+            requireConnected);
         var json = response.GetString(AgnosiaFileShuttleContract.ExtraFileInfoJson);
         return string.IsNullOrWhiteSpace(json)
             ? null
@@ -64,10 +70,16 @@ internal sealed class AgnosiaFileShuttleMessengerClient
                 AgnosiaFileShuttleJsonContext.Default.AgnosiaFileShuttleDocumentInfo);
     }
 
-    public IReadOnlyList<AgnosiaFileShuttleDocumentInfo> LoadFiles(string parentDocumentId)
+    public IReadOnlyList<AgnosiaFileShuttleDocumentInfo> LoadFiles(
+        string parentDocumentId,
+        TimeSpan? requestTimeout = null,
+        bool requireConnected = false)
     {
-        var response = SendRequest(AgnosiaFileShuttleContract.MessageLoadFiles, data =>
-            data.PutString(AgnosiaFileShuttleContract.ExtraPath, parentDocumentId));
+        var response = SendRequest(
+            AgnosiaFileShuttleContract.MessageLoadFiles,
+            data => data.PutString(AgnosiaFileShuttleContract.ExtraPath, parentDocumentId),
+            requestTimeout ?? RequestTimeout,
+            requireConnected);
         var json = response.GetString(AgnosiaFileShuttleContract.ExtraFileListJson);
         return string.IsNullOrWhiteSpace(json)
             ? []
@@ -76,56 +88,95 @@ internal sealed class AgnosiaFileShuttleMessengerClient
                 AgnosiaFileShuttleJsonContext.Default.AgnosiaFileShuttleDocumentInfoArray) ?? [];
     }
 
-    public ParcelFileDescriptor? OpenFile(string documentId, string mode)
+    public ParcelFileDescriptor? OpenFile(
+        string documentId,
+        string mode,
+        TimeSpan? requestTimeout = null,
+        bool requireConnected = false)
     {
-        var response = SendRequest(AgnosiaFileShuttleContract.MessageOpenFile, data =>
-        {
-            data.PutString(AgnosiaFileShuttleContract.ExtraPath, documentId);
-            data.PutString(AgnosiaFileShuttleContract.ExtraMode, mode);
-        });
+        var response = SendRequest(
+            AgnosiaFileShuttleContract.MessageOpenFile,
+            data =>
+            {
+                data.PutString(AgnosiaFileShuttleContract.ExtraPath, documentId);
+                data.PutString(AgnosiaFileShuttleContract.ExtraMode, mode);
+            },
+            requestTimeout ?? RequestTimeout,
+            requireConnected);
         return ReadParcelFileDescriptor(response);
     }
 
-    public ParcelFileDescriptor? OpenThumbnail(string documentId, Point sizeHint)
+    public ParcelFileDescriptor? OpenThumbnail(
+        string documentId,
+        Point sizeHint,
+        TimeSpan? requestTimeout = null,
+        bool requireConnected = false)
     {
-        var response = SendRequest(AgnosiaFileShuttleContract.MessageOpenThumbnail, data =>
-        {
-            data.PutString(AgnosiaFileShuttleContract.ExtraPath, documentId);
-            data.PutInt(AgnosiaFileShuttleContract.ExtraWidth, sizeHint.X);
-            data.PutInt(AgnosiaFileShuttleContract.ExtraHeight, sizeHint.Y);
-        });
+        var response = SendRequest(
+            AgnosiaFileShuttleContract.MessageOpenThumbnail,
+            data =>
+            {
+                data.PutString(AgnosiaFileShuttleContract.ExtraPath, documentId);
+                data.PutInt(AgnosiaFileShuttleContract.ExtraWidth, sizeHint.X);
+                data.PutInt(AgnosiaFileShuttleContract.ExtraHeight, sizeHint.Y);
+            },
+            requestTimeout ?? RequestTimeout,
+            requireConnected);
         return ReadParcelFileDescriptor(response);
     }
 
-    public string? CreateFile(string parentDocumentId, string mimeType, string displayName)
+    public string? CreateFile(
+        string parentDocumentId,
+        string mimeType,
+        string displayName,
+        TimeSpan? requestTimeout = null,
+        bool requireConnected = false)
     {
-        var response = SendRequest(AgnosiaFileShuttleContract.MessageCreateFile, data =>
-        {
-            data.PutString(AgnosiaFileShuttleContract.ExtraPath, parentDocumentId);
-            data.PutString(AgnosiaFileShuttleContract.ExtraMimeType, mimeType);
-            data.PutString(AgnosiaFileShuttleContract.ExtraDisplayName, displayName);
-        });
+        var response = SendRequest(
+            AgnosiaFileShuttleContract.MessageCreateFile,
+            data =>
+            {
+                data.PutString(AgnosiaFileShuttleContract.ExtraPath, parentDocumentId);
+                data.PutString(AgnosiaFileShuttleContract.ExtraMimeType, mimeType);
+                data.PutString(AgnosiaFileShuttleContract.ExtraDisplayName, displayName);
+            },
+            requestTimeout ?? RequestTimeout,
+            requireConnected);
         return response.GetString(AgnosiaFileShuttleContract.ExtraCreatedDocumentId);
     }
 
-    public string? DeleteFile(string documentId)
+    public string? DeleteFile(
+        string documentId,
+        TimeSpan? requestTimeout = null,
+        bool requireConnected = false)
     {
-        var response = SendRequest(AgnosiaFileShuttleContract.MessageDeleteFile, data =>
-            data.PutString(AgnosiaFileShuttleContract.ExtraPath, documentId));
+        var response = SendRequest(
+            AgnosiaFileShuttleContract.MessageDeleteFile,
+            data => data.PutString(AgnosiaFileShuttleContract.ExtraPath, documentId),
+            requestTimeout ?? RequestTimeout,
+            requireConnected);
         return response.GetString(AgnosiaFileShuttleContract.ExtraDeletedParentId);
     }
 
-    public bool IsChildOf(string parentDocumentId, string documentId)
+    public bool IsChildOf(
+        string parentDocumentId,
+        string documentId,
+        TimeSpan? requestTimeout = null,
+        bool requireConnected = false)
     {
-        var response = SendRequest(AgnosiaFileShuttleContract.MessageIsChildOf, data =>
-        {
-            data.PutString(AgnosiaFileShuttleContract.ExtraParentPath, parentDocumentId);
-            data.PutString(AgnosiaFileShuttleContract.ExtraChildPath, documentId);
-        });
+        var response = SendRequest(
+            AgnosiaFileShuttleContract.MessageIsChildOf,
+            data =>
+            {
+                data.PutString(AgnosiaFileShuttleContract.ExtraParentPath, parentDocumentId);
+                data.PutString(AgnosiaFileShuttleContract.ExtraChildPath, documentId);
+            },
+            requestTimeout ?? RequestTimeout,
+            requireConnected);
         return response.GetBoolean(AgnosiaFileShuttleContract.ExtraIsChild, false);
     }
 
-    private Bundle SendRequest(int what, Action<Bundle> configure)
+    private Bundle SendRequest(int what, Action<Bundle> configure, TimeSpan requestTimeout, bool requireConnected)
     {
         Exception? lastException = null;
         for (var attempt = 0; attempt < 2; attempt++)
@@ -136,7 +187,7 @@ internal sealed class AgnosiaFileShuttleMessengerClient
 
             try
             {
-                var remote = EnsureConnected();
+                var remote = requireConnected ? GetConnectedMessenger() : EnsureConnected();
                 var data = new Bundle();
                 data.PutInt(AgnosiaFileShuttleContract.ExtraRequestId, requestId);
                 configure(data);
@@ -150,7 +201,7 @@ internal sealed class AgnosiaFileShuttleMessengerClient
 
                 var response = WaitForResult(
                     completion.Task,
-                    RequestTimeout,
+                    requestTimeout,
                     "File Shuttle request timed out.");
                 var error = response.GetString(AgnosiaFileShuttleContract.ExtraError);
                 if (!string.IsNullOrWhiteSpace(error)) throw new InvalidOperationException(error);
@@ -205,6 +256,12 @@ internal sealed class AgnosiaFileShuttleMessengerClient
             ClearRemoteMessenger();
             throw;
         }
+    }
+
+    private Messenger GetConnectedMessenger()
+    {
+        return _remoteMessenger
+               ?? throw new InvalidOperationException("File Shuttle bridge is not connected.");
     }
 
     private void StartConnect()

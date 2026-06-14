@@ -163,9 +163,14 @@ public sealed class AndroidManifestContractTests
         Assert.Contains("GetClient(Context context)", brokerSource, StringComparison.Ordinal);
         Assert.Contains("_client ??= new AgnosiaFileShuttleMessengerClient(context)", brokerSource, StringComparison.Ordinal);
         Assert.Contains("AgnosiaFileShuttleClientBroker.GetClient(Context)", providerSource, StringComparison.Ordinal);
+        Assert.Contains("ProviderRequestTimeout", providerSource, StringComparison.Ordinal);
+        Assert.Contains("if (!client.IsConnected)", providerSource, StringComparison.Ordinal);
+        Assert.Contains("requireConnected: true", providerSource, StringComparison.Ordinal);
         Assert.Contains("manual Files launches are best-effort", providerSource, StringComparison.Ordinal);
         Assert.InRange(preconnectIndex, 0, startDocumentsIndex - 1);
         Assert.DoesNotContain("_context.StartActivity(intent)", clientSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("Preconnect(", providerSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("StartConnect(", providerSource, StringComparison.Ordinal);
         Assert.Contains("PendingIntent.GetActivity", pendingIntentSource, StringComparison.Ordinal);
         Assert.Contains("SetPendingIntentBackgroundActivityStartMode", pendingIntentSource, StringComparison.Ordinal);
         Assert.Contains(
@@ -190,6 +195,10 @@ public sealed class AndroidManifestContractTests
         Assert.DoesNotContain("[IntentFilter([\"android.net.VpnService\"])]", source, StringComparison.Ordinal);
         Assert.DoesNotContain("android.net.VpnService.SUPPORTS_ALWAYS_ON", source,
             StringComparison.Ordinal);
+        Assert.Contains("ActionVpnService = \"android.net.VpnService\"", source, StringComparison.Ordinal);
+        Assert.Contains("base.OnBind(intent)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("public override IBinder? OnBind(Intent? intent)\n    {\n        return null;", source,
+            StringComparison.Ordinal);
         Assert.False(File.Exists(
             RepositoryPaths.Get("Agnosia.Android.Api", "Vpn", "TransientVpnDisconnectService.cs")));
     }
@@ -208,14 +217,47 @@ public sealed class AndroidManifestContractTests
         Assert.Contains("Permission = \"android.permission.BIND_VPN_SERVICE\"", source, StringComparison.Ordinal);
         Assert.Contains("ForegroundServiceType = ForegroundService.TypeSystemExempted", source,
             StringComparison.Ordinal);
-        Assert.Contains("[IntentFilter([\"android.net.VpnService\"])]", source, StringComparison.Ordinal);
+        Assert.Contains("ActionVpnService = \"android.net.VpnService\"", source, StringComparison.Ordinal);
+        Assert.Contains("[IntentFilter([ActionVpnService])]", source, StringComparison.Ordinal);
+        Assert.Contains("ActionVpnManagerEvent = \"android.net.action.VPN_MANAGER_EVENT\"", source,
+            StringComparison.Ordinal);
+        Assert.Contains("CategoryEventAlwaysOnStateChanged = \"android.net.category.EVENT_ALWAYS_ON_STATE_CHANGED\"",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains("[IntentFilter([ActionVpnManagerEvent], Categories = [CategoryEventAlwaysOnStateChanged])]",
+            source,
+            StringComparison.Ordinal);
         Assert.Contains("[MetaData(\"android.net.VpnService.SUPPORTS_ALWAYS_ON\", Value = \"true\")]", source,
+            StringComparison.Ordinal);
+        Assert.Contains("base.OnBind(intent)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("public override IBinder? OnBind(Intent? intent)\n    {\n        return null;", source,
             StringComparison.Ordinal);
         Assert.Contains("builder.AddDisallowedApplication(packageName)", source, StringComparison.Ordinal);
         Assert.Contains("LockdownVpnController.EnsureEnabledPolicy(context", startupSource,
             StringComparison.Ordinal);
         Assert.False(File.Exists(
             RepositoryPaths.Get("Agnosia.Android.Api", "Vpn", "LockdownVpnService.cs")));
+    }
+
+    [Fact]
+    public void Vpn_permission_snapshot_does_not_call_prepare()
+    {
+        var source = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Permissions", "AndroidPermissionCoordinator.cs"));
+        var loadPermissions = Regex.Match(
+            source,
+            @"public async Task<IReadOnlyList<PermissionSnapshot>> LoadPermissionsAsync[\s\S]*?\n    public async Task<OperationResult> RequestPermissionAsync",
+            RegexOptions.Singleline).Value;
+        var requestVpnControl = Regex.Match(
+            source,
+            @"private async Task<OperationResult> RequestVpnControlAsync[\s\S]*?\n    private Task<OperationResult> RequestPackageInstallAccessAsync",
+            RegexOptions.Singleline).Value;
+
+        Assert.Contains("StorageKeys.VpnControlPrepared", loadPermissions, StringComparison.Ordinal);
+        Assert.DoesNotContain("VpnService.Prepare", loadPermissions, StringComparison.Ordinal);
+        Assert.DoesNotContain("IsVpnPrepared", loadPermissions, StringComparison.Ordinal);
+        Assert.Contains("VpnService.Prepare(activity)", requestVpnControl, StringComparison.Ordinal);
+        Assert.Contains("StorageKeys.VpnControlPrepared", requestVpnControl, StringComparison.Ordinal);
     }
 
     private static XDocument ReadManifest()

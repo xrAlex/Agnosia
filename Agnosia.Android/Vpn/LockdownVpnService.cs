@@ -16,11 +16,15 @@ namespace Agnosia.Android.Vpn;
     Permission = "android.permission.BIND_VPN_SERVICE",
     Exported = true,
     ForegroundServiceType = ForegroundService.TypeSystemExempted)]
-[IntentFilter(["android.net.VpnService"])]
+[IntentFilter([ActionVpnService])]
+[IntentFilter([ActionVpnManagerEvent], Categories = [CategoryEventAlwaysOnStateChanged])]
 [MetaData("android.net.VpnService.SUPPORTS_ALWAYS_ON", Value = "true")]
 public sealed class LockdownVpnService : VpnService
 {
     private const string LogTag = "AgnosiaLockdownVpn";
+    private const string ActionVpnService = "android.net.VpnService";
+    private const string ActionVpnManagerEvent = "android.net.action.VPN_MANAGER_EVENT";
+    private const string CategoryEventAlwaysOnStateChanged = "android.net.category.EVENT_ALWAYS_ON_STATE_CHANGED";
     private const string ActionRefresh = "agnosia.action.REFRESH_LOCKDOWN_VPN";
     private const string ActionStop = "agnosia.action.STOP_LOCKDOWN_VPN";
     private const int NotificationId = 0x10CDA;
@@ -108,7 +112,9 @@ public sealed class LockdownVpnService : VpnService
 
     public override IBinder? OnBind(Intent? intent)
     {
-        return null;
+        return string.Equals(intent?.Action, ActionVpnService, StringComparison.Ordinal)
+            ? base.OnBind(intent)
+            : null;
     }
 
     private void EstablishOrRefreshInterface()

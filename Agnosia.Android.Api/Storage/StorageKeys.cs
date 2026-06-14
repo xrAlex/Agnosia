@@ -11,6 +11,7 @@ public static class StorageKeys
     public const string AuthKey = "auth_key";
     public const string ShowAllApps = "show_all_apps";
     public const string DisableVpnBeforeWorkLaunch = "disable_vpn_before_work_launch";
+    public const string VpnControlPrepared = "vpn_control_prepared";
     public const string CrossProfileFileShuttleEnabled = "cross_profile_file_shuttle_enabled";
     public const string LockdownEnabled = "lockdown_enabled";
     public const string LockdownBlockedPackages = "lockdown_blocked_packages";

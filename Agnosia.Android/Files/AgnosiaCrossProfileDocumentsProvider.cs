@@ -23,6 +23,7 @@ namespace Agnosia.Android.Files;
 public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
 {
     private const string LogTag = "AgnosiaDocumentsProvider";
+    private static readonly TimeSpan ProviderRequestTimeout = TimeSpan.FromSeconds(2);
 
     private static readonly string[] DefaultRootProjection =
     [
@@ -82,7 +83,7 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
             }
 
             if (TryGetReadyClient(out var client)
-                && client.LoadFileMeta(documentId) is { } info)
+                && client.LoadFileMeta(documentId, ProviderRequestTimeout, requireConnected: true) is { } info)
                 IncludeFile(cursor, info);
         }
         catch (Exception exception)
@@ -105,7 +106,7 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
                 DocumentsContract.BuildDocumentUri(AgnosiaFileShuttleContract.Authority, parentDocumentId));
 
             if (TryGetReadyClient(out var client))
-                foreach (var info in client.LoadFiles(parentDocumentId))
+                foreach (var info in client.LoadFiles(parentDocumentId, ProviderRequestTimeout, requireConnected: true))
                     IncludeFile(cursor, info);
         }
         catch (Exception exception)
@@ -125,7 +126,9 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
 
         try
         {
-            return TryGetReadyClient(out var client) ? client.OpenFile(documentId, mode ?? "r") : null;
+            return TryGetReadyClient(out var client)
+                ? client.OpenFile(documentId, mode ?? "r", ProviderRequestTimeout, requireConnected: true)
+                : null;
         }
         catch (Exception exception)
         {
@@ -145,7 +148,11 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
         {
             if (!TryGetReadyClient(out var client)) return null;
 
-            var descriptor = client.OpenThumbnail(documentId, sizeHint ?? new Point(128, 128));
+            var descriptor = client.OpenThumbnail(
+                documentId,
+                sizeHint ?? new Point(128, 128),
+                ProviderRequestTimeout,
+                requireConnected: true);
             return descriptor is null
                 ? null
                 : new AssetFileDescriptor(descriptor, 0, AssetFileDescriptor.UnknownLength);
@@ -168,7 +175,9 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
             var documentId = client.CreateFile(
                 parentDocumentId,
                 mimeType ?? "application/octet-stream",
-                displayName);
+                displayName,
+                ProviderRequestTimeout,
+                requireConnected: true);
             if (!string.IsNullOrWhiteSpace(documentId)) NotifyDocumentChanged(parentDocumentId);
             return documentId;
         }
@@ -187,7 +196,7 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
         {
             if (!TryGetReadyClient(out var client)) return;
 
-            var parentId = client.DeleteFile(documentId);
+            var parentId = client.DeleteFile(documentId, ProviderRequestTimeout, requireConnected: true);
             if (!string.IsNullOrWhiteSpace(parentId)) NotifyDocumentChanged(parentId);
         }
         catch (Exception exception)
@@ -202,7 +211,8 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
 
         try
         {
-            return TryGetReadyClient(out var client) && client.IsChildOf(parentDocumentId, documentId);
+            return TryGetReadyClient(out var client)
+                   && client.IsChildOf(parentDocumentId, documentId, ProviderRequestTimeout, requireConnected: true);
         }
         catch (Exception exception)
         {
@@ -232,7 +242,12 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
         {
             client = GetClient();
             if (!client.IsConnected)
+            {
                 Log.Warn(LogTag, "File Shuttle provider has no preconnected bridge; manual Files launches are best-effort on Android 14+ because background activity starts can be blocked.");
+                client = null!;
+                return false;
+            }
+
             return true;
         }
 
