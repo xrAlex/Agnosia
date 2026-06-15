@@ -499,48 +499,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     partial void OnSearchTextChanged(string value) => QueueSearchRefresh();
 
-    partial void OnSelectedThemeChanged(AppThemeKind value)
-    {
-        if (!_isApplyingSnapshot) AppThemeManager.Apply(value);
-
-        QueueSettingsSave();
-    }
-
-    partial void OnLoggingEnabledChanged(bool value)
-    {
-        if (value)
-        {
-            QueueSettingsSave();
-            return;
-        }
-
-        IsLogWindowOpen = false;
-        ClearLogs();
-        QueueSettingsSave();
-    }
-
-    partial void OnShowAllAppsChanged(bool value) => QueueSettingsSave();
-
-    partial void OnDisableVpnBeforeWorkLaunchChanged(bool value) => QueueSettingsSave();
-
-    partial void OnCrossProfileFileShuttleEnabledChanged(bool value) => QueueSettingsSave();
-
-    partial void OnEnableVpnAfterWorkFreezeChanged(bool value) => QueueSettingsSave();
-
-    partial void OnVpnAfterWorkFreezeClientChanged(VpnAutomationClientKind value)
-    {
-        foreach (var option in VpnAfterFreezeClientOptions) option.NotifySelectionChanged();
-        SelectedModule?.NotifyVpnSettingsChanged();
-
-        QueueSettingsSave();
-    }
-
-    partial void OnTunguskaAutomationTokenChanged(string value)
-    {
-        SelectedModule?.NotifyVpnSettingsChanged();
-        QueueSettingsSave();
-    }
-
     partial void OnOnboardingCompletedChanged(bool value)
     {
         if (value) StopOnboardingMonitor();
@@ -776,26 +734,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private void OpenSettingsSection()
     {
         if (CanOpenSettingsSection) SelectedSection = DashboardSection.Settings;
-    }
-
-    [RelayCommand]
-    private async Task OpenLogsAsync()
-    {
-        if (!LoggingEnabled)
-            return;
-
-        await ReloadPlatformLogsAsync(true);
-        IsLogWindowOpen = true;
-    }
-
-    [RelayCommand]
-    private void CloseLogs() => IsLogWindowOpen = false;
-
-    [RelayCommand]
-    private void ClearLogs()
-    {
-        _eventLogService.Clear();
-        NotifyLogStateChanged();
     }
 
     [RelayCommand]
@@ -1604,74 +1542,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         StartProvisioningCommand.NotifyCanExecuteChanged();
     }
 
-    private AppSettingsSnapshot CaptureSettingsSnapshot()
-    {
-        return new AppSettingsSnapshot(
-            ShowAllApps,
-            DisableVpnBeforeWorkLaunch,
-            CrossProfileFileShuttleEnabled,
-            LoggingEnabled,
-            SelectedTheme,
-            EnableVpnAfterWorkFreeze,
-            VpnAfterWorkFreezeClient,
-            TunguskaAutomationToken);
-    }
-
-    private void QueueSettingsSave() => _settingsSaveCoordinator.Queue();
-
-    internal bool IsVpnAfterFreezeClientSelected(VpnAutomationClientKind kind)
-    {
-        return VpnAfterWorkFreezeClient == kind;
-    }
-
-    internal void SelectVpnAfterFreezeClient(VpnAutomationClientKind kind)
-    {
-        VpnAfterWorkFreezeClient = kind;
-    }
-
-    private VpnAutomationClientOptionViewModel[] CreateVpnAfterFreezeClientOptions()
-    {
-        return
-        [
-            new(this, VpnAutomationClientKind.FlClash, "FlClash"),
-            new(this, VpnAutomationClientKind.ClashMeta, "Clash Meta"),
-            new(this, VpnAutomationClientKind.Happ, "Happ"),
-            new(this, VpnAutomationClientKind.Tunguska, "Tunguska"),
-            new(this, VpnAutomationClientKind.Incy, "INCY"),
-            new(this, VpnAutomationClientKind.Exclave, "Exclave"),
-            new(this, VpnAutomationClientKind.Husi, "husi"),
-            new(this, VpnAutomationClientKind.NekoBoxPlus, "NekoBox+")
-        ];
-    }
-
-    private void SetSettingsSaveStatus(bool isError, string? message)
-    {
-        StatusIsError = isError;
-        if (!string.IsNullOrWhiteSpace(message)) StatusMessage = message;
-    }
-
-    private void NotifyLogStateChanged()
-    {
-        OnPropertyChanged(nameof(LogSummary));
-        OnPropertyChanged(nameof(LogOutput));
-        OnPropertyChanged(nameof(LogLines));
-    }
-
-    private async Task ReloadPlatformLogsAsync(bool force = false)
-    {
-        var shouldLoad = await InvokeOnUiThreadFuncAsync(
-                () => LoggingEnabled && (force || IsLogWindowOpen),
-                DispatcherPriority.Background)
-            .ConfigureAwait(false);
-        if (!shouldLoad) return;
-
-        var logs = await LoadRecentLogsOnWorkerAsync().ConfigureAwait(false);
-        await InvokeOnUiThreadActionAsync(
-                () => ImportPlatformLogs(logs),
-                DispatcherPriority.Background)
-            .ConfigureAwait(false);
-    }
-
     private Task ReloadPermissionsAsync()
     {
         lock (_permissionReloadSync)
@@ -1778,11 +1648,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         {
             await ReportErrorOnUiThreadAsync(ex, "PermissionRequestFailed");
         }
-    }
-
-    private void ImportPlatformLogs(IEnumerable<AppLogEntry> logs)
-    {
-        if (_eventLogService.ImportPlatformLogs(logs)) NotifyLogStateChanged();
     }
 
     private async Task ReportErrorOnUiThreadAsync(Exception exception, string fallbackMessage)

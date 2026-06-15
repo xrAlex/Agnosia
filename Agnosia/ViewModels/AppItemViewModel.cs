@@ -82,7 +82,8 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     public bool HasPermissionDetails => HasManifestPermissions || HasRuntimePermissions;
 
-    public bool CanRevokeRuntimePermissions => HasRuntimePermissions && !Snapshot.IsSystem && Profile == ProfileKind.Work;
+    public bool CanRevokeRuntimePermissions =>
+        AppItemPresentation.CanRevokeRuntimePermissions(Snapshot, HasRuntimePermissions);
 
     public string ManifestPermissionsText =>
         _manifestPermissionsText ??= AppPermissionRiskTextFormatter.FormatPermissionBlockList(ManifestPermissions);
@@ -102,21 +103,12 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     public bool IsPermissionRiskCritical => PermissionRiskLevel == AppPermissionRiskLevel.Critical;
 
-    public bool ShowPermissionRiskIndicator =>
-        Snapshot.PermissionRiskAvailable
-        && !Snapshot.IsSystem
-        && PermissionRiskLevel != AppPermissionRiskLevel.Safe;
+    public bool ShowPermissionRiskIndicator => AppItemPresentation.ShouldShowPermissionRiskIndicator(Snapshot);
 
-    public string PermissionRiskTooltip => PermissionRiskLevel switch
-    {
-        AppPermissionRiskLevel.Critical => PermissionRiskSummaryText,
-        AppPermissionRiskLevel.Dangerous => PermissionRiskSummaryText,
-        _ => "Разрешения: OK"
-    };
+    public string PermissionRiskTooltip =>
+        AppItemPresentation.GetPermissionRiskTooltip(PermissionRiskLevel, PermissionRiskSummaryText);
 
-    public string Monogram => string.IsNullOrWhiteSpace(Snapshot.Label)
-        ? "?"
-        : char.ToUpperInvariant(Snapshot.Label[0]).ToString();
+    public string Monogram => AppItemPresentation.GetMonogram(Snapshot.Label);
 
     public Bitmap? Icon
     {
@@ -153,35 +145,35 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         }
     }
 
-    public string StatusTagLabel => ResolveStatusTagLabel(Snapshot);
+    public string StatusTagLabel => AppItemPresentation.GetStatusTagLabel(Snapshot);
 
-    public string ProfileLabel => Profile == ProfileKind.Work ? "Work" : "Personal";
+    public string ProfileLabel => AppItemPresentation.GetProfileLabel(Profile);
 
     public bool HasStatusTag => StatusTagLabel.Length > 0;
 
-    public bool ShowSecondaryRow => HasStatusTag || Profile == ProfileKind.Work;
+    public bool ShowSecondaryRow => AppItemPresentation.ShouldShowSecondaryRow(Snapshot);
 
-    public bool ShowWorkControls => Profile == ProfileKind.Work;
+    public bool ShowWorkControls => AppItemPresentation.ShouldShowWorkControls(Profile);
 
-    public bool IsAgnosiaManaged => ShowWorkControls && IsHidden;
+    public bool IsAgnosiaManaged => AppItemPresentation.IsAgnosiaManaged(Snapshot);
 
-    public bool CanClone => Profile == ProfileKind.Personal || !Snapshot.IsSystem;
+    public bool CanClone => AppItemPresentation.CanClone(Snapshot);
 
-    public bool CanMoveToWork => Profile == ProfileKind.Personal && CanClone && CanUninstall;
+    public bool CanMoveToWork => AppItemPresentation.CanMoveToWork(Snapshot);
 
-    public bool CanUninstall => !Snapshot.IsSystem;
+    public bool CanUninstall => AppItemPresentation.CanUninstall(Snapshot);
 
-    public bool CanFreeze => Profile == ProfileKind.Work && !Snapshot.IsSystem;
+    public bool CanFreeze => AppItemPresentation.CanFreeze(Snapshot);
 
-    public bool CanToggleInternetAccess => Profile == ProfileKind.Work && !Snapshot.IsSystem;
+    public bool CanToggleInternetAccess => AppItemPresentation.CanToggleInternetAccess(Snapshot);
 
     public bool ShowInternetAccessControl => CanToggleInternetAccess && _owner.IsLockdownModuleEnabled;
 
-    public bool ShowLaunch => Snapshot.CanLaunch || Profile == ProfileKind.Work;
+    public bool ShowLaunch => AppItemPresentation.ShouldShowLaunch(Snapshot);
 
-    public string LaunchLabel => Profile == ProfileKind.Work && IsHidden ? "UnfreezeAndOpen" : "Open";
+    public string LaunchLabel => AppItemPresentation.GetLaunchLabel(Snapshot);
 
-    public string CloneLabel => Profile == ProfileKind.Work ? "CopyToPersonal" : "CopyToWork";
+    public string CloneLabel => AppItemPresentation.GetCloneLabel(Profile);
 
     public static string MoveToWorkLabel => "MoveToWork";
 
@@ -193,9 +185,9 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     public static string UninstallLabel => "Uninstall";
 
-    public string InteractionLabel => InteractionAllowed ? "DisallowInteraction" : "AllowInteraction";
+    public string InteractionLabel => AppItemPresentation.GetInteractionLabel(InteractionAllowed);
 
-    public string InternetAccessLabel => IsInternetBlocked ? "UnblockInternet" : "BlockInternet";
+    public string InternetAccessLabel => AppItemPresentation.GetInternetAccessLabel(IsInternetBlocked);
 
     [RelayCommand(CanExecute = nameof(CanClone))]
     private Task CloneAsync()
@@ -602,17 +594,6 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
             RiskyPermissions,
             PermissionRiskScoreBreakdown,
             MatchedPermissionRiskRuleIds);
-    }
-
-    private static string ResolveStatusTagLabel(AppSnapshot snapshot)
-    {
-        if (snapshot.Profile == ProfileKind.Work && snapshot.IsHidden) return "Isolated";
-
-        if (!snapshot.IsInstalled) return "NotInstalled";
-
-        if (snapshot.IsSystem) return "System";
-
-        return string.Empty;
     }
 
     private static Bitmap? DecodeIcon(byte[]? iconPng)

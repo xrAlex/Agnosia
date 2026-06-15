@@ -83,6 +83,51 @@ public sealed class AppItemViewModelTests
         Assert.Equal("BlockInternet", work.InternetAccessLabel);
     }
 
+    [Fact]
+    public void AppItemPresentation_hides_permission_risk_indicator_when_indicator_has_no_value()
+    {
+        var safeApp = TestSnapshots.App(
+            ProfileKind.Personal,
+            permissionRiskLevel: AppPermissionRiskLevel.Safe);
+        var systemRiskyApp = TestSnapshots.App(
+            ProfileKind.Personal,
+            isSystem: true,
+            permissionRiskLevel: AppPermissionRiskLevel.Critical);
+        var unavailableRiskyApp = TestSnapshots.App(
+            ProfileKind.Personal,
+            permissionRiskAvailable: false,
+            permissionRiskLevel: AppPermissionRiskLevel.Critical);
+        var riskyUserApp = TestSnapshots.App(
+            ProfileKind.Personal,
+            permissionRiskLevel: AppPermissionRiskLevel.Dangerous);
+
+        Assert.False(AppItemPresentation.ShouldShowPermissionRiskIndicator(safeApp));
+        Assert.False(AppItemPresentation.ShouldShowPermissionRiskIndicator(systemRiskyApp));
+        Assert.False(AppItemPresentation.ShouldShowPermissionRiskIndicator(unavailableRiskyApp));
+        Assert.True(AppItemPresentation.ShouldShowPermissionRiskIndicator(riskyUserApp));
+    }
+
+    [Fact]
+    public void AppItemPresentation_formats_current_action_and_status_labels()
+    {
+        var personal = TestSnapshots.App(ProfileKind.Personal);
+        var hiddenWork = TestSnapshots.App(ProfileKind.Work, isHidden: true);
+        var system = TestSnapshots.App(ProfileKind.Personal, isSystem: true);
+        var notInstalled = TestSnapshots.App(ProfileKind.Personal, isInstalled: false);
+
+        Assert.Equal("Open", AppItemPresentation.GetLaunchLabel(personal));
+        Assert.Equal("UnfreezeAndOpen", AppItemPresentation.GetLaunchLabel(hiddenWork));
+        Assert.Equal("CopyToWork", AppItemPresentation.GetCloneLabel(personal.Profile));
+        Assert.Equal("CopyToPersonal", AppItemPresentation.GetCloneLabel(hiddenWork.Profile));
+        Assert.Equal("AllowInteraction", AppItemPresentation.GetInteractionLabel(interactionAllowed: false));
+        Assert.Equal("DisallowInteraction", AppItemPresentation.GetInteractionLabel(interactionAllowed: true));
+        Assert.Equal("BlockInternet", AppItemPresentation.GetInternetAccessLabel(isInternetBlocked: false));
+        Assert.Equal("UnblockInternet", AppItemPresentation.GetInternetAccessLabel(isInternetBlocked: true));
+        Assert.Equal("System", AppItemPresentation.GetStatusTagLabel(system));
+        Assert.Equal("NotInstalled", AppItemPresentation.GetStatusTagLabel(notInstalled));
+        Assert.Equal("Isolated", AppItemPresentation.GetStatusTagLabel(hiddenWork));
+    }
+
     // Проверяет, что приложение рабочего профиля не получает межпрофильный обмен по умолчанию.
     [Fact]
     public void Work_app_defaults_interaction_access_to_disabled()
