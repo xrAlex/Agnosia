@@ -5,20 +5,20 @@ public static class AgnosiaModuleCatalog
     public static AgnosiaModuleMetadata FileShuttle { get; } = new(
         AgnosiaModuleKind.FileShuttle,
         "File Shuttle",
-        "Передача файлов между личным и рабочим профилем через Files / DocumentsUI.",
-        "File Shuttle показывает хранилище второго профиля в системном Files / DocumentsUI и передает выбранные файлы через content:// URI Android.");
+        "Передача файлов между личным и рабочим профилем.",
+        "File Shuttle показывает хранилище второго профиля в системном приложении Files, благодаря этому можно безопасно передавать файлы в рабочий профиль из основногои назад.");
 
     public static AgnosiaModuleMetadata VpnGuard { get; } = new(
         AgnosiaModuleKind.VpnGuard,
         "VPN Guard",
-        "Временное отключение VPN перед запуском рабочего приложения и возврат после заморозки.",
-        "VPN Guard управляет VPN-сценарием вокруг скрытых рабочих приложений: перед запуском временно освобождает VPN-слот, а после заморозки отправляет команду выбранному VPN-клиенту.");
+        "Отключение VPN перед запуском рабочего приложения и включение после заморозки.",
+        "VPN Guard предотвращает возможность видеть ваш VPN приложениям из рабочего профиля, отключая его при запуске такого приложения и включая после закрытия.");
 
     public static AgnosiaModuleMetadata Lockdown { get; } = new(
         AgnosiaModuleKind.Lockdown,
         "Lockdown",
         "Блокировка интернета выбранным приложениям рабочего профиля.",
-        "Lockdown использует always-on VPN lockdown в рабочем профиле, чтобы выбранные приложения оставались без доступа к сети.");
+        "Lockdown позволяет заблокировать доступ к интернету приложениям в рабочем профиле, используя always ON VPN (у вас будет гореть значок VPN пока акутивен модуль), не влияет на основной профиль.");
 
     public static AgnosiaModuleMetadata RiskEngine { get; } = new(
         AgnosiaModuleKind.RiskEngine,

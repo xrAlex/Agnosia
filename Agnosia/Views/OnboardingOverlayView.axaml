@@ -127,6 +127,24 @@
                               ColumnSpacing="14">
                             <Border Classes="icon-tile tutorial-step-icon">
                                 <PathIcon Classes="section-icon centered"
+                                          Data="{StaticResource IconLockdownGeometry}" />
+                            </Border>
+                            <StackPanel Grid.Column="1"
+                                        MinWidth="0"
+                                        Spacing="5">
+                                <TextBlock Classes="group-title feature-title"
+                                           Text="Устрой им Lockdown" />
+                                <TextBlock Classes="page-caption"
+                                           Text="Модуль Lockdown позволяет заблокировать интернет выбранным приложениям в рабочем профиле." />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Border Classes="surface-card compact">
+                        <Grid ColumnDefinitions="Auto,*"
+                              ColumnSpacing="14">
+                            <Border Classes="icon-tile tutorial-step-icon">
+                                <PathIcon Classes="section-icon centered"
                                           Data="{StaticResource IconAlertGeometry}" />
                             </Border>
                             <StackPanel Grid.Column="1"
