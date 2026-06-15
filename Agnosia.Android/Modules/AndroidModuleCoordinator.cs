@@ -124,14 +124,8 @@ internal sealed partial class AndroidModuleCoordinator(
             missingActivationRequirements,
             providerRequirement.IsSatisfied);
 
-        return new AgnosiaModuleSnapshot(
-            AgnosiaModuleKind.FileShuttle,
-            "File Shuttle",
-            "Передача файлов между личным и рабочим профилем через Android приложение Files.",
-            """
-            File Shuttle открывает хранилище второго профиля в системном Files.
-            Позволяет передавать файлы между профилями через стандартное приложение Files.
-            """,
+        return AgnosiaModuleSnapshot.Create(
+            AgnosiaModuleCatalog.FileShuttle,
             isSettingEnabled,
             state,
             requirements,
@@ -194,14 +188,8 @@ internal sealed partial class AndroidModuleCoordinator(
             workProfileAvailable,
             missingActivationRequirements);
 
-        return new AgnosiaModuleSnapshot(
-            AgnosiaModuleKind.VpnGuard,
-            "VPN Guard",
-            "Временное отключение VPN перед запуском рабочего приложения и возврат после заморозки.",
-            """
-            Перед запуском приложения в рабочем  профиле Agnosia отключает VPN, а после заморозки приложения запускает выбранный VPN-клиент обратно.
-            Клиент для восстановления выбирается в настройках.
-            """,
+        return AgnosiaModuleSnapshot.Create(
+            AgnosiaModuleCatalog.VpnGuard,
             isFullyEnabled,
             state,
             activationRequirements,
@@ -253,14 +241,8 @@ internal sealed partial class AndroidModuleCoordinator(
             .IsSatisfied;
         var state = ResolveLockdownState(isSettingEnabled, workProfileAvailable);
 
-        return new AgnosiaModuleSnapshot(
-            AgnosiaModuleKind.Lockdown,
-            "Lockdown",
-            "Блокировка интернета выбранным приложениям рабочего профиля.",
-            """
-            Lockdown включает always-on VPN с lockdown-режимом в рабочем профиле.
-            Выбранные приложения остаются внутри технического VPN без доступа к сети.
-            """,
+        return AgnosiaModuleSnapshot.Create(
+            AgnosiaModuleCatalog.Lockdown,
             isSettingEnabled,
             state,
             activationRequirements,
@@ -295,13 +277,8 @@ internal sealed partial class AndroidModuleCoordinator(
         var isEnabled = LocalStorageManager.Instance.GetBoolean(StorageKeys.RiskEngineEnabled, true);
         var state = isEnabled ? AgnosiaModuleState.Enabled : AgnosiaModuleState.Disabled;
 
-        return new AgnosiaModuleSnapshot(
-            AgnosiaModuleKind.RiskEngine,
-            "Risk Engine",
-            "Анализ риска приложений по разрешениям, специальным доступам и runtime состояниям.",
-            """
-            Risk Engine оценивает приложения по возможным функциям слежки за пользователем, если модуль включен, то в карточке приложения появится индикатор отображающий уровень риска.
-            """,
+        return AgnosiaModuleSnapshot.Create(
+            AgnosiaModuleCatalog.RiskEngine,
             isEnabled,
             state,
             [],

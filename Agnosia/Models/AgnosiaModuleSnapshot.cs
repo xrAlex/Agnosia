@@ -11,47 +11,46 @@ public sealed record AgnosiaModuleSnapshot(
     string StatusText,
     bool CanSetEnabled)
 {
-    public static AgnosiaModuleSnapshot FileShuttleUnavailable { get; } = new(
-        AgnosiaModuleKind.FileShuttle,
-        "File Shuttle",
-        "Передача файлов между личным и рабочим профилем через Files / DocumentsUI.",
-        "File Shuttle показывает хранилище второго профиля в системном Files / DocumentsUI и передает выбранные файлы через content:// URI Android.",
-        false,
-        AgnosiaModuleState.Unavailable,
-        [],
-        "Недоступен",
-        false);
+    public static AgnosiaModuleSnapshot FileShuttleUnavailable { get; } = Unavailable(
+        AgnosiaModuleKind.FileShuttle);
 
-    public static AgnosiaModuleSnapshot VpnGuardUnavailable { get; } = new(
-        AgnosiaModuleKind.VpnGuard,
-        "VPN Guard",
-        "Временное отключение VPN перед запуском рабочего приложения и возврат после заморозки.",
-        "VPN Guard управляет VPN-сценарием вокруг скрытых рабочих приложений: перед запуском временно освобождает VPN-слот, а после заморозки отправляет команду выбранному VPN-клиенту.",
-        false,
-        AgnosiaModuleState.Unavailable,
-        [],
-        "Недоступен",
-        false);
+    public static AgnosiaModuleSnapshot VpnGuardUnavailable { get; } = Unavailable(
+        AgnosiaModuleKind.VpnGuard);
 
-    public static AgnosiaModuleSnapshot LockdownUnavailable { get; } = new(
-        AgnosiaModuleKind.Lockdown,
-        "Lockdown",
-        "Блокировка интернета выбранным приложениям рабочего профиля.",
-        "Lockdown использует always-on VPN lockdown в рабочем профиле, чтобы выбранные приложения оставались без доступа к сети.",
-        false,
-        AgnosiaModuleState.Unavailable,
-        [],
-        "Недоступен",
-        false);
+    public static AgnosiaModuleSnapshot LockdownUnavailable { get; } = Unavailable(
+        AgnosiaModuleKind.Lockdown);
 
-    public static AgnosiaModuleSnapshot RiskEngineUnavailable { get; } = new(
-        AgnosiaModuleKind.RiskEngine,
-        "Risk Engine",
-        "Анализ риска приложений по разрешениям, специальным доступам и runtime-состояниям.",
-        "Risk Engine оценивает приложения по комбинациям разрешений, специальных доступов и runtime-состояний, чтобы подсветить опасные конфигурации в каталоге.",
-        false,
-        AgnosiaModuleState.Unavailable,
-        [],
-        "Недоступен",
-        false);
+    public static AgnosiaModuleSnapshot RiskEngineUnavailable { get; } = Unavailable(
+        AgnosiaModuleKind.RiskEngine);
+
+    public static AgnosiaModuleSnapshot Unavailable(AgnosiaModuleKind kind)
+    {
+        return Create(
+            AgnosiaModuleCatalog.Get(kind),
+            false,
+            AgnosiaModuleState.Unavailable,
+            [],
+            "Недоступен",
+            false);
+    }
+
+    public static AgnosiaModuleSnapshot Create(
+        AgnosiaModuleMetadata metadata,
+        bool isEnabled,
+        AgnosiaModuleState state,
+        IReadOnlyList<AgnosiaModuleRequirement> requirements,
+        string statusText,
+        bool canSetEnabled)
+    {
+        return new AgnosiaModuleSnapshot(
+            metadata.Kind,
+            metadata.Title,
+            metadata.ShortDescription,
+            metadata.FullDescription,
+            isEnabled,
+            state,
+            requirements,
+            statusText,
+            canSetEnabled);
+    }
 }

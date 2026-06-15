@@ -115,11 +115,8 @@ internal static class TestSnapshots
         IReadOnlyList<AgnosiaModuleRequirement>? requirements = null,
         bool canSetEnabled = true)
     {
-        return new AgnosiaModuleSnapshot(
-            AgnosiaModuleKind.FileShuttle,
-            "File Shuttle",
-            "Short file shuttle description",
-            "Full file shuttle description",
+        return AgnosiaModuleSnapshot.Create(
+            AgnosiaModuleCatalog.FileShuttle,
             isEnabled,
             state,
             requirements ?? [],
@@ -139,11 +136,8 @@ internal static class TestSnapshots
         IReadOnlyList<AgnosiaModuleRequirement>? requirements = null,
         bool canSetEnabled = true)
     {
-        return new AgnosiaModuleSnapshot(
-            AgnosiaModuleKind.VpnGuard,
-            "VPN Guard",
-            "Short VPN Guard description",
-            "Full VPN Guard description",
+        return AgnosiaModuleSnapshot.Create(
+            AgnosiaModuleCatalog.VpnGuard,
             isEnabled,
             state,
             requirements ?? [],
@@ -163,11 +157,8 @@ internal static class TestSnapshots
         IReadOnlyList<AgnosiaModuleRequirement>? requirements = null,
         bool canSetEnabled = true)
     {
-        return new AgnosiaModuleSnapshot(
-            AgnosiaModuleKind.Lockdown,
-            "Lockdown",
-            "Short Lockdown description",
-            "Full Lockdown description",
+        return AgnosiaModuleSnapshot.Create(
+            AgnosiaModuleCatalog.Lockdown,
             isEnabled,
             state,
             requirements ?? [],
@@ -185,11 +176,8 @@ internal static class TestSnapshots
         AgnosiaModuleState state = AgnosiaModuleState.Enabled,
         bool canSetEnabled = true)
     {
-        return new AgnosiaModuleSnapshot(
-            AgnosiaModuleKind.RiskEngine,
-            "Risk Engine",
-            "Short Risk Engine description",
-            "Full Risk Engine description",
+        return AgnosiaModuleSnapshot.Create(
+            AgnosiaModuleCatalog.RiskEngine,
             isEnabled,
             state,
             [],
