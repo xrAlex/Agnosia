@@ -102,7 +102,10 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     public bool IsPermissionRiskCritical => PermissionRiskLevel == AppPermissionRiskLevel.Critical;
 
-    public bool ShowPermissionRiskIndicator => Snapshot.PermissionRiskAvailable && !Snapshot.IsSystem;
+    public bool ShowPermissionRiskIndicator =>
+        Snapshot.PermissionRiskAvailable
+        && !Snapshot.IsSystem
+        && PermissionRiskLevel != AppPermissionRiskLevel.Safe;
 
     public string PermissionRiskTooltip => PermissionRiskLevel switch
     {

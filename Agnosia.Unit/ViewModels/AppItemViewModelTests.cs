@@ -23,7 +23,7 @@ public sealed class AppItemViewModelTests
         Assert.True(app.IsPermissionRiskSafe);
         Assert.False(app.IsPermissionRiskDangerous);
         Assert.False(app.IsPermissionRiskCritical);
-        Assert.True(app.ShowPermissionRiskIndicator);
+        Assert.False(app.ShowPermissionRiskIndicator);
         Assert.False(app.HasRiskyPermissions);
         Assert.Empty(app.RiskyPermissionsText);
         Assert.Equal("Разрешения: OK", app.PermissionRiskTooltip);
