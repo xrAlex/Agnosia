@@ -21,6 +21,9 @@ public static class AndroidAppInventoryApi
     private const string FineLocationOp = "android:fine_location";
     private const string CoarseLocationOp = "android:coarse_location";
     private const string MicrophoneOp = "android:record_audio";
+    private const string ManageExternalStorageOp = "android:manage_external_storage";
+    private const string RequestInstallPackagesOp = "android:request_install_packages";
+    private const string ScheduleExactAlarmOp = "android:schedule_exact_alarm";
     private const string UsageStatsOp = "android:get_usage_stats";
     private const string SystemAlertWindowOp = "android:system_alert_window";
     public static List<AppServiceModel> QueryInstalledApps(
@@ -368,7 +371,11 @@ public static class AndroidAppInventoryApi
                 IsAppOpAllowedOrUnknown(context, appInfo, CameraOp),
                 IsAppOpAllowedOrUnknown(context, appInfo, MicrophoneOp),
                 IsAppOpAllowedOrUnknown(context, appInfo, FineLocationOp),
-                IsAppOpAllowedOrUnknown(context, appInfo, CoarseLocationOp)));
+                IsAppOpAllowedOrUnknown(context, appInfo, CoarseLocationOp),
+                HasManageExternalStorageAccess: HasManageExternalStorageAccess(context, appInfo),
+                CanRequestPackageInstalls: CanRequestPackageInstalls(context, packageManager, appInfo),
+                CanScheduleExactAlarms: CanScheduleExactAlarms(context, appInfo),
+                IsIgnoringBatteryOptimizations: IsIgnoringBatteryOptimizations(context, packageName)));
             return true;
         }
         catch (Exception exception) when (exception is PackageManager.NameNotFoundException
@@ -517,6 +524,91 @@ public static class AndroidAppInventoryApi
     private static bool IsAppOpAllowed(Context context, ApplicationInfo? appInfo, string op)
     {
         return IsAppOpAllowedOrUnknown(context, appInfo, op) == true;
+    }
+
+    private static bool HasManageExternalStorageAccess(Context context, ApplicationInfo? appInfo)
+    {
+        var packageName = appInfo?.PackageName;
+        if (packageName is not null && packageName == context.PackageName)
+        {
+            try
+            {
+                return !OperatingSystem.IsAndroidVersionAtLeast(30)
+                       || global::Android.OS.Environment.IsExternalStorageManager;
+            }
+            catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+            {
+                Log.Debug(
+                    LogTag,
+                    $"All-files access check failed. package={packageName}, error={exception.GetType().Name}.");
+                return false;
+            }
+        }
+
+        return IsAppOpAllowed(context, appInfo, ManageExternalStorageOp);
+    }
+
+    private static bool CanRequestPackageInstalls(
+        Context context,
+        PackageManager packageManager,
+        ApplicationInfo? appInfo)
+    {
+        var packageName = appInfo?.PackageName;
+        if (packageName is not null && packageName == context.PackageName)
+        {
+            try
+            {
+                return packageManager.CanRequestPackageInstalls();
+            }
+            catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+            {
+                Log.Debug(
+                    LogTag,
+                    $"Package install access check failed. package={packageName}, error={exception.GetType().Name}.");
+                return false;
+            }
+        }
+
+        return IsAppOpAllowed(context, appInfo, RequestInstallPackagesOp);
+    }
+
+    private static bool CanScheduleExactAlarms(Context context, ApplicationInfo? appInfo)
+    {
+        var packageName = appInfo?.PackageName;
+        if (packageName is not null && packageName == context.PackageName)
+        {
+            try
+            {
+                return context.GetSystemService(Context.AlarmService) is AlarmManager alarmManager
+                       && alarmManager.CanScheduleExactAlarms();
+            }
+            catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+            {
+                Log.Debug(
+                    LogTag,
+                    $"Exact alarm access check failed. package={packageName}, error={exception.GetType().Name}.");
+                return false;
+            }
+        }
+
+        return IsAppOpAllowed(context, appInfo, ScheduleExactAlarmOp);
+    }
+
+    private static bool IsIgnoringBatteryOptimizations(Context context, string packageName)
+    {
+        if (string.IsNullOrWhiteSpace(packageName)) return false;
+
+        try
+        {
+            return AndroidSystemApi.GetPowerManager(context)?.IsIgnoringBatteryOptimizations(packageName) == true;
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Debug(
+                LogTag,
+                $"Battery optimization check failed. package={packageName}, error={exception.GetType().Name}.");
+            return false;
+        }
     }
 
     private static bool? IsAppOpAllowedOrUnknown(Context context, ApplicationInfo? appInfo, string op)

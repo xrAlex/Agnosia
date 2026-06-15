@@ -86,11 +86,9 @@ public static partial class AppPermissionRiskCatalog
         Rule("CR-MIC-PERSIST-01", AppPermissionRiskLevel.Critical, [RecordAudio, BootCompleted, Internet], foregroundServiceType: FgsMicrophone, maxTargetSdkVersion: Android13Api),
         Rule("CR-MIC-PERSIST-02", AppPermissionRiskLevel.Critical, [RecordAudio, IgnoreBatteryOptimizations, Internet], foregroundServiceType: FgsMicrophone),
         Rule("CR-MIC-FGS-LEGACY-01", AppPermissionRiskLevel.Critical, [RecordAudio, Internet], foregroundServiceType: FgsMicrophone, maxDeviceSdkVersion: Android13Api),
-        Rule("CR-MIC-FGS-14-01", AppPermissionRiskLevel.Critical, [RecordAudio, ForegroundServiceMicrophone, Internet], minDeviceSdkVersion: Android14Api),
         Rule("CR-CAM-PERSIST-01", AppPermissionRiskLevel.Critical, [Camera, BootCompleted, Internet], foregroundServiceType: FgsCamera, maxTargetSdkVersion: Android14Api),
         Rule("CR-CAM-PERSIST-02", AppPermissionRiskLevel.Critical, [Camera, IgnoreBatteryOptimizations, Internet], foregroundServiceType: FgsCamera),
         Rule("CR-CAM-FGS-LEGACY-01", AppPermissionRiskLevel.Critical, [Camera, Internet], foregroundServiceType: FgsCamera, maxDeviceSdkVersion: Android13Api),
-        Rule("CR-CAM-FGS-14-01", AppPermissionRiskLevel.Critical, [Camera, ForegroundServiceCamera, Internet], minDeviceSdkVersion: Android14Api),
         Rule("CR-SMS-SEND-01", AppPermissionRiskLevel.Critical, [ReceiveSms, SendSms, Internet]),
         Rule("CR-SMS-READ-01", AppPermissionRiskLevel.Critical, [ReadSms, Internet]),
         Rule("CR-SMS-RECEIVE-01", AppPermissionRiskLevel.Critical, [ReceiveSms, Internet]),
@@ -104,14 +102,13 @@ public static partial class AppPermissionRiskCatalog
         Rule("CR-PROF-USAGE-PERSIST-01", AppPermissionRiskLevel.Critical, [PackageUsageStats, BootCompleted, ForegroundService, Internet]),
         Rule("CR-PROF-USAGE-PERSIST-02", AppPermissionRiskLevel.Critical, [PackageUsageStats, IgnoreBatteryOptimizations, Internet]),
         Rule("CR-PROF-INVENTORY-01", AppPermissionRiskLevel.Critical, [PackageUsageStats, QueryAllPackages, Internet]),
-        Rule("CR-FILE-ALL-PERSIST-01", AppPermissionRiskLevel.Critical, [ManageExternalStorage, BootCompleted, Internet]),
-        Rule("CR-FILE-ALL-PERSIST-02", AppPermissionRiskLevel.Critical, [ManageExternalStorage, IgnoreBatteryOptimizations, Internet]),
-        Rule("CR-FILE-ALL-MEDIA-LOC-01", AppPermissionRiskLevel.Critical, [ManageExternalStorage, AccessMediaLocation, Internet])
+        Rule("CR-FILE-ALL-PERSIST-01", AppPermissionRiskLevel.Critical, [ManageExternalStorage, BootCompleted, Internet], requireEffectivePermissionsForMatch: true),
+        Rule("CR-FILE-ALL-PERSIST-02", AppPermissionRiskLevel.Critical, [ManageExternalStorage, IgnoreBatteryOptimizations, Internet], requireEffectivePermissionsForMatch: true),
+        Rule("CR-FILE-ALL-MEDIA-LOC-01", AppPermissionRiskLevel.Critical, [ManageExternalStorage, AccessMediaLocation, Internet], requireEffectivePermissionsForMatch: true)
     ];
     
     private static readonly PermissionCombinationRule[] DangerousRules =
     [
-        Rule("SU-NET-STATE-01", AppPermissionRiskLevel.Dangerous, [AccessNetworkState], score: 2),
         Rule("SU-LOC-01", "location", AppPermissionRiskLevel.Dangerous, [AccessFineLocation], score: 4, excludedPermissions: [AccessBackgroundLocation], requireEffectivePermissionsForMatch: true),
         Rule("SU-LOC-02", "location", AppPermissionRiskLevel.Dangerous, [AccessCoarseLocation], score: 3, excludedPermissions: [AccessBackgroundLocation], requireEffectivePermissionsForMatch: true),
         Rule("SU-LOC-FGS-PERSIST-01", "location-persistent", AppPermissionRiskLevel.Dangerous, [AccessFineLocation, BootCompleted, Internet], score: 4, foregroundServiceType: FgsLocation, requireEffectivePermissionsForMatch: true),
@@ -121,9 +118,11 @@ public static partial class AppPermissionRiskCatalog
         Rule("SU-MIC-01", "microphone", AppPermissionRiskLevel.Dangerous, [RecordAudio], score: 3, requireEffectivePermissionsForMatch: true),
         Rule("SU-MIC-PERSIST-01", "microphone", AppPermissionRiskLevel.Dangerous, [RecordAudio, BootCompleted], score: 3, requireEffectivePermissionsForMatch: true),
         Rule("SU-MIC-PERSIST-02", "microphone", AppPermissionRiskLevel.Dangerous, [RecordAudio, IgnoreBatteryOptimizations], score: 3, requireEffectivePermissionsForMatch: true),
+        Rule("SU-MIC-FGS-14-01", "microphone", AppPermissionRiskLevel.Dangerous, [RecordAudio, ForegroundServiceMicrophone, Internet], score: 3, minDeviceSdkVersion: Android14Api, foregroundServiceType: FgsMicrophone, requireEffectivePermissionsForMatch: true),
         Rule("SU-CAM-01", "camera", AppPermissionRiskLevel.Dangerous, [Camera], score: 3, requireEffectivePermissionsForMatch: true),
         Rule("SU-CAM-PERSIST-01", "camera", AppPermissionRiskLevel.Dangerous, [Camera, BootCompleted], score: 3, requireEffectivePermissionsForMatch: true),
         Rule("SU-CAM-PERSIST-02", "camera", AppPermissionRiskLevel.Dangerous, [Camera, IgnoreBatteryOptimizations], score: 3, requireEffectivePermissionsForMatch: true),
+        Rule("SU-CAM-FGS-14-01", "camera", AppPermissionRiskLevel.Dangerous, [Camera, ForegroundServiceCamera, Internet], score: 3, minDeviceSdkVersion: Android14Api, foregroundServiceType: FgsCamera, requireEffectivePermissionsForMatch: true),
         Rule("SU-CALL-ID-01", AppPermissionRiskLevel.Dangerous, [ReadPhoneNumbers], score: 4, requireEffectivePermissionsForMatch: true),
         Rule("SU-CALL-STATE-PROF-01", AppPermissionRiskLevel.Dangerous, [ReadPhoneState, QueryAllPackages], score: 4, requireEffectivePermissionsForMatch: true),
         Rule("SU-GRAPH-CONTACTS-01", AppPermissionRiskLevel.Dangerous, [ReadContacts], score: 3, requireEffectivePermissionsForMatch: true),
@@ -133,8 +132,8 @@ public static partial class AppPermissionRiskCatalog
         Rule("SU-UI-ACC-01", AppPermissionRiskLevel.Dangerous, [BindAccessibilityService], score: 5, requireEffectivePermissionsForMatch: true),
         Rule("SU-UI-OVERLAY-01", AppPermissionRiskLevel.Dangerous, [SystemAlertWindow], score: 4, requireEffectivePermissionsForMatch: true),
         Rule("SU-PROF-USAGE-01", AppPermissionRiskLevel.Dangerous, [PackageUsageStats], score: 5, requireEffectivePermissionsForMatch: true),
-        Rule("SU-PROF-INVENTORY-01", AppPermissionRiskLevel.Dangerous, [QueryAllPackages], score: 5),
-        Rule("SU-FILE-ALL-01", AppPermissionRiskLevel.Dangerous, [ManageExternalStorage], score: 5),
+        Rule("SU-PROF-INVENTORY-01", "package-inventory", AppPermissionRiskLevel.Dangerous, [QueryAllPackages], score: 5),
+        Rule("SU-FILE-ALL-01", AppPermissionRiskLevel.Dangerous, [ManageExternalStorage], score: 5, requireEffectivePermissionsForMatch: true),
         Rule("SU-MEDIA-LEGACY-01", AppPermissionRiskLevel.Dangerous, [ReadExternalStorage], score: 3, maxDeviceSdkVersion: Android12LApi, requireEffectivePermissionsForMatch: true),
         Rule("SU-FILE-WRITE-LEGACY-01", AppPermissionRiskLevel.Dangerous, [WriteExternalStorage], score: 3, maxDeviceSdkVersion: Android12LApi, maxTargetSdkVersion: LegacyExternalStorageMaxTargetSdk, requireEffectivePermissionsForMatch: true),
         Rule("SU-MEDIA-IMG-01", "media", AppPermissionRiskLevel.Dangerous, [ReadMediaImages], score: 3, minDeviceSdkVersion: Android13Api, excludedPermissions: [ReadMediaVisualUserSelected], requireEffectivePermissionsForMatch: true),
@@ -149,9 +148,7 @@ public static partial class AppPermissionRiskCatalog
         Rule("SU-PROX-RANGING-01", AppPermissionRiskLevel.Dangerous, [Ranging], score: 4, minDeviceSdkVersion: Android16Api, requireEffectivePermissionsForMatch: true),
         Rule("SU-LAN-16-01", AppPermissionRiskLevel.Dangerous, [NearbyWifiDevices], score: 3, minDeviceSdkVersion: Android16Api, maxDeviceSdkVersion: Android16Api, minTargetSdkVersion: Android16Api, requireEffectivePermissionsForMatch: true),
         Rule("SU-LAN-17-01", AppPermissionRiskLevel.Dangerous, [AccessLocalNetwork], score: 2, minDeviceSdkVersion: Android17Api, minTargetSdkVersion: Android17Api, requireEffectivePermissionsForMatch: true),
-        Rule("SU-APK-INSTALL-01", AppPermissionRiskLevel.Dangerous, [RequestInstallPackages, QueryAllPackages], score: 5),
-        Rule("SU-PERSIST-ALARM-01", AppPermissionRiskLevel.Dangerous, [ScheduleExactAlarm, BootCompleted], score: 4),
-        Rule("SU-PERSIST-ALARM-02", AppPermissionRiskLevel.Dangerous, [UseExactAlarm, BootCompleted], score: 4),
+        Rule("SU-APK-INSTALL-01", "package-inventory", AppPermissionRiskLevel.Dangerous, [RequestInstallPackages, QueryAllPackages], score: 5, requireEffectivePermissionsForMatch: true),
         Rule("SU-NOTIF-OVERLAY-01", AppPermissionRiskLevel.Dangerous, [PostNotifications, SystemAlertWindow], score: 4, requireEffectivePermissionsForMatch: true),
         Rule("SU-ASSIST-SCREEN-01", AppPermissionRiskLevel.Dangerous, [ReadAssistStructureScreenContent], score: 5, minDeviceSdkVersion: Android17Api, requiredObservedSignals: [ObservedAssistantScreenContent], requireEffectivePermissionsForMatch: true),
         Rule("SU-SCR-FGS-01", AppPermissionRiskLevel.Dangerous, [ForegroundServiceMediaProjection], score: 5, minDeviceSdkVersion: Android14Api, foregroundServiceType: FgsMediaProjection, requiredObservedSignals: [ObservedMediaProjection])

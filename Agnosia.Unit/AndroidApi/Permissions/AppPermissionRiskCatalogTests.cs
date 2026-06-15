@@ -207,8 +207,8 @@ public sealed class AppPermissionRiskCatalogTests
                 "SU-MEDIA-LOC-IMG-01"
             ],
             result.MatchedRuleIds);
-        Assert.Equal(13, result.Score);
-        Assert.Equal(13, result.RawScore);
+        Assert.Equal(10, result.Score);
+        Assert.Equal(10, result.RawScore);
         Assert.Equal(AppPermissionRiskConfidence.High, result.Confidence);
     }
 
@@ -273,7 +273,7 @@ public sealed class AppPermissionRiskCatalogTests
     }
 
     [Fact]
-    public void Analyze_uses_android_14_type_specific_foreground_service_permission()
+    public void Analyze_does_not_treat_android_14_type_specific_foreground_service_permission_as_critical()
     {
         var result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
             [
@@ -284,14 +284,32 @@ public sealed class AppPermissionRiskCatalogTests
             DeviceSdkVersion: 34,
             GrantedPermissions: ["android.permission.RECORD_AUDIO"]));
 
-        Assert.Equal(AppPermissionRiskLevel.Critical, result.Level);
+        Assert.Equal(AppPermissionRiskLevel.Dangerous, result.Level);
+        Assert.DoesNotContain("CR-MIC-FGS-14-01", result.MatchedRuleIds);
         Assert.Equal(
+            [
+                "android.permission.RECORD_AUDIO",
+                "android.permission.INTERNET"
+            ],
+            result.RiskyPermissions);
+    }
+
+    [Fact]
+    public void Analyze_treats_android_14_foreground_service_type_as_dangerous_when_type_is_declared()
+    {
+        var result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
             [
                 "android.permission.RECORD_AUDIO",
                 "android.permission.FOREGROUND_SERVICE_MICROPHONE",
                 "android.permission.INTERNET"
             ],
-            result.RiskyPermissions);
+            DeviceSdkVersion: 34,
+            ForegroundServiceTypes: ["microphone"],
+            GrantedPermissions: ["android.permission.RECORD_AUDIO"]));
+
+        Assert.Equal(AppPermissionRiskLevel.Dangerous, result.Level);
+        Assert.Contains("SU-MIC-FGS-14-01", result.MatchedRuleIds);
+        Assert.DoesNotContain("CR-MIC-FGS-14-01", result.MatchedRuleIds);
     }
 
     [Fact]
@@ -389,7 +407,7 @@ public sealed class AppPermissionRiskCatalogTests
             ],
             result.MatchedRuleIds);
         Assert.Equal(8, result.Score);
-        Assert.Equal(15, result.RawScore);
+        Assert.Equal(12, result.RawScore);
         Assert.Equal(AppPermissionRiskConfidence.High, result.Confidence);
     }
 
@@ -410,7 +428,7 @@ public sealed class AppPermissionRiskCatalogTests
 
         Assert.Equal(AppPermissionRiskLevel.Dangerous, result.Level);
         Assert.Equal(7, result.Score);
-        Assert.Equal(13, result.RawScore);
+        Assert.Equal(10, result.RawScore);
     }
 
     [Fact]
@@ -596,12 +614,67 @@ public sealed class AppPermissionRiskCatalogTests
         var result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
             [
                 "android.permission.REQUEST_INSTALL_PACKAGES",
+                "android.permission.QUERY_ALL_PACKAGES"
+            ],
+            CanRequestPackageInstalls: true));
+
+        Assert.Equal(AppPermissionRiskLevel.Dangerous, result.Level);
+        Assert.Contains("SU-APK-INSTALL-01", result.MatchedRuleIds);
+    }
+
+    [Fact]
+    public void Analyze_does_not_match_apk_install_rule_from_manifest_only()
+    {
+        var result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
+            [
+                "android.permission.REQUEST_INSTALL_PACKAGES",
                 "android.permission.QUERY_ALL_PACKAGES",
                 "android.permission.INTERNET"
             ]));
 
         Assert.Equal(AppPermissionRiskLevel.Dangerous, result.Level);
-        Assert.Contains("SU-APK-INSTALL-01", result.MatchedRuleIds);
+        Assert.DoesNotContain("SU-APK-INSTALL-01", result.MatchedRuleIds);
+    }
+
+    [Fact]
+    public void Analyze_does_not_match_all_files_rule_from_manifest_only()
+    {
+        var result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
+            [
+                "android.permission.MANAGE_EXTERNAL_STORAGE",
+                "android.permission.INTERNET"
+            ]));
+
+        Assert.Equal(AppPermissionRiskLevel.Safe, result.Level);
+        Assert.Empty(result.MatchedRuleIds);
+    }
+
+    [Fact]
+    public void Analyze_flags_all_files_access_only_when_enabled()
+    {
+        var result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
+            [
+                "android.permission.MANAGE_EXTERNAL_STORAGE",
+                "android.permission.INTERNET"
+            ],
+            HasManageExternalStorageAccess: true));
+
+        Assert.Equal(AppPermissionRiskLevel.Critical, result.Level);
+        Assert.Contains("SU-FILE-ALL-01", result.MatchedRuleIds);
+    }
+
+    [Fact]
+    public void Analyze_keeps_exact_alarm_boot_shape_safe_without_data_rule()
+    {
+        var result = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
+            [
+                "android.permission.SCHEDULE_EXACT_ALARM",
+                "android.permission.RECEIVE_BOOT_COMPLETED"
+            ],
+            CanScheduleExactAlarms: true));
+
+        Assert.Equal(AppPermissionRiskLevel.Safe, result.Level);
+        Assert.Empty(result.MatchedRuleIds);
     }
 
     [Fact]

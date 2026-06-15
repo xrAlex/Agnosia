@@ -194,49 +194,56 @@ public static partial class AppPermissionRiskCatalog
         AnalysisContext context,
         IReadOnlyList<PermissionCombinationRule> matchedRules)
     {
-        var score = 0;
+        if (matchedRules.Count == 0) return 0;
+
+        var breakdowns = new AppPermissionRiskScoreBreakdown[matchedRules.Count];
         for (var index = 0; index < matchedRules.Count; index++)
         {
-            score += matchedRules[index].GetScore(context);
+            breakdowns[index] = matchedRules[index].GetScoreBreakdown(context);
         }
 
-        return score;
+        return AddAppLevelScoreBreakdown(context, SumBreakdowns(breakdowns)).Total;
     }
 
     private static int CalculateGroupedScore(
         AnalysisContext context,
         IReadOnlyList<PermissionCombinationRule> matchedRules)
     {
-        var scoreByGroup = new Dictionary<string, int>(StringComparer.Ordinal);
-        for (var index = 0; index < matchedRules.Count; index++)
-        {
-            var rule = matchedRules[index];
-            var score = rule.GetScore(context);
-            if (!scoreByGroup.TryGetValue(rule.GroupId, out var currentScore) || score > currentScore)
-                scoreByGroup[rule.GroupId] = score;
-        }
-
-        var total = 0;
-        foreach (var score in scoreByGroup.Values) total += score;
-
-        return total;
+        return CalculateGroupedScoreBreakdown(context, matchedRules).Total;
     }
 
     private static AppPermissionRiskScoreBreakdown CalculateGroupedScoreBreakdown(
         AnalysisContext context,
         IReadOnlyList<PermissionCombinationRule> matchedRules)
     {
+        var scoreByGroup = new Dictionary<string, int>(StringComparer.Ordinal);
         var breakdownByGroup = new Dictionary<string, AppPermissionRiskScoreBreakdown>(StringComparer.Ordinal);
         for (var index = 0; index < matchedRules.Count; index++)
         {
             var rule = matchedRules[index];
             var breakdown = rule.GetScoreBreakdown(context);
-            if (!breakdownByGroup.TryGetValue(rule.GroupId, out var currentBreakdown)
-                || breakdown.Total > currentBreakdown.Total)
+            var score = breakdown.Total;
+            if (!scoreByGroup.TryGetValue(rule.GroupId, out var currentScore) || score > currentScore)
+            {
+                scoreByGroup[rule.GroupId] = score;
                 breakdownByGroup[rule.GroupId] = breakdown;
+            }
         }
 
-        return SumBreakdowns(breakdownByGroup.Values);
+        return matchedRules.Count == 0
+            ? AppPermissionRiskScoreBreakdown.Empty
+            : AddAppLevelScoreBreakdown(context, SumBreakdowns(breakdownByGroup.Values));
+    }
+
+    private static AppPermissionRiskScoreBreakdown AddAppLevelScoreBreakdown(
+        AnalysisContext context,
+        AppPermissionRiskScoreBreakdown breakdown)
+    {
+        return breakdown with
+        {
+            ExfiltrationScore = breakdown.ExfiltrationScore + context.GetExfiltrationScore(),
+            ConfidenceScore = breakdown.ConfidenceScore + context.GetConfidenceScore()
+        };
     }
 
     private static AppPermissionRiskScoreBreakdown SumBreakdowns(
@@ -349,11 +356,11 @@ public static partial class AppPermissionRiskCatalog
             return new AppPermissionRiskScoreBreakdown(
                 score,
                 context.GetPersistenceScore(RequiredPermissions),
-                context.GetExfiltrationScore(),
+                0,
                 controlSurfaceScore,
                 context.GetStealthScore(RequiredPermissions),
                 legitimacyPenalty,
-                context.GetConfidenceScore());
+                0);
         }
 
         private bool MatchesSdk(AnalysisContext context)
@@ -433,6 +440,10 @@ public static partial class AppPermissionRiskCatalog
             bool? isMicrophoneAppOpAllowed,
             bool? isFineLocationAppOpAllowed,
             bool? isCoarseLocationAppOpAllowed,
+            bool hasManageExternalStorageAccess,
+            bool canRequestPackageInstalls,
+            bool canScheduleExactAlarms,
+            bool isIgnoringBatteryOptimizations,
             IReadOnlyList<string> orderedPermissions,
             HashSet<string> permissions,
             HashSet<string> grantedPermissions,
@@ -454,6 +465,10 @@ public static partial class AppPermissionRiskCatalog
             IsMicrophoneAppOpAllowed = isMicrophoneAppOpAllowed;
             IsFineLocationAppOpAllowed = isFineLocationAppOpAllowed;
             IsCoarseLocationAppOpAllowed = isCoarseLocationAppOpAllowed;
+            HasManageExternalStorageAccess = hasManageExternalStorageAccess;
+            CanRequestPackageInstalls = canRequestPackageInstalls;
+            CanScheduleExactAlarms = canScheduleExactAlarms;
+            IsIgnoringBatteryOptimizations = isIgnoringBatteryOptimizations;
             _orderedPermissions = orderedPermissions;
             _permissions = permissions;
             _grantedPermissions = grantedPermissions;
@@ -489,6 +504,14 @@ public static partial class AppPermissionRiskCatalog
 
         public bool? IsCoarseLocationAppOpAllowed { get; }
 
+        public bool HasManageExternalStorageAccess { get; }
+
+        public bool CanRequestPackageInstalls { get; }
+
+        public bool CanScheduleExactAlarms { get; }
+
+        public bool IsIgnoringBatteryOptimizations { get; }
+
         public bool HasAnySignal =>
             _orderedPermissions.Count > 0
             || _foregroundServiceTypes.Count > 0
@@ -503,7 +526,11 @@ public static partial class AppPermissionRiskCatalog
             || IsCameraAppOpAllowed is not null
             || IsMicrophoneAppOpAllowed is not null
             || IsFineLocationAppOpAllowed is not null
-            || IsCoarseLocationAppOpAllowed is not null;
+            || IsCoarseLocationAppOpAllowed is not null
+            || HasManageExternalStorageAccess
+            || CanRequestPackageInstalls
+            || CanScheduleExactAlarms
+            || IsIgnoringBatteryOptimizations;
 
         public bool HasPermissionGrantState => _grantedPermissions.Count > 0 || _deniedPermissions.Count > 0;
 
@@ -519,7 +546,11 @@ public static partial class AppPermissionRiskCatalog
             || IsCameraAppOpAllowed == true
             || IsMicrophoneAppOpAllowed == true
             || IsFineLocationAppOpAllowed == true
-            || IsCoarseLocationAppOpAllowed == true;
+            || IsCoarseLocationAppOpAllowed == true
+            || HasManageExternalStorageAccess
+            || CanRequestPackageInstalls
+            || CanScheduleExactAlarms
+            || IsIgnoringBatteryOptimizations;
 
         public int DangerousScoreThreshold => BaseDangerousScoreThreshold;
 
@@ -557,6 +588,10 @@ public static partial class AppPermissionRiskCatalog
                 input.IsMicrophoneAppOpAllowed,
                 input.IsFineLocationAppOpAllowed,
                 input.IsCoarseLocationAppOpAllowed,
+                input.HasManageExternalStorageAccess,
+                input.CanRequestPackageInstalls,
+                input.CanScheduleExactAlarms,
+                input.IsIgnoringBatteryOptimizations,
                 orderedPermissions,
                 permissions,
                 grantedPermissions,
@@ -692,6 +727,10 @@ public static partial class AppPermissionRiskCatalog
                 ReadAssistStructureScreenContent => IsAssistantScreenContentEnabled,
                 SystemAlertWindow => CanDrawOverlays,
                 PackageUsageStats => HasUsageStatsAccess,
+                ManageExternalStorage => HasManageExternalStorageAccess,
+                RequestInstallPackages => CanRequestPackageInstalls,
+                ScheduleExactAlarm or UseExactAlarm => CanScheduleExactAlarms,
+                IgnoreBatteryOptimizations => IsIgnoringBatteryOptimizations,
                 _ => false
             };
 
@@ -700,7 +739,12 @@ public static partial class AppPermissionRiskCatalog
                 or BindVpnService
                 or ReadAssistStructureScreenContent
                 or SystemAlertWindow
-                or PackageUsageStats;
+                or PackageUsageStats
+                or ManageExternalStorage
+                or RequestInstallPackages
+                or ScheduleExactAlarm
+                or UseExactAlarm
+                or IgnoreBatteryOptimizations;
         }
 
         public bool IsBlockedByAppOp(string permission)
@@ -729,9 +773,7 @@ public static partial class AppPermissionRiskCatalog
 
         public bool HasForegroundServiceType(string type)
         {
-            return _foregroundServiceTypes.Contains(type)
-                   || (ForegroundServicePermissionByType.TryGetValue(type, out var permission)
-                       && HasPermission(permission));
+            return _foregroundServiceTypes.Contains(type);
         }
 
         public bool HasExfiltrationChannel =>
@@ -744,7 +786,7 @@ public static partial class AppPermissionRiskCatalog
             || HasPermission(Ranging)
             || HasPermission(SendSms)
             || HasPermission(WriteExternalStorage)
-            || HasPermission(ManageExternalStorage);
+            || HasEffectivePermission(ManageExternalStorage);
 
         public int GetExfiltrationScore()
         {
@@ -756,7 +798,7 @@ public static partial class AppPermissionRiskCatalog
             if (HasPermission(Nfc)) score += 1;
             if (HasPermission(Ranging)) score += 1;
             if (HasPermission(SendSms)) score += 1;
-            if (HasPermission(WriteExternalStorage) || HasPermission(ManageExternalStorage)) score += 1;
+            if (HasPermission(WriteExternalStorage) || HasEffectivePermission(ManageExternalStorage)) score += 1;
 
             return score;
         }
@@ -765,7 +807,8 @@ public static partial class AppPermissionRiskCatalog
         {
             var score = 0;
             if (ContainsPermission(permissions, BootCompleted)) score += 2;
-            if (ContainsPermission(permissions, ScheduleExactAlarm) || ContainsPermission(permissions, UseExactAlarm))
+            if ((ContainsPermission(permissions, ScheduleExactAlarm) && HasEffectivePermission(ScheduleExactAlarm))
+                || (ContainsPermission(permissions, UseExactAlarm) && HasEffectivePermission(UseExactAlarm)))
                 score += 1;
             if (ContainsPermission(permissions, ForegroundService) || _foregroundServiceTypes.Count > 0) score += 1;
 
@@ -774,7 +817,10 @@ public static partial class AppPermissionRiskCatalog
 
         public int GetStealthScore(IReadOnlyList<string> permissions)
         {
-            return ContainsPermission(permissions, IgnoreBatteryOptimizations) ? 2 : 0;
+            return ContainsPermission(permissions, IgnoreBatteryOptimizations)
+                   && HasEffectivePermission(IgnoreBatteryOptimizations)
+                ? 2
+                : 0;
         }
 
         public int GetConfidenceScore()
@@ -825,7 +871,7 @@ public static partial class AppPermissionRiskCatalog
             if (HasPermission(Ranging)) yield return Ranging;
             if (HasPermission(SendSms)) yield return SendSms;
             if (HasPermission(WriteExternalStorage)) yield return WriteExternalStorage;
-            if (HasPermission(ManageExternalStorage)) yield return ManageExternalStorage;
+            if (HasEffectivePermission(ManageExternalStorage)) yield return ManageExternalStorage;
         }
 
         private static bool ContainsPermission(IReadOnlyList<string> permissions, string expected)
@@ -913,6 +959,14 @@ public static partial class AppPermissionRiskCatalog
                 AddDistinct(orderedPermissions, permissions, BindVpnService);
             if (input.IsAssistantScreenContentEnabled)
                 AddDistinct(orderedPermissions, permissions, ReadAssistStructureScreenContent);
+            if (input.HasManageExternalStorageAccess)
+                AddDistinct(orderedPermissions, permissions, ManageExternalStorage);
+            if (input.CanRequestPackageInstalls)
+                AddDistinct(orderedPermissions, permissions, RequestInstallPackages);
+            if (input.CanScheduleExactAlarms)
+                AddDistinct(orderedPermissions, permissions, ScheduleExactAlarm);
+            if (input.IsIgnoringBatteryOptimizations)
+                AddDistinct(orderedPermissions, permissions, IgnoreBatteryOptimizations);
         }
     }
 }

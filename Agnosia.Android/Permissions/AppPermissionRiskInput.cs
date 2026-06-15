@@ -19,4 +19,8 @@ public sealed record AppPermissionRiskInput(
     IEnumerable<string>? ObservedSignals = null,
     bool IsVpnControlEnabled = false,
     bool IsAssistantScreenContentEnabled = false,
-    bool IsMediaProjectionActive = false);
+    bool IsMediaProjectionActive = false,
+    bool HasManageExternalStorageAccess = false,
+    bool CanRequestPackageInstalls = false,
+    bool CanScheduleExactAlarms = false,
+    bool IsIgnoringBatteryOptimizations = false);
