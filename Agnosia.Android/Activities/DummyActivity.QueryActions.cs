@@ -212,7 +212,7 @@ public sealed partial class DummyActivity
             var iconPng = await Task.Run(() => AndroidAppIconWarmupQueue.TryLoadCachedOrQueue(
                 this,
                 packageManager,
-                packageName), cancellationToken);
+                packageName), cancellationToken).ConfigureAwait(false);
             var result = new Intent();
             if (iconPng is { Length: > 0 }) result.PutExtra(AndroidCommandContract.ResultIconPng, iconPng);
 
@@ -254,7 +254,7 @@ public sealed partial class DummyActivity
                 }
 
                 return loadedIcons;
-            }, cancellationToken);
+            }, cancellationToken).ConfigureAwait(false);
 
             var result = new Intent();
             var bundle = new Bundle();
@@ -301,6 +301,18 @@ public sealed partial class DummyActivity
             AndroidPolicyApi.GetCrossProfilePackages(
                 _policyManager,
                 AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType)));
+        FinishWithResult(Result.Ok, result);
+    }
+
+    private void ActionQueryPermissions()
+    {
+        var result = new Intent();
+        result.PutExtra(AndroidCommandContract.ResultUsageStatsAccess,
+            AndroidUsageStatsAccessApi.HasAccess(this, LogTag));
+        result.PutExtra(AndroidCommandContract.ResultPackageInstallAccess,
+            AndroidPackageApi.CanRequestInstalls(this, LogTag));
+        result.PutExtra(AndroidCommandContract.ResultAllFilesAccess,
+            AndroidPermissionApi.HasAllFilesAccess(this));
         FinishWithResult(Result.Ok, result);
     }
 

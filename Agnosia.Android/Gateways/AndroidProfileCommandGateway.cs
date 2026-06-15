@@ -19,7 +19,7 @@ public static class AndroidProfileCommandGateway
         AndroidActivityCommandGateway commandRunner,
         CancellationToken cancellationToken)
     {
-        return (await CheckWorkProfileOwnerAsync(commandRunner, cancellationToken)).Kind
+        return (await CheckWorkProfileOwnerAsync(commandRunner, cancellationToken).ConfigureAwait(false)).Kind
                == WorkProfileOwnerCheckKind.AppIsProfileOwner;
     }
 
@@ -42,10 +42,11 @@ public static class AndroidProfileCommandGateway
         pingCancellation.CancelAfter(ProfilePingTimeout);
         try
         {
-            var result = await commandRunner.StartActivityForResultAsync(
+        var result = await commandRunner.StartActivityForResultAsync(
                 new Intent(AgnosiaActions.ProfilePing),
                 true,
-                pingCancellation.Token);
+                pingCancellation.Token)
+            .ConfigureAwait(false);
             return InterpretProfilePingResult(result);
         }
         catch (System.OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -208,10 +209,11 @@ public static class AndroidProfileCommandGateway
         CancellationToken cancellationToken)
     {
         var data = await AndroidProfileCommandTransport.StartForDataAsync(
-            commandRunner,
-            new Intent(AgnosiaActions.QueryCrossProfilePackages),
-            "Failed to query work cross-profile packages through the profile activity command.",
-            cancellationToken);
+                commandRunner,
+                new Intent(AgnosiaActions.QueryCrossProfilePackages),
+                "Failed to query work cross-profile packages through the profile activity command.",
+                cancellationToken)
+            .ConfigureAwait(false);
         if (data is null) return [];
 
         return AndroidPackageAccessPolicy.ApplyRequiredCrossProfilePackages(
@@ -223,15 +225,38 @@ public static class AndroidProfileCommandGateway
         CancellationToken cancellationToken)
     {
         var data = await AndroidProfileCommandTransport.StartForDataAsync(
-            commandRunner,
-            new Intent(AgnosiaActions.QueryLogs),
-            "Failed to query work logs through the profile activity command.",
-            cancellationToken);
+                commandRunner,
+                new Intent(AgnosiaActions.QueryLogs),
+                "Failed to query work logs through the profile activity command.",
+                cancellationToken)
+            .ConfigureAwait(false);
         if (data is null) return [];
 
         return AndroidProfileCommandJson.DeserializeAppLogEntriesResult(
             data.GetStringExtra(AndroidCommandContract.ResultLogsJson),
             "work logs") ?? [];
+    }
+
+    internal static async Task<WorkProfilePermissionQueryResult> QueryWorkPermissionsAsync(
+        AndroidActivityCommandGateway commandRunner,
+        CancellationToken cancellationToken)
+    {
+        var data = await AndroidProfileCommandTransport.StartForDataAsync(
+                commandRunner,
+                new Intent(AgnosiaActions.QueryPermissions),
+                "Failed to query work permissions through the profile activity command.",
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (data is null) return WorkProfilePermissionQueryResult.Empty;
+
+        var result = new WorkProfilePermissionQueryResult(
+            data.GetBooleanExtra(AndroidCommandContract.ResultUsageStatsAccess, false),
+            data.GetBooleanExtra(AndroidCommandContract.ResultPackageInstallAccess, false),
+            data.GetBooleanExtra(AndroidCommandContract.ResultAllFilesAccess, false));
+        AndroidProfileBooleanQueryCache.Set(AgnosiaActions.QueryUsageStatsAccess, result.UsageStatsAccess);
+        AndroidProfileBooleanQueryCache.Set(AgnosiaActions.QueryPackageInstallAccess, result.PackageInstallAccess);
+        AndroidProfileBooleanQueryCache.Set(AgnosiaActions.QueryAllFilesAccess, result.AllFilesAccess);
+        return result;
     }
 
     internal static Task<bool> QueryWorkUsageStatsAccessAsync(
@@ -336,9 +361,10 @@ public static class AndroidProfileCommandGateway
         intent.PutExtra(AndroidCommandContract.ExtraPermissions, permissions.ToArray());
 
         var result = await commandRunner.StartActivityForResultAsync(
-            intent,
-            true,
-            cancellationToken);
+                intent,
+                true,
+                cancellationToken)
+            .ConfigureAwait(false);
         return AndroidActivityResultApi.ToVoidOperationResult(
             result,
             $"Runtime-разрешения отозваны: {permissions.Count}.");
@@ -354,9 +380,10 @@ public static class AndroidProfileCommandGateway
         intent.PutExtra(AndroidCommandContract.ExtraPackages,
             AndroidPackageAccessPolicy.ApplyRequiredCrossProfilePackages(packages));
         var result = await commandRunner.StartActivityForResultAsync(
-            intent,
-            true,
-            cancellationToken);
+                intent,
+                true,
+                cancellationToken)
+            .ConfigureAwait(false);
         if (result.ResultCode == Result.Canceled)
             return OperationResult.Failure(
                 AndroidActivityResultApi.ExtractError(result)
@@ -375,9 +402,10 @@ public static class AndroidProfileCommandGateway
         var intent = new Intent(AgnosiaActions.SetLockdownEnabled);
         intent.PutExtra(AndroidCommandContract.ExtraPreferenceBoolean, enabled);
         var result = await commandRunner.StartActivityForResultAsync(
-            intent,
-            true,
-            cancellationToken);
+                intent,
+                true,
+                cancellationToken)
+            .ConfigureAwait(false);
         return AndroidActivityResultApi.ToVoidOperationResult(
             result,
             enabled ? "Lockdown включён." : "Lockdown выключен.");
@@ -393,9 +421,10 @@ public static class AndroidProfileCommandGateway
         intent.PutExtra(AndroidCommandContract.ExtraPackage, packageName);
         intent.PutExtra(AndroidCommandContract.ExtraInternetBlocked, blocked);
         var result = await commandRunner.StartActivityForResultAsync(
-            intent,
-            true,
-            cancellationToken);
+                intent,
+                true,
+                cancellationToken)
+            .ConfigureAwait(false);
         return AndroidActivityResultApi.ToVoidOperationResult(
             result,
             blocked ? "Интернет приложения заблокирован." : "Интернет приложения разблокирован.");
@@ -453,9 +482,10 @@ public static class AndroidProfileCommandGateway
         if (AndroidProfileBooleanQueryCache.TryGet(action, out var cachedValue)) return cachedValue;
 
         var result = await commandRunner.StartActivityForResultAsync(
-            new Intent(action),
-            true,
-            cancellationToken);
+                new Intent(action),
+                true,
+                cancellationToken)
+            .ConfigureAwait(false);
         var value = result.ResultCode == Result.Ok
                     && result.Data?.GetBooleanExtra(resultExtra, false) == true;
         AndroidProfileBooleanQueryCache.Set(action, value);
@@ -469,9 +499,10 @@ public static class AndroidProfileCommandGateway
         CancellationToken cancellationToken)
     {
         var result = await commandRunner.StartActivityForResultAsync(
-            intent,
-            true,
-            cancellationToken);
+                intent,
+                true,
+                cancellationToken)
+            .ConfigureAwait(false);
         return AndroidActivityResultApi.ToPackageOperationResult(result, successMessage);
     }
 
@@ -661,6 +692,14 @@ public static class AndroidProfileCommandGateway
 internal sealed record ProfileAppsQueryResult(
     IReadOnlyList<AppServiceModel> Apps,
     IReadOnlyList<string> InteractionPackages);
+
+internal sealed record WorkProfilePermissionQueryResult(
+    bool UsageStatsAccess,
+    bool PackageInstallAccess,
+    bool AllFilesAccess)
+{
+    public static WorkProfilePermissionQueryResult Empty { get; } = new(false, false, false);
+}
 
 internal enum WorkProfileOwnerCheckKind
 {

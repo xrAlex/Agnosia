@@ -47,7 +47,7 @@ public sealed class WorkAppFrozenReceiver : BroadcastReceiver
                 var result = await WorkAppFrozenHandler.RestoreParentVpnAndHideOverlayAsync(
                     appContext,
                     trigger,
-                    LogTag);
+                    LogTag).ConfigureAwait(false);
                 if (result.Succeeded)
                 {
                     Log.Info(LogTag,

@@ -110,7 +110,7 @@ public sealed partial class DummyActivity
             if (string.Equals(operation, AndroidCommandContract.PackageInstallerOperationInstall,
                     StringComparison.Ordinal)
                 && !string.IsNullOrWhiteSpace(callbackPackage)
-                && !await WaitForPackageAvailableAsync(callbackPackage, cancellationToken))
+                && !await WaitForPackageAvailableAsync(callbackPackage, cancellationToken).ConfigureAwait(false))
             {
                 FinishWithError($"Android установил {callbackPackage}, но пакет еще не доступен в рабочем профиле.");
                 return;

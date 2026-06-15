@@ -68,7 +68,7 @@ public sealed class TransientVpnDisconnectService : VpnService
             }
         }
 
-        if (!shouldStartService) return await completionTask;
+        if (!shouldStartService) return await completionTask.ConfigureAwait(false);
 
         var intent = new Intent(context, typeof(TransientVpnDisconnectService));
         intent.SetAction(ActionDisconnect);
@@ -86,7 +86,7 @@ public sealed class TransientVpnDisconnectService : VpnService
         }
 
         await using var registration = cancellationToken.Register(static _ => CancelPending(), null);
-        return await completionTask;
+        return await completionTask.ConfigureAwait(false);
     }
 
     public override void OnCreate()
@@ -160,11 +160,11 @@ public sealed class TransientVpnDisconnectService : VpnService
                 return;
             }
 
-            await Task.Delay(EstablishHoldTime);
+            await Task.Delay(EstablishHoldTime).ConfigureAwait(false);
 
             CloseVpnInterface();
 
-            await Task.Delay(PostCloseDelay);
+            await Task.Delay(PostCloseDelay).ConfigureAwait(false);
             Complete(OperationResult.Success("VPN отключен."));
         }
         catch (Exception exception)

@@ -72,7 +72,7 @@ public sealed partial class DummyActivity
                 this,
                 trigger,
                 LogTag,
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
             if (result.Succeeded)
             {
                 FinishWithSuccessMessage(result.Message);

@@ -319,6 +319,15 @@ public sealed class TestPlatformServices :
         return Task.FromResult(Modules);
     }
 
+    public Task<IReadOnlyList<AgnosiaModuleSnapshot>> LoadModulesAsync(
+        IReadOnlyList<PermissionSnapshot> permissions,
+        CancellationToken cancellationToken = default)
+    {
+        ModuleLoadCount++;
+
+        return Task.FromResult(Modules);
+    }
+
     public Task<OperationResult> SetModuleEnabledAsync(
         AgnosiaModuleKind module,
         bool enabled,

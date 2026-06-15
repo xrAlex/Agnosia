@@ -35,7 +35,7 @@ internal sealed class AndroidAppCommandCoordinator(
                 commandRunner,
                 app.PackageName,
                 "Приложение скопировано в рабочий профиль.",
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
         }
         else
         {
@@ -72,7 +72,8 @@ internal sealed class AndroidAppCommandCoordinator(
                 ? commandRunner.RunPackageOperationAsync(intent, true, cancellationToken,
                     "Приложение скопировано в рабочий профиль.")
                 : commandRunner.RunPackageOperationAsync(intent, false, cancellationToken,
-                    "Приложение скопировано в личный профиль."));
+                    "Приложение скопировано в личный профиль."))
+                .ConfigureAwait(false);
         }
 
         if (!result.Succeeded || app.Profile != ProfileKind.Personal) return result;
@@ -85,7 +86,7 @@ internal sealed class AndroidAppCommandCoordinator(
                 CanLaunch = true,
                 IsInstalled = true
             },
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
 
         return !freezeResult.Succeeded
             ? OperationResult.Failure($"Приложение скопировано, но скрыть его не удалось: {freezeResult.Message}")
@@ -101,7 +102,7 @@ internal sealed class AndroidAppCommandCoordinator(
                 commandRunner,
                 app.PackageName,
                 "Приложение удалено из рабочего профиля.",
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
         }
         else
         {
@@ -111,7 +112,8 @@ internal sealed class AndroidAppCommandCoordinator(
                 ? commandRunner.RunPackageOperationAsync(intent, true, cancellationToken,
                     "Приложение удалено из рабочего профиля.")
                 : commandRunner.RunPackageOperationAsync(intent, false, cancellationToken,
-                    "Приложение удалено из личного профиля."));
+                    "Приложение удалено из личного профиля."))
+                .ConfigureAwait(false);
         }
 
         if (!result.Succeeded || app.Profile != ProfileKind.Work) return result;
@@ -134,8 +136,9 @@ internal sealed class AndroidAppCommandCoordinator(
         ShortcutPreparationResult? shortcutResult = null;
         if (hidden)
         {
-            await permissionCoordinator.EnsureUsageStatsAccessRequestedAsync(cancellationToken);
-            shortcutResult = await PreparePinnedShortcutInParentAsync(app.PackageName, app.IsSystem, cancellationToken);
+            await permissionCoordinator.EnsureUsageStatsAccessRequestedAsync(cancellationToken).ConfigureAwait(false);
+            shortcutResult = await PreparePinnedShortcutInParentAsync(app.PackageName, app.IsSystem, cancellationToken)
+                .ConfigureAwait(false);
             if (!shortcutResult.Succeeded || !shortcutResult.HideImmediately)
                 return new OperationResult(shortcutResult.Succeeded, shortcutResult.Message);
         }
@@ -145,7 +148,7 @@ internal sealed class AndroidAppCommandCoordinator(
             app.PackageName,
             hidden,
             hidden ? "Приложение скрыто." : "Приложение восстановлено.",
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
         return hideResult.Succeeded || shortcutResult is null
             ? hideResult
             : OperationResult.Failure(FormatShortcutCreatedButHideFailed(shortcutResult, hideResult.Message));
@@ -158,13 +161,14 @@ internal sealed class AndroidAppCommandCoordinator(
         if (app.IsSystem)
             return OperationResult.Success("Системное приложение включено в рабочем профиле без заморозки.");
 
-        await permissionCoordinator.EnsureUsageStatsAccessRequestedAsync(cancellationToken);
+        await permissionCoordinator.EnsureUsageStatsAccessRequestedAsync(cancellationToken).ConfigureAwait(false);
         Log.Info(
             ActivityResultLogTag,
             $"Waiting for cloned work package to settle before hidden-shortcut preparation. package={app.PackageName}, delayMs={ClonedPackageSettleDelay.TotalMilliseconds:0}.");
-        await Task.Delay(ClonedPackageSettleDelay, cancellationToken);
+        await Task.Delay(ClonedPackageSettleDelay, cancellationToken).ConfigureAwait(false);
 
-        var shortcutResult = await PreparePinnedShortcutInParentAsync(app.PackageName, app.IsSystem, cancellationToken);
+        var shortcutResult = await PreparePinnedShortcutInParentAsync(app.PackageName, app.IsSystem, cancellationToken)
+            .ConfigureAwait(false);
         if (!shortcutResult.Succeeded) return new OperationResult(false, shortcutResult.Message);
 
         var hideResult = await AndroidProfileCommandGateway.SetPackageHiddenInWorkProfileAsync(
@@ -172,7 +176,7 @@ internal sealed class AndroidAppCommandCoordinator(
             app.PackageName,
             true,
             "Приложение скрыто.",
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
         return hideResult.Succeeded
             ? hideResult
             : OperationResult.Failure(FormatShortcutCreatedButHideFailed(shortcutResult, hideResult.Message));
@@ -203,7 +207,8 @@ internal sealed class AndroidAppCommandCoordinator(
         if (app.Profile != ProfileKind.Work)
             return OperationResult.Failure("Ярлыки доступны только для приложений рабочего профиля.");
 
-        var shortcutResult = await PreparePinnedShortcutInParentAsync(app.PackageName, app.IsSystem, cancellationToken);
+        var shortcutResult = await PreparePinnedShortcutInParentAsync(app.PackageName, app.IsSystem, cancellationToken)
+            .ConfigureAwait(false);
         if (!shortcutResult.Succeeded) return OperationResult.Failure(shortcutResult.Message);
 
         return string.IsNullOrWhiteSpace(shortcutResult.PreHideError)
@@ -237,7 +242,8 @@ internal sealed class AndroidAppCommandCoordinator(
 
         if (!app.IsSystem)
         {
-            var vpnPreparationResult = await EnsurePersonalVpnDisabledBeforeWorkLaunchAsync(cancellationToken);
+            var vpnPreparationResult = await EnsurePersonalVpnDisabledBeforeWorkLaunchAsync(cancellationToken)
+                .ConfigureAwait(false);
             if (!vpnPreparationResult.Succeeded) return vpnPreparationResult;
         }
 
@@ -249,7 +255,8 @@ internal sealed class AndroidAppCommandCoordinator(
             intent.PutExtra(
                 AndroidCommandContract.ExtraParentFrozenCallback,
                 commandRunner.CreateWorkAppFrozenCallbackPendingIntent(app.PackageName));
-        return await commandRunner.RunVoidOperationAsync(intent, true, cancellationToken, "Открываем приложение.");
+        return await commandRunner.RunVoidOperationAsync(intent, true, cancellationToken, "Открываем приложение.")
+            .ConfigureAwait(false);
     }
 
     public async Task<OperationResult> SetInteractionAccessAsync(
@@ -274,7 +281,7 @@ internal sealed class AndroidAppCommandCoordinator(
             commandRunner,
             packages.ToArray(),
             enabled ? "Межпрофильный обмен включен." : "Межпрофильный обмен отключен.",
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
     }
 
     public Task<OperationResult> SetLockdownInternetAccessAsync(
@@ -318,7 +325,7 @@ internal sealed class AndroidAppCommandCoordinator(
         Log.Debug(LogTag, "Active VPN detected, starting transient VpnService.");
         var disconnectResult = await TransientVpnDisconnectCoordinator.DisconnectActiveVpnAsync(
             commandRunner,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
         if (!disconnectResult.Succeeded)
         {
             Log.Warn(LogTag, "Transient VpnService failed to disconnect the active VPN.");
@@ -344,7 +351,8 @@ internal sealed class AndroidAppCommandCoordinator(
         prepareIntent.PutExtra(AndroidCommandContract.ExtraPackage, packageName);
         prepareIntent.PutExtra(AndroidCommandContract.ExtraIsSystem, isSystem);
 
-        var prepareResult = await commandRunner.StartActivityForResultAsync(prepareIntent, true, cancellationToken);
+        var prepareResult = await commandRunner.StartActivityForResultAsync(prepareIntent, true, cancellationToken)
+            .ConfigureAwait(false);
         if (prepareResult.ResultCode != Result.Ok || prepareResult.Data is null)
         {
             var error = prepareResult.Data?.GetStringExtra(AndroidCommandContract.ResultError);
@@ -365,7 +373,8 @@ internal sealed class AndroidAppCommandCoordinator(
             AndroidCommandContract.ExtraIsSystem,
             prepareResult.Data.GetBooleanExtra(AndroidCommandContract.ExtraIsSystem, false));
 
-        var createResult = await commandRunner.StartActivityForResultAsync(createIntent, false, cancellationToken);
+        var createResult = await commandRunner.StartActivityForResultAsync(createIntent, false, cancellationToken)
+            .ConfigureAwait(false);
         if (createResult.ResultCode != Result.Ok)
         {
             var error = createResult.Data?.GetStringExtra(AndroidCommandContract.ResultError);

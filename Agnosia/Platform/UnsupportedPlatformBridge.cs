@@ -186,6 +186,13 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
         return UnsupportedModulesTask;
     }
 
+    public Task<IReadOnlyList<AgnosiaModuleSnapshot>> LoadModulesAsync(
+        IReadOnlyList<PermissionSnapshot> permissions,
+        CancellationToken cancellationToken = default)
+    {
+        return UnsupportedModulesTask;
+    }
+
     public Task<OperationResult> SetModuleEnabledAsync(
         AgnosiaModuleKind module,
         bool enabled,

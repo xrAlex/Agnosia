@@ -26,7 +26,8 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
         CancellationToken cancellationToken,
         string successMessage)
     {
-        var result = await StartActivityForResultAsync(intent, useWorkProfile, cancellationToken);
+        var result = await StartActivityForResultAsync(intent, useWorkProfile, cancellationToken)
+            .ConfigureAwait(false);
         return AndroidActivityResultApi.ToPackageOperationResult(result, successMessage);
     }
 
@@ -36,7 +37,8 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
         CancellationToken cancellationToken,
         string successMessage)
     {
-        var result = await StartActivityForResultAsync(intent, useWorkProfile, cancellationToken);
+        var result = await StartActivityForResultAsync(intent, useWorkProfile, cancellationToken)
+            .ConfigureAwait(false);
         return AndroidActivityResultApi.ToVoidOperationResult(result, successMessage);
     }
 
@@ -87,7 +89,7 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
             Log.Debug(
                 ActivityResultLogTag,
                 $"Starting external activity for result. action={GetActionForLog(intent)}, timeoutMs={activityResultTimeout.TotalMilliseconds:0}.");
-            return await host.StartForResultAsync(intent, timeoutCancellation.Token);
+            return await host.StartForResultAsync(intent, timeoutCancellation.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -129,15 +131,16 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
             {
                 AgnosiaUtilities.TransferIntentToProfile(activity, intent);
                 return await RunWorkProfileActivityCommandAsync(
-                    host,
-                    intent,
-                    isLaunchCommand,
-                    cancellationToken);
+                        host,
+                        intent,
+                        isLaunchCommand,
+                        cancellationToken)
+                    .ConfigureAwait(false);
             }
 
             intent.SetComponent(new ComponentName(activity, Class.FromType(host.CommandActivityType)));
             AuthenticationUtility.SignIntent(intent);
-            return await RunLocalActivityCommandAsync(host, intent, cancellationToken);
+            return await RunLocalActivityCommandAsync(host, intent, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -176,10 +179,11 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
             AgnosiaRuntime.Initialize(activity);
             AgnosiaUtilities.TransferIntentToProfileWithoutAuthentication(activity, intent);
             return await RunWorkProfileActivityCommandAsync(
-                host,
-                intent,
-                false,
-                cancellationToken);
+                    host,
+                    intent,
+                    false,
+                    cancellationToken)
+                .ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -201,7 +205,7 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
         Log.Debug(
             ActivityResultLogTag,
             $"Starting local activity command. action={GetActionForLog(intent)}.");
-        var result = await host.StartForResultAsync(intent, cancellationToken);
+        var result = await host.StartForResultAsync(intent, cancellationToken).ConfigureAwait(false);
         Log.Debug(
             ActivityResultLogTag,
             FormatActivityCommandCompleted("Local", intent, result));
@@ -222,7 +226,7 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
             Log.Debug(
                 ActivityResultLogTag,
                 $"Starting work-profile activity command. action={GetActionForLog(intent)}, timeoutMs={profileCommandTimeout.TotalMilliseconds:0}.");
-            var result = await host.StartForResultAsync(intent, timeoutCancellation.Token);
+            var result = await host.StartForResultAsync(intent, timeoutCancellation.Token).ConfigureAwait(false);
             Log.Debug(
                 ActivityResultLogTag,
                 FormatActivityCommandCompleted("Work-profile", intent, result));

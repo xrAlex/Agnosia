@@ -37,6 +37,7 @@ namespace Agnosia.Android.Activities;
     AgnosiaActions.QueryAppIcons,
     AgnosiaActions.QueryLogs,
     AgnosiaActions.QueryCrossProfilePackages,
+    AgnosiaActions.QueryPermissions,
     AgnosiaActions.QueryUsageStatsAccess,
     AgnosiaActions.RequestUsageStatsAccess,
     AgnosiaActions.QueryPackageInstallAccess,
@@ -86,7 +87,7 @@ public sealed partial class DummyActivity : Activity
         _isProfileOwner = _policyManager?.IsProfileOwnerApp(PackageName) == true;
         if (_isProfileOwner)
         {
-            AndroidStartup.EnforceWorkProfilePoliciesAndStartLockFreezeMonitor(
+            AndroidStartup.EnsureWorkProfilePoliciesAndStartLockFreezeMonitor(
                 this,
                 string.Equals(Intent?.Action, AgnosiaActions.FinalizeProvision, StringComparison.Ordinal));
         }
@@ -199,7 +200,7 @@ public sealed partial class DummyActivity : Activity
 
             try
             {
-                if (!await WaitForPackageAvailableAsync(packageName, cancellationToken))
+                if (!await WaitForPackageAvailableAsync(packageName, cancellationToken).ConfigureAwait(false))
                 {
                     FinishWithError(
                         $"Android не видит {packageName} в рабочем профиле. Проверьте, что приложение установлено в рабочем профиле, и повторите действие.");
@@ -215,7 +216,7 @@ public sealed partial class DummyActivity : Activity
                             packageName,
                             isSystem,
                             cancellationToken),
-                        cancellationToken);
+                        cancellationToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -238,7 +239,7 @@ public sealed partial class DummyActivity : Activity
                     ? null
                     : await Task.Run(
                         () => TryHidePackageAfterInstallAsync(admin, packageName, cancellationToken),
-                        cancellationToken);
+                        cancellationToken).ConfigureAwait(false);
                 var preHideSucceeded = hideError is null;
                 if (preHideSucceeded)
                 {
@@ -356,7 +357,7 @@ public sealed partial class DummyActivity : Activity
                 return false;
             }
 
-            await Task.Delay(PackageAvailabilityRetryDelay, cancellationToken);
+            await Task.Delay(PackageAvailabilityRetryDelay, cancellationToken).ConfigureAwait(false);
             attempt++;
         }
     }
@@ -415,7 +416,7 @@ public sealed partial class DummyActivity : Activity
                 return hideError ?? $"Android не смог скрыть {packageName} после установки.";
             }
 
-            await Task.Delay(HideAfterInstallRetryDelay, cancellationToken);
+            await Task.Delay(HideAfterInstallRetryDelay, cancellationToken).ConfigureAwait(false);
             attempt++;
         }
     }

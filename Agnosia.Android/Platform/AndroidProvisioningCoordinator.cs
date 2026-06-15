@@ -31,10 +31,11 @@ internal sealed class AndroidProvisioningCoordinator(
         var authKey = PrepareProvisioningAuthentication();
         var intent = CreateManagedProfileProvisioningIntent(activity, host.AdminReceiverType, authKey);
         var result = await commandRunner.StartExternalActivityForResultAsync(
-            intent,
-            cancellationToken,
-            AndroidActivityCommandGateway.ProvisioningActivityResultTimeout);
-        return await CompleteProvisioningAsync(activity, result, cancellationToken);
+                intent,
+                cancellationToken,
+                AndroidActivityCommandGateway.ProvisioningActivityResultTimeout)
+            .ConfigureAwait(false);
+        return await CompleteProvisioningAsync(activity, result, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<OperationResult> OpenWorkProfileSettingsAsync(CancellationToken cancellationToken = default)
@@ -50,7 +51,8 @@ internal sealed class AndroidProvisioningCoordinator(
 
         foreach (var intent in intents)
         {
-            var result = await TryOpenSettingsIntentAsync(activity, intent, cancellationToken);
+            var result = await TryOpenSettingsIntentAsync(activity, intent, cancellationToken)
+                .ConfigureAwait(false);
             if (!WasCanceledWithError(result))
                 return OperationResult.Success("Проверьте удаление рабочего профиля в настройках Android.");
         }
@@ -120,7 +122,7 @@ internal sealed class AndroidProvisioningCoordinator(
             return OperationResult.Failure("Создание рабочего профиля отменено или отклонено Android.");
         }
 
-        if (await WaitForWorkProfileAvailabilityAsync(cancellationToken))
+        if (await WaitForWorkProfileAvailabilityAsync(cancellationToken).ConfigureAwait(false))
         {
             AgnosiaUtilities.MarkWorkProfileReady();
             return OperationResult.Success("Рабочий профиль подключен.");
@@ -150,9 +152,10 @@ internal sealed class AndroidProvisioningCoordinator(
         for (var attempt = 0; attempt < attempts; attempt++)
         {
             if (AgnosiaUtilities.HasWorkProfileTarget(activity) &&
-                await commandRunner.CanReachWorkProfileAsync(cancellationToken)) return true;
+                await commandRunner.CanReachWorkProfileAsync(cancellationToken).ConfigureAwait(false)) return true;
 
-            if (attempt < attempts - 1) await Task.Delay(delayMilliseconds, cancellationToken);
+            if (attempt < attempts - 1)
+                await Task.Delay(delayMilliseconds, cancellationToken).ConfigureAwait(false);
         }
 
         return false;
@@ -180,6 +183,7 @@ internal sealed class AndroidProvisioningCoordinator(
             || intent.ResolveActivity(packageManager) is null)
             return AndroidActivityResultApi.CreateCanceledResult("Android не нашёл подходящий экран настроек.");
 
-        return await commandRunner.StartExternalActivityForResultAsync(intent, cancellationToken);
+        return await commandRunner.StartExternalActivityForResultAsync(intent, cancellationToken)
+            .ConfigureAwait(false);
     }
 }

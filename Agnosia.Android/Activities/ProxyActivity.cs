@@ -140,7 +140,7 @@ public sealed class ProxyActivity : Activity
         {
             if (!AgnosiaUtilities.IsProfileOwner(this))
             {
-                await PrepareVpnIfNeededAndForwardAsync(request);
+                await PrepareVpnIfNeededAndForwardAsync(request).ConfigureAwait(false);
                 return;
             }
 
@@ -207,7 +207,8 @@ public sealed class ProxyActivity : Activity
                 return;
             }
 
-            await RefreshLockdownForUnhiddenPackageAsync(policyManager, admin, request.PackageName);
+            await RefreshLockdownForUnhiddenPackageAsync(policyManager, admin, request.PackageName)
+                .ConfigureAwait(false);
 
             Intent? launchIntent = null;
             for (var attempt = 0; attempt < LaunchResolveAttempts; attempt++)
@@ -215,7 +216,7 @@ public sealed class ProxyActivity : Activity
                 launchIntent = CreateLaunchIntent(request);
                 if (launchIntent is not null) break;
 
-                await Task.Delay(LaunchResolveDelayMilliseconds);
+                await Task.Delay(LaunchResolveDelayMilliseconds).ConfigureAwait(false);
             }
 
             if (launchIntent is null)
@@ -338,7 +339,7 @@ public sealed class ProxyActivity : Activity
                 return;
             }
 
-            await DisconnectVpnAndForwardAsync(request);
+            await DisconnectVpnAndForwardAsync(request).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
@@ -349,7 +350,7 @@ public sealed class ProxyActivity : Activity
 
     private async Task DisconnectVpnAndForwardAsync(HiddenAppLaunchRequest request)
     {
-        var result = await TransientVpnDisconnectService.DisconnectPreparedVpnAsync(this);
+        var result = await TransientVpnDisconnectService.DisconnectPreparedVpnAsync(this).ConfigureAwait(false);
         if (!result.Succeeded)
         {
             ShowErrorAndFinish(result.Message);
@@ -412,7 +413,7 @@ public sealed class ProxyActivity : Activity
         {
             try
             {
-                await operation();
+                await operation().ConfigureAwait(false);
             }
             catch (Exception exception)
             {
@@ -552,7 +553,7 @@ public sealed class ProxyActivity : Activity
     {
         if (!LockdownSettingsStore.IsEnabled()) return;
         if (IsLockdownBlockedPackage(packageName)) return;
-        if (!await WaitForPackageVisibleToVpnPolicyAsync(packageName)) return;
+        if (!await WaitForPackageVisibleToVpnPolicyAsync(packageName).ConfigureAwait(false)) return;
 
         var result = LockdownVpnController.RefreshPolicy(this, policyManager, admin);
         if (!result.Succeeded)
@@ -570,7 +571,7 @@ public sealed class ProxyActivity : Activity
         for (var attempt = 0; attempt < LaunchResolveAttempts; attempt++)
         {
             if (IsPackageVisibleToVpnPolicy(packageName)) return true;
-            await Task.Delay(LaunchResolveDelayMilliseconds);
+            await Task.Delay(LaunchResolveDelayMilliseconds).ConfigureAwait(false);
         }
 
         Log.Warn(

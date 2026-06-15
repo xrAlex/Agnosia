@@ -46,15 +46,15 @@ public sealed class DebouncedAsyncAction
     {
         try
         {
-            await _delayAsync(_delay, cancellation.Token);
-            await action(cancellation.Token);
+            await _delayAsync(_delay, cancellation.Token).ConfigureAwait(false);
+            await action(cancellation.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
         }
         catch (Exception exception)
         {
-            if (_onError is not null) await _onError(exception);
+            if (_onError is not null) await _onError(exception).ConfigureAwait(false);
         }
         finally
         {

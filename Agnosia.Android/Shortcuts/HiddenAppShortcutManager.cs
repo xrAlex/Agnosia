@@ -49,7 +49,7 @@ internal static class HiddenAppShortcutManager
                 return HiddenAppShortcutBuildResult.Failure(error);
             }
 
-            await Task.Delay(MetadataResolveDelayMilliseconds, cancellationToken);
+            await Task.Delay(MetadataResolveDelayMilliseconds, cancellationToken).ConfigureAwait(false);
         }
 
         return HiddenAppShortcutBuildResult.Failure($"Не удалось подготовить данные ярлыка для {packageName}.");

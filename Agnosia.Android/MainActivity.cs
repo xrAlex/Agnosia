@@ -86,7 +86,7 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         {
             try
             {
-                await Task.Delay(100);
+                await Task.Delay(100).ConfigureAwait(false);
 
                 RunOnUiThread(ApplyPreferredDisplayMode);
 

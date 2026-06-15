@@ -52,15 +52,15 @@ public static class AndroidSettingsStore
 
         if (loggingChanged)
             await TrySyncBooleanSettingToWorkProfileAsync(activity, StorageKeys.LoggingEnabled, settings.LoggingEnabled,
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
 
         if (disableVpnBeforeLaunchChanged || settings.DisableVpnBeforeWorkLaunch)
             await TrySyncBooleanSettingToWorkProfileAsync(activity, StorageKeys.DisableVpnBeforeWorkLaunch,
-                settings.DisableVpnBeforeWorkLaunch, cancellationToken);
+                settings.DisableVpnBeforeWorkLaunch, cancellationToken).ConfigureAwait(false);
 
         if (fileShuttleChanged || settings.CrossProfileFileShuttleEnabled)
             await TrySyncBooleanSettingToWorkProfileAsync(activity, StorageKeys.CrossProfileFileShuttleEnabled,
-                settings.CrossProfileFileShuttleEnabled, cancellationToken);
+                settings.CrossProfileFileShuttleEnabled, cancellationToken).ConfigureAwait(false);
 
         if (vpnAfterFreezeClientChanged)
             Log.Debug(LogTag, $"VPN after work freeze client changed: client={settings.VpnAfterWorkFreezeClient}.");
@@ -89,7 +89,8 @@ public static class AndroidSettingsStore
 
         try
         {
-            var result = await SettingsManager.Instance.SyncBooleanSettingAsync(name, value, cancellationToken);
+            var result = await SettingsManager.Instance.SyncBooleanSettingAsync(name, value, cancellationToken)
+                .ConfigureAwait(false);
             if (!result.Succeeded)
                 Log.Warn(LogTag, $"Failed to synchronize {name} to the work profile: {result.Message}");
         }

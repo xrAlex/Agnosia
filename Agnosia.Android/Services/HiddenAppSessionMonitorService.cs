@@ -269,7 +269,7 @@ public sealed partial class HiddenAppSessionMonitorService : Service
     {
         try
         {
-            await MonitorSessionAsync(session, cancellationToken);
+            await MonitorSessionAsync(session, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -353,7 +353,7 @@ public sealed partial class HiddenAppSessionMonitorService : Service
 
             try
             {
-                await Task.Delay(transition.PollDelay, cancellationToken);
+                await Task.Delay(transition.PollDelay, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {

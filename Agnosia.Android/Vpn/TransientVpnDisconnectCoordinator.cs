@@ -15,11 +15,12 @@ internal static class TransientVpnDisconnectCoordinator
         if (prepareIntent is not null)
         {
             var prepareResult =
-                await activityCommands.StartExternalActivityForResultAsync(prepareIntent, cancellationToken);
+                await activityCommands.StartExternalActivityForResultAsync(prepareIntent, cancellationToken)
+                    .ConfigureAwait(false);
             if (prepareResult.ResultCode != Result.Ok)
                 return OperationResult.Failure("Android не выдал Agnosia временное управление VPN.");
         }
 
-        return await activityCommands.DisconnectPreparedVpnAsync(cancellationToken);
+        return await activityCommands.DisconnectPreparedVpnAsync(cancellationToken).ConfigureAwait(false);
     }
 }

@@ -62,6 +62,9 @@ public sealed partial class DummyActivity
                 case AgnosiaActions.QueryCrossProfilePackages:
                     ActionQueryCrossProfilePackages();
                     break;
+                case AgnosiaActions.QueryPermissions:
+                    ActionQueryPermissions();
+                    break;
                 case AgnosiaActions.QueryUsageStatsAccess:
                     ActionQueryUsageStatsAccess();
                     break;
@@ -173,7 +176,7 @@ public sealed partial class DummyActivity
             return;
         }
 
-        AndroidStartup.EnforceWorkProfilePoliciesAndStartLockFreezeMonitor(this);
+        AndroidStartup.EnsureWorkProfilePoliciesAndStartLockFreezeMonitor(this);
         AuthenticationUtility.SignIntent(pingResult);
         FinishWithResult(Result.Ok, pingResult);
     }
@@ -218,7 +221,7 @@ public sealed partial class DummyActivity
     {
         try
         {
-            await action(cancellationToken);
+            await action(cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

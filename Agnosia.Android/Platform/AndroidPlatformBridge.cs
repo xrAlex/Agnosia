@@ -118,9 +118,9 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
             cancellationToken);
     }
 
-    public async Task<bool> LoadOnboardingCompletedAsync(CancellationToken cancellationToken = default)
+    public Task<bool> LoadOnboardingCompletedAsync(CancellationToken cancellationToken = default)
     {
-        return await _settingsCoordinator.LoadOnboardingCompletedAsync(cancellationToken);
+        return _settingsCoordinator.LoadOnboardingCompletedAsync(cancellationToken);
     }
 
     public Task<OperationResult> CompleteOnboardingAsync(CancellationToken cancellationToken = default)
@@ -135,7 +135,7 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
 
     public async Task<OperationResult> OpenWorkProfileSettingsAsync(CancellationToken cancellationToken = default)
     {
-        return await _provisioningCoordinator.OpenWorkProfileSettingsAsync(cancellationToken);
+        return await _provisioningCoordinator.OpenWorkProfileSettingsAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public Task<OperationResult> CloneAsync(AppSnapshot app, CancellationToken cancellationToken = default)
@@ -195,6 +195,13 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
     public Task<IReadOnlyList<AgnosiaModuleSnapshot>> LoadModulesAsync(CancellationToken cancellationToken = default)
     {
         return _moduleCoordinator.LoadModulesAsync(cancellationToken);
+    }
+
+    public Task<IReadOnlyList<AgnosiaModuleSnapshot>> LoadModulesAsync(
+        IReadOnlyList<PermissionSnapshot> permissions,
+        CancellationToken cancellationToken = default)
+    {
+        return _moduleCoordinator.LoadModulesAsync(permissions, cancellationToken);
     }
 
     public Task<OperationResult> SetModuleEnabledAsync(

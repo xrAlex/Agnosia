@@ -42,6 +42,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private readonly Func<TimeSpan, CancellationToken, Task> _delayAsync;
     private readonly DebouncedAsyncAction _searchRefreshDebouncer;
     private readonly DashboardSettingsSaveCoordinator _settingsSaveCoordinator;
+    private readonly SerializedBackgroundWorker _dashboardRefreshWorker = new();
     private readonly SemaphoreSlim _iconLoadGate = new(1, 1);
     private readonly Lock _iconBatchProcessorSync = new();
     private readonly Lock _permissionReloadSync = new();
@@ -174,6 +175,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsEmptyStateVisible))]
     [NotifyPropertyChangedFor(nameof(IsAppInventoryProgressVisible))]
     private partial bool IsInventoryLoading { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsDashboardRefreshing { get; set; }
 
     [ObservableProperty]
     public partial string StatusMessage { get; set; } = "Ready";
@@ -599,7 +603,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             _settingsService,
             TimeSpan.FromMilliseconds(SettingsSaveDelayMs),
             () => !_isApplyingSnapshot && HasLoadedSnapshot,
-            () => !IsBusy && !_isOperationInProgress && HasLoadedSnapshot,
+            () => !IsBusy && !_isOperationInProgress && !IsDashboardRefreshing && HasLoadedSnapshot,
             () => SelectedSection == DashboardSection.Apps,
             CaptureSettingsSnapshot,
             RefreshAsync,
@@ -663,57 +667,80 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         if (!allowDuringOperation && (IsBusy || _isOperationInProgress))
             return;
 
-        CancelInventoryLoad(true);
-        BeginBusy();
-        StatusIsError = false;
-        StatusMessage = "Updating";
+        await _dashboardRefreshWorker.RunAsync(
+                () => RefreshDashboardCoreAsync(allowDuringOperation))
+            .ConfigureAwait(false);
+    }
+
+    private async Task RefreshDashboardCoreAsync(bool allowDuringOperation)
+    {
+        await InvokeOnUiThreadActionAsync(() =>
+        {
+            CancelInventoryLoad(true);
+            IsDashboardRefreshing = true;
+            StatusIsError = false;
+            StatusMessage = "Updating";
+        }, DispatcherPriority.Background).ConfigureAwait(false);
 
         try
         {
-            var profileSnapshot = await _dashboardService.LoadDashboardProfileAsync();
-            _lastProfileSnapshot = profileSnapshot;
-            ApplyProfileSnapshot(profileSnapshot);
-            await ReloadModulesAsync();
-            HasLoadedSnapshot = true;
-            StatusMessage = !string.IsNullOrWhiteSpace(profileSnapshot.StatusMessage)
-                ? profileSnapshot.StatusMessage
-                : IsSupported
-                    ? "Updated"
-                    : "NotSupported";
-            StatusIsError = WorkProfileRecovery == WorkProfileRecoveryKind.UpdateFailedDeleteWorkProfile;
+            var profileSnapshot = await LoadDashboardProfileOnWorkerAsync().ConfigureAwait(false);
+            await InvokeOnUiThreadActionAsync(() =>
+            {
+                _lastProfileSnapshot = profileSnapshot;
+                ApplyProfileSnapshot(profileSnapshot);
+            }, DispatcherPriority.Background).ConfigureAwait(false);
 
-            if (IsDashboardVisible)
+            var permissionSnapshots = profileSnapshot.IsSupported && profileSnapshot.HasSetup && !allowDuringOperation
+                ? await LoadPermissionsOnWorkerAsync().ConfigureAwait(false)
+                : null;
+            var moduleSnapshots = await LoadModulesOnWorkerAsync(permissionSnapshots).ConfigureAwait(false);
+
+            await InvokeOnUiThreadActionAsync(() =>
             {
-                if (!allowDuringOperation) await ReloadPermissionsAsync();
-                StartInventoryLoad(
-                    profileSnapshot,
-                    showProgress: SelectedSection == DashboardSection.Apps);
-            }
-            else
-            {
-                ApplyInventorySnapshot(DashboardAppInventorySnapshot.Empty);
-                HasLoadedInventory = true;
-            }
+                ApplyModuleSnapshots(moduleSnapshots);
+                if (permissionSnapshots is not null) ApplyPermissionSnapshots(permissionSnapshots);
+
+                HasLoadedSnapshot = true;
+                StatusMessage = !string.IsNullOrWhiteSpace(profileSnapshot.StatusMessage)
+                    ? profileSnapshot.StatusMessage
+                    : IsSupported
+                        ? "Updated"
+                        : "NotSupported";
+                StatusIsError = WorkProfileRecovery == WorkProfileRecoveryKind.UpdateFailedDeleteWorkProfile;
+
+                if (IsDashboardVisible)
+                {
+                    StartInventoryLoad(
+                        profileSnapshot,
+                        showProgress: SelectedSection == DashboardSection.Apps);
+                }
+                else
+                {
+                    ApplyInventorySnapshot(DashboardAppInventorySnapshot.Empty);
+                    HasLoadedInventory = true;
+                }
+            }, DispatcherPriority.Background).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            HasLoadedSnapshot = true;
-            HasLoadedInventory = true;
-            StatusIsError = true;
-            StatusMessage = ResolveExceptionMessage(ex, "UpdateState");
-            IsInventoryLoading = false;
+            await InvokeOnUiThreadActionAsync(() =>
+            {
+                HasLoadedSnapshot = true;
+                HasLoadedInventory = true;
+                StatusIsError = true;
+                StatusMessage = ResolveExceptionMessage(ex, "UpdateState");
+                IsInventoryLoading = false;
+            }, DispatcherPriority.Background).ConfigureAwait(false);
         }
         finally
         {
-            try
+            await ReloadPlatformLogsAsync().ConfigureAwait(false);
+            await InvokeOnUiThreadActionAsync(() =>
             {
-                await ReloadPlatformLogsAsync();
-            }
-            finally
-            {
-                EndBusy();
+                IsDashboardRefreshing = false;
                 _settingsSaveCoordinator.TryStartQueued();
-            }
+            }, DispatcherPriority.Background).ConfigureAwait(false);
         }
     }
 
@@ -1501,6 +1528,40 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             priority == default ? DispatcherPriority.Background : priority);
     }
 
+    private async ValueTask<T> InvokeOnUiThreadFuncAsync<T>(
+        Func<T> func,
+        DispatcherPriority priority = default)
+    {
+        T result = default!;
+        await InvokeOnUiThreadActionAsync(
+            () => result = func(),
+            priority == default ? DispatcherPriority.Background : priority).ConfigureAwait(false);
+        return result;
+    }
+
+    private Task<DashboardSnapshot> LoadDashboardProfileOnWorkerAsync()
+    {
+        return Task.Run(() => _dashboardService.LoadDashboardProfileAsync());
+    }
+
+    private Task<IReadOnlyList<AgnosiaModuleSnapshot>> LoadModulesOnWorkerAsync(
+        IReadOnlyList<PermissionSnapshot>? permissions = null)
+    {
+        return Task.Run(() => permissions is null
+            ? _moduleService.LoadModulesAsync()
+            : _moduleService.LoadModulesAsync(permissions));
+    }
+
+    private Task<IReadOnlyList<PermissionSnapshot>> LoadPermissionsOnWorkerAsync()
+    {
+        return Task.Run(() => _permissionService.LoadPermissionsAsync());
+    }
+
+    private Task<IReadOnlyList<AppLogEntry>> LoadRecentLogsOnWorkerAsync()
+    {
+        return Task.Run(() => _platformEventLogReader.LoadRecentLogsAsync());
+    }
+
     private void BeginBusy()
     {
         _busyScopeCount++;
@@ -1598,10 +1659,17 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private async Task ReloadPlatformLogsAsync(bool force = false)
     {
-        if (!LoggingEnabled || (!force && !IsLogWindowOpen)) return;
+        var shouldLoad = await InvokeOnUiThreadFuncAsync(
+                () => LoggingEnabled && (force || IsLogWindowOpen),
+                DispatcherPriority.Background)
+            .ConfigureAwait(false);
+        if (!shouldLoad) return;
 
-        var logs = await _platformEventLogReader.LoadRecentLogsAsync();
-        ImportPlatformLogs(logs);
+        var logs = await LoadRecentLogsOnWorkerAsync().ConfigureAwait(false);
+        await InvokeOnUiThreadActionAsync(
+                () => ImportPlatformLogs(logs),
+                DispatcherPriority.Background)
+            .ConfigureAwait(false);
     }
 
     private Task ReloadPermissionsAsync()
@@ -1617,9 +1685,12 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private async Task ReloadModulesAsync()
     {
-        var snapshots = await _moduleService.LoadModulesAsync();
+        var snapshots = await LoadModulesOnWorkerAsync().ConfigureAwait(false);
 
-        await InvokeOnUiThreadActionAsync(() => ApplyModuleSnapshots(snapshots), DispatcherPriority.Background);
+        await InvokeOnUiThreadActionAsync(
+                () => ApplyModuleSnapshots(snapshots),
+                DispatcherPriority.Background)
+            .ConfigureAwait(false);
     }
 
     private void ApplyModuleSnapshots(IReadOnlyList<AgnosiaModuleSnapshot> snapshots)
@@ -1663,27 +1734,32 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private async Task ReloadPermissionsCoreAsync()
     {
-        var snapshots = await _permissionService.LoadPermissionsAsync();
+        var snapshots = await LoadPermissionsOnWorkerAsync().ConfigureAwait(false);
 
-        await InvokeOnUiThreadActionAsync(() =>
+        await InvokeOnUiThreadActionAsync(
+                () => ApplyPermissionSnapshots(snapshots),
+                DispatcherPriority.Background)
+            .ConfigureAwait(false);
+    }
+
+    private void ApplyPermissionSnapshots(IReadOnlyList<PermissionSnapshot> snapshots)
+    {
+        _permissionItems.Clear();
+        _settingsPermissionItems.Clear();
+        foreach (var snapshot in snapshots)
         {
-            _permissionItems.Clear();
-            _settingsPermissionItems.Clear();
-            foreach (var snapshot in snapshots)
-            {
-                var item = new PermissionItemViewModel(this, snapshot);
-                _permissionItems.Add(item);
-                if (IsAppPermission(snapshot.Kind)) _settingsPermissionItems.Add(item);
-            }
+            var item = new PermissionItemViewModel(this, snapshot);
+            _permissionItems.Add(item);
+            if (IsAppPermission(snapshot.Kind)) _settingsPermissionItems.Add(item);
+        }
 
-            OnPropertyChanged(nameof(PermissionSummary));
-            OnPropertyChanged(nameof(OnboardingPermissionItems));
-            OnPropertyChanged(nameof(OnboardingPermissionSummary));
-            OnPropertyChanged(nameof(AreOnboardingPermissionsGranted));
-            OnPropertyChanged(nameof(IsOnboardingPermissionsStep));
-            OnPropertyChanged(nameof(OnboardingStepLabel));
-            NotifyOverviewMetricsChanged();
-        }, DispatcherPriority.Background);
+        OnPropertyChanged(nameof(PermissionSummary));
+        OnPropertyChanged(nameof(OnboardingPermissionItems));
+        OnPropertyChanged(nameof(OnboardingPermissionSummary));
+        OnPropertyChanged(nameof(AreOnboardingPermissionsGranted));
+        OnPropertyChanged(nameof(IsOnboardingPermissionsStep));
+        OnPropertyChanged(nameof(OnboardingStepLabel));
+        NotifyOverviewMetricsChanged();
     }
 
     private async Task RefreshPermissionsAfterResumeAsync()

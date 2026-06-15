@@ -252,10 +252,17 @@ public sealed class AndroidManifestContractTests
             source,
             @"private async Task<OperationResult> RequestVpnControlAsync[\s\S]*?\n    private Task<OperationResult> RequestPackageInstallAccessAsync",
             RegexOptions.Singleline).Value;
+        var localStateReader = Regex.Match(
+            source,
+            @"private static Task<PermissionLocalState> ReadPermissionLocalStateAsync[\s\S]*?\n    private sealed record PermissionLocalState",
+            RegexOptions.Singleline).Value;
 
-        Assert.Contains("StorageKeys.VpnControlPrepared", loadPermissions, StringComparison.Ordinal);
+        Assert.Contains("ReadPermissionLocalStateAsync", loadPermissions, StringComparison.Ordinal);
+        Assert.Contains("StorageKeys.VpnControlPrepared", localStateReader, StringComparison.Ordinal);
         Assert.DoesNotContain("VpnService.Prepare", loadPermissions, StringComparison.Ordinal);
+        Assert.DoesNotContain("VpnService.Prepare", localStateReader, StringComparison.Ordinal);
         Assert.DoesNotContain("IsVpnPrepared", loadPermissions, StringComparison.Ordinal);
+        Assert.DoesNotContain("IsVpnPrepared", localStateReader, StringComparison.Ordinal);
         Assert.Contains("VpnService.Prepare(activity)", requestVpnControl, StringComparison.Ordinal);
         Assert.Contains("StorageKeys.VpnControlPrepared", requestVpnControl, StringComparison.Ordinal);
     }

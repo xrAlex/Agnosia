@@ -20,8 +20,26 @@ internal sealed partial class AndroidModuleCoordinator(
     {
         var activity = commandRunner.CurrentActivity;
         AgnosiaRuntime.Initialize(activity);
-        var permissions = await permissionCoordinator.LoadPermissionsAsync(cancellationToken);
+        var permissions = await permissionCoordinator.LoadPermissionsAsync(cancellationToken).ConfigureAwait(false);
+        return CreateModuleSnapshots(activity, permissions);
+    }
 
+    public Task<IReadOnlyList<AgnosiaModuleSnapshot>> LoadModulesAsync(
+        IReadOnlyList<PermissionSnapshot> permissions,
+        CancellationToken cancellationToken = default)
+    {
+        if (cancellationToken.IsCancellationRequested)
+            return Task.FromCanceled<IReadOnlyList<AgnosiaModuleSnapshot>>(cancellationToken);
+
+        var activity = commandRunner.CurrentActivity;
+        AgnosiaRuntime.Initialize(activity);
+        return Task.FromResult(CreateModuleSnapshots(activity, permissions));
+    }
+
+    private static IReadOnlyList<AgnosiaModuleSnapshot> CreateModuleSnapshots(
+        Context activity,
+        IReadOnlyList<PermissionSnapshot> permissions)
+    {
         return
         [
             CreateFileShuttleSnapshot(activity, permissions),
@@ -38,10 +56,14 @@ internal sealed partial class AndroidModuleCoordinator(
     {
         return module switch
         {
-            AgnosiaModuleKind.FileShuttle => await SetFileShuttleEnabledAsync(enabled, cancellationToken),
-            AgnosiaModuleKind.Lockdown => await SetLockdownEnabledAsync(enabled, cancellationToken),
-            AgnosiaModuleKind.VpnGuard => await SetVpnGuardEnabledAsync(enabled, cancellationToken),
-            AgnosiaModuleKind.RiskEngine => await SetRiskEngineEnabledAsync(enabled, cancellationToken),
+            AgnosiaModuleKind.FileShuttle => await SetFileShuttleEnabledAsync(enabled, cancellationToken)
+                .ConfigureAwait(false),
+            AgnosiaModuleKind.Lockdown => await SetLockdownEnabledAsync(enabled, cancellationToken)
+                .ConfigureAwait(false),
+            AgnosiaModuleKind.VpnGuard => await SetVpnGuardEnabledAsync(enabled, cancellationToken)
+                .ConfigureAwait(false),
+            AgnosiaModuleKind.RiskEngine => await SetRiskEngineEnabledAsync(enabled, cancellationToken)
+                .ConfigureAwait(false),
             _ => OperationResult.Failure("Неизвестный модуль.")
         };
     }
@@ -55,7 +77,8 @@ internal sealed partial class AndroidModuleCoordinator(
 
         if (enabled)
         {
-            var permissions = await permissionCoordinator.LoadPermissionsAsync(cancellationToken);
+            var permissions = await permissionCoordinator.LoadPermissionsAsync(cancellationToken)
+                .ConfigureAwait(false);
             var missingRequirements = GetActivationRequirements(permissions)
                 .Where(requirement => !requirement.IsSatisfied)
                 .ToArray();
@@ -68,7 +91,8 @@ internal sealed partial class AndroidModuleCoordinator(
         storage.SetBoolean(StorageKeys.CrossProfileFileShuttleEnabled, enabled);
         AgnosiaUtilities.ApplyCrossProfileFileShuttleComponentState(activity);
 
-        var syncResult = await TrySyncFileShuttleSettingAsync(activity, enabled, cancellationToken);
+        var syncResult = await TrySyncFileShuttleSettingAsync(activity, enabled, cancellationToken)
+            .ConfigureAwait(false);
         if (!syncResult.Succeeded) return syncResult;
 
         if (enabled && !IsFileShuttleProviderEnabled(activity))
@@ -124,7 +148,8 @@ internal sealed partial class AndroidModuleCoordinator(
 
         if (enabled)
         {
-            var permissions = await permissionCoordinator.LoadPermissionsAsync(cancellationToken);
+            var permissions = await permissionCoordinator.LoadPermissionsAsync(cancellationToken)
+                .ConfigureAwait(false);
             var missingRequirements = GetVpnGuardActivationRequirements(permissions)
                 .Where(requirement => !requirement.IsSatisfied)
                 .ToArray();
@@ -139,11 +164,12 @@ internal sealed partial class AndroidModuleCoordinator(
         if (!enabled) storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
 
         var syncResult = await TrySyncBooleanSettingAsync(
-            activity,
-            StorageKeys.DisableVpnBeforeWorkLaunch,
-            enabled,
-            "VPN Guard",
-            cancellationToken);
+                activity,
+                StorageKeys.DisableVpnBeforeWorkLaunch,
+                enabled,
+                "VPN Guard",
+                cancellationToken)
+            .ConfigureAwait(false);
         if (!syncResult.Succeeded) return syncResult;
 
         return OperationResult.Success(enabled ? "VPN Guard включён." : "VPN Guard выключен.");
@@ -192,7 +218,8 @@ internal sealed partial class AndroidModuleCoordinator(
 
         if (enabled)
         {
-            var permissions = await permissionCoordinator.LoadPermissionsAsync(cancellationToken);
+            var permissions = await permissionCoordinator.LoadPermissionsAsync(cancellationToken)
+                .ConfigureAwait(false);
             var missingRequirements = GetLockdownActivationRequirements(permissions)
                 .Where(requirement => !requirement.IsSatisfied)
                 .ToArray();
@@ -205,9 +232,10 @@ internal sealed partial class AndroidModuleCoordinator(
             return OperationResult.Failure("Рабочий профиль недоступен для настройки Lockdown.");
 
         var result = await AndroidProfileCommandGateway.SetLockdownEnabledAsync(
-            commandRunner,
-            enabled,
-            cancellationToken);
+                commandRunner,
+                enabled,
+                cancellationToken)
+            .ConfigureAwait(false);
         if (!result.Succeeded) return result;
 
         LocalStorageManager.Instance.SetBoolean(StorageKeys.LockdownEnabled, enabled);
@@ -251,11 +279,12 @@ internal sealed partial class AndroidModuleCoordinator(
         storage.SetBoolean(StorageKeys.RiskEngineEnabled, enabled);
 
         var syncResult = await TrySyncBooleanSettingAsync(
-            activity,
-            StorageKeys.RiskEngineEnabled,
-            enabled,
-            "Risk Engine",
-            cancellationToken);
+                activity,
+                StorageKeys.RiskEngineEnabled,
+                enabled,
+                "Risk Engine",
+                cancellationToken)
+            .ConfigureAwait(false);
         if (!syncResult.Succeeded) return syncResult;
 
         return OperationResult.Success(enabled ? "Risk Engine включён." : "Risk Engine выключен.");
@@ -334,9 +363,10 @@ internal sealed partial class AndroidModuleCoordinator(
         try
         {
             var result = await SettingsManager.Instance.SyncBooleanSettingAsync(
-                StorageKeys.CrossProfileFileShuttleEnabled,
-                enabled,
-                cancellationToken);
+                    StorageKeys.CrossProfileFileShuttleEnabled,
+                    enabled,
+                    cancellationToken)
+                .ConfigureAwait(false);
             if (result.Succeeded) return OperationResult.Success(string.Empty);
 
             return OperationResult.Failure(
@@ -365,7 +395,8 @@ internal sealed partial class AndroidModuleCoordinator(
 
         try
         {
-            var result = await SettingsManager.Instance.SyncBooleanSettingAsync(key, enabled, cancellationToken);
+            var result = await SettingsManager.Instance.SyncBooleanSettingAsync(key, enabled, cancellationToken)
+                .ConfigureAwait(false);
             if (result.Succeeded) return OperationResult.Success(string.Empty);
 
             return OperationResult.Failure(

@@ -18,24 +18,18 @@ internal sealed class AndroidPermissionCoordinator(
         var activity = commandRunner.CurrentActivity;
         AgnosiaRuntime.Initialize(activity);
 
-        var profileDiagnostics = AndroidWorkProfileDiagnosticsReader.Read(activity);
+        var localState = await ReadPermissionLocalStateAsync(activity, cancellationToken).ConfigureAwait(false);
+        var profileDiagnostics = localState.ProfileDiagnostics;
         var hasWorkProfileTarget = profileDiagnostics.CommandTargetResolvable;
         var workProfileAvailable = hasWorkProfileTarget
                                    && profileDiagnostics.AvailableToCrossProfileApps
                                    && profileDiagnostics.QuietModeEnabled != true
-                                   && await commandRunner.CanReachWorkProfileAsync(cancellationToken);
-        var hasSetup = LocalStorageManager.Instance.GetBoolean(StorageKeys.HasSetup)
-                       || hasWorkProfileTarget
-                       || profileDiagnostics.ManagedProfileExists;
-        var usageAccessGranted = workProfileAvailable
-                                 && await AndroidProfileCommandGateway.QueryWorkUsageStatsAccessAsync(commandRunner,
-                                     cancellationToken);
-        var workPackageInstallGranted = workProfileAvailable
-                                        && await AndroidProfileCommandGateway.QueryWorkPackageInstallAccessAsync(
-                                            commandRunner, cancellationToken);
-        var workAllFilesGranted = workProfileAvailable
-                                  && await AndroidProfileCommandGateway.QueryWorkAllFilesAccessAsync(
-                                      commandRunner, cancellationToken);
+                                   && await commandRunner.CanReachWorkProfileAsync(cancellationToken)
+                                       .ConfigureAwait(false);
+        var workPermissions = workProfileAvailable
+            ? await AndroidProfileCommandGateway.QueryWorkPermissionsAsync(commandRunner, cancellationToken)
+                .ConfigureAwait(false)
+            : WorkProfilePermissionQueryResult.Empty;
 
         return
         [
@@ -44,16 +38,16 @@ internal sealed class AndroidPermissionCoordinator(
                 "Рабочий профиль",
                 "Основной профиль",
                 "Нужен для изоляции клонированных приложений, скрытия пакетов и управления политиками рабочего пространства",
-                hasSetup && workProfileAvailable,
-                !hasSetup || !workProfileAvailable,
+                localState.HasSetup && workProfileAvailable,
+                !localState.HasSetup || !workProfileAvailable,
                 "Подключен",
-                hasSetup ? "Проверить профиль" : "Создать профиль"),
+                localState.HasSetup ? "Проверить профиль" : "Создать профиль"),
             new PermissionSnapshot(
                 PermissionKind.Notifications,
                 "Уведомления",
                 "Основной профиль",
                 "Необходимо для отображения фоновой активности приложения",
-                AndroidPermissionApi.HasNotificationPermission(activity),
+                localState.NotificationPermissionGranted,
                 OperatingSystem.IsAndroidVersionAtLeast(33),
                 "Получено",
                 "Разрешить"),
@@ -62,7 +56,7 @@ internal sealed class AndroidPermissionCoordinator(
                 "Временное управление VPN",
                 "Основной профиль",
                 "Позволяет приложению управлять VPN-соединениями",
-                LocalStorageManager.Instance.GetBoolean(StorageKeys.VpnControlPrepared),
+                localState.VpnControlPrepared,
                 true,
                 "Получено",
                 "Разрешить"),
@@ -71,7 +65,7 @@ internal sealed class AndroidPermissionCoordinator(
                 "Установка APK",
                 "Рабочий профиль",
                 "Нужна для копирования пользовательских приложений в рабочий профиль через установщик APK",
-                workPackageInstallGranted,
+                workPermissions.PackageInstallAccess,
                 workProfileAvailable,
                 "Получено",
                 "Открыть настройки"),
@@ -80,7 +74,7 @@ internal sealed class AndroidPermissionCoordinator(
                 "Доступ к файлам",
                 "Основной профиль",
                 "Нужно для File Shuttle, чтобы Agnosia могла отдавать выбранные файлы личного профиля через DocumentsUI",
-                AndroidPermissionApi.HasAllFilesAccess(activity),
+                localState.PersonalAllFilesGranted,
                 true,
                 "Получено",
                 "Открыть настройки"),
@@ -89,7 +83,7 @@ internal sealed class AndroidPermissionCoordinator(
                 "Доступ к файлам",
                 "Рабочий профиль",
                 "Нужно для File Shuttle, чтобы Agnosia могла отдавать выбранные файлы рабочего профиля через DocumentsUI",
-                workAllFilesGranted,
+                workPermissions.AllFilesAccess,
                 workProfileAvailable,
                 "Получено",
                 "Открыть настройки"),
@@ -112,7 +106,7 @@ internal sealed class AndroidPermissionCoordinator(
                 7. Пролистайте вниз
                 8. Активируйте 'Доступ к истории использования'
                 """,
-                usageAccessGranted,
+                workPermissions.UsageStatsAccess,
                 workProfileAvailable,
                 "Получено",
                 "Открыть настройки"),
@@ -135,7 +129,7 @@ internal sealed class AndroidPermissionCoordinator(
                 7. Пролистайте вниз
                 8. Активируйте 'Поверх других приложений'
                 """,
-                AndroidPermissionApi.HasOverlayPermission(activity),
+                localState.OverlayPermissionGranted,
                 true,
                 "Получено",
                 "Открыть настройки")
@@ -151,13 +145,14 @@ internal sealed class AndroidPermissionCoordinator(
 
         return permission switch
         {
-            PermissionKind.WorkProfile => await startProvisioningAsync(cancellationToken),
-            PermissionKind.UsageStats => await RequestUsageStatsAccessAsync(cancellationToken),
+            PermissionKind.WorkProfile => await startProvisioningAsync(cancellationToken).ConfigureAwait(false),
+            PermissionKind.UsageStats => await RequestUsageStatsAccessAsync(cancellationToken).ConfigureAwait(false),
             PermissionKind.Notifications => AndroidPermissionApi.RequestNotificationPermission(activity),
-            PermissionKind.VpnControl => await RequestVpnControlAsync(cancellationToken),
-            PermissionKind.PackageInstall => await RequestPackageInstallAccessAsync(cancellationToken),
+            PermissionKind.VpnControl => await RequestVpnControlAsync(cancellationToken).ConfigureAwait(false),
+            PermissionKind.PackageInstall => await RequestPackageInstallAccessAsync(cancellationToken)
+                .ConfigureAwait(false),
             PermissionKind.PersonalAllFiles => AndroidPermissionApi.OpenAllFilesAccessSettings(activity),
-            PermissionKind.WorkAllFiles => await RequestAllFilesAccessAsync(cancellationToken),
+            PermissionKind.WorkAllFiles => await RequestAllFilesAccessAsync(cancellationToken).ConfigureAwait(false),
             PermissionKind.Overlay => AndroidPermissionApi.OpenAppDetailsSettings(activity),
             _ => OperationResult.Failure("Неизвестное разрешение.")
         };
@@ -168,22 +163,24 @@ internal sealed class AndroidPermissionCoordinator(
         var storage = LocalStorageManager.Instance;
         if (storage.GetBoolean(StorageKeys.UsageStatsAccessPrompted)) return;
 
-        if (await AndroidProfileCommandGateway.QueryWorkUsageStatsAccessAsync(commandRunner, cancellationToken))
+        if (await AndroidProfileCommandGateway.QueryWorkUsageStatsAccessAsync(commandRunner, cancellationToken)
+                .ConfigureAwait(false))
         {
             storage.SetBoolean(StorageKeys.UsageStatsAccessPrompted, true);
             return;
         }
 
-        var requestResult = await RequestUsageStatsAccessAsync(cancellationToken);
+        var requestResult = await RequestUsageStatsAccessAsync(cancellationToken).ConfigureAwait(false);
         if (requestResult.Succeeded) storage.SetBoolean(StorageKeys.UsageStatsAccessPrompted, true);
     }
 
     private async Task<OperationResult> RequestUsageStatsAccessAsync(CancellationToken cancellationToken)
     {
         var result = await RunWorkProfilePermissionRequestAsync(
-            AgnosiaActions.RequestUsageStatsAccess,
-            cancellationToken,
-            "Откройте Agnosia в списке и включите доступ к истории использования.");
+                AgnosiaActions.RequestUsageStatsAccess,
+                cancellationToken,
+                "Откройте Agnosia в списке и включите доступ к истории использования.")
+            .ConfigureAwait(false);
         if (result.Succeeded) LocalStorageManager.Instance.SetBoolean(StorageKeys.UsageStatsAccessPrompted, true);
 
         return result;
@@ -211,7 +208,8 @@ internal sealed class AndroidPermissionCoordinator(
             return OperationResult.Success("VPN-доступ уже подготовлен.");
         }
 
-        var result = await commandRunner.StartExternalActivityForResultAsync(prepareIntent, cancellationToken);
+        var result = await commandRunner.StartExternalActivityForResultAsync(prepareIntent, cancellationToken)
+            .ConfigureAwait(false);
         var error = AndroidActivityResultApi.ExtractError(result);
         if (!string.IsNullOrWhiteSpace(error))
         {
@@ -255,10 +253,41 @@ internal sealed class AndroidPermissionCoordinator(
             successMessage);
     }
 
+    private static Task<PermissionLocalState> ReadPermissionLocalStateAsync(
+        Activity activity,
+        CancellationToken cancellationToken)
+    {
+        return Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var profileDiagnostics = AndroidWorkProfileDiagnosticsReader.Read(activity);
+            var hasWorkProfileTarget = profileDiagnostics.CommandTargetResolvable;
+            var hasSetup = LocalStorageManager.Instance.GetBoolean(StorageKeys.HasSetup)
+                           || hasWorkProfileTarget
+                           || profileDiagnostics.ManagedProfileExists;
+            return new PermissionLocalState(
+                profileDiagnostics,
+                hasSetup,
+                AndroidPermissionApi.HasNotificationPermission(activity),
+                LocalStorageManager.Instance.GetBoolean(StorageKeys.VpnControlPrepared),
+                AndroidPermissionApi.HasAllFilesAccess(activity),
+                AndroidPermissionApi.HasOverlayPermission(activity));
+        }, cancellationToken);
+    }
+
     public OperationResult OpenAppDetailsSettings()
     {
         var activity = commandRunner.CurrentActivity;
         AgnosiaRuntime.Initialize(activity);
         return AndroidPermissionApi.OpenAppDetailsSettings(activity);
     }
+
+    private sealed record PermissionLocalState(
+        WorkProfileDiagnostics ProfileDiagnostics,
+        bool HasSetup,
+        bool NotificationPermissionGranted,
+        bool VpnControlPrepared,
+        bool PersonalAllFilesGranted,
+        bool OverlayPermissionGranted);
 }

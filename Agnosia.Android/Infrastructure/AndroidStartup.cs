@@ -11,6 +11,10 @@ namespace Agnosia.Android.Infrastructure;
 
 internal static class AndroidStartup
 {
+    private static readonly TimeSpan WorkProfilePolicyRefreshInterval = TimeSpan.FromMinutes(5);
+    private static readonly object WorkProfilePolicyRefreshSync = new();
+    private static DateTimeOffset _lastWorkProfilePolicyRefreshUtc = DateTimeOffset.MinValue;
+
     public static void ConfigurePrimaryProfileServices(Context context)
     {
         ServiceRegistry.SuppressPrimaryUiStartup = false;
@@ -46,6 +50,14 @@ internal static class AndroidStartup
             enableLauncher);
         AgnosiaUtilities.EnforceUserRestrictions(context, typeof(AgnosiaDeviceAdminReceiver));
         LockdownVpnController.EnsureEnabledPolicy(context, typeof(AgnosiaDeviceAdminReceiver));
+        MarkWorkProfilePoliciesRefreshed();
+    }
+
+    public static void EnsureWorkProfilePolicies(Context context, bool enableLauncher = false)
+    {
+        if (!enableLauncher && !ShouldRefreshWorkProfilePolicies()) return;
+
+        EnforceWorkProfilePolicies(context, enableLauncher);
     }
 
     public static void EnforceWorkProfilePoliciesAndStartLockFreezeMonitor(
@@ -55,5 +67,30 @@ internal static class AndroidStartup
         EnforceWorkProfilePolicies(context, enableLauncher);
         WorkProfileLockFreezeService.EnsureRunning(context);
         LockFreezeCleanupJobService.RunStartupSafetyNet(context);
+    }
+
+    public static void EnsureWorkProfilePoliciesAndStartLockFreezeMonitor(
+        Context context,
+        bool enableLauncher = false)
+    {
+        EnsureWorkProfilePolicies(context, enableLauncher);
+        WorkProfileLockFreezeService.EnsureRunning(context);
+        LockFreezeCleanupJobService.RunStartupSafetyNet(context);
+    }
+
+    private static bool ShouldRefreshWorkProfilePolicies()
+    {
+        lock (WorkProfilePolicyRefreshSync)
+        {
+            return DateTimeOffset.UtcNow - _lastWorkProfilePolicyRefreshUtc >= WorkProfilePolicyRefreshInterval;
+        }
+    }
+
+    private static void MarkWorkProfilePoliciesRefreshed()
+    {
+        lock (WorkProfilePolicyRefreshSync)
+        {
+            _lastWorkProfilePolicyRefreshUtc = DateTimeOffset.UtcNow;
+        }
     }
 }

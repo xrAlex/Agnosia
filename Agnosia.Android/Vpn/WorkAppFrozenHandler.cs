@@ -16,7 +16,8 @@ internal static class WorkAppFrozenHandler
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var result = await AndroidVpnAutomationApi.EnableConfiguredVpnAfterWorkFreezeAsync(context, trigger);
+            var result = await AndroidVpnAutomationApi.EnableConfiguredVpnAfterWorkFreezeAsync(context, trigger)
+                .ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             return result;
         }

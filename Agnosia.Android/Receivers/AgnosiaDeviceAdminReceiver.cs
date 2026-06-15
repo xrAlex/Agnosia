@@ -1,4 +1,3 @@
-using Agnosia.Android.Api.Commands;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Infrastructure;
 using Android;
@@ -45,26 +44,12 @@ public sealed class AgnosiaDeviceAdminReceiver : DeviceAdminReceiver
             }
 
             AndroidStartup.EnforceWorkProfilePolicies(context, true);
-            NotifyParentProvisioningFinalized(context);
             Log.Info(LogTag,
-                "Work profile provisioning finalized and profile enabled; lock-freeze monitor startup deferred to profile activity bootstrap.");
+                "Work profile provisioning completed and profile enabled; parent profile will observe provisioning through the managed-profile broadcast.");
         }
         catch (Exception exception)
         {
             Log.Error(LogTag, $"Work profile provisioning finalization failed: {exception}");
         }
-    }
-
-    private static void NotifyParentProvisioningFinalized(Context context)
-    {
-        var intent = new Intent(AgnosiaActions.FinalizeProvision);
-        intent.AddFlags(ActivityFlags.NewTask);
-        if (!AgnosiaUtilities.TryTransferToProfileAndStartActivity(
-                context,
-                intent,
-                LogTag,
-                "Android не смог уведомить основной профиль о завершении настройки.",
-                out _))
-            Log.Warn(LogTag, "Parent profile provisioning finalization notification was not delivered.");
     }
 }

@@ -9,10 +9,10 @@ internal sealed class AndroidSettingsCoordinator(Func<Activity> getInitializedAc
 {
     private const string LogTag = "AgnosiaPlatformBridge";
 
-    public async Task<bool> LoadOnboardingCompletedAsync(CancellationToken cancellationToken = default)
+    public Task<bool> LoadOnboardingCompletedAsync(CancellationToken cancellationToken = default)
     {
         _ = getInitializedActivity();
-        return await Task.FromResult(LocalStorageManager.Instance.GetBoolean(StorageKeys.OnboardingCompleted));
+        return Task.FromResult(LocalStorageManager.Instance.GetBoolean(StorageKeys.OnboardingCompleted));
     }
 
     public Task<OperationResult> CompleteOnboardingAsync(CancellationToken cancellationToken = default)
