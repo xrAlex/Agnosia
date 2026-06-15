@@ -61,32 +61,18 @@ internal sealed class HiddenAppSessionMonitorStateMachine
             _hasSeenTarget = true;
 
         if (observation.IsSystemDelegatedFlow)
-        {
-            var previousInactiveSince = ResetInactiveCandidate();
-            _hasSeenTarget = true;
-            _phase = HiddenAppSessionMonitorPhase.TargetForegroundOrDelegated;
-            _lastForegroundAt = now;
-            return KeepAlive(
+            return MoveToTargetForegroundOrDelegated(
                 observation,
                 now,
                 targetForegroundFirstSeen,
-                previousInactiveSince,
                 "system_delegated_flow");
-        }
 
         if (observation.IsForeground)
-        {
-            var previousInactiveSince = ResetInactiveCandidate();
-            _hasSeenTarget = true;
-            _phase = HiddenAppSessionMonitorPhase.TargetForegroundOrDelegated;
-            _lastForegroundAt = now;
-            return KeepAlive(
+            return MoveToTargetForegroundOrDelegated(
                 observation,
                 now,
                 targetForegroundFirstSeen,
-                previousInactiveSince,
                 "target_foreground");
-        }
 
         if (_hasSeenTarget && observation.ConfirmedInactive)
         {
@@ -152,6 +138,24 @@ internal sealed class HiddenAppSessionMonitorStateMachine
         _hasSeenTarget = true;
         _phase = HiddenAppSessionMonitorPhase.TargetForegroundOrDelegated;
         _lastForegroundAt = now;
+    }
+
+    private HiddenAppSessionTransition MoveToTargetForegroundOrDelegated(
+        SessionObservation observation,
+        DateTimeOffset now,
+        bool targetForegroundFirstSeen,
+        string reason)
+    {
+        var previousInactiveSince = ResetInactiveCandidate();
+        _hasSeenTarget = true;
+        _phase = HiddenAppSessionMonitorPhase.TargetForegroundOrDelegated;
+        _lastForegroundAt = now;
+        return KeepAlive(
+            observation,
+            now,
+            targetForegroundFirstSeen,
+            previousInactiveSince,
+            reason);
     }
 
     private DateTimeOffset? ResetInactiveCandidate()

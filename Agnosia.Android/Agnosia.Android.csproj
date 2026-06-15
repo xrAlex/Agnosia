@@ -38,7 +38,10 @@
     <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
         <Compile Remove="**\*.cs"/>
         <Compile Include="Permissions\AppPermissionRiskCatalog.cs"/>
+        <Compile Include="Permissions\AppPermissionRiskCatalog.AnalysisContext.cs"/>
+        <Compile Include="Permissions\AppPermissionRiskCatalog.PermissionCombinationRule.cs"/>
         <Compile Include="Permissions\AppPermissionRiskCatalog.Rules.cs"/>
+        <Compile Include="Permissions\AppPermissionRiskCatalog.Scoring.cs"/>
         <Compile Include="Permissions\AppPermissionRiskInput.cs"/>
         <Compile Include="Platform\AndroidPackageAccessPolicy.cs"/>
     </ItemGroup>
