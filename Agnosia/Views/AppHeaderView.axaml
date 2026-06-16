@@ -26,22 +26,13 @@
                        Text="{Binding StatusMessage, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.Dashboard.Status.'}" />
         </StackPanel>
 
-        <Grid Grid.Column="2"
-              RowDefinitions="Auto,Auto"
-              RowSpacing="4"
-              VerticalAlignment="Center">
-            <Button Classes="icon-button"
-                    ToolTip.Tip="Обновить"
-                    Command="{Binding RefreshCommand}">
-                <PathIcon Classes="action-icon"
-                          Data="{StaticResource IconRefreshGeometry}" />
-            </Button>
-
-            <ProgressBar Grid.Row="1"
-                         Width="36"
-                         Height="2"
-                         IsVisible="{Binding IsDashboardRefreshing}"
-                         IsIndeterminate="True" />
-        </Grid>
+        <Button Grid.Column="2"
+                Classes="icon-button"
+                VerticalAlignment="Center"
+                ToolTip.Tip="Обновить"
+                Command="{Binding RefreshCommand}">
+            <PathIcon Classes="action-icon"
+                      Data="{StaticResource IconRefreshGeometry}" />
+        </Button>
     </Grid>
 </UserControl>

@@ -34,7 +34,9 @@
         <views:BottomNavigationView Grid.Row="2" />
 
         <ProgressBar Grid.Row="0"
+                     Grid.RowSpan="3"
                      Classes="operation-progress"
+                     HorizontalAlignment="Stretch"
                      VerticalAlignment="Top"
                      IsHitTestVisible="False"
                      IsVisible="{Binding IsOperationActive}"

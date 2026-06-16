@@ -177,6 +177,10 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private partial bool IsInventoryLoading { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsOperationActive))]
+    [NotifyPropertyChangedFor(nameof(OverviewHeadline))]
+    [NotifyPropertyChangedFor(nameof(OverallStatusText))]
+    [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
     public partial bool IsDashboardRefreshing { get; set; }
 
     [ObservableProperty]
@@ -476,7 +480,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         && IsSupported
         && !WorkProfileAvailable;
 
-    public bool IsOperationActive => IsBusy || _isOperationInProgress;
+    public bool IsOperationActive => IsBusy || _isOperationInProgress || IsDashboardRefreshing;
 
     partial void OnSelectedSectionChanged(DashboardSection value)
     {
@@ -1527,7 +1531,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
         _isOperationInProgress = true;
         OnPropertyChanged(nameof(CanStartProvisioning));
-        OnPropertyChanged(nameof(IsOperationActive));
+        NotifyOperationStatusChanged();
         StartProvisioningCommand.NotifyCanExecuteChanged();
         return true;
     }
@@ -1538,8 +1542,16 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
         _isOperationInProgress = false;
         OnPropertyChanged(nameof(CanStartProvisioning));
-        OnPropertyChanged(nameof(IsOperationActive));
+        NotifyOperationStatusChanged();
         StartProvisioningCommand.NotifyCanExecuteChanged();
+    }
+
+    private void NotifyOperationStatusChanged()
+    {
+        OnPropertyChanged(nameof(IsOperationActive));
+        OnPropertyChanged(nameof(OverviewHeadline));
+        OnPropertyChanged(nameof(OverallStatusText));
+        OnPropertyChanged(nameof(OverallStatusCaption));
     }
 
     private Task ReloadPermissionsAsync()
