@@ -1,6 +1,4 @@
-using Agnosia.Android.Api.Commands;
 using Agnosia.Models;
-using Android.App;
 using Android.Content;
 
 namespace Agnosia.Android.Gateways;

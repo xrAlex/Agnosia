@@ -1,5 +1,3 @@
-using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Infrastructure;
 using Android.Content;
 using Android.Content.PM;

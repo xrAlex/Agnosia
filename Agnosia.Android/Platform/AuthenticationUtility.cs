@@ -1,9 +1,6 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
-using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Api.Storage;
 using Android.Content;
 using Java.Lang;
 using Boolean = Java.Lang.Boolean;
@@ -84,15 +81,14 @@ public static class AuthenticationUtility
         {
             var actualBytes = Convert.FromHexString(actualHex);
             var expectedBytes = Convert.FromHexString(expectedHex);
-            if (actualBytes.Length != expectedBytes.Length)
-            {
-                var paddedActual = new byte[expectedBytes.Length];
-                Array.Copy(actualBytes, paddedActual, Math.Min(actualBytes.Length, paddedActual.Length));
-                CryptographicOperations.FixedTimeEquals(paddedActual, expectedBytes);
-                return false;
-            }
+            if (actualBytes.Length == expectedBytes.Length)
+                return CryptographicOperations.FixedTimeEquals(actualBytes, expectedBytes);
+            
+            var paddedActual = new byte[expectedBytes.Length];
+            Array.Copy(actualBytes, paddedActual, Math.Min(actualBytes.Length, paddedActual.Length));
+            CryptographicOperations.FixedTimeEquals(paddedActual, expectedBytes);
+            return false;
 
-            return CryptographicOperations.FixedTimeEquals(actualBytes, expectedBytes);
         }
         catch (FormatException)
         {

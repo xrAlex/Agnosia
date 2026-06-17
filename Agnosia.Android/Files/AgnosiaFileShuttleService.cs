@@ -1,12 +1,10 @@
 using System.Text.Json;
-using Agnosia.Android.Api.Notifications;
-using Android.App;
+using _Microsoft.Android.Resource.Designer;
 using Android.Content;
 using Android.Content.PM;
 using Android.OS;
 using Android.Provider;
 using Android.Webkit;
-using Java.IO;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 using Environment = Android.OS.Environment;
 using File = Java.IO.File;
@@ -71,7 +69,7 @@ public sealed class AgnosiaFileShuttleService : Service
 
     private void StartForegroundServiceNotification()
     {
-        var smallIcon = ApplicationInfo?.Icon ?? Resource.Mipmap.ic_launcher;
+        var smallIcon = ApplicationInfo?.Icon ?? ResourceConstant.Mipmap.ic_launcher;
         var notification = AndroidNotificationApi.BuildNotification(
             this,
             NotificationChannelId,
@@ -376,17 +374,12 @@ public sealed class AgnosiaFileShuttleService : Service
     {
         if (!IsWithinExternalStorage(file) || IsExternalStorageRoot(file)) return false;
 
-        if (file.IsDirectory)
-        {
-            var children = file.ListFiles();
-            if (children is null) return false;
+        if (!file.IsDirectory) return file.Delete();
+        
+        var children = file.ListFiles();
+        if (children is null) return false;
 
-            foreach (var child in children)
-                if (!DeleteRecursively(child))
-                    return false;
-        }
-
-        return file.Delete();
+        return children.All(DeleteRecursively) && file.Delete();
     }
 
     private bool IsExternalStorageRoot(File file)
@@ -412,7 +405,7 @@ public sealed class AgnosiaFileShuttleService : Service
 
     private static string GetMimeType(File file)
     {
-        var extension = System.IO.Path.GetExtension(file.Name).TrimStart('.').ToLowerInvariant();
+        var extension = Path.GetExtension(file.Name).TrimStart('.').ToLowerInvariant();
         var mimeType = string.IsNullOrWhiteSpace(extension)
             ? null
             : MimeTypeMap.Singleton?.GetMimeTypeFromExtension(extension);
@@ -440,7 +433,7 @@ public sealed class AgnosiaFileShuttleService : Service
 
         var parent = initial.ParentFile;
         var name = initial.Name;
-        var extension = isDirectory ? string.Empty : System.IO.Path.GetExtension(name);
+        var extension = isDirectory ? string.Empty : Path.GetExtension(name);
         var baseName = string.IsNullOrEmpty(extension)
             ? name
             : name[..^extension.Length];

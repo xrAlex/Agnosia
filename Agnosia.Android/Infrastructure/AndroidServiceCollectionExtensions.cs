@@ -1,4 +1,3 @@
-using Agnosia.Infrastructure;
 using Agnosia.Platform;
 using Microsoft.Extensions.DependencyInjection;
 

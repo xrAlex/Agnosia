@@ -1,15 +1,5 @@
 using System.Globalization;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using _Microsoft.Android.Resource.Designer;
-using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Notifications;
-using Agnosia.Android.Api.Packages;
-using Agnosia.Android.Api.Permissions;
-using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Api.Storage;
 using Agnosia.Android.Infrastructure;
-using Agnosia.Android.Platform;
 using Agnosia.Android.Receivers;
 using Agnosia.Services;
 using Android.App.Usage;
@@ -728,14 +718,12 @@ public sealed partial class HiddenAppSessionMonitorService : Service
                 targetEvents++;
                 if (IsUsageForegroundEvent(eventType)) sawTargetForeground = true;
 
-                if (IsUsageForegroundEvent(eventType) || IsUsageInactiveEvent(eventType))
-                {
-                    latestTargetEventType = eventType;
-                    latestTargetEventAt = usageEvent.TimeStamp;
-                    latestTargetClassName = eventClassName;
-                    latestTargetEventName = GetUsageEventName(eventType);
-                    AppendUsageEventTrace(targetUsageEvents, latestTargetEventName, eventClassName, usageEvent.TimeStamp);
-                }
+                if (!IsUsageForegroundEvent(eventType) && !IsUsageInactiveEvent(eventType)) continue;
+                latestTargetEventType = eventType;
+                latestTargetEventAt = usageEvent.TimeStamp;
+                latestTargetClassName = eventClassName;
+                latestTargetEventName = GetUsageEventName(eventType);
+                AppendUsageEventTrace(targetUsageEvents, latestTargetEventName, eventClassName, usageEvent.TimeStamp);
             }
 
             UsageSessionObservation observation;
@@ -913,21 +901,20 @@ public sealed partial class HiddenAppSessionMonitorService : Service
             return false;
         }
 
-        if (latestForegroundAt >= previousObservation.InactiveSince.Value.ToUnixTimeMilliseconds()
-            && !string.IsNullOrWhiteSpace(latestForegroundPackage)
-            && !string.Equals(latestForegroundPackage, packageName, StringComparison.Ordinal)
-            && !IsTransientSystemPackage(latestForegroundPackage))
+        if (latestForegroundAt < previousObservation.InactiveSince.Value.ToUnixTimeMilliseconds()
+            || string.IsNullOrWhiteSpace(latestForegroundPackage)
+            || string.Equals(latestForegroundPackage, packageName, StringComparison.Ordinal)
+            || IsTransientSystemPackage(latestForegroundPackage)) return false;
+        
+        observation = previousObservation with
         {
-            observation = previousObservation with
-            {
-                ConfirmedInactive = true,
-                TopPackage = latestForegroundPackage
-            };
-            reason = "target_inactive_then_successor_foreground";
-            return true;
-        }
+            ConfirmedInactive = true,
+            TopPackage = latestForegroundPackage
+        };
+        
+        reason = "target_inactive_then_successor_foreground";
+        return true;
 
-        return false;
     }
 
     private void LogUsageObservationIfChanged(
@@ -1122,11 +1109,9 @@ public sealed partial class HiddenAppSessionMonitorService : Service
         var updatedSession = session with { LaunchResult = updatedResult };
         lock (_sync)
         {
-            if (_activeSession is not null && Matches(_activeSession, session))
-            {
-                _activeSession = updatedSession;
-                PersistSession(updatedSession);
-            }
+            if (_activeSession is null || !Matches(_activeSession, session)) return updatedSession;
+            _activeSession = updatedSession;
+            PersistSession(updatedSession);
         }
 
         return updatedSession;

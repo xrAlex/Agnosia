@@ -1,6 +1,5 @@
 using Agnosia.Android.Files;
 using Agnosia.Models;
-using Android.App;
 using Android.Content;
 
 namespace Agnosia.Android.Platform;

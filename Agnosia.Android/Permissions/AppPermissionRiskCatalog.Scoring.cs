@@ -25,16 +25,14 @@ public static partial class AppPermissionRiskCatalog
     {
         var scoreByGroup = new Dictionary<string, int>(StringComparer.Ordinal);
         var breakdownByGroup = new Dictionary<string, AppPermissionRiskScoreBreakdown>(StringComparer.Ordinal);
-        for (var index = 0; index < matchedRules.Count; index++)
+        foreach (var rule in matchedRules)
         {
-            var rule = matchedRules[index];
             var breakdown = rule.GetScoreBreakdown(context);
             var score = breakdown.Total;
-            if (!scoreByGroup.TryGetValue(rule.GroupId, out var currentScore) || score > currentScore)
-            {
-                scoreByGroup[rule.GroupId] = score;
-                breakdownByGroup[rule.GroupId] = breakdown;
-            }
+            if (scoreByGroup.TryGetValue(rule.GroupId, out var currentScore) && score <= currentScore) continue;
+            
+            scoreByGroup[rule.GroupId] = score;
+            breakdownByGroup[rule.GroupId] = breakdown;
         }
 
         return matchedRules.Count == 0

@@ -1,9 +1,5 @@
-using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Api.Storage;
 using Agnosia.Android.Receivers;
 using Agnosia.Android.Services;
-using Agnosia.Android.Vpn;
-using Agnosia.Infrastructure;
 using Android.Content;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
@@ -12,7 +8,7 @@ namespace Agnosia.Android.Infrastructure;
 internal static class AndroidStartup
 {
     private static readonly TimeSpan WorkProfilePolicyRefreshInterval = TimeSpan.FromMinutes(5);
-    private static readonly object WorkProfilePolicyRefreshSync = new();
+    private static readonly Lock WorkProfilePolicyRefreshSync = new();
     private static DateTimeOffset _lastWorkProfilePolicyRefreshUtc = DateTimeOffset.MinValue;
 
     public static void ConfigurePrimaryProfileServices(Context context)

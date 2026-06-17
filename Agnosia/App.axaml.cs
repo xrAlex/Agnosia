@@ -36,21 +36,27 @@ public class App : Application
         var workspaceViewModel = ServiceRegistry.GetRequiredService<DashboardWorkspaceViewModel>();
         ServiceRegistry.PrimaryActivityResumed += workspaceViewModel.HandlePrimaryActivityResumed;
 
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-            desktop.MainWindow = new MainWindow
-            {
-                DataContext = workspaceViewModel
-            };
-        else if (ApplicationLifetime is IActivityApplicationLifetime activityLifetime)
-            activityLifetime.MainViewFactory = () => new MainView
-            {
-                DataContext = workspaceViewModel
-            };
-        else if (ApplicationLifetime is ISingleViewApplicationLifetime singleViewPlatform)
-            singleViewPlatform.MainView = new MainView
-            {
-                DataContext = workspaceViewModel
-            };
+        switch (ApplicationLifetime)
+        {
+            case IClassicDesktopStyleApplicationLifetime desktop:
+                desktop.MainWindow = new MainWindow
+                {
+                    DataContext = workspaceViewModel
+                };
+                break;
+            case IActivityApplicationLifetime activityLifetime:
+                activityLifetime.MainViewFactory = () => new MainView
+                {
+                    DataContext = workspaceViewModel
+                };
+                break;
+            case ISingleViewApplicationLifetime singleViewPlatform:
+                singleViewPlatform.MainView = new MainView
+                {
+                    DataContext = workspaceViewModel
+                };
+                break;
+        }
 
         base.OnFrameworkInitializationCompleted();
     }

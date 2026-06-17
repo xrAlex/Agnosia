@@ -75,7 +75,7 @@ public partial class DashboardWorkspaceViewModel
         }
 
         var completionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        Dispatcher.UIThread.Post(async () =>
+        Dispatcher.UIThread.Post(async void () =>
         {
             try
             {
@@ -128,10 +128,11 @@ public partial class DashboardWorkspaceViewModel
         }
     }
 
-    private async Task CompleteOnboardingIfReadyAsync()
+    private Task CompleteOnboardingIfReadyAsync()
     {
         if (OnboardingStep == OnboardingStep.Permissions && AreOnboardingPermissionsGranted)
             OnboardingStep = OnboardingStep.Final;
+        return Task.CompletedTask;
     }
 
     private void SetPreparingOnboardingPermissions(bool value)

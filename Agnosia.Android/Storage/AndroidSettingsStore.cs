@@ -1,5 +1,3 @@
-using Agnosia.Android.Api.Logging;
-using Agnosia.Android.Api.Platform;
 using Agnosia.Models;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 

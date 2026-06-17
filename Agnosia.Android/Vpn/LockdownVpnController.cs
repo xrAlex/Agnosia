@@ -1,6 +1,3 @@
-using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Platform;
-using Agnosia.Android.Storage;
 using Agnosia.Models;
 using Android.App.Admin;
 using Android.Content;

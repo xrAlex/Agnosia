@@ -1,16 +1,10 @@
 using System.Globalization;
 using Agnosia.Android.Activities;
-using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Infrastructure;
 using Agnosia.Android.Receivers;
-using Agnosia.Android.Services;
-using Agnosia.Android.Vpn;
-using Agnosia.Infrastructure;
 using Agnosia.Models;
 using Android.Content;
 using Android.Content.PM;
-using Android.OS;
 using Android.Views;
 using Avalonia.Android;
 using Avalonia.Controls;

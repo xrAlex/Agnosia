@@ -297,9 +297,7 @@ public sealed class AndroidManifestContractTests
     private static string MatchRequired(string source, string pattern)
     {
         var match = Regex.Match(source, pattern);
-        if (!match.Success) throw new InvalidOperationException($"Pattern not found: {pattern}");
-
-        return match.Groups["value"].Value;
+        return !match.Success ? throw new InvalidOperationException($"Pattern not found: {pattern}") : match.Groups["value"].Value;
     }
 
     private static string AndroidAttribute(XElement element, string name)

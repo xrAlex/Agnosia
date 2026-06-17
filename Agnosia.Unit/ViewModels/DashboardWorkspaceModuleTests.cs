@@ -1,7 +1,6 @@
 using Agnosia.Models;
 using Agnosia.Unit.TestDoubles;
 using Agnosia.Unit.TestSupport;
-using Agnosia.ViewModels;
 using Xunit;
 
 namespace Agnosia.Unit.ViewModels;

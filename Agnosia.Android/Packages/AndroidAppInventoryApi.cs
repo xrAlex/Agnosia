@@ -1,9 +1,4 @@
-using Agnosia.Android.Api.Permissions;
-using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Api.Storage;
-using Agnosia.Android.Storage;
 using Agnosia.Models;
-using Android.App;
 using Android.App.Admin;
 using Android.Content;
 using Android.Content.PM;
@@ -359,7 +354,7 @@ public static class AndroidAppInventoryApi
             permissionRisk = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
                 packageInfo.RequestedPermissions,
                 (int)Build.VERSION.SdkInt,
-                appInfo is { } ? (int)appInfo.TargetSdkVersion : 0,
+                appInfo is not null ? (int)appInfo.TargetSdkVersion : 0,
                 GetForegroundServiceTypes(packageInfo),
                 GetServicePermissions(packageInfo),
                 GetGrantedPermissions(packageInfo, packageName),
@@ -475,7 +470,7 @@ public static class AndroidAppInventoryApi
             var permission = permissions[index];
             if (string.IsNullOrWhiteSpace(permission)) continue;
 
-            var isGranted = ((int)flags[index] & RequestedPermissionGrantedFlag) != 0;
+            var isGranted = (flags[index] & RequestedPermissionGrantedFlag) != 0;
             if (isGranted == granted) result.Add(permission);
         }
 
@@ -529,23 +524,21 @@ public static class AndroidAppInventoryApi
     private static bool HasManageExternalStorageAccess(Context context, ApplicationInfo? appInfo)
     {
         var packageName = appInfo?.PackageName;
-        if (packageName is not null && packageName == context.PackageName)
+        if (packageName is null || packageName != context.PackageName)
+            return IsAppOpAllowed(context, appInfo, ManageExternalStorageOp);
+        
+        try
         {
-            try
-            {
-                return !OperatingSystem.IsAndroidVersionAtLeast(30)
-                       || global::Android.OS.Environment.IsExternalStorageManager;
-            }
-            catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
-            {
-                Log.Debug(
-                    LogTag,
-                    $"All-files access check failed. package={packageName}, error={exception.GetType().Name}.");
-                return false;
-            }
+            return !OperatingSystem.IsAndroidVersionAtLeast(30)
+                   || global::Android.OS.Environment.IsExternalStorageManager;
         }
-
-        return IsAppOpAllowed(context, appInfo, ManageExternalStorageOp);
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Debug(
+                LogTag,
+                $"All-files access check failed. package={packageName}, error={exception.GetType().Name}.");
+            return false;
+        }
     }
 
     private static bool CanRequestPackageInstalls(
@@ -554,44 +547,39 @@ public static class AndroidAppInventoryApi
         ApplicationInfo? appInfo)
     {
         var packageName = appInfo?.PackageName;
-        if (packageName is not null && packageName == context.PackageName)
+        if (packageName is null || packageName != context.PackageName)
+            return IsAppOpAllowed(context, appInfo, RequestInstallPackagesOp);
+        
+        try
         {
-            try
-            {
-                return packageManager.CanRequestPackageInstalls();
-            }
-            catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
-            {
-                Log.Debug(
-                    LogTag,
-                    $"Package install access check failed. package={packageName}, error={exception.GetType().Name}.");
-                return false;
-            }
+            return packageManager.CanRequestPackageInstalls();
         }
-
-        return IsAppOpAllowed(context, appInfo, RequestInstallPackagesOp);
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Debug(
+                LogTag,
+                $"Package install access check failed. package={packageName}, error={exception.GetType().Name}.");
+            return false;
+        }
     }
 
     private static bool CanScheduleExactAlarms(Context context, ApplicationInfo? appInfo)
     {
         var packageName = appInfo?.PackageName;
-        if (packageName is not null && packageName == context.PackageName)
+        if (packageName is null || packageName != context.PackageName)
+            return IsAppOpAllowed(context, appInfo, ScheduleExactAlarmOp);
+        try
         {
-            try
-            {
-                return context.GetSystemService(Context.AlarmService) is AlarmManager alarmManager
-                       && alarmManager.CanScheduleExactAlarms();
-            }
-            catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
-            {
-                Log.Debug(
-                    LogTag,
-                    $"Exact alarm access check failed. package={packageName}, error={exception.GetType().Name}.");
-                return false;
-            }
+            return context.GetSystemService(Context.AlarmService) is AlarmManager alarmManager
+                   && alarmManager.CanScheduleExactAlarms();
         }
-
-        return IsAppOpAllowed(context, appInfo, ScheduleExactAlarmOp);
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Debug(
+                LogTag,
+                $"Exact alarm access check failed. package={packageName}, error={exception.GetType().Name}.");
+            return false;
+        }
     }
 
     private static bool IsIgnoringBatteryOptimizations(Context context, string packageName)
@@ -634,11 +622,12 @@ public static class AndroidAppInventoryApi
             }
 
             var mode = appOpsManager.CheckOpNoThrow(op, appInfo.Uid, packageName);
-            return mode == AppOpsManagerMode.Allowed
-                ? true
-                : mode is AppOpsManagerMode.Ignored or AppOpsManagerMode.Errored
-                    ? false
-                    : null;
+            return mode switch
+            {
+                AppOpsManagerMode.Allowed => true,
+                AppOpsManagerMode.Ignored or AppOpsManagerMode.Errored => false,
+                _ => null
+            };
         }
         catch (Exception exception) when (exception is Java.Lang.SecurityException
                                           || AndroidRecoverableException.IsMatch(exception))

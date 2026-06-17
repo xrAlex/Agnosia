@@ -90,7 +90,7 @@ public static class AndroidAppIconWarmupQueue
                     LogTag,
                     $"Icon load is still running after {HungIconLogDelay.TotalMilliseconds:0}ms. package={request.PackageName}.");
             else
-                delayCancellation.Cancel();
+                await delayCancellation.CancelAsync();
 
             await loadTask.ConfigureAwait(false);
         }

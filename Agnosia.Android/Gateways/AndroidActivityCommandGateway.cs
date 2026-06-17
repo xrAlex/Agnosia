@@ -1,6 +1,3 @@
-using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Packages;
-using Agnosia.Android.Api.Platform;
 using Agnosia.Models;
 using Android.Content;
 using Java.Lang;

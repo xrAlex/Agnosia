@@ -1,7 +1,4 @@
-using Agnosia.Android.Api.Notifications;
-using Agnosia.Android.Api.Platform;
 using Agnosia.Models;
-using Android.App;
 using Android.Content;
 using Android.Content.PM;
 using Android.Net;

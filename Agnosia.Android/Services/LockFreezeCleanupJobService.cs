@@ -1,5 +1,3 @@
-using Agnosia.Android.Api.Platform;
-using Android.App;
 using Android.App.Job;
 using Android.Content;
 using Android.OS;
@@ -30,7 +28,7 @@ public sealed class LockFreezeCleanupJobService : JobService
                 return "skipped_no_session";
             }
 
-            if (context.GetSystemService(Context.JobSchedulerService) is not JobScheduler scheduler)
+            if (context.GetSystemService(JobSchedulerService) is not JobScheduler scheduler)
             {
                 Log.Warn(LogTag, $"Lock-freeze cleanup job failed: JobScheduler unavailable. trigger={trigger}.");
                 return "failed";
@@ -80,7 +78,7 @@ public sealed class LockFreezeCleanupJobService : JobService
 
     public override bool OnStartJob(JobParameters? parameters)
     {
-        var trigger = parameters?.Extras?.GetString(ExtraTrigger) ?? "job";
+        var trigger = parameters?.Extras.GetString(ExtraTrigger) ?? "job";
         _ = Task.Run(() =>
         {
             try

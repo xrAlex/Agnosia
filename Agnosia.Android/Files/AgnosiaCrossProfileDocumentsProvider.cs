@@ -1,6 +1,4 @@
-using Agnosia.Android.Api.Permissions;
-using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Api.Storage;
+using _Microsoft.Android.Resource.Designer;
 using Android;
 using Android.Content;
 using Android.Content.Res;
@@ -59,7 +57,7 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
                   ?? throw new InvalidOperationException("Android did not create a DocumentsUI root row.");
         row.Add(DocumentsContract.Root.ColumnRootId, AgnosiaFileShuttleContract.DummyRoot);
         row.Add(DocumentsContract.Root.ColumnDocumentId, AgnosiaFileShuttleContract.DummyRoot);
-        row.Add(DocumentsContract.Root.ColumnIcon, Resource.Mipmap.ic_launcher);
+        row.Add(DocumentsContract.Root.ColumnIcon, ResourceConstant.Mipmap.ic_launcher);
         row.Add(DocumentsContract.Root.ColumnTitle, GetRootTitle());
         row.Add(
             DocumentsContract.Root.ColumnFlags,
@@ -231,9 +229,9 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
 
     private AgnosiaFileShuttleMessengerClient GetClient()
     {
-        if (Context is null) throw new InvalidOperationException("DocumentsProvider context is unavailable.");
-
-        return AgnosiaFileShuttleClientBroker.GetClient(Context);
+        return Context is null 
+            ? throw new InvalidOperationException("DocumentsProvider context is unavailable.") 
+            : AgnosiaFileShuttleClientBroker.GetClient(Context);
     }
 
     private bool TryGetReadyClient(out AgnosiaFileShuttleMessengerClient client)
@@ -241,14 +239,9 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
         if (IsProviderReady())
         {
             client = GetClient();
-            if (!client.IsConnected)
-            {
-                Log.Warn(LogTag, "File Shuttle provider has no preconnected bridge; manual Files launches are best-effort on Android 14+ because background activity starts can be blocked.");
-                client = null!;
-                return false;
-            }
-
-            return true;
+            if (client.IsConnected) return true;
+            
+            Log.Warn(LogTag, "File Shuttle provider has no preconnected bridge; manual Files launches are best-effort on Android 14+ because background activity starts can be blocked.");
         }
 
         client = null!;

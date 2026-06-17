@@ -1,6 +1,3 @@
-using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Shortcuts;
 using Android.Content;
 
 namespace Agnosia.Android.Receivers;

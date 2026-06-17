@@ -1,6 +1,5 @@
 using System.Text.Json.Serialization;
 using Agnosia.Android.Services;
-using Agnosia.Android.Shortcuts;
 
 namespace Agnosia.Android.Serialization;
 

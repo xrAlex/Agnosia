@@ -1,8 +1,3 @@
-using Agnosia.Android.Api.Notifications;
-using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Platform;
-using Agnosia.Android.Storage;
-using Android.App;
 using Android.Content;
 using Android.Content.PM;
 using Android.Net;
@@ -34,7 +29,7 @@ public sealed class LockdownVpnService : VpnService
     private const string NotificationChannelDescription =
         "Блокировка интернета выбранным приложениям рабочего профиля";
 
-    private readonly object _sync = new();
+    private readonly Lock _sync = new();
     private ParcelFileDescriptor? _vpnInterface;
 
     public static void StartOrRefresh(Context context)

@@ -1,5 +1,3 @@
-using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Api.Storage;
 using Agnosia.Models;
 using Android.Content;
 using Android.Content.PM;
@@ -170,20 +168,18 @@ public static class AndroidVpnAutomationApi
         var fallbackIntent = CreateStartActivityIntent(definition, true);
         if (definition.IsolateActivityTask) AddIsolatedActivityTaskFlags(fallbackIntent);
 
-        if (AndroidIntentApi.TryStartActivity(
+        if (!AndroidIntentApi.TryStartActivity(
                 context,
                 fallbackIntent,
                 LogTag,
                 $"VPN-клиент {definition.DisplayName} не найден или не принимает резервную команду запуска.",
                 out error))
-        {
-            Log.Info(LogTag,
-                $"StartActivity fallback command sent. client={definition.DisplayName}, component={definition.ActivityClassName}.");
-            return CreateStartCommandSuccess(definition);
-        }
+            return OperationResult.Failure(error ?? $"VPN-клиент {definition.DisplayName} не найден или не принимает команду запуска.");
+        
+        Log.Info(LogTag, $"StartActivity fallback command sent. client={definition.DisplayName}, component={definition.ActivityClassName}.");
+        
+        return CreateStartCommandSuccess(definition);
 
-        return OperationResult.Failure(error ??
-                                       $"VPN-клиент {definition.DisplayName} не найден или не принимает команду запуска.");
     }
 
     private static Intent CreateStartActivityIntent(VpnClientDefinition definition, bool useComponent)

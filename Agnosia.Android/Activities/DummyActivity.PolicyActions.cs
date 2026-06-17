@@ -1,11 +1,3 @@
-using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Permissions;
-using Agnosia.Android.Platform;
-using Agnosia.Android.Storage;
-using Agnosia.Android.Vpn;
-using Android.App;
-using Android.Content.PM;
-using Exception = System.Exception;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Activities;

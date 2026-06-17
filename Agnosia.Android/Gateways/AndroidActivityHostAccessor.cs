@@ -1,5 +1,3 @@
-using Android.App;
-
 namespace Agnosia.Android.Gateways;
 
 internal sealed class AndroidActivityHostAccessor : IAndroidActivityHostAccessor

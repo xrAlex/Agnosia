@@ -1,7 +1,3 @@
-using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Permissions;
-using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Api.Storage;
 using Agnosia.Models;
 using Android.Content;
 using Android.Content.PM;
@@ -164,9 +160,7 @@ internal sealed partial class AndroidModuleCoordinator(
                 "VPN Guard",
                 cancellationToken)
             .ConfigureAwait(false);
-        if (!syncResult.Succeeded) return syncResult;
-
-        return OperationResult.Success(enabled ? "VPN Guard включён." : "VPN Guard выключен.");
+        return !syncResult.Succeeded ? syncResult : OperationResult.Success(enabled ? "VPN Guard включён." : "VPN Guard выключен.");
     }
 
     private static AgnosiaModuleSnapshot CreateVpnGuardSnapshot(
@@ -267,9 +261,7 @@ internal sealed partial class AndroidModuleCoordinator(
                 "Risk Engine",
                 cancellationToken)
             .ConfigureAwait(false);
-        if (!syncResult.Succeeded) return syncResult;
-
-        return OperationResult.Success(enabled ? "Risk Engine включён." : "Risk Engine выключен.");
+        return !syncResult.Succeeded ? syncResult : OperationResult.Success(enabled ? "Risk Engine включён." : "Risk Engine выключен.");
     }
 
     private static AgnosiaModuleSnapshot CreateRiskEngineSnapshot()

@@ -1,8 +1,4 @@
-using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Api.Storage;
 using Agnosia.Models;
-using Android.App;
 using Android.Content;
 using Android.Net;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
@@ -18,8 +14,7 @@ internal sealed class AndroidPermissionCoordinator(
         var activity = commandRunner.CurrentActivity;
         AgnosiaRuntime.Initialize(activity);
 
-        var localState = await ReadPermissionLocalStateAsync(activity, cancellationToken).ConfigureAwait(false);
-        var profileDiagnostics = localState.ProfileDiagnostics;
+        var (profileDiagnostics, hasSetup, notificationPermissionGranted, vpnControlPrepared, personalAllFilesGranted, overlayPermissionGranted) = await ReadPermissionLocalStateAsync(activity, cancellationToken).ConfigureAwait(false);
         var hasWorkProfileTarget = profileDiagnostics.CommandTargetResolvable;
         var workProfileAvailable = hasWorkProfileTarget
                                    && profileDiagnostics.AvailableToCrossProfileApps
@@ -38,16 +33,16 @@ internal sealed class AndroidPermissionCoordinator(
                 "Рабочий профиль",
                 "Основной профиль",
                 "Нужен для изоляции клонированных приложений, скрытия пакетов и управления политиками рабочего пространства",
-                localState.HasSetup && workProfileAvailable,
-                !localState.HasSetup || !workProfileAvailable,
+                hasSetup && workProfileAvailable,
+                !hasSetup || !workProfileAvailable,
                 "Подключен",
-                localState.HasSetup ? "Проверить профиль" : "Создать профиль"),
+                hasSetup ? "Проверить профиль" : "Создать профиль"),
             new PermissionSnapshot(
                 PermissionKind.Notifications,
                 "Уведомления",
                 "Основной профиль",
                 "Необходимо для отображения фоновой активности приложения",
-                localState.NotificationPermissionGranted,
+                notificationPermissionGranted,
                 OperatingSystem.IsAndroidVersionAtLeast(33),
                 "Получено",
                 "Разрешить"),
@@ -56,7 +51,7 @@ internal sealed class AndroidPermissionCoordinator(
                 "Временное управление VPN",
                 "Основной профиль",
                 "Позволяет приложению управлять VPN-соединениями",
-                localState.VpnControlPrepared,
+                vpnControlPrepared,
                 true,
                 "Получено",
                 "Разрешить"),
@@ -74,7 +69,7 @@ internal sealed class AndroidPermissionCoordinator(
                 "Доступ к файлам",
                 "Основной профиль",
                 "Нужно для File Shuttle, чтобы Agnosia могла отдавать выбранные файлы личного профиля через DocumentsUI",
-                localState.PersonalAllFilesGranted,
+                personalAllFilesGranted,
                 true,
                 "Получено",
                 "Открыть настройки"),
@@ -129,7 +124,7 @@ internal sealed class AndroidPermissionCoordinator(
                 7. Пролистайте вниз
                 8. Активируйте 'Поверх других приложений'
                 """,
-                localState.OverlayPermissionGranted,
+                overlayPermissionGranted,
                 true,
                 "Получено",
                 "Открыть настройки")

@@ -34,10 +34,6 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
     private static readonly Task<OperationResult> ProvisioningFailureTask =
         Task.FromResult(OperationResult.Failure(ProvisioningMessage));
 
-    public UnsupportedPlatformBridge()
-    {
-    }
-
     public Task<DashboardSnapshot> LoadDashboardAsync(CancellationToken cancellationToken = default)
     {
         return UnsupportedDashboardTask;

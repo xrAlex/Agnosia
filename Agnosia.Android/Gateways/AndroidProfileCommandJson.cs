@@ -1,6 +1,4 @@
-using Agnosia.Android.Api.Platform;
 using System.Text.Json;
-using Agnosia.Android.Api.Serialization;
 using Agnosia.Models;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
@@ -12,7 +10,7 @@ internal static class AndroidProfileCommandJson
 
     public static List<AppServiceModel>? DeserializeAppServiceModelsResult(string? raw, string description)
     {
-        if (string.IsNullOrWhiteSpace(raw)) return default;
+        if (string.IsNullOrWhiteSpace(raw)) return null;
 
         try
         {
@@ -21,13 +19,13 @@ internal static class AndroidProfileCommandJson
         catch (JsonException exception)
         {
             Log.Warn(LogTag, $"Failed to deserialize {description}: {exception.Message}");
-            return default;
+            return null;
         }
     }
 
     public static List<AppLogEntry>? DeserializeAppLogEntriesResult(string? raw, string description)
     {
-        if (string.IsNullOrWhiteSpace(raw)) return default;
+        if (string.IsNullOrWhiteSpace(raw)) return null;
 
         try
         {
@@ -36,7 +34,7 @@ internal static class AndroidProfileCommandJson
         catch (JsonException exception)
         {
             Log.Warn(LogTag, $"Failed to deserialize {description}: {exception.Message}");
-            return default;
+            return null;
         }
     }
 }

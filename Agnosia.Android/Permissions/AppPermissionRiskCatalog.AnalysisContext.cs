@@ -471,9 +471,9 @@ public static partial class AppPermissionRiskCatalog
 
         private static bool ContainsPermission(IReadOnlyList<string> permissions, string expected)
         {
-            for (var index = 0; index < permissions.Count; index++)
+            foreach (var t in permissions)
             {
-                if (string.Equals(permissions[index], expected, StringComparison.Ordinal)) return true;
+                if (string.Equals(t, expected, StringComparison.Ordinal)) return true;
             }
 
             return false;

@@ -264,9 +264,8 @@ public sealed class PlexusBackground : Control
 
         var width = Bounds.Width;
         var height = Bounds.Height;
-        for (var index = 0; index < _nodes.Count; index++)
+        foreach (var node in _nodes)
         {
-            var node = _nodes[index];
             var nextPosition = node.Position + node.Velocity * elapsedSeconds;
 
             if (nextPosition.X <= 0 || nextPosition.X >= width)
@@ -296,11 +295,9 @@ public sealed class PlexusBackground : Control
             return;
         }
 
-        if (!_animationTimer.IsEnabled)
-        {
-            _lastFrameUtc = DateTime.UtcNow;
-            _animationTimer.Start();
-        }
+        if (_animationTimer.IsEnabled) return;
+        _lastFrameUtc = DateTime.UtcNow;
+        _animationTimer.Start();
     }
 
     private bool CanAnimate()
@@ -392,9 +389,9 @@ public sealed class PlexusBackground : Control
 
     private static Color ResolveColor(IBrush? brush, Color fallback)
     {
-        if (brush is not ISolidColorBrush solidColorBrush) return fallback;
-
-        return ApplyOpacity(solidColorBrush.Color, solidColorBrush.Opacity);
+        return brush is not ISolidColorBrush solidColorBrush 
+            ? fallback 
+            : ApplyOpacity(solidColorBrush.Color, solidColorBrush.Opacity);
     }
 
     private static Color ApplyOpacity(Color color, double opacity)

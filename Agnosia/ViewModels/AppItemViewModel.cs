@@ -4,8 +4,6 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
-using Trace = System.Diagnostics.Trace;
-
 namespace Agnosia.ViewModels;
 
 public partial class AppItemViewModel : ObservableObject, IDisposable
@@ -35,7 +33,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
     private string[]? _permissionRiskReasons;
 
     [ObservableProperty]
-    private bool _isPermissionDetailsExpanded;
+    public partial bool IsPermissionDetailsExpanded { get; set; }
 
     public AppItemViewModel(DashboardWorkspaceViewModel owner, AppSnapshot snapshot)
     {
@@ -486,11 +484,9 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
             if (!iconLoaded && !iconLoadCancellation.IsCancellationRequested)
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
-                    if (!_disposed && ReferenceEquals(_iconLoadCancellation, iconLoadCancellation))
-                    {
-                        _iconLoadRequested = false;
-                        QueueIconRetry();
-                    }
+                    if (_disposed || !ReferenceEquals(_iconLoadCancellation, iconLoadCancellation)) return;
+                    _iconLoadRequested = false;
+                    QueueIconRetry();
                 }, DispatcherPriority.Background);
 
             iconLoadCancellation.Dispose();

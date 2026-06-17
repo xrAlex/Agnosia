@@ -1,6 +1,5 @@
 using Android;
 using Android.Content;
-using Android.OS;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Receivers;
@@ -39,8 +38,6 @@ public sealed class AgnosiaPolicyUpdateReceiver : BroadcastReceiver
         var entries = new List<string>();
         foreach (var key in keys)
         {
-            if (key is null) continue;
-
             var value = extras.Get(key);
             entries.Add($"{key}={value?.ToString() ?? "<null>"}");
         }

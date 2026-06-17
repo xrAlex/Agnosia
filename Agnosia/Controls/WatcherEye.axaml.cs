@@ -68,11 +68,9 @@ public partial class WatcherEye : UserControl
         _pointerIdleTimer.Tick += (_, _) =>
         {
             _pointerIdleTimer.Stop();
-            if (_isTrackingPointer)
-            {
-                _isTrackingPointer = false;
-                ScheduleLookAtUser();
-            }
+            if (!_isTrackingPointer) return;
+            _isTrackingPointer = false;
+            ScheduleLookAtUser();
         };
 
         _returnToUserTimer = new DispatcherTimer

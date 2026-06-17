@@ -1,15 +1,12 @@
 using System.Collections.ObjectModel;
 using System.Reflection;
 using System.Threading.Channels;
-using Agnosia.Infrastructure;
 using Agnosia.Models;
 using Agnosia.Platform;
 using Agnosia.Services;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-
-using Trace = System.Diagnostics.Trace;
 
 namespace Agnosia.ViewModels;
 
@@ -721,11 +718,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [RelayCommand]
     private void OpenAppsSection()
     {
-        if (CanOpenAppsSection)
-        {
-            SelectedSection = DashboardSection.Apps;
-            _settingsSaveCoordinator.TryStartPendingCatalogRefresh();
-        }
+        if (!CanOpenAppsSection) return;
+        SelectedSection = DashboardSection.Apps;
+        _settingsSaveCoordinator.TryStartPendingCatalogRefresh();
     }
 
     [RelayCommand]
@@ -1114,7 +1109,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
             StatusIsError = !result.Succeeded;
             StatusMessage = string.IsNullOrWhiteSpace(result.Message)
-                ? (enabled ? "ModuleEnabled" : "ModuleDisabled")
+                ? enabled ? "ModuleEnabled" : "ModuleDisabled"
                 : result.Message;
         }
         catch (Exception ex)
@@ -1309,7 +1304,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             preservedWorkApps[index] = _workApps[index].Snapshot;
         }
 
-        return new DashboardAppInventorySnapshot(inventory.PersonalApps, preservedWorkApps);
+        return inventory with { WorkApps = preservedWorkApps };
     }
 
     private void RefreshVisibleApps() => SetVisibleApps(AppCatalogFilter.FilterVisibleApps(_personalApps, _workApps, SelectedProfile, SearchText));

@@ -88,9 +88,7 @@ internal sealed partial class AndroidModuleCoordinator
         if (!workProfileAvailable && (isFullyEnabled || hasPartialSettings)) return AgnosiaModuleState.Unavailable;
         if (isFullyEnabled && missingActivationRequirements) return AgnosiaModuleState.PartiallyEnabled;
         if (hasPartialSettings && !isFullyEnabled) return AgnosiaModuleState.PartiallyEnabled;
-        if (isFullyEnabled) return AgnosiaModuleState.Enabled;
-
-        return AgnosiaModuleState.Disabled;
+        return isFullyEnabled ? AgnosiaModuleState.Enabled : AgnosiaModuleState.Disabled;
     }
 
     private static AgnosiaModuleState ResolveLockdownState(

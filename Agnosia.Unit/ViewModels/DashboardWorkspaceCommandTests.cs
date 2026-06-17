@@ -65,15 +65,15 @@ public sealed class DashboardWorkspaceCommandTests
         }
     }
 
-    public static TheoryData<PermissionKind> ResumePermissionKinds => new()
-    {
+    public static TheoryData<PermissionKind> ResumePermissionKinds =>
+    [
         PermissionKind.Notifications,
         PermissionKind.UsageStats,
         PermissionKind.PackageInstall,
         PermissionKind.PersonalAllFiles,
         PermissionKind.WorkAllFiles,
         PermissionKind.Overlay
-    };
+    ];
 
     // Проверяет цепочку move: clone, uninstall и refresh dashboard после успеха.
     [Fact]

@@ -79,24 +79,23 @@ internal sealed class HiddenAppSessionMonitorStateMachine
             _inactiveSince ??= observation.InactiveSince ?? now;
             _phase = HiddenAppSessionMonitorPhase.InactiveCandidate;
             var inactiveFor = now - _inactiveSince.Value;
-            if (inactiveFor >= _userBackgroundHideDelay)
-            {
-                _phase = HiddenAppSessionMonitorPhase.Completed;
-                return Complete(
-                    HiddenAppSessionCompletionKind.AfterTargetTaskRecheck,
-                    "user_backgrounded_or_closed",
-                    "confirmed_inactivity_delay_elapsed",
+            if (inactiveFor < _userBackgroundHideDelay)
+                return KeepAlive(
                     observation,
                     now,
-                    targetForegroundFirstSeen);
-            }
-
-            return KeepAlive(
+                    targetForegroundFirstSeen,
+                    null,
+                    "confirmed_inactivity_delay_pending");
+            
+            _phase = HiddenAppSessionMonitorPhase.Completed;
+            
+            return Complete(
+                HiddenAppSessionCompletionKind.AfterTargetTaskRecheck,
+                "user_backgrounded_or_closed",
+                "confirmed_inactivity_delay_elapsed",
                 observation,
                 now,
-                targetForegroundFirstSeen,
-                null,
-                "confirmed_inactivity_delay_pending");
+                targetForegroundFirstSeen);
         }
 
         if (!_hasSeenTarget)

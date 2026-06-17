@@ -1,17 +1,7 @@
 using System.Text.Json;
-using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Logging;
-using Agnosia.Android.Api.Packages;
-using Agnosia.Android.Api.Permissions;
-using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Api.Serialization;
-using Agnosia.Android.Api.Storage;
-using Agnosia.Android.Gateways;
-using Android.App;
 using Android.App.Admin;
 using Android.Content;
 using Android.Content.PM;
-using Android.OS;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 using OperationCanceledException = System.OperationCanceledException;
 

@@ -15,10 +15,8 @@ public partial class AppsSectionView : UserControl
     {
         if (sender is not Control { DataContext: AppItemViewModel app }) return;
 
-        if (app.OpenControlsCommand.CanExecute(null))
-        {
-            app.OpenControlsCommand.Execute(null);
-            e.Handled = true;
-        }
+        if (!app.OpenControlsCommand.CanExecute(null)) return;
+        app.OpenControlsCommand.Execute(null);
+        e.Handled = true;
     }
 }

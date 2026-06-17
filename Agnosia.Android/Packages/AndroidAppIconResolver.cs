@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using Agnosia.Android.Api.Platform;
 using Android.Content;
 using Android.Content.PM;
 using Android.Graphics;
@@ -63,17 +62,15 @@ internal static class AndroidAppIconResolver
         }
 
         var cacheKey = GetIconCacheKey(packageName, identity);
-        if (TryReadDiskCachedIcon(context, cacheKey, out iconPng))
+        if (!TryReadDiskCachedIcon(context, cacheKey, out iconPng)) return false;
+        
+        lock (IconCacheSync)
         {
-            lock (IconCacheSync)
-            {
-                IconCache[packageName] = new AppIconCacheEntry(identity, iconPng);
-            }
-
-            return true;
+            IconCache[packageName] = new AppIconCacheEntry(identity, iconPng);
         }
 
-        return false;
+        return true;
+
     }
 
     public static void PruneMemoryIconCache(HashSet<string> installedPackageNames)
@@ -180,6 +177,7 @@ internal static class AndroidAppIconResolver
 
         var missingPath = Path.Combine(directory, cacheKey + MissingIconCacheFileExtension);
         if (File.Exists(missingPath))
+        {
             try
             {
                 File.Delete(missingPath);
@@ -187,6 +185,7 @@ internal static class AndroidAppIconResolver
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
             }
+        }
 
         return false;
     }
@@ -284,7 +283,7 @@ internal static class AndroidAppIconResolver
 
     private static string GetIconCacheKey(string packageName, PackageIdentity identity)
     {
-        var packageHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(packageName))).Substring(0, 16);
+        var packageHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(packageName)))[..16];
         return $"{packageHash}.{identity.VersionCode}";
     }
 

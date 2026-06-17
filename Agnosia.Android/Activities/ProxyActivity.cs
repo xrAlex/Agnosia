@@ -1,16 +1,6 @@
-using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Packages;
-using Agnosia.Android.Api.Permissions;
-using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Api.Storage;
-using Agnosia.Android.Api.Vpn;
 using Agnosia.Android.Infrastructure;
-using Agnosia.Android.Platform;
 using Agnosia.Android.Receivers;
 using Agnosia.Android.Services;
-using Agnosia.Android.Shortcuts;
-using Agnosia.Android.Storage;
-using Agnosia.Android.Vpn;
 using Android.App.Admin;
 using Android.Content;
 using Android.Content.PM;

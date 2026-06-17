@@ -18,8 +18,7 @@ public sealed class DashboardWorkspaceIconLoadingTests
             LoadAppIconsHandler = (apps, _) =>
             {
                 IReadOnlyDictionary<AppItemKey, byte[]?> result = apps.ToDictionary(
-                    AppItemKey.FromSnapshot,
-                    _ => (byte[]?)icon,
+                    AppItemKey.FromSnapshot, byte[]? (_) => icon,
                     EqualityComparer<AppItemKey>.Default);
 
                 return Task.FromResult(result);
@@ -52,7 +51,7 @@ public sealed class DashboardWorkspaceIconLoadingTests
         using var cancellation = new CancellationTokenSource();
 
         var task = viewModel.LoadAppIconPngAsync(app, cancellation.Token);
-        cancellation.Cancel();
+        await cancellation.CancelAsync();
         delays.CompleteNext();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await task);

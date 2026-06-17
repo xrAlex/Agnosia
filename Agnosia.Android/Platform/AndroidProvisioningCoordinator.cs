@@ -1,7 +1,6 @@
 using Agnosia.Models;
 using Android.App.Admin;
 using Android.Content;
-using Android.OS;
 using Android.Provider;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 

@@ -1,6 +1,4 @@
 using _Microsoft.Android.Resource.Designer;
-using Agnosia.Android.Api.Notifications;
-using Android.App;
 using Android.Content.PM;
 
 namespace Agnosia.Android.Services;

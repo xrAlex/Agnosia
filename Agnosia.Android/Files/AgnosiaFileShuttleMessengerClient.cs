@@ -1,8 +1,5 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
-using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Packages;
-using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Infrastructure;
 using Android.Content;
 using Android.Graphics;
@@ -20,7 +17,6 @@ internal sealed class AgnosiaFileShuttleMessengerClient
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(8);
 
     private readonly Context _context;
-    private readonly HandlerThread _handlerThread;
     private readonly Messenger _callbackMessenger;
     private readonly ConcurrentDictionary<int, TaskCompletionSource<Bundle>> _pendingRequests = [];
     private readonly Lock _connectSync = new();
@@ -31,9 +27,9 @@ internal sealed class AgnosiaFileShuttleMessengerClient
     public AgnosiaFileShuttleMessengerClient(Context context)
     {
         _context = context.ApplicationContext ?? context;
-        _handlerThread = new HandlerThread("AgnosiaFileShuttleClient");
-        _handlerThread.Start();
-        _callbackMessenger = new Messenger(new ResponseHandler(_handlerThread.Looper!, this));
+        var handlerThread = new HandlerThread("AgnosiaFileShuttleClient");
+        handlerThread.Start();
+        _callbackMessenger = new Messenger(new ResponseHandler(handlerThread.Looper!, this));
     }
 
     public bool IsConnected => _remoteMessenger is not null;
@@ -204,18 +200,15 @@ internal sealed class AgnosiaFileShuttleMessengerClient
                     requestTimeout,
                     "File Shuttle request timed out.");
                 var error = response.GetString(AgnosiaFileShuttleContract.ExtraError);
-                if (!string.IsNullOrWhiteSpace(error)) throw new InvalidOperationException(error);
-
-                return response;
+                return !string.IsNullOrWhiteSpace(error) ? throw new InvalidOperationException(error) : response;
             }
             catch (RemoteException exception)
             {
                 lastException = exception;
                 ClearRemoteMessenger();
             }
-            catch (TimeoutException exception)
+            catch (TimeoutException)
             {
-                lastException = exception;
                 ClearRemoteMessenger();
                 Log.Warn(LogTag, $"File Shuttle request timed out. what={what}, attempt={attempt + 1}.");
                 throw;

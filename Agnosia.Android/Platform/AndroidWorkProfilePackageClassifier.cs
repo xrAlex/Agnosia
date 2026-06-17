@@ -1,5 +1,4 @@
 using Android.Content.PM;
-using Agnosia.Android.Api.Platform;
 
 namespace Agnosia.Android.Platform;
 

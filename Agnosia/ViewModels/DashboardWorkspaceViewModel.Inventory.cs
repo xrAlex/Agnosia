@@ -102,12 +102,10 @@ public partial class DashboardWorkspaceViewModel
         {
             await InvokeOnUiThreadActionAsync(() =>
             {
-                if (ReferenceEquals(_inventoryLoadCancellation, inventoryCancellation))
-                {
-                    _inventoryLoadCancellation = null;
-                    _inventoryLoadInProgress = false;
-                    IsInventoryLoading = false;
-                }
+                if (!ReferenceEquals(_inventoryLoadCancellation, inventoryCancellation)) return;
+                _inventoryLoadCancellation = null;
+                _inventoryLoadInProgress = false;
+                IsInventoryLoading = false;
             }, DispatcherPriority.Background);
             inventoryCancellation.Dispose();
         }

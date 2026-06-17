@@ -1,7 +1,4 @@
-using Agnosia.Android.Api.Commands;
 using Agnosia.Android.Api.Internal;
-using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Api.Storage;
 using Android.App.Admin;
 using Android.Content;
 using Android.Content.PM;
@@ -259,8 +256,7 @@ public static class AgnosiaUtilities
         AddCrossProfileIntent(manager, admin, action, DevicePolicyManagerFlags.ParentCanAccessManaged);
     }
 
-    private static bool TryEnsureRequiredCrossProfilePackages(
-        DevicePolicyManager manager,
+    private static void TryEnsureRequiredCrossProfilePackages(DevicePolicyManager manager,
         ComponentName admin,
         string logTag)
     {
@@ -270,15 +266,13 @@ public static class AgnosiaUtilities
             var required = AndroidPackageAccessPolicy.ApplyRequiredCrossProfilePackages(current);
             if (current.Length == required.Length
                 && current.ToHashSet(StringComparer.Ordinal).SetEquals(required))
-                return true;
+                return;
 
             manager.SetCrossProfilePackages(admin, required);
-            return true;
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
             Log.Warn(logTag, $"Failed to enforce required cross-profile package policy: {exception}");
-            return false;
         }
     }
 

@@ -111,9 +111,7 @@ public sealed partial class AgnosiaModuleViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanToggle))]
     private Task ToggleEnabledAsync()
     {
-        if (!CanToggle) return Task.CompletedTask;
-
-        return _owner.SetModuleEnabledAsync(this, !IsEnabled);
+        return !CanToggle ? Task.CompletedTask : _owner.SetModuleEnabledAsync(this, !IsEnabled);
     }
 
     [RelayCommand(CanExecute = nameof(CanOpenDocumentsUi))]

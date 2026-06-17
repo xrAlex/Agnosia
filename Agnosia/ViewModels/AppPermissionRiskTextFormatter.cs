@@ -97,10 +97,7 @@ internal static class AppPermissionRiskTextFormatter
         if (trimmed.StartsWith(AndroidHealthPermissionPrefix, StringComparison.Ordinal))
             return trimmed[AndroidHealthPermissionPrefix.Length..];
 
-        if (trimmed.StartsWith(AndroidPermissionPrefix, StringComparison.Ordinal))
-            return trimmed[AndroidPermissionPrefix.Length..];
-
-        return trimmed;
+        return trimmed.StartsWith(AndroidPermissionPrefix, StringComparison.Ordinal) ? trimmed[AndroidPermissionPrefix.Length..] : trimmed;
     }
 
     private static void AddSpecificPermissionReasons(IReadOnlyList<string> permissions, List<string> reasons)
@@ -108,9 +105,8 @@ internal static class AppPermissionRiskTextFormatter
         if (permissions.Count == 0) return;
 
         var matchedRules = new bool[SpecificPermissionReasonRules.Length];
-        for (var permissionIndex = 0; permissionIndex < permissions.Count; permissionIndex++)
+        foreach (var permission in permissions)
         {
-            var permission = permissions[permissionIndex];
             for (var ruleIndex = 0; ruleIndex < SpecificPermissionReasonRules.Length; ruleIndex++)
             {
                 if (!matchedRules[ruleIndex] && SpecificPermissionReasonRules[ruleIndex].Matches(permission))
@@ -128,9 +124,9 @@ internal static class AppPermissionRiskTextFormatter
     {
         public bool Matches(string permission)
         {
-            for (var tokenIndex = 0; tokenIndex < Tokens.Length; tokenIndex++)
+            foreach (var token in Tokens)
             {
-                if (permission.Contains(Tokens[tokenIndex], StringComparison.Ordinal)) return true;
+                if (permission.Contains(token, StringComparison.Ordinal)) return true;
             }
 
             return false;

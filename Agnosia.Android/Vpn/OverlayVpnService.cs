@@ -1,4 +1,3 @@
-using Agnosia.Android.Api.Platform;
 using Android.Content;
 using Android.Graphics;
 using Android.OS;
@@ -21,7 +20,7 @@ public sealed class OverlayVpnService : Service
     private const int OverlayAlpha = 60;
 
     private static readonly Color OverlayColor = Color.Argb(OverlayAlpha, 100, 150, 255);
-    private static readonly object HideConnectionsGate = new();
+    private static readonly Lock HideConnectionsGate = new();
     private static readonly HashSet<HideOverlayServiceConnection> HideConnections = [];
 
     private IWindowManager? _windowManager;
@@ -90,7 +89,7 @@ public sealed class OverlayVpnService : Service
         base.OnDestroy();
     }
 
-    public override IBinder? OnBind(Intent? intent)
+    public override IBinder OnBind(Intent? intent)
     {
         return _binder;
     }

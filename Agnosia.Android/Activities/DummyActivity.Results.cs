@@ -1,6 +1,3 @@
-using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Packages;
-using Android.App;
 using Android.Content;
 using Android.Content.PM;
 using Exception = System.Exception;

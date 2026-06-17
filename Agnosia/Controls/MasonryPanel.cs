@@ -100,13 +100,13 @@ public sealed class MasonryPanel : Panel
 
         if (double.IsInfinity(availableWidth))
         {
-            var unconstrainedWidth = (maxColumns * minColumnWidth) + ((maxColumns - 1) * columnSpacing);
+            var unconstrainedWidth = maxColumns * minColumnWidth + (maxColumns - 1) * columnSpacing;
             return new MasonryLayout(unconstrainedWidth, minColumnWidth, new double[maxColumns]);
         }
 
         var columnsByWidth = (int)Math.Floor((availableWidth + columnSpacing) / (minColumnWidth + columnSpacing));
         var columnCount = Math.Clamp(columnsByWidth, 1, maxColumns);
-        var columnWidth = (availableWidth - ((columnCount - 1) * columnSpacing)) / columnCount;
+        var columnWidth = (availableWidth - (columnCount - 1) * columnSpacing) / columnCount;
 
         return new MasonryLayout(availableWidth, columnWidth, new double[columnCount]);
     }

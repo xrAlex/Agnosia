@@ -76,14 +76,14 @@ public partial class DashboardWorkspaceViewModel
     {
         return
         [
-            new(this, VpnAutomationClientKind.FlClash, "FlClash"),
-            new(this, VpnAutomationClientKind.ClashMeta, "Clash Meta"),
-            new(this, VpnAutomationClientKind.Happ, "Happ"),
-            new(this, VpnAutomationClientKind.Tunguska, "Tunguska"),
-            new(this, VpnAutomationClientKind.Incy, "INCY"),
-            new(this, VpnAutomationClientKind.Exclave, "Exclave"),
-            new(this, VpnAutomationClientKind.Husi, "husi"),
-            new(this, VpnAutomationClientKind.NekoBoxPlus, "NekoBox+")
+            new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.FlClash, "FlClash"),
+            new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.ClashMeta, "Clash Meta"),
+            new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.Happ, "Happ"),
+            new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.Tunguska, "Tunguska"),
+            new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.Incy, "INCY"),
+            new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.Exclave, "Exclave"),
+            new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.Husi, "husi"),
+            new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.NekoBoxPlus, "NekoBox+")
         ];
     }
 

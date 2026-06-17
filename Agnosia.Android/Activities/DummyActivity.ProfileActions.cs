@@ -1,10 +1,5 @@
-using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Storage;
 using Agnosia.Android.Infrastructure;
-using Agnosia.Android.Vpn;
-using Android.App;
 using Android.Content;
-using Android.Widget;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Activities;

@@ -1,7 +1,4 @@
 using System.Text.Json;
-using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Api.Serialization;
-using Agnosia.Android.Api.Storage;
 using Agnosia.Models;
 using Android.Content;
 

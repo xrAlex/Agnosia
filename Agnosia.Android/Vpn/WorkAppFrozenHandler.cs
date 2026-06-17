@@ -1,4 +1,3 @@
-using Agnosia.Android.Api.Vpn;
 using Agnosia.Models;
 using Android.Content;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;

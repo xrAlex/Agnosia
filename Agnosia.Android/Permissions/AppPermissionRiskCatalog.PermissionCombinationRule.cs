@@ -127,9 +127,8 @@ public static partial class AppPermissionRiskCatalog
             var hasDeniedRuntimeSensitivePermission = false;
             var isBlockedByAppOp = false;
             var controlSurfaceScore = 0;
-            for (var index = 0; index < RequiredPermissions.Count; index++)
+            foreach (var permission in RequiredPermissions)
             {
-                var permission = RequiredPermissions[index];
                 if (context.IsRuntimeSensitivePermission(permission))
                 {
                     hasRuntimeSensitivePermission = true;

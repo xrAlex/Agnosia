@@ -1,8 +1,4 @@
-using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Packages;
 using Agnosia.Android.Receivers;
-using Android.App;
-using Android.App.Admin;
 using Android.Content;
 using Exception = System.Exception;
 

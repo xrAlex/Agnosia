@@ -1,8 +1,4 @@
-using Agnosia.Android.Api.Logging;
-using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Api.Storage;
 using Agnosia.Models;
-using Android.App;
 using Android.Content.PM;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
@@ -28,24 +24,22 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         var activity = commandRunner.CurrentActivity;
         AgnosiaRuntime.Initialize(activity);
 
-        var localState = await ReadDashboardProfileLocalStateAsync(activity, cancellationToken).ConfigureAwait(false);
-        if (!localState.IsSupported) return DashboardSnapshot.Unsupported;
+        var (isSupported, appSettingsSnapshot, hadConfiguredWorkProfile, workProfileDiagnostics, localVersionCode) = await ReadDashboardProfileLocalStateAsync(activity, cancellationToken).ConfigureAwait(false);
+        if (!isSupported) return DashboardSnapshot.Unsupported;
 
-        var settings = localState.Settings ?? AppSettingsSnapshot.Default;
-        var hadConfiguredWorkProfile = localState.HadConfiguredWorkProfile;
-        var profileDiagnostics = localState.ProfileDiagnostics
+        var settings = appSettingsSnapshot ?? AppSettingsSnapshot.Default;
+        var profileDiagnostics = workProfileDiagnostics
                                  ?? throw new InvalidOperationException("Profile diagnostics were not loaded.");
         var ownerCheck = await ReadWorkProfileOwnerCheckAsync(
                 profileDiagnostics,
                 cancellationToken)
             .ConfigureAwait(false);
         var statusMessage = string.Empty;
-        if (hadConfiguredWorkProfile && ShouldUpdateWorkProfileApp(localState.LocalVersionCode, ownerCheck))
+        if (hadConfiguredWorkProfile && ShouldUpdateWorkProfileApp(localVersionCode, ownerCheck))
         {
             Log.Info(
                 LogTag,
-                $"Work profile Agnosia version mismatch; starting update. ownerCheck={ownerCheck.DiagnosticReason}; workVersionCode={ownerCheck.AppVersionCode}; localVersionCode={localState.LocalVersionCode}.");
-            statusMessage = "UpdatingWorkProfile";
+                $"Work profile Agnosia version mismatch; starting update. ownerCheck={ownerCheck.DiagnosticReason}; workVersionCode={ownerCheck.AppVersionCode}; localVersionCode={localVersionCode}.");
             AndroidQueryCache.Shared.ClearOwnerCheck();
             var updateResult = await AndroidProfileCommandGateway.UpdateAgnosiaInWorkProfileAsync(
                     commandRunner,
@@ -54,18 +48,10 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             AndroidQueryCache.Shared.ClearOwnerCheck();
             ownerCheck = updateResult.Succeeded
                 ? await ReadWorkProfileOwnerCheckAsync(profileDiagnostics, cancellationToken).ConfigureAwait(false)
-                : new WorkProfileOwnerCheckResult(
-                    WorkProfileOwnerCheckKind.VersionUpdateFailed,
-                    $"profileUpdate=failed; message={updateResult.Message}; previous={ownerCheck.DiagnosticReason}",
-                    ownerCheck.AppVersionCode,
-                    ownerCheck.AppVersionName);
+                : ownerCheck with { Kind = WorkProfileOwnerCheckKind.VersionUpdateFailed, DiagnosticReason = $"profileUpdate=failed; message={updateResult.Message}; previous={ownerCheck.DiagnosticReason}" };
 
-            if (updateResult.Succeeded && ShouldUpdateWorkProfileApp(localState.LocalVersionCode, ownerCheck))
-                ownerCheck = new WorkProfileOwnerCheckResult(
-                    WorkProfileOwnerCheckKind.VersionUpdateFailed,
-                    $"profileUpdate=stillMismatch; previous={ownerCheck.DiagnosticReason}",
-                    ownerCheck.AppVersionCode,
-                    ownerCheck.AppVersionName);
+            if (updateResult.Succeeded && ShouldUpdateWorkProfileApp(localVersionCode, ownerCheck))
+                ownerCheck = ownerCheck with { Kind = WorkProfileOwnerCheckKind.VersionUpdateFailed, DiagnosticReason = $"profileUpdate=stillMismatch; previous={ownerCheck.DiagnosticReason}" };
 
             statusMessage = ownerCheck.Kind == WorkProfileOwnerCheckKind.VersionUpdateFailed
                 ? "WorkProfileUpdateFailed"
@@ -146,11 +132,10 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         var activity = commandRunner.CurrentActivity;
         AgnosiaRuntime.Initialize(activity);
 
-        var localState = await ReadRecentLogLocalStateAsync(activity, cancellationToken).ConfigureAwait(false);
-        if (!localState.LoggingEnabled) return [];
+        var (loggingEnabled, appLogEntries, profileDiagnostics) = await ReadRecentLogLocalStateAsync(activity, cancellationToken).ConfigureAwait(false);
+        if (!loggingEnabled) return [];
 
-        var logs = localState.Logs.ToList();
-        var profileDiagnostics = localState.ProfileDiagnostics;
+        var logs = appLogEntries.ToList();
         if (CanAttemptWorkProfileOwnerCheck(profileDiagnostics)
             && (await AndroidProfileCommandGateway.CheckWorkProfileOwnerAsync(commandRunner, cancellationToken)
                 .ConfigureAwait(false)).Kind == WorkProfileOwnerCheckKind.AppIsProfileOwner)

@@ -90,9 +90,9 @@ public partial class DashboardWorkspaceViewModel
     {
         var snapshots = new List<AppSnapshot>(batch.Count);
         var seen = new HashSet<AppItemKey>();
-        for (var index = 0; index < batch.Count; index++)
+        foreach (var t in batch)
         {
-            var snapshot = batch[index].Snapshot;
+            var snapshot = t.Snapshot;
             if (seen.Add(AppItemKey.FromSnapshot(snapshot)))
                 snapshots.Add(snapshot);
         }

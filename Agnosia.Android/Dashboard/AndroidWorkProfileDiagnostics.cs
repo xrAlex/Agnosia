@@ -1,5 +1,3 @@
-using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Api.Storage;
 using Android.Content;
 using Android.OS;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
@@ -112,7 +110,7 @@ internal static class AndroidWorkProfileDiagnosticsReader
 
         try
         {
-            return crossProfileApps.TargetUserProfiles?.ToArray() ?? [];
+            return crossProfileApps.TargetUserProfiles.ToArray() ?? [];
         }
         catch (Exception exception)
         {
@@ -134,9 +132,9 @@ internal static class AndroidWorkProfileDiagnosticsReader
             && !IsSameUser(userManager, currentUser, storedUser, notes))
             return storedUser;
 
-        if (targetProfiles.Count > 0) return targetProfiles[0];
-
-        return userProfiles.FirstOrDefault(profile => !IsSameUser(userManager, currentUser, profile, notes));
+        return targetProfiles.Count > 0 
+            ? targetProfiles[0] 
+            : userProfiles.FirstOrDefault(profile => !IsSameUser(userManager, currentUser, profile, notes));
     }
 
     private static UserHandle? TryGetUserForSerial(

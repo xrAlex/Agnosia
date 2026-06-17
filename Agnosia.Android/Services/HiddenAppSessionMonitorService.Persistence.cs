@@ -1,9 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Agnosia.Android.Api.Commands;
-using Agnosia.Android.Api.Storage;
 using Agnosia.Android.Serialization;
-using Android.App;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Services;

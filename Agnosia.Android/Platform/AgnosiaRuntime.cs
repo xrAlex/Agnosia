@@ -1,6 +1,5 @@
 using Agnosia.Android.Api.Logging;
 using Agnosia.Android.Infrastructure;
-using Agnosia.Infrastructure;
 using Android.Content;
 using Microsoft.Extensions.DependencyInjection;
 using AndroidUtilLog = Android.Util.Log;
@@ -9,7 +8,7 @@ namespace Agnosia.Android.Platform;
 
 public static class AgnosiaRuntime
 {
-    private static readonly object InitializationSync = new();
+    private static readonly Lock InitializationSync = new();
     private static Context? _applicationContext;
 
     public static void Initialize(Context context)

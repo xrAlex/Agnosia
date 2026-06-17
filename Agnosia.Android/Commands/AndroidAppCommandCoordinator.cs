@@ -1,8 +1,3 @@
-using Agnosia.Android.Api.Packages;
-using Agnosia.Android.Api.Permissions;
-using Agnosia.Android.Api.Platform;
-using Agnosia.Android.Api.Storage;
-using Agnosia.Android.Api.Vpn;
 using Agnosia.Models;
 using Android.Content;
 using Android.Content.PM;
@@ -229,15 +224,14 @@ internal sealed class AndroidAppCommandCoordinator(
             if (launchIntent is null)
                 return OperationResult.Failure("Android не смог определить, как открыть это приложение.");
 
-            if (AndroidIntentApi.TryStartActivity(
-                    activity,
-                    launchIntent,
-                    ActivityResultLogTag,
-                    "Android не смог открыть это приложение.",
-                    out var error))
-                return OperationResult.Success("Открываем приложение.");
-
-            return OperationResult.Failure(error ?? "Android не смог открыть это приложение.");
+            return AndroidIntentApi.TryStartActivity(
+                activity,
+                launchIntent,
+                ActivityResultLogTag,
+                "Android не смог открыть это приложение.",
+                out var error) 
+                ? OperationResult.Success("Открываем приложение.") 
+                : OperationResult.Failure(error ?? "Android не смог открыть это приложение.");
         }
 
         if (!app.IsSystem)

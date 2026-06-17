@@ -1,4 +1,3 @@
-using Agnosia.Models;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agnosia.Infrastructure;
