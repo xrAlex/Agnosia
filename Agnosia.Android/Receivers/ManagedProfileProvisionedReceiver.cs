@@ -26,7 +26,7 @@ public sealed class ManagedProfileProvisionedReceiver : BroadcastReceiver
 
         try
         {
-            AndroidPlatformBridge.Instance.NotifyManagedProfileProvisioned(context, intent);
+            ServiceRegistry.GetRequiredService<AndroidPlatformBridge>().NotifyManagedProfileProvisioned(context, intent);
             Log.Info(LogTag, "Primary-profile managed-profile provisioned broadcast recorded.");
         }
         catch (Exception exception)

@@ -35,7 +35,7 @@ public sealed partial class DummyActivity
         try
         {
             var showAll = intent.GetBooleanExtra(AndroidCommandContract.ExtraShowAll, false);
-            var isRiskEngineEnabled = LocalStorageManager.Instance.GetBoolean(StorageKeys.RiskEngineEnabled, true);
+            var isRiskEngineEnabled = ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.RiskEngineEnabled, true);
             var policyManager = _policyManager;
             var admin = _isProfileOwner && policyManager is not null
                 ? AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType)

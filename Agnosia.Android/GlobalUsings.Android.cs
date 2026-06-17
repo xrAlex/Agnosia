@@ -18,4 +18,5 @@ global using Agnosia.Android.Platform;
 global using Agnosia.Android.Shortcuts;
 global using Agnosia.Android.Storage;
 global using Agnosia.Android.Vpn;
+global using Agnosia.Infrastructure;
 #endif

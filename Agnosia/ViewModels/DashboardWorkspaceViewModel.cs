@@ -516,7 +516,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }
     }
 
-    public DashboardWorkspaceViewModel() : this(UnsupportedPlatformBridge.Instance)
+    public DashboardWorkspaceViewModel() : this(new UnsupportedPlatformBridge())
     {
     }
 

@@ -19,18 +19,18 @@ public sealed partial class HiddenAppSessionMonitorService
     {
         if (session is null)
         {
-            LocalStorageManager.Instance.Remove(StorageKeys.HiddenAppActiveSession);
+            ServiceRegistry.GetRequiredService<LocalStorageManager>().Remove(StorageKeys.HiddenAppActiveSession);
             return;
         }
 
-        LocalStorageManager.Instance.SetString(
+        ServiceRegistry.GetRequiredService<LocalStorageManager>().SetString(
             StorageKeys.HiddenAppActiveSession,
             JsonSerializer.Serialize(session, AndroidJsonContext.Default.HiddenAppSessionState));
     }
 
     private static bool TryLoadPersistedSession(out HiddenAppSessionState session)
     {
-        var raw = LocalStorageManager.Instance.GetString(StorageKeys.HiddenAppActiveSession);
+        var raw = ServiceRegistry.GetRequiredService<LocalStorageManager>().GetString(StorageKeys.HiddenAppActiveSession);
         if (string.IsNullOrWhiteSpace(raw))
         {
             session = HiddenAppSessionState.Empty;
@@ -46,7 +46,7 @@ public sealed partial class HiddenAppSessionMonitorService
         catch (JsonException exception)
         {
             Log.Warn(LogTag, $"Failed to restore hidden-app session: {exception.Message}");
-            LocalStorageManager.Instance.Remove(StorageKeys.HiddenAppActiveSession);
+            ServiceRegistry.GetRequiredService<LocalStorageManager>().Remove(StorageKeys.HiddenAppActiveSession);
             session = HiddenAppSessionState.Empty;
             return false;
         }

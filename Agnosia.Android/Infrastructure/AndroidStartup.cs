@@ -17,15 +17,18 @@ internal static class AndroidStartup
 
     public static void ConfigurePrimaryProfileServices(Context context)
     {
-        ServiceRegistry.SuppressPrimaryUiStartup = false;
-        ServiceRegistry.PlatformBridge = AndroidPlatformBridge.Instance;
-        ServiceRegistry.InitialTheme = AndroidSettingsStore.LoadAppTheme(LocalStorageManager.Instance);
+        AgnosiaRuntime.Initialize(context);
+
+        var startupState = ServiceRegistry.GetRequiredService<AppStartupState>();
+        startupState.SuppressPrimaryUiStartup = false;
+        startupState.InitialTheme = AndroidSettingsStore.LoadAppTheme(
+            ServiceRegistry.GetRequiredService<LocalStorageManager>());
         AgnosiaUtilities.ApplyCrossProfileFileShuttleComponentState(context);
     }
 
     public static void SuppressPrimaryUiStartup()
     {
-        ServiceRegistry.SuppressPrimaryUiStartup = true;
+        ServiceRegistry.GetRequiredService<AppStartupState>().SuppressPrimaryUiStartup = true;
     }
 
     public static bool TryIsProfileOwner(Context context, string logTag, string failureContext)

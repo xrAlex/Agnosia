@@ -46,7 +46,7 @@ internal static class AndroidHiddenShortcutApi
 
     private static void RemoveMetadata(string packageName)
     {
-        LocalStorageManager.Instance.Remove(GetStorageKey(packageName));
+        ServiceRegistry.GetRequiredService<LocalStorageManager>().Remove(GetStorageKey(packageName));
     }
 
     private static string GetShortcutId(string packageName)

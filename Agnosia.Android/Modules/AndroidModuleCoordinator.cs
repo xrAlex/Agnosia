@@ -87,7 +87,7 @@ internal sealed partial class AndroidModuleCoordinator(
                 return OperationResult.Failure("Сначала выполните требования File Shuttle.");
         }
 
-        var storage = LocalStorageManager.Instance;
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
         storage.SetBoolean(StorageKeys.CrossProfileFileShuttleEnabled, enabled);
         AgnosiaUtilities.ApplyCrossProfileFileShuttleComponentState(activity);
 
@@ -105,7 +105,7 @@ internal sealed partial class AndroidModuleCoordinator(
         Context context,
         IReadOnlyList<PermissionSnapshot> permissions)
     {
-        var storage = LocalStorageManager.Instance;
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
         var isSettingEnabled = storage.GetBoolean(StorageKeys.CrossProfileFileShuttleEnabled);
         var activationRequirements = GetActivationRequirements(permissions);
         var providerRequirement = new AgnosiaModuleRequirement(
@@ -152,7 +152,7 @@ internal sealed partial class AndroidModuleCoordinator(
                 return OperationResult.Failure("Сначала выполните требования VPN Guard.");
         }
 
-        var storage = LocalStorageManager.Instance;
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
         storage.SetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch, enabled);
         storage.SetBoolean(StorageKeys.EnableVpnAfterWorkFreeze, enabled);
         if (!enabled) storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
@@ -172,7 +172,7 @@ internal sealed partial class AndroidModuleCoordinator(
     private static AgnosiaModuleSnapshot CreateVpnGuardSnapshot(
         IReadOnlyList<PermissionSnapshot> permissions)
     {
-        var storage = LocalStorageManager.Instance;
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
         var disableBeforeLaunchEnabled = storage.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch);
         var enableAfterFreezeEnabled = storage.GetBoolean(StorageKeys.EnableVpnAfterWorkFreeze);
         var activationRequirements = GetVpnGuardActivationRequirements(permissions);
@@ -226,14 +226,14 @@ internal sealed partial class AndroidModuleCoordinator(
             .ConfigureAwait(false);
         if (!result.Succeeded) return result;
 
-        LocalStorageManager.Instance.SetBoolean(StorageKeys.LockdownEnabled, enabled);
+        ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.LockdownEnabled, enabled);
         return OperationResult.Success(enabled ? "Lockdown включён." : "Lockdown выключен.");
     }
 
     private static AgnosiaModuleSnapshot CreateLockdownSnapshot(
         IReadOnlyList<PermissionSnapshot> permissions)
     {
-        var storage = LocalStorageManager.Instance;
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
         var isSettingEnabled = storage.GetBoolean(StorageKeys.LockdownEnabled);
         var activationRequirements = GetLockdownActivationRequirements(permissions);
         var workProfileAvailable = activationRequirements
@@ -257,7 +257,7 @@ internal sealed partial class AndroidModuleCoordinator(
         var activity = commandRunner.CurrentActivity;
         AgnosiaRuntime.Initialize(activity);
 
-        var storage = LocalStorageManager.Instance;
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
         storage.SetBoolean(StorageKeys.RiskEngineEnabled, enabled);
 
         var syncResult = await TrySyncBooleanSettingAsync(
@@ -274,7 +274,7 @@ internal sealed partial class AndroidModuleCoordinator(
 
     private static AgnosiaModuleSnapshot CreateRiskEngineSnapshot()
     {
-        var isEnabled = LocalStorageManager.Instance.GetBoolean(StorageKeys.RiskEngineEnabled, true);
+        var isEnabled = ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.RiskEngineEnabled, true);
         var state = isEnabled ? AgnosiaModuleState.Enabled : AgnosiaModuleState.Disabled;
 
         return AgnosiaModuleSnapshot.Create(
@@ -339,7 +339,7 @@ internal sealed partial class AndroidModuleCoordinator(
 
         try
         {
-            var result = await SettingsManager.Instance.SyncBooleanSettingAsync(
+            var result = await ServiceRegistry.GetRequiredService<SettingsManager>().SyncBooleanSettingAsync(
                     StorageKeys.CrossProfileFileShuttleEnabled,
                     enabled,
                     cancellationToken)
@@ -372,7 +372,7 @@ internal sealed partial class AndroidModuleCoordinator(
 
         try
         {
-            var result = await SettingsManager.Instance.SyncBooleanSettingAsync(key, enabled, cancellationToken)
+            var result = await ServiceRegistry.GetRequiredService<SettingsManager>().SyncBooleanSettingAsync(key, enabled, cancellationToken)
                 .ConfigureAwait(false);
             if (result.Succeeded) return OperationResult.Success(string.Empty);
 

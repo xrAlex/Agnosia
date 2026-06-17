@@ -36,7 +36,7 @@ public static class AndroidAppInventoryApi
         AppInventoryQueryOptions? options = null)
     {
         options ??= AppInventoryQueryOptions.Full;
-        var isRiskEngineEnabled = LocalStorageManager.Instance.GetBoolean(StorageKeys.RiskEngineEnabled, true);
+        var isRiskEngineEnabled = ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.RiskEngineEnabled, true);
         var apps = packageManager.GetInstalledApplications(AndroidSystemApi.GetInstalledApplicationFlags());
         var models = new List<AppServiceModel>(apps.Count);
         var installedPackageNames = new HashSet<string>(StringComparer.Ordinal);

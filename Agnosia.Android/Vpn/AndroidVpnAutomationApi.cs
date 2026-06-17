@@ -76,7 +76,7 @@ public static class AndroidVpnAutomationApi
     public static Task<OperationResult> EnableConfiguredVpnAfterWorkFreezeAsync(Context context, string trigger)
     {
         AgnosiaRuntime.Initialize(context);
-        var storage = LocalStorageManager.Instance;
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
         if (!storage.GetBoolean(StorageKeys.EnableVpnAfterWorkFreeze))
         {
             Log.Debug(LogTag, $"Enable-after-freeze is disabled. trigger={trigger}.");

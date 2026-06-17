@@ -183,7 +183,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
 
             if (!isSupported) return new DashboardProfileLocalState(false, null, false, null, 0);
 
-            var storage = LocalStorageManager.Instance;
+            var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
             return new DashboardProfileLocalState(
                 true,
                 AndroidSettingsStore.LoadSnapshot(storage),
@@ -201,7 +201,7 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var loggingEnabled = LocalStorageManager.Instance.GetBoolean(StorageKeys.LoggingEnabled, true);
+            var loggingEnabled = ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.LoggingEnabled, true);
             if (!loggingEnabled)
                 return new RecentLogLocalState(false, [], CreateEmptyWorkProfileDiagnostics());
 

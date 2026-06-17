@@ -25,7 +25,7 @@ public static class AndroidAppLogArchive
         var appContext = GetApplicationContext(context);
         lock (Sync)
         {
-            if (!LocalStorageManager.Instance.GetBoolean(StorageKeys.LoggingEnabled, true)) return;
+            if (!ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.LoggingEnabled, true)) return;
 
             PendingEntries.Add(CreateEntry(appContext, level, tag, message));
 
@@ -50,7 +50,7 @@ public static class AndroidAppLogArchive
         lock (Sync)
         {
             PendingEntries.Clear();
-            LocalStorageManager.Instance.Remove(StorageKeys.LogEntries);
+            ServiceRegistry.GetRequiredService<LocalStorageManager>().Remove(StorageKeys.LogEntries);
         }
     }
 
@@ -105,7 +105,7 @@ public static class AndroidAppLogArchive
 
         if (PendingEntries.Count == 0) return;
 
-        if (!LocalStorageManager.Instance.GetBoolean(StorageKeys.LoggingEnabled, true))
+        if (!ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.LoggingEnabled, true))
         {
             PendingEntries.Clear();
             return;
@@ -120,7 +120,7 @@ public static class AndroidAppLogArchive
 
     private static List<AppLogEntry> LoadCore()
     {
-        var raw = LocalStorageManager.Instance.GetString(StorageKeys.LogEntries);
+        var raw = ServiceRegistry.GetRequiredService<LocalStorageManager>().GetString(StorageKeys.LogEntries);
         if (string.IsNullOrWhiteSpace(raw))
             return [];
 
@@ -132,14 +132,14 @@ public static class AndroidAppLogArchive
         }
         catch (JsonException)
         {
-            LocalStorageManager.Instance.Remove(StorageKeys.LogEntries);
+            ServiceRegistry.GetRequiredService<LocalStorageManager>().Remove(StorageKeys.LogEntries);
             return [];
         }
     }
 
     private static void SaveCore(List<AppLogEntry> entries)
     {
-        LocalStorageManager.Instance.SetString(
+        ServiceRegistry.GetRequiredService<LocalStorageManager>().SetString(
             StorageKeys.LogEntries,
             JsonSerializer.Serialize(entries, AndroidApiJsonContext.Default.ListAppLogEntry));
     }

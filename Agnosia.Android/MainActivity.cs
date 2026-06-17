@@ -57,7 +57,7 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
     {
         if (IsProfileOwnerStartup())
         {
-            ServiceRegistry.SuppressPrimaryUiStartup = true;
+            AndroidStartup.SuppressPrimaryUiStartup();
             base.OnCreate(savedInstanceState);
             BootstrapWorkProfileAndFinish();
             return;
@@ -76,7 +76,7 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
     {
         AgnosiaRuntime.Initialize(this);
         AndroidStartup.ConfigurePrimaryProfileServices(this);
-        AndroidPlatformBridge.Instance.AttachActivity(this);
+        ServiceRegistry.GetRequiredService<AndroidPlatformBridge>().AttachActivity(this);
         Current = this;
     }
 
@@ -129,7 +129,7 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         base.OnResume();
         _isResumed = true;
         Current = this;
-        AndroidPlatformBridge.Instance.AttachActivity(this);
+        ServiceRegistry.GetRequiredService<AndroidPlatformBridge>().AttachActivity(this);
         ServiceRegistry.NotifyPrimaryActivityResumed();
         ApplyPreferredDisplayMode();
         DrainPendingActivityStarts();
@@ -159,7 +159,7 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         if (ReferenceEquals(Current, this))
         {
             Current = null;
-            AndroidPlatformBridge.Instance.DetachActivity();
+            ServiceRegistry.GetRequiredService<AndroidPlatformBridge>().DetachActivity();
         }
 
         base.OnDestroy();

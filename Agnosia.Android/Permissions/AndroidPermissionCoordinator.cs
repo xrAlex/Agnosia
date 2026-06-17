@@ -160,7 +160,7 @@ internal sealed class AndroidPermissionCoordinator(
 
     public async Task EnsureUsageStatsAccessRequestedAsync(CancellationToken cancellationToken)
     {
-        var storage = LocalStorageManager.Instance;
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
         if (storage.GetBoolean(StorageKeys.UsageStatsAccessPrompted)) return;
 
         if (await AndroidProfileCommandGateway.QueryWorkUsageStatsAccessAsync(commandRunner, cancellationToken)
@@ -181,7 +181,7 @@ internal sealed class AndroidPermissionCoordinator(
                 cancellationToken,
                 "Откройте Agnosia в списке и включите доступ к истории использования.")
             .ConfigureAwait(false);
-        if (result.Succeeded) LocalStorageManager.Instance.SetBoolean(StorageKeys.UsageStatsAccessPrompted, true);
+        if (result.Succeeded) ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.UsageStatsAccessPrompted, true);
 
         return result;
     }
@@ -189,7 +189,7 @@ internal sealed class AndroidPermissionCoordinator(
     private async Task<OperationResult> RequestVpnControlAsync(CancellationToken cancellationToken)
     {
         var activity = commandRunner.CurrentActivity;
-        var storage = LocalStorageManager.Instance;
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
         Intent? prepareIntent;
         try
         {
@@ -263,14 +263,14 @@ internal sealed class AndroidPermissionCoordinator(
 
             var profileDiagnostics = AndroidWorkProfileDiagnosticsReader.Read(activity);
             var hasWorkProfileTarget = profileDiagnostics.CommandTargetResolvable;
-            var hasSetup = LocalStorageManager.Instance.GetBoolean(StorageKeys.HasSetup)
+            var hasSetup = ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.HasSetup)
                            || hasWorkProfileTarget
                            || profileDiagnostics.ManagedProfileExists;
             return new PermissionLocalState(
                 profileDiagnostics,
                 hasSetup,
                 AndroidPermissionApi.HasNotificationPermission(activity),
-                LocalStorageManager.Instance.GetBoolean(StorageKeys.VpnControlPrepared),
+                ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.VpnControlPrepared),
                 AndroidPermissionApi.HasAllFilesAccess(activity),
                 AndroidPermissionApi.HasOverlayPermission(activity));
         }, cancellationToken);

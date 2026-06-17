@@ -45,7 +45,7 @@ public static class AuthenticationUtility
     public static string CreateAndStoreKey()
     {
         var key = CreateKey();
-        LocalStorageManager.Instance.SetString(StorageKeys.AuthKey, key);
+        ServiceRegistry.GetRequiredService<LocalStorageManager>().SetString(StorageKeys.AuthKey, key);
         return key;
     }
 
@@ -53,7 +53,7 @@ public static class AuthenticationUtility
     {
         if (string.IsNullOrWhiteSpace(key) || !IsValidKey(key)) return false;
 
-        LocalStorageManager.Instance.SetString(StorageKeys.AuthKey, key);
+        ServiceRegistry.GetRequiredService<LocalStorageManager>().SetString(StorageKeys.AuthKey, key);
         return true;
     }
 
@@ -145,7 +145,7 @@ public static class AuthenticationUtility
 
     public static void Reset()
     {
-        LocalStorageManager.Instance.Remove(StorageKeys.AuthKey);
+        ServiceRegistry.GetRequiredService<LocalStorageManager>().Remove(StorageKeys.AuthKey);
     }
 
     private static string CreateKey()
@@ -155,7 +155,7 @@ public static class AuthenticationUtility
 
     private static bool TryGetValidStoredKey(bool removeMissingKey, out string key)
     {
-        var storage = LocalStorageManager.Instance;
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
         var storedKey = storage.GetString(StorageKeys.AuthKey);
         if (string.IsNullOrWhiteSpace(storedKey))
         {

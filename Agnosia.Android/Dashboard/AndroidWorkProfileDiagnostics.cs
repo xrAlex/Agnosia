@@ -12,7 +12,7 @@ internal static class AndroidWorkProfileDiagnosticsReader
 
     public static WorkProfileDiagnostics Read(Context context)
     {
-        var storage = LocalStorageManager.Instance;
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
         var userManager = AndroidSystemApi.GetUserManager(context);
         var crossProfileApps = AndroidSystemApi.GetCrossProfileApps(context);
         var notes = new List<string>();

@@ -290,7 +290,7 @@ internal static class HiddenAppShortcutManager
     private static HiddenAppShortcutMetadata? ReadMetadata(string packageName)
     {
         var storageKey = GetStorageKey(packageName);
-        var raw = LocalStorageManager.Instance.GetString(storageKey);
+        var raw = ServiceRegistry.GetRequiredService<LocalStorageManager>().GetString(storageKey);
         if (string.IsNullOrWhiteSpace(raw))
             return null;
 
@@ -301,7 +301,7 @@ internal static class HiddenAppShortcutManager
         catch (JsonException exception)
         {
             Log.Warn(LogTag, $"Failed to read shortcut metadata for {packageName}: {exception.Message}");
-            LocalStorageManager.Instance.Remove(storageKey);
+            ServiceRegistry.GetRequiredService<LocalStorageManager>().Remove(storageKey);
             return null;
         }
     }
@@ -309,7 +309,7 @@ internal static class HiddenAppShortcutManager
     private static void WriteMetadata(HiddenAppShortcutMetadata metadata)
     {
         var raw = JsonSerializer.Serialize(metadata, AndroidJsonContext.Default.HiddenAppShortcutMetadata);
-        LocalStorageManager.Instance.SetString(GetStorageKey(metadata.TargetPackage), raw);
+        ServiceRegistry.GetRequiredService<LocalStorageManager>().SetString(GetStorageKey(metadata.TargetPackage), raw);
     }
 
     private static bool IsStoredSystemShortcut(Context context, string packageName)

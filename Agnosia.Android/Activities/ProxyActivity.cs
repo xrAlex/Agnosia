@@ -307,15 +307,15 @@ public sealed class ProxyActivity : Activity
         {
             if (IsSystemWorkProfileRequest(request))
             {
-                LocalStorageManager.Instance.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
+                ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, false);
                 Log.Debug(LogTag, $"Shortcut launch: skipping VPN Guard for system work-profile app {request.PackageName}.");
                 ForwardLaunchToManagedProfile(request, isSystem: true);
                 return;
             }
 
-            if (!LocalStorageManager.Instance.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch))
+            if (!ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch))
             {
-                LocalStorageManager.Instance.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
+                ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, false);
                 Log.Debug(LogTag, "Disable-VPN-before-shortcut-launch is disabled in settings.");
                 ForwardLaunchToManagedProfile(request);
                 return;
@@ -323,14 +323,14 @@ public sealed class ProxyActivity : Activity
 
             if (!AndroidVpnApi.IsVpnActive(this))
             {
-                LocalStorageManager.Instance.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
+                ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, false);
                 Log.Debug(LogTag, "Shortcut launch: no active VPN detected.");
                 ForwardLaunchToManagedProfile(request);
                 return;
             }
 
             var prepareIntent = VpnService.Prepare(this);
-            LocalStorageManager.Instance.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
+            ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, false);
             if (prepareIntent is not null)
             {
                 Log.Debug(LogTag, "Shortcut launch: Android confirmation is required for VPN control.");
@@ -359,12 +359,12 @@ public sealed class ProxyActivity : Activity
 
         if (AndroidVpnApi.IsVpnActive(this))
         {
-            LocalStorageManager.Instance.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
+            ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, false);
             ShowErrorAndFinish("VPN все еще активен в личном профиле. Сторонний клиент мог сразу подключиться снова.");
             return;
         }
 
-        LocalStorageManager.Instance.SetBoolean(StorageKeys.HaveActiveVpnSession, true);
+        ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, true);
         OverlayVpnService.ShowOverlay(this);
         _pendingVpnDisconnectRequest = null;
         ForwardLaunchToManagedProfile(request);

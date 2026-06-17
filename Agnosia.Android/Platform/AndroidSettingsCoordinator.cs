@@ -12,13 +12,13 @@ internal sealed class AndroidSettingsCoordinator(Func<Activity> getInitializedAc
     public Task<bool> LoadOnboardingCompletedAsync(CancellationToken cancellationToken = default)
     {
         _ = getInitializedActivity();
-        return Task.FromResult(LocalStorageManager.Instance.GetBoolean(StorageKeys.OnboardingCompleted));
+        return Task.FromResult(ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.OnboardingCompleted));
     }
 
     public Task<OperationResult> CompleteOnboardingAsync(CancellationToken cancellationToken = default)
     {
         _ = getInitializedActivity();
-        LocalStorageManager.Instance.SetBoolean(StorageKeys.OnboardingCompleted, true);
+        ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.OnboardingCompleted, true);
         return Task.FromResult(OperationResult.Success("Первичная настройка завершена."));
     }
 

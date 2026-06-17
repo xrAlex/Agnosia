@@ -40,13 +40,13 @@ public sealed partial class DummyActivity
         if (intent?.HasExtra("boolean") == true)
         {
             var booleanValue = intent.GetBooleanExtra("boolean", false);
-            LocalStorageManager.Instance.SetBoolean(name, booleanValue);
+            ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(name, booleanValue);
             if (string.Equals(name, StorageKeys.LoggingEnabled, StringComparison.Ordinal) && !booleanValue)
                 AndroidAppLogArchive.Clear(this);
         }
         else if (intent?.HasExtra("int") == true)
         {
-            LocalStorageManager.Instance.SetInt(name, intent.GetIntExtra("int", int.MinValue));
+            ServiceRegistry.GetRequiredService<LocalStorageManager>().SetInt(name, intent.GetIntExtra("int", int.MinValue));
         }
 
         if (_isProfileOwner)
@@ -101,7 +101,7 @@ public sealed partial class DummyActivity
             return;
         }
 
-        AndroidPlatformBridge.Instance.NotifyManagedProfileProvisioned(this, Intent);
+        ServiceRegistry.GetRequiredService<AndroidPlatformBridge>().NotifyManagedProfileProvisioned(this, Intent);
 
         var launchIntent = string.IsNullOrWhiteSpace(PackageName)
             ? null

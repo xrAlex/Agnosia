@@ -20,7 +20,8 @@ public class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
-        if (ServiceRegistry.SuppressPrimaryUiStartup)
+        var startupState = ServiceRegistry.GetRequiredService<AppStartupState>();
+        if (startupState.SuppressPrimaryUiStartup)
         {
             if (ApplicationLifetime is IActivityApplicationLifetime activityLifetime)
                 activityLifetime.MainViewFactory = static () => new UserControl();
@@ -31,8 +32,8 @@ public class App : Application
             return;
         }
 
-        AppThemeManager.Apply(ServiceRegistry.InitialTheme);
-        var workspaceViewModel = new DashboardWorkspaceViewModel(ServiceRegistry.PlatformBridge);
+        AppThemeManager.Apply(startupState.InitialTheme);
+        var workspaceViewModel = ServiceRegistry.GetRequiredService<DashboardWorkspaceViewModel>();
         ServiceRegistry.PrimaryActivityResumed += workspaceViewModel.HandlePrimaryActivityResumed;
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)

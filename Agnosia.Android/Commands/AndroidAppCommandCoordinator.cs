@@ -306,7 +306,7 @@ internal sealed class AndroidAppCommandCoordinator(
         CancellationToken cancellationToken)
     {
         var activity = commandRunner.CurrentActivity;
-        var storage = LocalStorageManager.Instance;
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
         if (!storage.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch))
         {
             storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);

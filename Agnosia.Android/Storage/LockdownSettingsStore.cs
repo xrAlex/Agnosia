@@ -8,17 +8,17 @@ internal static class LockdownSettingsStore
 
     public static bool IsEnabled()
     {
-        return LocalStorageManager.Instance.GetBoolean(StorageKeys.LockdownEnabled);
+        return ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.LockdownEnabled);
     }
 
     public static void SetEnabled(bool enabled)
     {
-        LocalStorageManager.Instance.SetBoolean(StorageKeys.LockdownEnabled, enabled);
+        ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.LockdownEnabled, enabled);
     }
 
     public static string[] LoadBlockedPackages()
     {
-        var savedValue = LocalStorageManager.Instance.GetString(StorageKeys.LockdownBlockedPackages);
+        var savedValue = ServiceRegistry.GetRequiredService<LocalStorageManager>().GetString(StorageKeys.LockdownBlockedPackages);
         if (string.IsNullOrWhiteSpace(savedValue)) return [];
 
         return savedValue
@@ -40,11 +40,11 @@ internal static class LockdownSettingsStore
 
         if (normalized.Length == 0)
         {
-            LocalStorageManager.Instance.Remove(StorageKeys.LockdownBlockedPackages);
+            ServiceRegistry.GetRequiredService<LocalStorageManager>().Remove(StorageKeys.LockdownBlockedPackages);
             return;
         }
 
-        LocalStorageManager.Instance.SetString(
+        ServiceRegistry.GetRequiredService<LocalStorageManager>().SetString(
             StorageKeys.LockdownBlockedPackages,
             string.Join(PackageSeparator, normalized));
     }

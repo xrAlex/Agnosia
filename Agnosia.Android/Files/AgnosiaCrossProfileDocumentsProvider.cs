@@ -225,7 +225,7 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
     {
         var context = Context;
         return context is not null
-               && LocalStorageManager.Instance.GetBoolean(StorageKeys.CrossProfileFileShuttleEnabled)
+               && ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.CrossProfileFileShuttleEnabled)
                && AndroidPermissionApi.HasAllFilesAccess(context);
     }
 

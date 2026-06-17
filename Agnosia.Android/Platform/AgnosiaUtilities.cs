@@ -105,7 +105,7 @@ public static class AgnosiaUtilities
 
     public static void MarkWorkProfileReady()
     {
-        var storage = LocalStorageManager.Instance;
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
         storage.SetBoolean(StorageKeys.IsSettingUp, false);
         storage.SetBoolean(StorageKeys.HasSetup, true);
         storage.Remove(StorageKeys.SetupStartedAtUtc);
@@ -113,7 +113,7 @@ public static class AgnosiaUtilities
 
     public static void MarkWorkProfileResetRequired()
     {
-        var storage = LocalStorageManager.Instance;
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
         storage.SetBoolean(StorageKeys.IsSettingUp, false);
         storage.SetBoolean(StorageKeys.HasSetup, true);
         storage.Remove(StorageKeys.SetupStartedAtUtc);
@@ -121,7 +121,7 @@ public static class AgnosiaUtilities
 
     public static void MarkWorkProfileSetupStarted()
     {
-        var storage = LocalStorageManager.Instance;
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
         storage.SetBoolean(StorageKeys.IsSettingUp, true);
         storage.SetBoolean(StorageKeys.HasSetup, false);
         storage.SetLong(StorageKeys.SetupStartedAtUtc, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
@@ -130,7 +130,7 @@ public static class AgnosiaUtilities
 
     public static void MarkManagedProfileProvisioned(Context context, Intent? intent)
     {
-        var storage = LocalStorageManager.Instance;
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         storage.SetBoolean(StorageKeys.IsSettingUp, true);
         storage.SetBoolean(StorageKeys.HasSetup, false);
@@ -151,7 +151,7 @@ public static class AgnosiaUtilities
 
     public static void ClearWorkProfileConfiguredState()
     {
-        var storage = LocalStorageManager.Instance;
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
         storage.SetBoolean(StorageKeys.IsSettingUp, false);
         storage.SetBoolean(StorageKeys.HasSetup, false);
         storage.SetBoolean(StorageKeys.OnboardingCompleted, false);
@@ -215,7 +215,7 @@ public static class AgnosiaUtilities
         var component = new ComponentName(
             context.PackageName,
             AndroidCommandContract.FileShuttleDocumentsProviderComponent);
-        var enabled = LocalStorageManager.Instance.GetBoolean(StorageKeys.CrossProfileFileShuttleEnabled);
+        var enabled = ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.CrossProfileFileShuttleEnabled);
         var state = enabled
             ? ComponentEnabledState.Enabled
             : ComponentEnabledState.Disabled;

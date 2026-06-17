@@ -8,6 +8,7 @@ namespace Agnosia.Android.Platform;
 
 public sealed class AndroidPlatformBridge : IPlatformBridge
 {
+    private readonly IAndroidActivityHostAccessor _activityHostAccessor;
     private readonly AndroidActivityCommandGateway _commandRunner;
     private readonly AndroidDashboardReader _dashboardReader;
     private readonly AndroidPermissionCoordinator _permissionCoordinator;
@@ -15,36 +16,35 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
     private readonly AndroidModuleCoordinator _moduleCoordinator;
     private readonly AndroidProvisioningCoordinator _provisioningCoordinator;
     private readonly AndroidSettingsCoordinator _settingsCoordinator;
-    private WeakReference<IAndroidActivityHost>? _activityHostReference;
 
-    public static AndroidPlatformBridge Instance { get; } = new();
-
-    private AndroidPlatformBridge()
+    internal AndroidPlatformBridge(
+        IAndroidActivityHostAccessor activityHostAccessor,
+        AndroidActivityCommandGateway commandRunner,
+        AndroidDashboardReader dashboardReader,
+        AndroidPermissionCoordinator permissionCoordinator,
+        AndroidAppCommandCoordinator appCommandCoordinator,
+        AndroidModuleCoordinator moduleCoordinator,
+        AndroidProvisioningCoordinator provisioningCoordinator,
+        AndroidSettingsCoordinator settingsCoordinator)
     {
-        _commandRunner = new AndroidActivityCommandGateway(GetActivityHost);
-        _provisioningCoordinator = new AndroidProvisioningCoordinator(_commandRunner, GetActivityHost);
-        _settingsCoordinator = new AndroidSettingsCoordinator(GetInitializedActivity);
-        _dashboardReader = new AndroidDashboardReader(_commandRunner);
-        _permissionCoordinator = new AndroidPermissionCoordinator(
-            _commandRunner,
-            _provisioningCoordinator.StartProvisioningAsync);
-        _appCommandCoordinator = new AndroidAppCommandCoordinator(
-            _commandRunner,
-            _permissionCoordinator);
-        _moduleCoordinator = new AndroidModuleCoordinator(
-            _commandRunner,
-            _permissionCoordinator);
+        _activityHostAccessor = activityHostAccessor;
+        _commandRunner = commandRunner;
+        _dashboardReader = dashboardReader;
+        _permissionCoordinator = permissionCoordinator;
+        _appCommandCoordinator = appCommandCoordinator;
+        _moduleCoordinator = moduleCoordinator;
+        _provisioningCoordinator = provisioningCoordinator;
+        _settingsCoordinator = settingsCoordinator;
     }
 
     public void AttachActivity(IAndroidActivityHost activityHost)
     {
-        AgnosiaRuntime.Initialize(activityHost.CurrentActivity);
-        _activityHostReference = new WeakReference<IAndroidActivityHost>(activityHost);
+        _activityHostAccessor.Attach(activityHost);
     }
 
     public void DetachActivity()
     {
-        _activityHostReference = null;
+        _activityHostAccessor.Detach();
     }
 
     public Task<DashboardSnapshot> LoadDashboardAsync(CancellationToken cancellationToken = default)
@@ -216,7 +216,7 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
     {
         try
         {
-            var activity = GetActivityHost().CurrentActivity;
+            var activity = _activityHostAccessor.GetRequiredHost().CurrentActivity;
             var appVersion = activity.PackageManager?.GetPackageInfo(
                 activity.PackageName!, PackageInfoFlags.MatchAll)?.VersionName ?? "?";
 
@@ -243,29 +243,4 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         _provisioningCoordinator.NotifyManagedProfileProvisioned(context, intent);
     }
 
-    private Activity GetInitializedActivity()
-    {
-        var activity = GetActivityHost().CurrentActivity;
-        AgnosiaRuntime.Initialize(activity);
-        return activity;
-    }
-
-    private bool TryGetActivityHost(out IAndroidActivityHost activityHost)
-    {
-        if (_activityHostReference?.TryGetTarget(out var target) == true)
-        {
-            activityHost = target;
-            return true;
-        }
-
-        activityHost = null!;
-        return false;
-    }
-
-    private IAndroidActivityHost GetActivityHost()
-    {
-        return TryGetActivityHost(out var activityHost)
-            ? activityHost
-            : throw new InvalidOperationException("Agnosia is not attached to an active Android activity.");
-    }
 }

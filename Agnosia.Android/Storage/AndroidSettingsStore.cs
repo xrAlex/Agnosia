@@ -29,7 +29,7 @@ public static class AndroidSettingsStore
     {
         AgnosiaRuntime.Initialize(activity);
 
-        var storage = LocalStorageManager.Instance;
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
         var loggingChanged = storage.GetBoolean(StorageKeys.LoggingEnabled, true) != settings.LoggingEnabled;
         var disableVpnBeforeLaunchChanged = storage.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch) !=
                                             settings.DisableVpnBeforeWorkLaunch;
@@ -89,7 +89,7 @@ public static class AndroidSettingsStore
 
         try
         {
-            var result = await SettingsManager.Instance.SyncBooleanSettingAsync(name, value, cancellationToken)
+            var result = await ServiceRegistry.GetRequiredService<SettingsManager>().SyncBooleanSettingAsync(name, value, cancellationToken)
                 .ConfigureAwait(false);
             if (!result.Succeeded)
                 Log.Warn(LogTag, $"Failed to synchronize {name} to the work profile: {result.Message}");

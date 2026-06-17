@@ -5,22 +5,12 @@ namespace Agnosia.Android.Storage;
 
 public sealed class SettingsManager
 {
-    private static SettingsManager? _instance;
-
     private readonly Context _context;
 
-    private SettingsManager(Context context)
+    public SettingsManager(Context context)
     {
         _context = context;
     }
-
-    public static void Initialize(Context context)
-    {
-        _instance = new SettingsManager(context);
-    }
-
-    public static SettingsManager Instance =>
-        _instance ?? throw new InvalidOperationException("SettingsManager has not been initialized yet.");
 
     public Task<OperationResult> SyncBooleanSettingAsync(
         string name,

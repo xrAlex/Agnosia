@@ -1,20 +1,36 @@
 using Agnosia.Models;
-using Agnosia.Platform;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Agnosia.Infrastructure;
 
 public static class ServiceRegistry
 {
+    private static IServiceProvider _services = CreateDefaultServices();
+
     public static event Action? PrimaryActivityResumed;
 
-    public static IPlatformBridge PlatformBridge { get; set; } = UnsupportedPlatformBridge.Instance;
+    public static IServiceProvider Services => _services;
 
-    public static AppThemeKind InitialTheme { get; set; } = AppThemeKind.Agnosia;
+    public static void ConfigureServices(IServiceProvider services)
+    {
+        _services = services ?? throw new ArgumentNullException(nameof(services));
+    }
 
-    public static bool SuppressPrimaryUiStartup { get; set; }
+    public static T GetRequiredService<T>()
+        where T : notnull
+    {
+        return _services.GetRequiredService<T>();
+    }
 
     public static void NotifyPrimaryActivityResumed()
     {
         PrimaryActivityResumed?.Invoke();
+    }
+
+    private static IServiceProvider CreateDefaultServices()
+    {
+        return new ServiceCollection()
+            .AddAgnosiaCore()
+            .BuildServiceProvider();
     }
 }

@@ -34,9 +34,7 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
     private static readonly Task<OperationResult> ProvisioningFailureTask =
         Task.FromResult(OperationResult.Failure(ProvisioningMessage));
 
-    public static UnsupportedPlatformBridge Instance { get; } = new();
-
-    private UnsupportedPlatformBridge()
+    public UnsupportedPlatformBridge()
     {
     }
 

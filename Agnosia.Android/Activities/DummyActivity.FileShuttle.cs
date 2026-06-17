@@ -30,7 +30,7 @@ public sealed partial class DummyActivity
             return;
         }
 
-        if (!LocalStorageManager.Instance.GetBoolean(StorageKeys.CrossProfileFileShuttleEnabled))
+        if (!ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.CrossProfileFileShuttleEnabled))
         {
             SendFileShuttleConnectResult(callback, null, "File Shuttle выключен в Agnosia.");
             Finish();
