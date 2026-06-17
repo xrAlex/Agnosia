@@ -239,9 +239,14 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
         if (IsProviderReady())
         {
             client = GetClient();
-            if (client.IsConnected) return true;
-            
-            Log.Warn(LogTag, "File Shuttle provider has no preconnected bridge; manual Files launches are best-effort on Android 14+ because background activity starts can be blocked.");
+            if (!client.IsConnected)
+            {
+                Log.Warn(LogTag, "File Shuttle provider has no preconnected bridge; manual Files launches are best-effort on Android 14+ because background activity starts can be blocked.");
+                client = null!;
+                return false;
+            }
+
+            return true;
         }
 
         client = null!;

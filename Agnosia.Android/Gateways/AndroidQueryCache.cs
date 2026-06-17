@@ -5,7 +5,7 @@ namespace Agnosia.Android.Gateways;
 internal sealed class AndroidQueryCache
 {
     private static readonly TimeSpan BooleanCacheTtl = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan OwnerCheckSuccessTtl = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan OwnerCheckSuccessTtl = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan AppInventoryQueryTtl = TimeSpan.FromSeconds(60);
 
     private readonly Func<DateTimeOffset> _getUtcNow;
