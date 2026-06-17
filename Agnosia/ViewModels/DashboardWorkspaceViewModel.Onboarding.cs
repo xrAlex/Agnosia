@@ -100,15 +100,20 @@ public partial class DashboardWorkspaceViewModel
             SetPreparingOnboardingPermissions(true);
             try
             {
-                await RefreshAsync();
                 if (!WorkProfileAvailable)
                 {
-                    SetPreparingOnboardingPermissions(false);
-                    return;
+                    await RefreshAsync();
+                    if (!WorkProfileAvailable)
+                    {
+                        SetPreparingOnboardingPermissions(false);
+                        return;
+                    }
                 }
 
-                await ReloadPermissionsAsync();
+                await EnsurePermissionsLoadedAsync();
                 OnboardingStep = OnboardingStep.Permissions;
+                await CompleteOnboardingIfReadyAsync();
+                return;
             }
             finally
             {

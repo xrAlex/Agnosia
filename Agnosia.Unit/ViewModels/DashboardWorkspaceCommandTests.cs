@@ -268,11 +268,13 @@ public sealed class DashboardWorkspaceCommandTests
 
         Assert.Equal(permissionLoadCountBeforeRequest, services.PermissionLoadCount);
 
+        var moduleLoadCountBeforeResume = services.ModuleLoadCount;
         viewModel.HandlePrimaryActivityResumed();
 
         await AsyncAssert.EventuallyAsync(
             () => services.PermissionLoadCount == permissionLoadCountBeforeRequest + 1,
             "Permission reload should happen after primary activity resume.");
+        Assert.Equal(moduleLoadCountBeforeResume, services.ModuleLoadCount);
     }
 
     [Fact]
@@ -314,6 +316,38 @@ public sealed class DashboardWorkspaceCommandTests
         Assert.True(viewModel.IsOnboardingVisible);
         Assert.True(viewModel.IsOnboardingFinalStep);
         Assert.False(viewModel.StatusIsError);
+    }
+
+    [Fact]
+    public async Task CheckOnboardingWorkProfileCommand_reuses_refresh_permissions_when_profile_becomes_available()
+    {
+        var services = new TestPlatformServices
+        {
+            OnboardingCompleted = true,
+            DashboardProfile = TestSnapshots.Dashboard(
+                hasSetup: false,
+                workProfileAvailable: false,
+                workProfileState: WorkProfileStateKind.NoWorkProfile),
+            Permissions = TestSnapshots.RequiredOnboardingPermissions(granted: false)
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+        await viewModel.EnsureInitializedAsync();
+
+        Assert.True(viewModel.IsOnboardingWorkProfileStep);
+        Assert.Equal(0, services.PermissionLoadCount);
+
+        services.DashboardProfile = TestSnapshots.Dashboard(
+            hasSetup: true,
+            workProfileAvailable: true,
+            workProfileState: WorkProfileStateKind.Available);
+
+        await viewModel.CheckOnboardingWorkProfileCommand.ExecuteAsync(null);
+
+        await AsyncAssert.EventuallyAsync(
+            () => viewModel.OnboardingStep == OnboardingStep.Permissions,
+            "Work-profile refresh should advance onboarding to permissions.");
+        Assert.Equal(1, services.PermissionLoadCount);
+        Assert.True(viewModel.IsOnboardingPermissionsStep);
     }
 
     // Проверяет завершение onboarding с финального шага.

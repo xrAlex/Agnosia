@@ -153,7 +153,7 @@ internal sealed class AndroidPermissionCoordinator(
                 .ConfigureAwait(false),
             PermissionKind.PersonalAllFiles => AndroidPermissionApi.OpenAllFilesAccessSettings(activity),
             PermissionKind.WorkAllFiles => await RequestAllFilesAccessAsync(cancellationToken).ConfigureAwait(false),
-            PermissionKind.Overlay => AndroidPermissionApi.OpenAppDetailsSettings(activity),
+            PermissionKind.Overlay => AndroidPermissionApi.OpenOverlaySettings(activity),
             _ => OperationResult.Failure("Неизвестное разрешение.")
         };
     }

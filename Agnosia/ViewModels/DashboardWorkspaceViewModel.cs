@@ -67,7 +67,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private bool _isApplyingSnapshot;
     private bool _isOperationInProgress;
     private bool _isPreparingOnboardingPermissions;
-    private bool _refreshPermissionsOnResume;
+    private PermissionKind? _pendingResumePermissionKind;
     private bool _inventoryLoadInProgress;
     private int _busyScopeCount;
     private int _inventoryLoadGeneration;
@@ -513,7 +513,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         if (value && OnboardingStep == OnboardingStep.WorkProfile)
         {
             SetPreparingOnboardingPermissions(true);
-            StartOnboardingMonitorIfNeeded();
         }
     }
 
@@ -596,11 +595,12 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     public void HandlePrimaryActivityResumed()
     {
         var handledPermissionResume = false;
-        if (_refreshPermissionsOnResume)
+        var pendingResumePermissionKind = _pendingResumePermissionKind;
+        if (pendingResumePermissionKind is not null)
         {
             handledPermissionResume = true;
-            _refreshPermissionsOnResume = false;
-            _ = RefreshPermissionsAfterResumeAsync();
+            _pendingResumePermissionKind = null;
+            _ = RefreshPermissionsAfterResumeAsync(pendingResumePermissionKind.Value);
         }
 
         if (handledPermissionResume || StatusIsError) return;
@@ -832,7 +832,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         SetPreparingOnboardingPermissions(true);
         try
         {
-            await ReloadPermissionsAsync();
+            await EnsurePermissionsLoadedAsync();
             OnboardingStep = OnboardingStep.Permissions;
         }
         finally
@@ -845,6 +845,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private async Task CheckOnboardingWorkProfileAsync()
     {
         await RefreshAsync();
+        await AdvanceOnboardingAsync(CancellationToken.None);
     }
 
     [RelayCommand]
@@ -857,7 +858,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             return;
         }
 
-        await ReloadPermissionsAsync();
+        await EnsurePermissionsLoadedAsync();
         OnboardingStep = OnboardingStep.Permissions;
     }
 
@@ -1161,7 +1162,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         try
         {
             var refreshOnResume = ShouldRefreshPermissionOnResume(kind);
-            if (refreshOnResume) _refreshPermissionsOnResume = true;
+            if (refreshOnResume) _pendingResumePermissionKind = kind;
 
             var result = await _permissionService.RequestPermissionAsync(kind);
             StatusIsError = !result.Succeeded;
@@ -1171,7 +1172,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
             if (!refreshOnResume || !result.Succeeded)
             {
-                if (!result.Succeeded) _refreshPermissionsOnResume = false;
+                if (!result.Succeeded) _pendingResumePermissionKind = null;
 
                 await ReloadPermissionsAsync();
                 await ReloadModulesAsync();
@@ -1461,6 +1462,11 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             or PermissionKind.Overlay;
     }
 
+    private bool ShouldReloadModulesAfterPermissionResume(PermissionKind kind)
+    {
+        return IsModuleDetailsOpen && !IsAppPermission(kind);
+    }
+
     private ValueTask InvokeOnUiThreadActionAsync(
         Action action,
         DispatcherPriority priority = default)
@@ -1565,6 +1571,13 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }
     }
 
+    private Task EnsurePermissionsLoadedAsync()
+    {
+        return _permissionItems.Count == 0
+            ? ReloadPermissionsAsync()
+            : Task.CompletedTask;
+    }
+
     private async Task ReloadModulesAsync()
     {
         var snapshots = await LoadModulesOnWorkerAsync().ConfigureAwait(false);
@@ -1644,7 +1657,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         NotifyOverviewMetricsChanged();
     }
 
-    private async Task RefreshPermissionsAfterResumeAsync()
+    private async Task RefreshPermissionsAfterResumeAsync(PermissionKind kind)
     {
         if (!_initialized
             || (!IsPermissionsWindowOpen && !IsOnboardingPermissionsStep && !IsModuleDetailsOpen))
@@ -1653,7 +1666,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         try
         {
             await ReloadPermissionsAsync();
-            await ReloadModulesAsync();
+            if (ShouldReloadModulesAfterPermissionResume(kind))
+                await ReloadModulesAsync();
+
             await CompleteOnboardingIfReadyAsync();
         }
         catch (Exception ex)

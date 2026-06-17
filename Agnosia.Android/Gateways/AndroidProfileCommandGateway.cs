@@ -38,16 +38,21 @@ public static class AndroidProfileCommandGateway
                 WorkProfileOwnerCheckKind.TargetUnavailable,
                 "crossProfileTarget=missing");
 
+        if (AndroidWorkProfileOwnerCheckCache.TryGetSuccess(out var cachedOwnerCheck))
+            return cachedOwnerCheck;
+
         using var pingCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         pingCancellation.CancelAfter(ProfilePingTimeout);
         try
         {
-        var result = await commandRunner.StartActivityForResultAsync(
+            var result = await commandRunner.StartActivityForResultAsync(
                 new Intent(AgnosiaActions.ProfilePing),
                 true,
                 pingCancellation.Token)
             .ConfigureAwait(false);
-            return InterpretProfilePingResult(result);
+            var ownerCheck = InterpretProfilePingResult(result);
+            AndroidWorkProfileOwnerCheckCache.StoreIfSuccess(ownerCheck);
+            return ownerCheck;
         }
         catch (System.OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -62,6 +67,7 @@ public static class AndroidProfileCommandGateway
         AndroidActivityCommandGateway commandRunner,
         CancellationToken cancellationToken)
     {
+        AndroidWorkProfileOwnerCheckCache.Clear();
         var activity = commandRunner.CurrentActivity;
         if (!AgnosiaUtilities.HasWorkProfileTarget(activity))
             return new WorkProfileOwnerCheckResult(
@@ -85,11 +91,13 @@ public static class AndroidProfileCommandGateway
                 return ownerCheck with { DiagnosticReason = "authKey=recovered; " + ownerCheck.DiagnosticReason };
 
             AuthenticationUtility.Reset();
+            AndroidWorkProfileOwnerCheckCache.Clear();
             return ownerCheck with { DiagnosticReason = "authKey=recoveryFailed; " + ownerCheck.DiagnosticReason };
         }
         catch (System.OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             AuthenticationUtility.Reset();
+            AndroidWorkProfileOwnerCheckCache.Clear();
             Log.Warn(LogTag, "Timed out waiting for work-profile authentication recovery.");
             return new WorkProfileOwnerCheckResult(
                 WorkProfileOwnerCheckKind.AuthenticationKeyMissing,
