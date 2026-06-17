@@ -43,6 +43,9 @@
         <Compile Include="Permissions\AppPermissionRiskCatalog.Rules.cs"/>
         <Compile Include="Permissions\AppPermissionRiskCatalog.Scoring.cs"/>
         <Compile Include="Permissions\AppPermissionRiskInput.cs"/>
+        <Compile Include="Gateways\AndroidQueryCache.cs"/>
+        <Compile Include="Gateways\WorkProfileOwnerCheckResult.cs"/>
+        <Compile Include="InternalsVisibleTo.cs"/>
         <Compile Include="Platform\AndroidPackageAccessPolicy.cs"/>
     </ItemGroup>
 

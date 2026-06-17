@@ -38,7 +38,7 @@ public static class AndroidProfileCommandGateway
                 WorkProfileOwnerCheckKind.TargetUnavailable,
                 "crossProfileTarget=missing");
 
-        if (AndroidWorkProfileOwnerCheckCache.TryGetSuccess(out var cachedOwnerCheck))
+        if (AndroidQueryCache.Shared.TryGetSuccessfulOwnerCheck(out var cachedOwnerCheck))
             return cachedOwnerCheck;
 
         using var pingCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -51,7 +51,7 @@ public static class AndroidProfileCommandGateway
                 pingCancellation.Token)
             .ConfigureAwait(false);
             var ownerCheck = InterpretProfilePingResult(result);
-            AndroidWorkProfileOwnerCheckCache.StoreIfSuccess(ownerCheck);
+            AndroidQueryCache.Shared.StoreOwnerCheckIfSuccessful(ownerCheck);
             return ownerCheck;
         }
         catch (System.OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -67,7 +67,7 @@ public static class AndroidProfileCommandGateway
         AndroidActivityCommandGateway commandRunner,
         CancellationToken cancellationToken)
     {
-        AndroidWorkProfileOwnerCheckCache.Clear();
+        AndroidQueryCache.Shared.ClearOwnerCheck();
         var activity = commandRunner.CurrentActivity;
         if (!AgnosiaUtilities.HasWorkProfileTarget(activity))
             return new WorkProfileOwnerCheckResult(
@@ -91,13 +91,13 @@ public static class AndroidProfileCommandGateway
                 return ownerCheck with { DiagnosticReason = "authKey=recovered; " + ownerCheck.DiagnosticReason };
 
             AuthenticationUtility.Reset();
-            AndroidWorkProfileOwnerCheckCache.Clear();
+            AndroidQueryCache.Shared.ClearOwnerCheck();
             return ownerCheck with { DiagnosticReason = "authKey=recoveryFailed; " + ownerCheck.DiagnosticReason };
         }
         catch (System.OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             AuthenticationUtility.Reset();
-            AndroidWorkProfileOwnerCheckCache.Clear();
+            AndroidQueryCache.Shared.ClearOwnerCheck();
             Log.Warn(LogTag, "Timed out waiting for work-profile authentication recovery.");
             return new WorkProfileOwnerCheckResult(
                 WorkProfileOwnerCheckKind.AuthenticationKeyMissing,
@@ -261,9 +261,9 @@ public static class AndroidProfileCommandGateway
             data.GetBooleanExtra(AndroidCommandContract.ResultUsageStatsAccess, false),
             data.GetBooleanExtra(AndroidCommandContract.ResultPackageInstallAccess, false),
             data.GetBooleanExtra(AndroidCommandContract.ResultAllFilesAccess, false));
-        AndroidProfileBooleanQueryCache.Set(AgnosiaActions.QueryUsageStatsAccess, result.UsageStatsAccess);
-        AndroidProfileBooleanQueryCache.Set(AgnosiaActions.QueryPackageInstallAccess, result.PackageInstallAccess);
-        AndroidProfileBooleanQueryCache.Set(AgnosiaActions.QueryAllFilesAccess, result.AllFilesAccess);
+        AndroidQueryCache.Shared.SetBoolean(AgnosiaActions.QueryUsageStatsAccess, result.UsageStatsAccess);
+        AndroidQueryCache.Shared.SetBoolean(AgnosiaActions.QueryPackageInstallAccess, result.PackageInstallAccess);
+        AndroidQueryCache.Shared.SetBoolean(AgnosiaActions.QueryAllFilesAccess, result.AllFilesAccess);
         return result;
     }
 
@@ -487,7 +487,7 @@ public static class AndroidProfileCommandGateway
         string resultExtra,
         CancellationToken cancellationToken)
     {
-        if (AndroidProfileBooleanQueryCache.TryGet(action, out var cachedValue)) return cachedValue;
+        if (AndroidQueryCache.Shared.TryGetBoolean(action, out var cachedValue)) return cachedValue;
 
         var result = await commandRunner.StartActivityForResultAsync(
                 new Intent(action),
@@ -496,7 +496,7 @@ public static class AndroidProfileCommandGateway
             .ConfigureAwait(false);
         var value = result.ResultCode == Result.Ok
                     && result.Data?.GetBooleanExtra(resultExtra, false) == true;
-        AndroidProfileBooleanQueryCache.Set(action, value);
+        AndroidQueryCache.Shared.SetBoolean(action, value);
         return value;
     }
 
@@ -708,19 +708,3 @@ internal sealed record WorkProfilePermissionQueryResult(
 {
     public static WorkProfilePermissionQueryResult Empty { get; } = new(false, false, false);
 }
-
-internal enum WorkProfileOwnerCheckKind
-{
-    AuthenticationKeyMissing,
-    TargetUnavailable,
-    Unreachable,
-    VersionUpdateFailed,
-    AppInstalledButNotOwner,
-    AppIsProfileOwner
-}
-
-internal sealed record WorkProfileOwnerCheckResult(
-    WorkProfileOwnerCheckKind Kind,
-    string DiagnosticReason,
-    long AppVersionCode = 0,
-    string? AppVersionName = null);

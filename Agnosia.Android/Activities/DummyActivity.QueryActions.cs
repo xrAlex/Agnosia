@@ -6,6 +6,7 @@ using Agnosia.Android.Api.Permissions;
 using Agnosia.Android.Api.Platform;
 using Agnosia.Android.Api.Serialization;
 using Agnosia.Android.Api.Storage;
+using Agnosia.Android.Gateways;
 using Android.App;
 using Android.App.Admin;
 using Android.Content;
@@ -20,9 +21,6 @@ public sealed partial class DummyActivity
 {
     private const int DefaultQueryAppsPageLimit = 100;
     private const int DefaultQueryAppsMaxJsonBytes = 512 * 1024;
-    private static readonly TimeSpan QueryAppsCacheTtl = TimeSpan.FromSeconds(60);
-    private static readonly Lock QueryAppsCacheSync = new();
-    private static readonly Dictionary<string, CachedAppInventoryQuery> QueryAppsCache = [];
 
     private async Task ActionQueryAppsAsync(CancellationToken cancellationToken)
     {
@@ -66,7 +64,7 @@ public sealed partial class DummyActivity
         }
     }
 
-    private async Task<CachedAppInventoryQuery> GetOrCreateCachedAppInventoryQueryAsync(
+    private async Task<AndroidQueryCache.AppInventoryQuery> GetOrCreateCachedAppInventoryQueryAsync(
         bool showAll,
         bool isRiskEngineEnabled,
         string? pageToken,
@@ -75,7 +73,11 @@ public sealed partial class DummyActivity
         ComponentName? admin,
         CancellationToken cancellationToken)
     {
-        if (TryGetCachedAppInventoryQuery(pageToken, showAll, isRiskEngineEnabled, out var cachedQuery))
+        if (AndroidQueryCache.Shared.TryGetAppInventoryQuery(
+                pageToken,
+                showAll,
+                isRiskEngineEnabled,
+                out var cachedQuery))
             return cachedQuery;
 
         var models = await Task.Run(() => AndroidAppInventoryApi.QueryInstalledApps(
@@ -90,19 +92,18 @@ public sealed partial class DummyActivity
         var interactionPackages = admin is not null && policyManager is not null
             ? AndroidPolicyApi.GetCrossProfilePackages(policyManager, admin)
             : [];
-        var query = new CachedAppInventoryQuery(
+        var query = new AndroidQueryCache.AppInventoryQuery(
             showAll,
             isRiskEngineEnabled,
-            DateTimeOffset.UtcNow,
             models,
             interactionPackages);
-        CacheAppInventoryQuery(pageToken, query);
+        AndroidQueryCache.Shared.StoreAppInventoryQuery(pageToken, query);
         return query;
     }
 
     private static Intent CreateQueryAppsResult(
         Intent request,
-        CachedAppInventoryQuery inventory)
+        AndroidQueryCache.AppInventoryQuery inventory)
     {
         var result = new Intent();
         if (!IsPagedQuery(request))
@@ -142,58 +143,9 @@ public sealed partial class DummyActivity
                || request.HasExtra(AndroidCommandContract.ExtraQueryMaxJsonBytes);
     }
 
-    private static bool TryGetCachedAppInventoryQuery(
-        string? pageToken,
-        bool showAll,
-        bool isRiskEngineEnabled,
-        out CachedAppInventoryQuery query)
-    {
-        query = null!;
-        if (string.IsNullOrWhiteSpace(pageToken)) return false;
-
-        var now = DateTimeOffset.UtcNow;
-        lock (QueryAppsCacheSync)
-        {
-            PruneExpiredAppInventoryQueries(now);
-            if (!QueryAppsCache.TryGetValue(pageToken, out var cached)
-                || cached.ShowAll != showAll
-                || cached.RiskEngineEnabled != isRiskEngineEnabled)
-            {
-                QueryAppsCache.Remove(pageToken);
-                return false;
-            }
-
-            query = cached;
-            return true;
-        }
-    }
-
-    private static void CacheAppInventoryQuery(
-        string? pageToken,
-        CachedAppInventoryQuery query)
-    {
-        if (string.IsNullOrWhiteSpace(pageToken)) return;
-
-        lock (QueryAppsCacheSync)
-        {
-            PruneExpiredAppInventoryQueries(DateTimeOffset.UtcNow);
-            QueryAppsCache[pageToken] = query;
-        }
-    }
-
-    private static void PruneExpiredAppInventoryQueries(DateTimeOffset now)
-    {
-        foreach (var (key, query) in QueryAppsCache.ToArray())
-            if (now - query.CachedAt > QueryAppsCacheTtl)
-                QueryAppsCache.Remove(key);
-    }
-
     private static void ClearAppInventoryQueryCache()
     {
-        lock (QueryAppsCacheSync)
-        {
-            QueryAppsCache.Clear();
-        }
+        AndroidQueryCache.Shared.ClearAppInventoryQueries();
     }
 
     private async Task ActionQueryAppIconAsync(CancellationToken cancellationToken)
@@ -379,11 +331,4 @@ public sealed partial class DummyActivity
         else
             FinishWithError(result.Message);
     }
-
-    private sealed record CachedAppInventoryQuery(
-        bool ShowAll,
-        bool RiskEngineEnabled,
-        DateTimeOffset CachedAt,
-        IReadOnlyList<AppServiceModel> Apps,
-        string[] InteractionPackages);
 }

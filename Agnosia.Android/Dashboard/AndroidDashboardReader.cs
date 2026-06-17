@@ -46,12 +46,12 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
                 LogTag,
                 $"Work profile Agnosia version mismatch; starting update. ownerCheck={ownerCheck.DiagnosticReason}; workVersionCode={ownerCheck.AppVersionCode}; localVersionCode={localState.LocalVersionCode}.");
             statusMessage = "UpdatingWorkProfile";
-            AndroidWorkProfileOwnerCheckCache.Clear();
+            AndroidQueryCache.Shared.ClearOwnerCheck();
             var updateResult = await AndroidProfileCommandGateway.UpdateAgnosiaInWorkProfileAsync(
                     commandRunner,
                     cancellationToken)
                 .ConfigureAwait(false);
-            AndroidWorkProfileOwnerCheckCache.Clear();
+            AndroidQueryCache.Shared.ClearOwnerCheck();
             ownerCheck = updateResult.Succeeded
                 ? await ReadWorkProfileOwnerCheckAsync(profileDiagnostics, cancellationToken).ConfigureAwait(false)
                 : new WorkProfileOwnerCheckResult(
