@@ -267,6 +267,20 @@ public sealed class AndroidManifestContractTests
         Assert.Contains("StorageKeys.VpnControlPrepared", requestVpnControl, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Overlay_permission_request_opens_app_details()
+    {
+        var source = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Permissions", "AndroidPermissionApi.cs"));
+        var openOverlaySettings = Regex.Match(
+            source,
+            @"public static OperationResult OpenOverlaySettings[\s\S]*?\n    private static OperationResult OpenAllFilesAccessFallbackSettings",
+            RegexOptions.Singleline).Value;
+
+        Assert.Contains("return OpenAppDetailsSettings(activity);", openOverlaySettings, StringComparison.Ordinal);
+        Assert.DoesNotContain("Settings.ActionManageOverlayPermission", openOverlaySettings, StringComparison.Ordinal);
+    }
+
     private static XDocument ReadManifest()
     {
         return XDocument.Load(RepositoryPaths.Get("Agnosia.Android", "Properties", "AndroidManifest.xml"));

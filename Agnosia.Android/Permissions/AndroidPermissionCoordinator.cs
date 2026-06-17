@@ -28,106 +28,35 @@ internal sealed class AndroidPermissionCoordinator(
 
         return
         [
-            new PermissionSnapshot(
-                PermissionKind.WorkProfile,
-                "Рабочий профиль",
-                "Основной профиль",
-                "Нужен для изоляции клонированных приложений, скрытия пакетов и управления политиками рабочего пространства",
-                hasSetup && workProfileAvailable,
-                !hasSetup || !workProfileAvailable,
-                "Подключен",
-                hasSetup ? "Проверить профиль" : "Создать профиль"),
-            new PermissionSnapshot(
+            PermissionCatalog.CreateWorkProfileSnapshot(hasSetup, workProfileAvailable),
+            PermissionCatalog.CreateSnapshot(
                 PermissionKind.Notifications,
-                "Уведомления",
-                "Основной профиль",
-                "Необходимо для отображения фоновой активности приложения",
                 notificationPermissionGranted,
-                OperatingSystem.IsAndroidVersionAtLeast(33),
-                "Получено",
-                "Разрешить"),
-            new PermissionSnapshot(
+                OperatingSystem.IsAndroidVersionAtLeast(33)),
+            PermissionCatalog.CreateSnapshot(
                 PermissionKind.VpnControl,
-                "Временное управление VPN",
-                "Основной профиль",
-                "Позволяет приложению управлять VPN-соединениями",
                 vpnControlPrepared,
-                true,
-                "Получено",
-                "Разрешить"),
-            new PermissionSnapshot(
+                true),
+            PermissionCatalog.CreateSnapshot(
                 PermissionKind.PackageInstall,
-                "Установка APK",
-                "Рабочий профиль",
-                "Нужна для копирования пользовательских приложений в рабочий профиль через установщик APK",
                 workPermissions.PackageInstallAccess,
-                workProfileAvailable,
-                "Получено",
-                "Открыть настройки"),
-            new PermissionSnapshot(
+                workProfileAvailable),
+            PermissionCatalog.CreateSnapshot(
                 PermissionKind.PersonalAllFiles,
-                "Доступ к файлам",
-                "Основной профиль",
-                "Нужно для File Shuttle, чтобы Agnosia могла отдавать выбранные файлы личного профиля через DocumentsUI",
                 personalAllFilesGranted,
-                true,
-                "Получено",
-                "Открыть настройки"),
-            new PermissionSnapshot(
+                true),
+            PermissionCatalog.CreateSnapshot(
                 PermissionKind.WorkAllFiles,
-                "Доступ к файлам",
-                "Рабочий профиль",
-                "Нужно для File Shuttle, чтобы Agnosia могла отдавать выбранные файлы рабочего профиля через DocumentsUI",
                 workPermissions.AllFilesAccess,
-                workProfileAvailable,
-                "Получено",
-                "Открыть настройки"),
-            new PermissionSnapshot(
+                workProfileAvailable),
+            PermissionCatalog.CreateSnapshot(
                 PermissionKind.UsageStats,
-                "Доступ к истории использования",
-                "Рабочий профиль",
-                """
-                Позволяет Agnosia понять, когда вы перестали использовать приложение, и заморозить его
-
-                1. Нажмите Разрешить
-                2. Пролистайте вниз
-                3. Активируйте 'Доступ к истории использования'
-
-                Если на этом шаге Android не выдал разрешение, тогда:
-
-                4. Вернитесь назад
-                5. В верхней правой части экрана нажмите на ⋮
-                6. Выберите 'Разрешить доступ к настройкам'
-                7. Пролистайте вниз
-                8. Активируйте 'Доступ к истории использования'
-                """,
                 workPermissions.UsageStatsAccess,
-                workProfileAvailable,
-                "Получено",
-                "Открыть настройки"),
-            new PermissionSnapshot(
+                workProfileAvailable),
+            PermissionCatalog.CreateSnapshot(
                 PermissionKind.Overlay,
-                "Поверх окон",
-                "Основной профиль",
-                """
-                Необходимо для показа overlay-окна, которое позволяет запускать VPN после заморозки приложения в рабочем профиле.
-
-                1. Нажмите Разрешить
-                2. Пролистайте вниз
-                3. Активируйте 'Поверх других приложений'
-                
-                Если на этом шаге Android не выдал разрешение, тогда:
-                
-                4. Вернитесь назад
-                5. В верхней правой части экрана нажмите на ⋮
-                6. Выберите 'Разрешить доступ к настройкам'
-                7. Пролистайте вниз
-                8. Активируйте 'Поверх других приложений'
-                """,
                 overlayPermissionGranted,
-                true,
-                "Получено",
-                "Открыть настройки")
+                true)
         ];
     }
 
@@ -144,8 +73,7 @@ internal sealed class AndroidPermissionCoordinator(
             PermissionKind.UsageStats => await RequestUsageStatsAccessAsync(cancellationToken).ConfigureAwait(false),
             PermissionKind.Notifications => AndroidPermissionApi.RequestNotificationPermission(activity),
             PermissionKind.VpnControl => await RequestVpnControlAsync(cancellationToken).ConfigureAwait(false),
-            PermissionKind.PackageInstall => await RequestPackageInstallAccessAsync(cancellationToken)
-                .ConfigureAwait(false),
+            PermissionKind.PackageInstall => await RequestPackageInstallAccessAsync(cancellationToken).ConfigureAwait(false),
             PermissionKind.PersonalAllFiles => AndroidPermissionApi.OpenAllFilesAccessSettings(activity),
             PermissionKind.WorkAllFiles => await RequestAllFilesAccessAsync(cancellationToken).ConfigureAwait(false),
             PermissionKind.Overlay => AndroidPermissionApi.OpenOverlaySettings(activity),

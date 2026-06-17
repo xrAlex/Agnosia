@@ -278,36 +278,6 @@ internal sealed partial class AndroidModuleCoordinator(
             true);
     }
 
-    private static AgnosiaModuleRequirement[] GetVpnGuardActivationRequirements(
-        IReadOnlyList<PermissionSnapshot> permissions)
-    {
-        var workProfile = GetPermission(permissions, PermissionKind.WorkProfile);
-        var vpnControl = GetPermission(permissions, PermissionKind.VpnControl);
-        var overlay = GetPermission(permissions, PermissionKind.Overlay);
-
-        return
-        [
-            new AgnosiaModuleRequirement(
-                "Рабочий профиль",
-                "Нужен рабочий профиль, чтобы Agnosia могла запускать и снова скрывать изолированные приложения.",
-                workProfile.IsGranted,
-                PermissionKind.WorkProfile,
-                workProfile.RequestLabel),
-            new AgnosiaModuleRequirement(
-                "Управление VPN",
-                "Позволяет Agnosia отключить активный VPN перед запуском рабочего приложения.",
-                vpnControl.IsGranted,
-                PermissionKind.VpnControl,
-                vpnControl.RequestLabel),
-            new AgnosiaModuleRequirement(
-                "Overlay window",
-                "Позволяет Agnosia запускать выбранный VPN клиент после заморозки приложения.",
-                overlay.IsGranted,
-                PermissionKind.Overlay,
-                overlay.RequestLabel)
-        ];
-    }
-
     private static bool IsFileShuttleProviderEnabled(Context context)
     {
         if (context.PackageManager is not { } packageManager || string.IsNullOrWhiteSpace(context.PackageName))

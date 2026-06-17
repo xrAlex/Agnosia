@@ -7,47 +7,39 @@ internal sealed partial class AndroidModuleCoordinator
     private static AgnosiaModuleRequirement[] GetActivationRequirements(
         IReadOnlyList<PermissionSnapshot> permissions)
     {
-        var workProfile = GetPermission(permissions, PermissionKind.WorkProfile);
-        var personalAllFiles = GetPermission(permissions, PermissionKind.PersonalAllFiles);
-        var workAllFiles = GetPermission(permissions, PermissionKind.WorkAllFiles);
-
         return
         [
-            new AgnosiaModuleRequirement(
-                "Рабочий профиль",
-                "Нужен второй профиль, чтобы File Shuttle мог открыть файловый мост между personal и work.",
-                workProfile.IsGranted,
-                PermissionKind.WorkProfile,
-                workProfile.RequestLabel),
-            new AgnosiaModuleRequirement(
-                "Доступ к файлам в личном профиле",
-                "Позволяет Agnosia отдавать выбранные файлы личного профиля через DocumentsUI.",
-                personalAllFiles.IsGranted,
-                PermissionKind.PersonalAllFiles,
-                personalAllFiles.RequestLabel),
-            new AgnosiaModuleRequirement(
-                "Доступ к файлам в рабочем профиле",
-                "Позволяет Agnosia отдавать выбранные файлы рабочего профиля через DocumentsUI.",
-                workAllFiles.IsGranted,
-                PermissionKind.WorkAllFiles,
-                workAllFiles.RequestLabel)
+            GetPermissionRequirement(permissions, PermissionKind.WorkProfile),
+            GetPermissionRequirement(permissions, PermissionKind.PersonalAllFiles),
+            GetPermissionRequirement(permissions, PermissionKind.WorkAllFiles)
         ];
     }
 
     private static AgnosiaModuleRequirement[] GetLockdownActivationRequirements(
         IReadOnlyList<PermissionSnapshot> permissions)
     {
-        var workProfile = GetPermission(permissions, PermissionKind.WorkProfile);
-
         return
         [
-            new AgnosiaModuleRequirement(
-                "Рабочий профиль",
-                "Нужен рабочий profile owner, чтобы Agnosia могла включить always-on VPN lockdown.",
-                workProfile.IsGranted,
-                PermissionKind.WorkProfile,
-                workProfile.RequestLabel)
+            GetPermissionRequirement(permissions, PermissionKind.WorkProfile)
         ];
+    }
+
+    private static AgnosiaModuleRequirement[] GetVpnGuardActivationRequirements(
+        IReadOnlyList<PermissionSnapshot> permissions)
+    {
+        return
+        [
+            GetPermissionRequirement(permissions, PermissionKind.WorkProfile),
+            GetPermissionRequirement(permissions, PermissionKind.VpnControl),
+            GetPermissionRequirement(permissions, PermissionKind.Overlay)
+        ];
+    }
+
+    private static AgnosiaModuleRequirement GetPermissionRequirement(
+        IReadOnlyList<PermissionSnapshot> permissions,
+        PermissionKind kind)
+    {
+        return AgnosiaModuleRequirementFactory.FromPermission(GetPermission(permissions, kind));
     }
 
     private static PermissionSnapshot GetPermission(
@@ -55,15 +47,7 @@ internal sealed partial class AndroidModuleCoordinator
         PermissionKind kind)
     {
         return permissions.FirstOrDefault(permission => permission.Kind == kind)
-               ?? new PermissionSnapshot(
-                   kind,
-                   kind.ToString(),
-                   string.Empty,
-                   string.Empty,
-                   false,
-                   false,
-                   "Получено",
-                   "Открыть");
+               ?? PermissionCatalog.CreateSnapshot(kind, false, false);
     }
 
     private static AgnosiaModuleState ResolveFileShuttleState(

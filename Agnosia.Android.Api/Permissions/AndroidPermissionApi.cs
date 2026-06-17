@@ -137,18 +137,6 @@ public static class AndroidPermissionApi
             if (string.IsNullOrWhiteSpace(packageName))
                 return OperationResult.Failure("Не удалось определить имя пакета приложения.");
 
-            var intent = new Intent(Settings.ActionManageOverlayPermission);
-            intent.SetData(Uri.FromParts("package", packageName, null));
-
-            if (AndroidIntentApi.TryStartActivity(
-                    activity,
-                    intent,
-                    LogTag,
-                    "Android не смог открыть настройки разрешения поверх окон.",
-                    out _))
-                return OperationResult.Success(
-                    "Включите разрешение «Поверх других приложений» для Agnosia.");
-
             return OpenAppDetailsSettings(activity);
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
