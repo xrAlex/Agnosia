@@ -179,25 +179,19 @@ public sealed class AndroidManifestContractTests
             StringComparison.Ordinal);
     }
 
-    // Проверяет, что VpnService component живет в Android-проекте и сохраняет Android VPN contract.
+    // Проверяет, что transient VPN Guard не объявляет отдельный VpnService endpoint и не opt-out-ит пакет из always-on.
     [Fact]
-    public void Transient_vpn_disconnect_service_contract_is_declared_in_android_project()
+    public void Transient_vpn_disconnect_uses_lockdown_vpn_service_endpoint()
     {
         var source = File.ReadAllText(
             RepositoryPaths.Get("Agnosia.Android", "Vpn", "TransientVpnDisconnectService.cs"));
 
-        Assert.Contains("[Service(", source, StringComparison.Ordinal);
-        Assert.Contains("Name = \"com.agnosia.app.TransientVpnDisconnectService\"", source,
-            StringComparison.Ordinal);
-        Assert.Contains("Permission = \"android.permission.BIND_VPN_SERVICE\"", source, StringComparison.Ordinal);
-        Assert.Contains("ForegroundServiceType = ForegroundService.TypeSystemExempted", source,
-            StringComparison.Ordinal);
-        Assert.DoesNotContain("[IntentFilter([\"android.net.VpnService\"])]", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("[Service(", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(": VpnService", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("[IntentFilter([ActionVpnService])]", source, StringComparison.Ordinal);
         Assert.DoesNotContain("android.net.VpnService.SUPPORTS_ALWAYS_ON", source,
             StringComparison.Ordinal);
-        Assert.Contains("ActionVpnService = \"android.net.VpnService\"", source, StringComparison.Ordinal);
-        Assert.Contains("base.OnBind(intent)", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("public override IBinder? OnBind(Intent? intent)\n    {\n        return null;", source,
+        Assert.Contains("LockdownVpnService.DisconnectPreparedVpnAsync(context, cancellationToken)", source,
             StringComparison.Ordinal);
         Assert.False(File.Exists(
             RepositoryPaths.Get("Agnosia.Android.Api", "Vpn", "TransientVpnDisconnectService.cs")));
@@ -219,6 +213,11 @@ public sealed class AndroidManifestContractTests
             StringComparison.Ordinal);
         Assert.Contains("ActionVpnService = \"android.net.VpnService\"", source, StringComparison.Ordinal);
         Assert.Contains("[IntentFilter([ActionVpnService])]", source, StringComparison.Ordinal);
+        Assert.Contains("ActionDisconnect = \"agnosia.action.DISCONNECT_ACTIVE_VPN\"", source,
+            StringComparison.Ordinal);
+        Assert.Contains("public static Task<OperationResult> DisconnectPreparedVpnAsync", source,
+            StringComparison.Ordinal);
+        Assert.Contains("SetSession(\"Agnosia VPN Override\")", source, StringComparison.Ordinal);
         Assert.Contains("ActionVpnManagerEvent = \"android.net.action.VPN_MANAGER_EVENT\"", source,
             StringComparison.Ordinal);
         Assert.Contains("CategoryEventAlwaysOnStateChanged = \"android.net.category.EVENT_ALWAYS_ON_STATE_CHANGED\"",
@@ -265,6 +264,37 @@ public sealed class AndroidManifestContractTests
         Assert.DoesNotContain("IsVpnPrepared", localStateReader, StringComparison.Ordinal);
         Assert.Contains("VpnService.Prepare(activity)", requestVpnControl, StringComparison.Ordinal);
         Assert.Contains("StorageKeys.VpnControlPrepared", requestVpnControl, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Vpn_guard_runtime_prepare_paths_update_permission_snapshot_flag()
+    {
+        var coordinatorSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Vpn", "TransientVpnDisconnectCoordinator.cs"));
+        var proxySource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Activities", "ProxyActivity.cs"));
+        var serviceSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Vpn", "LockdownVpnService.cs"));
+
+        Assert.Contains("StorageKeys.VpnControlPrepared", coordinatorSource, StringComparison.Ordinal);
+        Assert.Contains("SetBoolean(StorageKeys.VpnControlPrepared, true)", coordinatorSource,
+            StringComparison.Ordinal);
+        Assert.Contains("SetBoolean(StorageKeys.VpnControlPrepared, false)", coordinatorSource,
+            StringComparison.Ordinal);
+
+        Assert.Contains("StorageKeys.VpnControlPrepared", proxySource, StringComparison.Ordinal);
+        Assert.Contains("SetBoolean(StorageKeys.VpnControlPrepared, true)", proxySource,
+            StringComparison.Ordinal);
+        Assert.Contains("SetBoolean(StorageKeys.VpnControlPrepared, false)", proxySource,
+            StringComparison.Ordinal);
+
+        Assert.Contains("StorageKeys.VpnControlPrepared", serviceSource, StringComparison.Ordinal);
+        Assert.Contains("SetVpnControlPrepared(true)", serviceSource,
+            StringComparison.Ordinal);
+        Assert.Contains("SetVpnControlPrepared(false)", serviceSource,
+            StringComparison.Ordinal);
+        Assert.Contains(".SetBoolean(StorageKeys.VpnControlPrepared, prepared)", serviceSource,
+            StringComparison.Ordinal);
     }
 
     [Fact]

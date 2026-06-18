@@ -75,10 +75,14 @@ public sealed class ProxyActivity : Activity
 
             if (resultCode != Result.Ok)
             {
+                ServiceRegistry.GetRequiredService<LocalStorageManager>()
+                    .SetBoolean(StorageKeys.VpnControlPrepared, false);
                 ShowErrorAndFinish("Android не выдал Agnosia временное управление VPN.");
                 return;
             }
 
+            ServiceRegistry.GetRequiredService<LocalStorageManager>()
+                .SetBoolean(StorageKeys.VpnControlPrepared, true);
             RunInBackground(
                 () => DisconnectVpnAndForwardAsync(vpnRequest),
                 "Agnosia не смог отключить VPN перед запуском ярлыка.");
@@ -323,12 +327,16 @@ public sealed class ProxyActivity : Activity
             ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, false);
             if (prepareIntent is not null)
             {
+                ServiceRegistry.GetRequiredService<LocalStorageManager>()
+                    .SetBoolean(StorageKeys.VpnControlPrepared, false);
                 Log.Debug(LogTag, "Shortcut launch: Android confirmation is required for VPN control.");
                 _pendingVpnDisconnectRequest = request;
                 RunOnUiThread(() => StartActivityForResult(prepareIntent, PrepareVpnRequestCode));
                 return;
             }
 
+            ServiceRegistry.GetRequiredService<LocalStorageManager>()
+                .SetBoolean(StorageKeys.VpnControlPrepared, true);
             await DisconnectVpnAndForwardAsync(request).ConfigureAwait(false);
         }
         catch (Exception exception)
