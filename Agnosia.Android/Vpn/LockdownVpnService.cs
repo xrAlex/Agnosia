@@ -62,18 +62,15 @@ public sealed class LockdownVpnService : VpnService
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
-            SetVpnControlPrepared(false);
             Log.Warn(TransientLogTag, $"Failed to verify VPN control before transient disconnect: {exception}");
             return Task.FromResult(OperationResult.Failure("Android не смог проверить доступ Agnosia к VPN."));
         }
 
         if (prepareIntent is not null)
         {
-            SetVpnControlPrepared(false);
             return Task.FromResult(OperationResult.Failure("Android еще не выдал Agnosia управление VPN."));
         }
 
-        SetVpnControlPrepared(true);
         return StartTransientDisconnectServiceAsync(context, cancellationToken);
     }
 
@@ -202,7 +199,6 @@ public sealed class LockdownVpnService : VpnService
         base.OnRevoke();
         if (_transientDisconnectActive)
         {
-            SetVpnControlPrepared(false);
             CompleteTransient(OperationResult.Failure("Android отозвал временное VPN-подключение Agnosia."));
             StopSelf();
             return;
@@ -402,11 +398,5 @@ public sealed class LockdownVpnService : VpnService
             _transientPendingCompletion?.TrySetCanceled();
             _transientPendingCompletion = null;
         }
-    }
-
-    private static void SetVpnControlPrepared(bool prepared)
-    {
-        ServiceRegistry.GetRequiredService<LocalStorageManager>()
-            .SetBoolean(StorageKeys.VpnControlPrepared, prepared);
     }
 }

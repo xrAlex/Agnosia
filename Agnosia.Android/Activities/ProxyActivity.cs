@@ -75,14 +75,10 @@ public sealed class ProxyActivity : Activity
 
             if (resultCode != Result.Ok)
             {
-                ServiceRegistry.GetRequiredService<LocalStorageManager>()
-                    .SetBoolean(StorageKeys.VpnControlPrepared, false);
                 ShowErrorAndFinish("Android не выдал Agnosia временное управление VPN.");
                 return;
             }
 
-            ServiceRegistry.GetRequiredService<LocalStorageManager>()
-                .SetBoolean(StorageKeys.VpnControlPrepared, true);
             RunInBackground(
                 () => DisconnectVpnAndForwardAsync(vpnRequest),
                 "Agnosia не смог отключить VPN перед запуском ярлыка.");
@@ -315,28 +311,25 @@ public sealed class ProxyActivity : Activity
                 return;
             }
 
-            if (!AndroidVpnApi.IsVpnActive(this))
-            {
-                ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, false);
-                Log.Debug(LogTag, "Shortcut launch: no active VPN detected.");
-                ForwardLaunchToManagedProfile(request);
-                return;
-            }
-
+            Log.Info(LogTag, $"VPN Guard is enabled for shortcut launch. package={request.PackageName}.");
             var prepareIntent = VpnService.Prepare(this);
             ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, false);
             if (prepareIntent is not null)
             {
-                ServiceRegistry.GetRequiredService<LocalStorageManager>()
-                    .SetBoolean(StorageKeys.VpnControlPrepared, false);
-                Log.Debug(LogTag, "Shortcut launch: Android confirmation is required for VPN control.");
+                Log.Info(LogTag, "Shortcut launch: Android confirmation is required for VPN control.");
                 _pendingVpnDisconnectRequest = request;
                 RunOnUiThread(() => StartActivityForResult(prepareIntent, PrepareVpnRequestCode));
                 return;
             }
 
-            ServiceRegistry.GetRequiredService<LocalStorageManager>()
-                .SetBoolean(StorageKeys.VpnControlPrepared, true);
+            if (!AndroidVpnApi.IsVpnActive(this))
+            {
+                ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, false);
+                Log.Info(LogTag, "Shortcut launch: no active VPN detected.");
+                ForwardLaunchToManagedProfile(request);
+                return;
+            }
+
             await DisconnectVpnAndForwardAsync(request).ConfigureAwait(false);
         }
         catch (Exception exception)

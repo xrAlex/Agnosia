@@ -239,7 +239,7 @@ public sealed class AndroidManifestContractTests
     }
 
     [Fact]
-    public void Vpn_permission_snapshot_does_not_call_prepare()
+    public void Vpn_permission_snapshot_checks_prepare_without_persisted_flag()
     {
         var source = File.ReadAllText(
             RepositoryPaths.Get("Agnosia.Android", "Permissions", "AndroidPermissionCoordinator.cs"));
@@ -247,28 +247,30 @@ public sealed class AndroidManifestContractTests
             source,
             @"public async Task<IReadOnlyList<PermissionSnapshot>> LoadPermissionsAsync[\s\S]*?\n    public async Task<OperationResult> RequestPermissionAsync",
             RegexOptions.Singleline).Value;
+        var localStateReader = Regex.Match(
+            source,
+            @"private static Task<PermissionLocalState> ReadPermissionLocalStateAsync[\s\S]*?\n    public OperationResult OpenAppDetailsSettings",
+            RegexOptions.Singleline).Value;
         var requestVpnControl = Regex.Match(
             source,
             @"private async Task<OperationResult> RequestVpnControlAsync[\s\S]*?\n    private Task<OperationResult> RequestPackageInstallAccessAsync",
             RegexOptions.Singleline).Value;
-        var localStateReader = Regex.Match(
-            source,
-            @"private static Task<PermissionLocalState> ReadPermissionLocalStateAsync[\s\S]*?\n    private sealed record PermissionLocalState",
-            RegexOptions.Singleline).Value;
 
         Assert.Contains("ReadPermissionLocalStateAsync", loadPermissions, StringComparison.Ordinal);
-        Assert.Contains("StorageKeys.VpnControlPrepared", localStateReader, StringComparison.Ordinal);
-        Assert.DoesNotContain("VpnService.Prepare", loadPermissions, StringComparison.Ordinal);
-        Assert.DoesNotContain("VpnService.Prepare", localStateReader, StringComparison.Ordinal);
-        Assert.DoesNotContain("IsVpnPrepared", loadPermissions, StringComparison.Ordinal);
-        Assert.DoesNotContain("IsVpnPrepared", localStateReader, StringComparison.Ordinal);
+        Assert.Contains("PermissionKind.VpnControl", loadPermissions, StringComparison.Ordinal);
+        Assert.Contains("vpnControlGranted", loadPermissions, StringComparison.Ordinal);
+        Assert.Contains("VpnService.Prepare(activity)", localStateReader, StringComparison.Ordinal);
+        Assert.DoesNotContain("VpnControlPrepared", source, StringComparison.Ordinal);
         Assert.Contains("VpnService.Prepare(activity)", requestVpnControl, StringComparison.Ordinal);
-        Assert.Contains("StorageKeys.VpnControlPrepared", requestVpnControl, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Vpn_guard_runtime_prepare_paths_update_permission_snapshot_flag()
+    public void Vpn_guard_does_not_use_persisted_vpn_permission_flag()
     {
+        var storageKeysSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Storage", "StorageKeys.cs"));
+        var requirementsSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Modules", "AndroidModuleCoordinator.Requirements.cs"));
         var coordinatorSource = File.ReadAllText(
             RepositoryPaths.Get("Agnosia.Android", "Vpn", "TransientVpnDisconnectCoordinator.cs"));
         var proxySource = File.ReadAllText(
@@ -276,25 +278,39 @@ public sealed class AndroidManifestContractTests
         var serviceSource = File.ReadAllText(
             RepositoryPaths.Get("Agnosia.Android", "Vpn", "LockdownVpnService.cs"));
 
-        Assert.Contains("StorageKeys.VpnControlPrepared", coordinatorSource, StringComparison.Ordinal);
-        Assert.Contains("SetBoolean(StorageKeys.VpnControlPrepared, true)", coordinatorSource,
-            StringComparison.Ordinal);
-        Assert.Contains("SetBoolean(StorageKeys.VpnControlPrepared, false)", coordinatorSource,
-            StringComparison.Ordinal);
+        Assert.DoesNotContain("VpnControlPrepared", storageKeysSource, StringComparison.Ordinal);
+        Assert.Contains("PermissionKind.VpnControl", requirementsSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("VpnControlPrepared", coordinatorSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("VpnControlPrepared", proxySource, StringComparison.Ordinal);
+        Assert.DoesNotContain("VpnControlPrepared", serviceSource, StringComparison.Ordinal);
+    }
 
-        Assert.Contains("StorageKeys.VpnControlPrepared", proxySource, StringComparison.Ordinal);
-        Assert.Contains("SetBoolean(StorageKeys.VpnControlPrepared, true)", proxySource,
-            StringComparison.Ordinal);
-        Assert.Contains("SetBoolean(StorageKeys.VpnControlPrepared, false)", proxySource,
-            StringComparison.Ordinal);
+    [Fact]
+    public void Vpn_guard_launch_paths_prepare_before_active_vpn_detection()
+    {
+        var coordinatorSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Commands", "AndroidAppCommandCoordinator.cs"));
+        var inAppLaunch = Regex.Match(
+            coordinatorSource,
+            @"private async Task<OperationResult> EnsurePersonalVpnDisabledBeforeWorkLaunchAsync[\s\S]*?\n    private async Task<ShortcutPreparationResult> PreparePinnedShortcutInParentAsync",
+            RegexOptions.Singleline).Value;
+        var proxySource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Activities", "ProxyActivity.cs"));
+        var shortcutLaunch = Regex.Match(
+            proxySource,
+            @"private async Task PrepareVpnIfNeededAndForwardAsync[\s\S]*?\n    private async Task DisconnectVpnAndForwardAsync",
+            RegexOptions.Singleline).Value;
 
-        Assert.Contains("StorageKeys.VpnControlPrepared", serviceSource, StringComparison.Ordinal);
-        Assert.Contains("SetVpnControlPrepared(true)", serviceSource,
-            StringComparison.Ordinal);
-        Assert.Contains("SetVpnControlPrepared(false)", serviceSource,
-            StringComparison.Ordinal);
-        Assert.Contains(".SetBoolean(StorageKeys.VpnControlPrepared, prepared)", serviceSource,
-            StringComparison.Ordinal);
+        Assert.InRange(
+            inAppLaunch.IndexOf("VpnService.Prepare(activity)", StringComparison.Ordinal),
+            0,
+            inAppLaunch.IndexOf("IsVpnActiveAsync(activity", StringComparison.Ordinal) - 1);
+        Assert.InRange(
+            shortcutLaunch.IndexOf("VpnService.Prepare(this)", StringComparison.Ordinal),
+            0,
+            shortcutLaunch.IndexOf("AndroidVpnApi.IsVpnActive(this)", StringComparison.Ordinal) - 1);
+        Assert.Contains("VPN Guard is enabled for parent launch", inAppLaunch, StringComparison.Ordinal);
+        Assert.Contains("VPN Guard is enabled for shortcut launch", shortcutLaunch, StringComparison.Ordinal);
     }
 
     [Fact]

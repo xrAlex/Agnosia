@@ -14,7 +14,7 @@ internal sealed class AndroidPermissionCoordinator(
         var activity = commandRunner.CurrentActivity;
         AgnosiaRuntime.Initialize(activity);
 
-        var (profileDiagnostics, hasSetup, notificationPermissionGranted, vpnControlPrepared, personalAllFilesGranted, overlayPermissionGranted) = await ReadPermissionLocalStateAsync(activity, cancellationToken).ConfigureAwait(false);
+        var (profileDiagnostics, hasSetup, notificationPermissionGranted, vpnControlGranted, personalAllFilesGranted, overlayPermissionGranted) = await ReadPermissionLocalStateAsync(activity, cancellationToken).ConfigureAwait(false);
         var hasWorkProfileTarget = profileDiagnostics.CommandTargetResolvable;
         var workProfileAvailable = hasWorkProfileTarget
                                    && profileDiagnostics.AvailableToCrossProfileApps
@@ -35,7 +35,7 @@ internal sealed class AndroidPermissionCoordinator(
                 OperatingSystem.IsAndroidVersionAtLeast(33)),
             PermissionCatalog.CreateSnapshot(
                 PermissionKind.VpnControl,
-                vpnControlPrepared,
+                vpnControlGranted,
                 true),
             PermissionCatalog.CreateSnapshot(
                 PermissionKind.PackageInstall,
@@ -112,7 +112,6 @@ internal sealed class AndroidPermissionCoordinator(
     private async Task<OperationResult> RequestVpnControlAsync(CancellationToken cancellationToken)
     {
         var activity = commandRunner.CurrentActivity;
-        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
         Intent? prepareIntent;
         try
         {
@@ -121,13 +120,11 @@ internal sealed class AndroidPermissionCoordinator(
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
             Log.Warn("AgnosiaPermissions", $"Failed to prepare VPN permission request: {exception}");
-            storage.SetBoolean(StorageKeys.VpnControlPrepared, false);
             return OperationResult.Failure("Android не смог открыть запрос доступа к VPN.");
         }
 
         if (prepareIntent is null)
         {
-            storage.SetBoolean(StorageKeys.VpnControlPrepared, true);
             return OperationResult.Success("VPN-доступ уже подготовлен.");
         }
 
@@ -136,12 +133,10 @@ internal sealed class AndroidPermissionCoordinator(
         var error = AndroidActivityResultApi.ExtractError(result);
         if (!string.IsNullOrWhiteSpace(error))
         {
-            storage.SetBoolean(StorageKeys.VpnControlPrepared, false);
             return OperationResult.Failure(error);
         }
 
         var prepared = result.ResultCode == Result.Ok;
-        storage.SetBoolean(StorageKeys.VpnControlPrepared, prepared);
 
         return prepared
             ? OperationResult.Success("VPN-доступ подготовлен.")
@@ -193,10 +188,23 @@ internal sealed class AndroidPermissionCoordinator(
                 profileDiagnostics,
                 hasSetup,
                 AndroidPermissionApi.HasNotificationPermission(activity),
-                ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.VpnControlPrepared),
+                IsVpnControlGranted(activity),
                 AndroidPermissionApi.HasAllFilesAccess(activity),
                 AndroidPermissionApi.HasOverlayPermission(activity));
         }, cancellationToken);
+    }
+
+    private static bool IsVpnControlGranted(Activity activity)
+    {
+        try
+        {
+            return VpnService.Prepare(activity) is null;
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn("AgnosiaPermissions", $"Failed to read VPN permission state: {exception}");
+            return false;
+        }
     }
 
     public OperationResult OpenAppDetailsSettings()
@@ -210,7 +218,7 @@ internal sealed class AndroidPermissionCoordinator(
         WorkProfileDiagnostics ProfileDiagnostics,
         bool HasSetup,
         bool NotificationPermissionGranted,
-        bool VpnControlPrepared,
+        bool VpnControlGranted,
         bool PersonalAllFilesGranted,
         bool OverlayPermissionGranted);
 }

@@ -1,6 +1,7 @@
 using Agnosia.Models;
 using Android.Content;
 using Android.Content.PM;
+using Android.Net;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Commands;
@@ -304,14 +305,35 @@ internal sealed class AndroidAppCommandCoordinator(
         if (!storage.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch))
         {
             storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
-            Log.Debug(LogTag, "Disable-VPN-before-launch is disabled in settings.");
+            Log.Info(LogTag, "Disable-VPN-before-launch is disabled in settings.");
             return new OperationResult(true, string.Empty);
+        }
+
+        Log.Info(LogTag, "VPN Guard is enabled for parent launch.");
+        Intent? prepareIntent;
+        try
+        {
+            prepareIntent = VpnService.Prepare(activity);
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn(LogTag, $"Failed to prepare VPN permission request before parent launch: {exception}");
+            return OperationResult.Failure("Android не смог открыть запрос доступа к VPN.");
+        }
+
+        if (prepareIntent is not null)
+        {
+            var prepareResult = await commandRunner.StartExternalActivityForResultAsync(prepareIntent, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (prepareResult.ResultCode != Result.Ok)
+                return OperationResult.Failure("Android не выдал Agnosia временное управление VPN.");
         }
 
         if (!await IsVpnActiveAsync(activity, cancellationToken).ConfigureAwait(false))
         {
             storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
-            Log.Debug(LogTag, "No active VPN detected, continuing without the transient VPN service.");
+            Log.Info(LogTag, "No active VPN detected, continuing without the transient VPN service.");
             return new OperationResult(true, string.Empty);
         }
 
