@@ -310,6 +310,13 @@ internal sealed class AndroidAppCommandCoordinator(
         }
 
         Log.Info(LogTag, "VPN Guard is enabled for parent launch.");
+        if (!await IsVpnActiveAsync(activity, cancellationToken).ConfigureAwait(false))
+        {
+            storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
+            Log.Info(LogTag, "No active VPN detected, continuing without the transient VPN service.");
+            return new OperationResult(true, string.Empty);
+        }
+
         Intent? prepareIntent;
         try
         {
@@ -330,14 +337,17 @@ internal sealed class AndroidAppCommandCoordinator(
                 return OperationResult.Failure("Android не выдал Agnosia временное управление VPN.");
         }
 
+        activity = commandRunner.CurrentActivity;
+        storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
         if (!await IsVpnActiveAsync(activity, cancellationToken).ConfigureAwait(false))
         {
-            storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
-            Log.Info(LogTag, "No active VPN detected, continuing without the transient VPN service.");
-            return new OperationResult(true, string.Empty);
+            storage.SetBoolean(StorageKeys.HaveActiveVpnSession, true);
+            commandRunner.ShowVpnGuardOverlay();
+            Log.Debug(LogTag, "Active VPN was cleared while preparing VPN control.");
+            return OperationResult.Success("VPN отключен.");
         }
 
-        storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
+        var vpnBaseline = AndroidVpnApi.GetVisibleVpnNetworkHandles(activity);
         Log.Debug(LogTag, "Active VPN detected, starting transient VpnService.");
         var disconnectResult = await TransientVpnDisconnectCoordinator.DisconnectActiveVpnAsync(
             commandRunner,
@@ -349,7 +359,7 @@ internal sealed class AndroidAppCommandCoordinator(
         }
 
         activity = commandRunner.CurrentActivity;
-        if (await IsVpnActiveAsync(activity, cancellationToken).ConfigureAwait(false))
+        if (await IsVpnActiveAsync(activity, vpnBaseline, cancellationToken).ConfigureAwait(false))
             return OperationResult.Failure(
                 "VPN все еще активен в личном профиле. Сторонний клиент мог сразу подключиться снова.");
 
@@ -439,6 +449,18 @@ internal sealed class AndroidAppCommandCoordinator(
         {
             cancellationToken.ThrowIfCancellationRequested();
             return AndroidVpnApi.IsVpnActive(context);
+        }, cancellationToken);
+    }
+
+    private static Task<bool> IsVpnActiveAsync(
+        Context context,
+        IReadOnlySet<long> ignoredVpnNetworkHandles,
+        CancellationToken cancellationToken)
+    {
+        return Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return AndroidVpnApi.IsVpnActive(context, ignoredVpnNetworkHandles);
         }, cancellationToken);
     }
 

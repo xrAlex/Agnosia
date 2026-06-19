@@ -1,4 +1,5 @@
 using Agnosia.Models;
+using Agnosia.Android.Storage;
 using Android.Content;
 using Android.Content.PM;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
@@ -89,7 +90,7 @@ public static class AndroidVpnAutomationApi
             return Task.FromResult(OperationResult.Success(string.Empty));
         }
 
-        if (AndroidVpnApi.IsVpnActive(context))
+        if (AndroidVpnApi.IsVpnActive(context) && !ShouldIgnoreSingleVisibleLockdownVpn(context, trigger))
         {
             storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
             Log.Debug(LogTag, $"VPN is already active; skipping enable-after-freeze command. trigger={trigger}.");
@@ -119,6 +120,25 @@ public static class AndroidVpnAutomationApi
             Log.Warn(LogTag, $"{message} error={exception.Message}");
             return Task.FromResult(OperationResult.Failure(message));
         }
+    }
+
+    private static bool ShouldIgnoreSingleVisibleLockdownVpn(Context context, string trigger)
+    {
+        if (!LockdownSettingsStore.IsEnabled()) return false;
+
+        var visibleVpnCount = AndroidVpnApi.GetVisibleVpnNetworkHandles(context).Count;
+        if (visibleVpnCount == 1)
+        {
+            Log.Debug(
+                LogTag,
+                $"Ignoring single visible VPN while Lockdown is enabled. trigger={trigger}, visibleVpnCount={visibleVpnCount}.");
+            return true;
+        }
+
+        Log.Debug(
+            LogTag,
+            $"Lockdown is enabled, but visible VPN count does not match the single-Lockdown restore case. trigger={trigger}, visibleVpnCount={visibleVpnCount}.");
+        return false;
     }
 
     private static OperationResult StartClient(

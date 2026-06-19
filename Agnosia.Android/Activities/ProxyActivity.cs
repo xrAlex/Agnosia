@@ -35,6 +35,7 @@ public sealed class ProxyActivity : Activity
     private bool _rehideStarted;
     private HiddenAppLaunchRequest? _request;
     private HiddenAppLaunchRequest? _pendingVpnDisconnectRequest;
+    private IReadOnlySet<long> _vpnDisconnectBaseline = new HashSet<long>();
     private AndroidAppLaunchResult? _launchResult;
 
     protected override void OnCreate(Bundle? savedInstanceState)
@@ -54,6 +55,7 @@ public sealed class ProxyActivity : Activity
         _rehideStarted = false;
         _request = null;
         _pendingVpnDisconnectRequest = null;
+        _vpnDisconnectBaseline = new HashSet<long>();
         _launchResult = null;
         TryStartProxyFlow();
     }
@@ -312,21 +314,20 @@ public sealed class ProxyActivity : Activity
             }
 
             Log.Info(LogTag, $"VPN Guard is enabled for shortcut launch. package={request.PackageName}.");
-            var prepareIntent = VpnService.Prepare(this);
-            ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, false);
-            if (prepareIntent is not null)
-            {
-                Log.Info(LogTag, "Shortcut launch: Android confirmation is required for VPN control.");
-                _pendingVpnDisconnectRequest = request;
-                RunOnUiThread(() => StartActivityForResult(prepareIntent, PrepareVpnRequestCode));
-                return;
-            }
-
             if (!AndroidVpnApi.IsVpnActive(this))
             {
                 ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, false);
                 Log.Info(LogTag, "Shortcut launch: no active VPN detected.");
                 ForwardLaunchToManagedProfile(request);
+                return;
+            }
+
+            var prepareIntent = VpnService.Prepare(this);
+            if (prepareIntent is not null)
+            {
+                Log.Info(LogTag, "Shortcut launch: Android confirmation is required for VPN control.");
+                _pendingVpnDisconnectRequest = request;
+                RunOnUiThread(() => StartActivityForResult(prepareIntent, PrepareVpnRequestCode));
                 return;
             }
 
@@ -341,6 +342,18 @@ public sealed class ProxyActivity : Activity
 
     private async Task DisconnectVpnAndForwardAsync(HiddenAppLaunchRequest request)
     {
+        ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, false);
+        if (!AndroidVpnApi.IsVpnActive(this))
+        {
+            ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, true);
+            OverlayVpnService.ShowOverlay(this);
+            _pendingVpnDisconnectRequest = null;
+            Log.Debug(LogTag, "Shortcut launch: active VPN was cleared while preparing VPN control.");
+            ForwardLaunchToManagedProfile(request);
+            return;
+        }
+
+        _vpnDisconnectBaseline = AndroidVpnApi.GetVisibleVpnNetworkHandles(this);
         var result = await TransientVpnDisconnectService.DisconnectPreparedVpnAsync(this).ConfigureAwait(false);
         if (!result.Succeeded)
         {
@@ -348,7 +361,7 @@ public sealed class ProxyActivity : Activity
             return;
         }
 
-        if (AndroidVpnApi.IsVpnActive(this))
+        if (AndroidVpnApi.IsVpnActive(this, _vpnDisconnectBaseline))
         {
             ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, false);
             ShowErrorAndFinish("VPN все еще активен в личном профиле. Сторонний клиент мог сразу подключиться снова.");

@@ -286,7 +286,7 @@ public sealed class AndroidManifestContractTests
     }
 
     [Fact]
-    public void Vpn_guard_launch_paths_prepare_before_active_vpn_detection()
+    public void Vpn_guard_launch_paths_detect_active_vpn_before_prepare_can_disconnect_it()
     {
         var coordinatorSource = File.ReadAllText(
             RepositoryPaths.Get("Agnosia.Android", "Commands", "AndroidAppCommandCoordinator.cs"));
@@ -302,15 +302,76 @@ public sealed class AndroidManifestContractTests
             RegexOptions.Singleline).Value;
 
         Assert.InRange(
-            inAppLaunch.IndexOf("VpnService.Prepare(activity)", StringComparison.Ordinal),
+            inAppLaunch.IndexOf("IsVpnActiveAsync(activity", StringComparison.Ordinal),
             0,
-            inAppLaunch.IndexOf("IsVpnActiveAsync(activity", StringComparison.Ordinal) - 1);
+            inAppLaunch.IndexOf("VpnService.Prepare(activity)", StringComparison.Ordinal) - 1);
         Assert.InRange(
-            shortcutLaunch.IndexOf("VpnService.Prepare(this)", StringComparison.Ordinal),
+            shortcutLaunch.IndexOf("AndroidVpnApi.IsVpnActive(this)", StringComparison.Ordinal),
             0,
-            shortcutLaunch.IndexOf("AndroidVpnApi.IsVpnActive(this)", StringComparison.Ordinal) - 1);
+            shortcutLaunch.IndexOf("VpnService.Prepare(this)", StringComparison.Ordinal) - 1);
         Assert.Contains("VPN Guard is enabled for parent launch", inAppLaunch, StringComparison.Ordinal);
         Assert.Contains("VPN Guard is enabled for shortcut launch", shortcutLaunch, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Vpn_active_detection_checks_all_visible_networks_not_only_default_network()
+    {
+        var source = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Vpn", "AndroidVpnApi.cs"));
+
+        Assert.Contains("connectivityManager.GetAllNetworks()", source, StringComparison.Ordinal);
+        Assert.Contains("VPN detected via network scan", source, StringComparison.Ordinal);
+        Assert.Contains("No VPN detected on visible networks", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("No VPN detected on the current default network.", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Vpn_active_detection_ignores_agnosia_lockdown_and_transient_sessions()
+    {
+        var source = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Vpn", "AndroidVpnApi.cs"));
+
+        Assert.Contains("Agnosia Lockdown", source, StringComparison.Ordinal);
+        Assert.Contains("Agnosia VPN Override", source, StringComparison.Ordinal);
+        Assert.Contains("IsAgnosiaVpnSession", source, StringComparison.Ordinal);
+        Assert.Contains("PerUserUidRange", source, StringComparison.Ordinal);
+        Assert.Contains("context.ApplicationInfo?.Uid", source, StringComparison.Ordinal);
+        Assert.Contains("capabilities.OwnerUid", source, StringComparison.Ordinal);
+        Assert.Contains("IsSameAppId", source, StringComparison.Ordinal);
+        Assert.Contains("TransportInfo?.ToString()", source, StringComparison.Ordinal);
+        Assert.Contains("Ignoring Agnosia VPN network", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Vpn_guard_verification_ignores_vpn_networks_that_existed_before_transient_disconnect()
+    {
+        var apiSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Vpn", "AndroidVpnApi.cs"));
+        var coordinatorSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Commands", "AndroidAppCommandCoordinator.cs"));
+        var proxySource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Activities", "ProxyActivity.cs"));
+
+        Assert.Contains("GetVisibleVpnNetworkHandles", apiSource, StringComparison.Ordinal);
+        Assert.Contains("ignoredVpnNetworkHandles", apiSource, StringComparison.Ordinal);
+        Assert.Contains("network.NetworkHandle", apiSource, StringComparison.Ordinal);
+        Assert.Contains("vpnBaseline", coordinatorSource, StringComparison.Ordinal);
+        Assert.Contains("IsVpnActiveAsync(activity, vpnBaseline", coordinatorSource, StringComparison.Ordinal);
+        Assert.Contains("_vpnDisconnectBaseline", proxySource, StringComparison.Ordinal);
+        Assert.Contains("AndroidVpnApi.IsVpnActive(this, _vpnDisconnectBaseline", proxySource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Vpn_restore_after_freeze_does_not_treat_single_lockdown_vpn_as_restored_client()
+    {
+        var source = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Vpn", "AndroidVpnAutomationApi.cs"));
+
+        Assert.Contains("ShouldIgnoreSingleVisibleLockdownVpn", source, StringComparison.Ordinal);
+        Assert.Contains("LockdownSettingsStore.IsEnabled()", source, StringComparison.Ordinal);
+        Assert.Contains("AndroidVpnApi.GetVisibleVpnNetworkHandles(context).Count", source, StringComparison.Ordinal);
+        Assert.Contains("visibleVpnCount == 1", source, StringComparison.Ordinal);
+        Assert.Contains("Ignoring single visible VPN while Lockdown is enabled", source, StringComparison.Ordinal);
     }
 
     [Fact]
