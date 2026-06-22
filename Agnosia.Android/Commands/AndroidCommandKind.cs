@@ -1,0 +1,37 @@
+namespace Agnosia.Android.Commands;
+
+internal enum AndroidCommandKind
+{
+    ProfilePing,
+    RecoverAuthentication,
+    QueryApps,
+    QueryAppIcon,
+    QueryAppIcons,
+    QueryLogs,
+    QueryCrossProfilePackages,
+    QueryPermissions,
+    QueryUsageStatsAccess,
+    QueryPackageInstallAccess,
+    QueryAllFilesAccess,
+    RequestUsageStatsAccess,
+    RequestPackageInstallAccess,
+    RequestAllFilesAccess,
+    InstallPackage,
+    UninstallPackage,
+    FreezePackage,
+    UnfreezePackage,
+    RevokeRuntimePermissions,
+    SetLockdownEnabled,
+    SetLockdownInternetAccess,
+    PrepareHiddenShortcut,
+    CreateHiddenShortcut,
+    UnfreezeAndLaunch,
+    LaunchAppProxy,
+    SetCrossProfileInteraction,
+    StartFileShuttleParentToWork,
+    StartFileShuttleWorkToParent,
+    SynchronizePreference,
+    WorkAppFrozen,
+    FinalizeProvision,
+    PackageInstallerCallback
+}

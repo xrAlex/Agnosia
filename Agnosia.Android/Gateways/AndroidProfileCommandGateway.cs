@@ -1,3 +1,5 @@
+using System.Text.Json;
+using Agnosia.Android.Commands.Handlers;
 using Agnosia.Models;
 using Android.Content;
 using Android.Content.PM;
@@ -190,53 +192,87 @@ public static class AndroidProfileCommandGateway
 
         if (loadableWorkPackageNames.Length <= 0) return icons;
         
-        var intent = new Intent(AgnosiaActions.QueryAppIcons);
-        intent.PutExtra(AndroidCommandContract.ExtraPackages, loadableWorkPackageNames);
-        var data = await AndroidProfileCommandTransport.StartForDataAsync(
-                commandRunner,
-                intent,
-                "Failed to query work app icons through the profile activity command.",
-                cancellationToken)
+        var request = new QueryAppIconsRequest(loadableWorkPackageNames);
+        var envelope = new AndroidCommandEnvelope(
+            Guid.NewGuid(),
+            AndroidCommandKind.QueryAppIcons,
+            AndroidCommandTargetProfile.Work,
+            AndroidCommandInteractivity.Silent,
+            AndroidCommandPriority.Background,
+            TimeSpan.FromSeconds(30),
+            JsonSerializer.Serialize(request));
+        var result = await ServiceRegistry.GetRequiredService<AndroidCommandCenter>()
+            .ExecuteAsync(envelope, cancellationToken)
             .ConfigureAwait(false);
-        var bundle = data?.GetBundleExtra(AndroidCommandContract.ResultIconsBundle);
-        if (bundle is null) return icons;
-        
+        if (!result.Succeeded)
+        {
+            Log.Warn(LogTag, $"Failed to query work app icons through command center. diagnostics={result.Diagnostics}");
+            return icons;
+        }
+
+        var response = DeserializeCommandPayload<QueryAppIconsResponse>(
+                result.PayloadJson,
+                "work app icons")
+            ?? new QueryAppIconsResponse(new Dictionary<string, byte[]?>(StringComparer.Ordinal));
+        if (response.Icons is null) return icons;
+
         foreach (var packageName in loadableWorkPackageNames)
-            icons[new AppItemKey(ProfileKind.Work, packageName)] = bundle.GetByteArray(packageName);
+            if (response.Icons.TryGetValue(packageName, out var iconPng))
+                icons[new AppItemKey(ProfileKind.Work, packageName)] = iconPng;
 
         return icons;
+    }
+
+    private static T? DeserializeCommandPayload<T>(string? payloadJson, string description)
+    {
+        if (string.IsNullOrWhiteSpace(payloadJson)) return default;
+
+        try
+        {
+            return JsonSerializer.Deserialize<T>(payloadJson);
+        }
+        catch (JsonException exception)
+        {
+            Log.Warn(LogTag, $"Failed to deserialize {description}: {exception.Message}");
+            return default;
+        }
     }
 
     internal static async Task<IReadOnlyList<string>> QueryWorkCrossProfilePackagesAsync(
         AndroidActivityCommandGateway commandRunner,
         CancellationToken cancellationToken)
     {
-        var data = await AndroidProfileCommandTransport.StartForDataAsync(
-                commandRunner,
-                new Intent(AgnosiaActions.QueryCrossProfilePackages),
-                "Failed to query work cross-profile packages through the profile activity command.",
+        var result = await ExecuteSilentWorkRefreshCommandAsync(
+                AndroidCommandKind.QueryCrossProfilePackages,
                 cancellationToken)
             .ConfigureAwait(false);
-        if (data is null) return [];
+        if (!result.Succeeded)
+        {
+            Log.Warn(LogTag, $"Failed to query work cross-profile packages through command center. diagnostics={result.Diagnostics}");
+            return [];
+        }
 
         return AndroidPackageAccessPolicy.ApplyRequiredCrossProfilePackages(
-            data.GetStringArrayExtra(AndroidCommandContract.ResultInteractionPackages) ?? []);
+            ReadStringArrayPayload(result.PayloadJson, AndroidCommandContract.ResultInteractionPackages));
     }
 
     internal static async Task<IReadOnlyList<AppLogEntry>> QueryWorkLogsAsync(
         AndroidActivityCommandGateway commandRunner,
         CancellationToken cancellationToken)
     {
-        var data = await AndroidProfileCommandTransport.StartForDataAsync(
-                commandRunner,
-                new Intent(AgnosiaActions.QueryLogs),
-                "Failed to query work logs through the profile activity command.",
+        var result = await ExecuteSilentWorkRefreshCommandAsync(
+                AndroidCommandKind.QueryLogs,
                 cancellationToken)
             .ConfigureAwait(false);
-        if (data is null) return [];
+        if (!result.Succeeded)
+        {
+            Log.Warn(LogTag, $"Failed to query work logs through command center. diagnostics={result.Diagnostics}");
+            return [];
+        }
 
+        var logsJson = ReadPayloadString(result.PayloadJson, AndroidCommandContract.ResultLogsJson);
         return AndroidProfileCommandJson.DeserializeAppLogEntriesResult(
-            data.GetStringExtra(AndroidCommandContract.ResultLogsJson),
+            logsJson,
             "work logs") ?? [];
     }
 
@@ -244,32 +280,39 @@ public static class AndroidProfileCommandGateway
         AndroidActivityCommandGateway commandRunner,
         CancellationToken cancellationToken)
     {
-        var data = await AndroidProfileCommandTransport.StartForDataAsync(
-                commandRunner,
-                new Intent(AgnosiaActions.QueryPermissions),
-                "Failed to query work permissions through the profile activity command.",
+        var commandResult = await ExecuteSilentWorkRefreshCommandAsync(
+                AndroidCommandKind.QueryPermissions,
                 cancellationToken)
             .ConfigureAwait(false);
-        if (data is null) return WorkProfilePermissionQueryResult.Empty;
+        if (!commandResult.Succeeded)
+        {
+            Log.Warn(LogTag, $"Failed to query work permissions through command center. diagnostics={commandResult.Diagnostics}");
+            return WorkProfilePermissionQueryResult.Empty;
+        }
 
-        var result = new WorkProfilePermissionQueryResult(
-            data.GetBooleanExtra(AndroidCommandContract.ResultUsageStatsAccess, false),
-            data.GetBooleanExtra(AndroidCommandContract.ResultPackageInstallAccess, false),
-            data.GetBooleanExtra(AndroidCommandContract.ResultAllFilesAccess, false));
-        AndroidQueryCache.Shared.SetBoolean(AgnosiaActions.QueryUsageStatsAccess, result.UsageStatsAccess);
-        AndroidQueryCache.Shared.SetBoolean(AgnosiaActions.QueryPackageInstallAccess, result.PackageInstallAccess);
-        AndroidQueryCache.Shared.SetBoolean(AgnosiaActions.QueryAllFilesAccess, result.AllFilesAccess);
-        return result;
+        if (!TryReadPayloadBoolean(commandResult.PayloadJson, AndroidCommandContract.ResultUsageStatsAccess, out var usageStatsAccess)
+            || !TryReadPayloadBoolean(commandResult.PayloadJson, AndroidCommandContract.ResultPackageInstallAccess, out var packageInstallAccess)
+            || !TryReadPayloadBoolean(commandResult.PayloadJson, AndroidCommandContract.ResultAllFilesAccess, out var allFilesAccess))
+            return WorkProfilePermissionQueryResult.Empty;
+
+        var permissions = new WorkProfilePermissionQueryResult(
+            usageStatsAccess,
+            packageInstallAccess,
+            allFilesAccess);
+        AndroidQueryCache.Shared.SetBoolean(AgnosiaActions.QueryUsageStatsAccess, permissions.UsageStatsAccess);
+        AndroidQueryCache.Shared.SetBoolean(AgnosiaActions.QueryPackageInstallAccess, permissions.PackageInstallAccess);
+        AndroidQueryCache.Shared.SetBoolean(AgnosiaActions.QueryAllFilesAccess, permissions.AllFilesAccess);
+        return permissions;
     }
 
     internal static Task<bool> QueryWorkUsageStatsAccessAsync(
         AndroidActivityCommandGateway commandRunner,
         CancellationToken cancellationToken)
     {
-        return QueryWorkBooleanAsync(
+        return QueryWorkPermissionBooleanAsync(
             commandRunner,
             AgnosiaActions.QueryUsageStatsAccess,
-            AndroidCommandContract.ResultUsageStatsAccess,
+            permissions => permissions.UsageStatsAccess,
             cancellationToken);
     }
 
@@ -277,10 +320,10 @@ public static class AndroidProfileCommandGateway
         AndroidActivityCommandGateway commandRunner,
         CancellationToken cancellationToken)
     {
-        return QueryWorkBooleanAsync(
+        return QueryWorkPermissionBooleanAsync(
             commandRunner,
             AgnosiaActions.QueryPackageInstallAccess,
-            AndroidCommandContract.ResultPackageInstallAccess,
+            permissions => permissions.PackageInstallAccess,
             cancellationToken);
     }
 
@@ -288,10 +331,10 @@ public static class AndroidProfileCommandGateway
         AndroidActivityCommandGateway commandRunner,
         CancellationToken cancellationToken)
     {
-        return QueryWorkBooleanAsync(
+        return QueryWorkPermissionBooleanAsync(
             commandRunner,
             AgnosiaActions.QueryAllFilesAccess,
-            AndroidCommandContract.ResultAllFilesAccess,
+            permissions => permissions.AllFilesAccess,
             cancellationToken);
     }
 
@@ -476,23 +519,111 @@ public static class AndroidProfileCommandGateway
             "Android не смог передать событие заморозки приложения в основной профиль.");
     }
 
-    private static async Task<bool> QueryWorkBooleanAsync(
+    private static async Task<bool> QueryWorkPermissionBooleanAsync(
         AndroidActivityCommandGateway commandRunner,
         string action,
-        string resultExtra,
+        Func<WorkProfilePermissionQueryResult, bool> selectValue,
         CancellationToken cancellationToken)
     {
         if (AndroidQueryCache.Shared.TryGetBoolean(action, out var cachedValue)) return cachedValue;
 
-        var result = await commandRunner.StartActivityForResultAsync(
-                new Intent(action),
-                true,
-                cancellationToken)
+        var permissions = await QueryWorkPermissionsAsync(commandRunner, cancellationToken)
             .ConfigureAwait(false);
-        var value = result.ResultCode == Result.Ok
-                    && result.Data?.GetBooleanExtra(resultExtra, false) == true;
+        var value = selectValue(permissions);
         AndroidQueryCache.Shared.SetBoolean(action, value);
         return value;
+    }
+
+    private static Task<AndroidCommandResultEnvelope> ExecuteSilentWorkRefreshCommandAsync(
+        AndroidCommandKind kind,
+        CancellationToken cancellationToken)
+    {
+        var envelope = new AndroidCommandEnvelope(
+            Guid.NewGuid(),
+            kind,
+            AndroidCommandTargetProfile.Work,
+            AndroidCommandInteractivity.Silent,
+            AndroidCommandPriority.Refresh,
+            TimeSpan.FromSeconds(10),
+            null);
+
+        return ServiceRegistry.GetRequiredService<AndroidCommandCenter>()
+            .ExecuteAsync(envelope, cancellationToken);
+    }
+
+    private static string? ReadPayloadString(string? payloadJson, string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(payloadJson)) return null;
+
+        try
+        {
+            using var document = JsonDocument.Parse(payloadJson);
+            return document.RootElement.TryGetProperty(propertyName, out var property)
+                   && property.ValueKind == JsonValueKind.String
+                ? property.GetString()
+                : null;
+        }
+        catch (JsonException exception)
+        {
+            Log.Warn(LogTag, $"Failed to parse command payload '{propertyName}': {exception.Message}");
+            return null;
+        }
+    }
+
+    private static bool TryReadPayloadBoolean(string? payloadJson, string propertyName, out bool value)
+    {
+        value = false;
+        if (string.IsNullOrWhiteSpace(payloadJson)) return false;
+
+        try
+        {
+            using var document = JsonDocument.Parse(payloadJson);
+            if (!document.RootElement.TryGetProperty(propertyName, out var property)
+                || property.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
+                return false;
+
+            value = property.GetBoolean();
+            return true;
+        }
+        catch (JsonException exception)
+        {
+            Log.Warn(LogTag, $"Failed to parse command payload '{propertyName}': {exception.Message}");
+            return false;
+        }
+    }
+
+    private static string[] ReadStringArrayPayload(string? payloadJson, string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(payloadJson)) return [];
+
+        try
+        {
+            using var document = JsonDocument.Parse(payloadJson);
+            var root = document.RootElement;
+            if (root.ValueKind == JsonValueKind.Array)
+                return ReadStringArray(root);
+
+            return root.TryGetProperty(propertyName, out var property)
+                ? ReadStringArray(property)
+                : [];
+        }
+        catch (JsonException exception)
+        {
+            Log.Warn(LogTag, $"Failed to parse command payload '{propertyName}': {exception.Message}");
+            return [];
+        }
+    }
+
+    private static string[] ReadStringArray(JsonElement element)
+    {
+        if (element.ValueKind != JsonValueKind.Array) return [];
+
+        return element.EnumerateArray()
+            .Where(item => item.ValueKind == JsonValueKind.String)
+            .Select(item => item.GetString())
+            .OfType<string>()
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToArray();
     }
 
     private static async Task<OperationResult> RunWorkPackageOperationAsync(

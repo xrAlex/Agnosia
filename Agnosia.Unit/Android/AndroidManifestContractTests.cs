@@ -138,6 +138,30 @@ public sealed class AndroidManifestContractTests
         Assert.Contains("return _messenger?.Binder", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Silent_command_service_contract_is_declared_in_android_project()
+    {
+        var source = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Services", "SilentCommandService.cs"));
+
+        Assert.Contains("[Service(", source, StringComparison.Ordinal);
+        Assert.Contains("Name = \"com.agnosia.app.SilentCommandService\"", source, StringComparison.Ordinal);
+        Assert.Contains("Exported = true", source, StringComparison.Ordinal);
+        Assert.Contains("Permission = \"com.agnosia.app.permission.CROSS_PROFILE_COMMAND\"", source,
+            StringComparison.Ordinal);
+        Assert.Contains("public override IBinder OnBind", source, StringComparison.Ordinal);
+        Assert.Contains("public Task<AndroidCommandResultEnvelope> ExecuteAsync", source, StringComparison.Ordinal);
+        Assert.Contains("ServiceRegistry.GetRequiredService<AndroidCommandHandlerExecutor>()", source,
+            StringComparison.Ordinal);
+        Assert.Contains("ServiceRegistry.GetRequiredService<AndroidCommandExecutionContextFactory>()", source,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("ServiceRegistry.GetRequiredService<AndroidCommandCenter>()", source,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("TargetProfile = AndroidCommandTargetProfile.Personal", source,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("new DirectLocalCommandTransport(", source, StringComparison.Ordinal);
+    }
+
     // Проверяет, что cross-profile File Shuttle стартует через PendingIntent с BAL opt-in.
     [Fact]
     public void File_shuttle_cross_profile_start_uses_pending_intent_bal_opt_in()

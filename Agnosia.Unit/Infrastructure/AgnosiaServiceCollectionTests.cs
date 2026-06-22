@@ -1,4 +1,6 @@
 using Agnosia.Infrastructure;
+using Agnosia.Android.Commands;
+using Agnosia.Android.Infrastructure;
 using Agnosia.Platform;
 using Agnosia.Services;
 using Agnosia.ViewModels;
@@ -39,5 +41,28 @@ public sealed class AgnosiaServiceCollectionTests
         Assert.Same(bridge, provider.GetRequiredService<IAppCommandService>());
         Assert.Same(bridge, provider.GetRequiredService<ISettingsPlatformService>());
         Assert.Same(bridge, provider.GetRequiredService<IModulePlatformService>());
+    }
+
+    [Fact]
+    public void AddAgnosiaAndroidRegistersCommandCenterDependencies()
+    {
+        using var provider = new ServiceCollection()
+            .AddAgnosiaAndroid()
+            .BuildServiceProvider();
+
+        Assert.NotNull(provider.GetRequiredService<AndroidCommandScheduler>());
+        Assert.NotNull(provider.GetRequiredService<AndroidCommandCenter>());
+        Assert.NotNull(provider.GetRequiredService<AndroidCommandHandlerExecutor>());
+        var handlerKinds = provider.GetServices<IAndroidCommandHandler>()
+            .Select(handler => handler.Kind)
+            .ToHashSet();
+        Assert.Contains(AndroidCommandKind.ProfilePing, handlerKinds);
+        Assert.Contains(AndroidCommandKind.QueryLogs, handlerKinds);
+        Assert.Contains(AndroidCommandKind.QueryPermissions, handlerKinds);
+        var transportKinds = provider.GetServices<IAndroidCommandTransport>()
+            .Select(transport => transport.Kind)
+            .ToHashSet();
+        Assert.Contains(AndroidCommandTransportKind.DirectLocal, transportKinds);
+        Assert.Contains(AndroidCommandTransportKind.SilentWorkProfile, transportKinds);
     }
 }

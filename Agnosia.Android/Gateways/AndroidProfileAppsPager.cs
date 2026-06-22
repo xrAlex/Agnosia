@@ -1,4 +1,5 @@
-using Android.Content;
+using System.Text.Json;
+using Agnosia.Android.Commands.Handlers;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Gateways;
@@ -22,31 +23,42 @@ internal static class AndroidProfileAppsPager
 
         for (var pageIndex = 0; pageIndex < QueryAppsMaxPages; pageIndex++)
         {
-            var intent = new Intent(AgnosiaActions.QueryApps);
-            intent.PutExtra(AndroidCommandContract.ExtraShowAll, showAll);
-            intent.PutExtra(AndroidCommandContract.ExtraQueryPageToken, pageToken);
-            intent.PutExtra(AndroidCommandContract.ExtraQueryOffset, offset);
-            intent.PutExtra(AndroidCommandContract.ExtraQueryLimit, QueryAppsPageLimit);
-            intent.PutExtra(AndroidCommandContract.ExtraQueryMaxJsonBytes, QueryAppsMaxJsonBytes);
+            var request = new QueryAppsRequest(
+                showAll,
+                pageToken,
+                offset,
+                QueryAppsPageLimit,
+                QueryAppsMaxJsonBytes);
+            var envelope = new AndroidCommandEnvelope(
+                Guid.NewGuid(),
+                AndroidCommandKind.QueryApps,
+                AndroidCommandTargetProfile.Work,
+                AndroidCommandInteractivity.Silent,
+                AndroidCommandPriority.Refresh,
+                TimeSpan.FromSeconds(30),
+                JsonSerializer.Serialize(request));
+            var result = await ServiceRegistry.GetRequiredService<AndroidCommandCenter>()
+                .ExecuteAsync(envelope, cancellationToken)
+                .ConfigureAwait(false);
+            if (!result.Succeeded)
+            {
+                Log.Warn(LogTag, $"Failed to query work apps page {pageIndex} through command center. diagnostics={result.Diagnostics}");
+                return null;
+            }
 
-            var data = await AndroidProfileCommandTransport.StartForDataAsync(
-                commandRunner,
-                intent,
-                $"Failed to query work apps page {pageIndex} through the profile activity command.",
-                cancellationToken).ConfigureAwait(false);
-            if (data is null) return null;
+            var response = DeserializePayload<QueryAppsResponse>(result.PayloadJson, $"work apps page {pageIndex}");
+            if (response is null) return null;
 
             var pageApps = AndroidProfileCommandJson.DeserializeAppServiceModelsResult(
-                data.GetStringExtra(AndroidCommandContract.ResultAppsJson),
+                response.AppsJson,
                 $"work apps page {pageIndex}") ?? [];
             apps.AddRange(pageApps);
 
             if (offset == 0)
-                interactionPackages =
-                    data.GetStringArrayExtra(AndroidCommandContract.ResultInteractionPackages) ?? [];
+                interactionPackages = response.InteractionPackages ?? [];
 
-            var hasMore = data.GetBooleanExtra(AndroidCommandContract.ResultQueryHasMore, false);
-            var nextOffset = data.GetIntExtra(AndroidCommandContract.ResultNextQueryOffset, offset + pageApps.Count);
+            var hasMore = response.HasMore;
+            var nextOffset = response.NextOffset;
             if (!hasMore) return new ProfileAppsQueryResult(apps, interactionPackages);
 
             if (nextOffset <= offset)
@@ -64,5 +76,20 @@ internal static class AndroidProfileAppsPager
             LogTag,
             $"Work apps paging stopped after reaching the page limit. pages={QueryAppsMaxPages}, loadedApps={apps.Count}.");
         return null;
+    }
+
+    private static T? DeserializePayload<T>(string? payloadJson, string description)
+    {
+        if (string.IsNullOrWhiteSpace(payloadJson)) return default;
+
+        try
+        {
+            return JsonSerializer.Deserialize<T>(payloadJson);
+        }
+        catch (JsonException exception)
+        {
+            Log.Warn(LogTag, $"Failed to deserialize {description}: {exception.Message}");
+            return default;
+        }
     }
 }

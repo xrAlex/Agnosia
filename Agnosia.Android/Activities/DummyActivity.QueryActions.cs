@@ -1,7 +1,7 @@
 using System.Text.Json;
-using Android.App.Admin;
+using Agnosia.Android.Commands.Handlers;
 using Android.Content;
-using Android.Content.PM;
+using Android.OS;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 using OperationCanceledException = System.OperationCanceledException;
 
@@ -12,116 +12,29 @@ public sealed partial class DummyActivity
     private const int DefaultQueryAppsPageLimit = 100;
     private const int DefaultQueryAppsMaxJsonBytes = 512 * 1024;
 
-    private async Task ActionQueryAppsAsync(CancellationToken cancellationToken)
-    {
-        var intent = Intent;
-        var packageManager = PackageManager;
-        if (intent is null || packageManager is null)
-        {
-            FinishWithResult(Result.Canceled);
-            return;
-        }
-
-        try
-        {
-            var showAll = intent.GetBooleanExtra(AndroidCommandContract.ExtraShowAll, false);
-            var isRiskEngineEnabled = ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.RiskEngineEnabled, true);
-            var policyManager = _policyManager;
-            var admin = _isProfileOwner && policyManager is not null
-                ? AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType)
-                : null;
-            var inventory = await GetOrCreateCachedAppInventoryQueryAsync(
-                    showAll,
-                    isRiskEngineEnabled,
-                    intent.GetStringExtra(AndroidCommandContract.ExtraQueryPageToken),
-                    packageManager,
-                    policyManager,
-                    admin,
-                    cancellationToken)
-                .ConfigureAwait(false);
-
-            var result = CreateQueryAppsResult(intent, inventory);
-            FinishWithResult(Result.Ok, result);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            Log.Warn(LogTag, $"Failed to query apps: {exception}");
-            FinishWithResult(Result.Canceled);
-        }
-    }
-
-    private async Task<AndroidQueryCache.AppInventoryQuery> GetOrCreateCachedAppInventoryQueryAsync(
-        bool showAll,
-        bool isRiskEngineEnabled,
-        string? pageToken,
-        PackageManager packageManager,
-        DevicePolicyManager? policyManager,
-        ComponentName? admin,
-        CancellationToken cancellationToken)
-    {
-        if (AndroidQueryCache.Shared.TryGetAppInventoryQuery(
-                pageToken,
-                showAll,
-                isRiskEngineEnabled,
-                out var cachedQuery))
-            return cachedQuery;
-
-        var models = await Task.Run(() => AndroidAppInventoryApi.QueryInstalledApps(
-            this,
-            packageManager,
-            policyManager,
-            admin,
-            showAll,
-            cancellationToken,
-            AppInventoryQueryOptions.WorkList), cancellationToken).ConfigureAwait(false);
-
-        var interactionPackages = admin is not null && policyManager is not null
-            ? AndroidPolicyApi.GetCrossProfilePackages(policyManager, admin)
-            : [];
-        var query = new AndroidQueryCache.AppInventoryQuery(
-            showAll,
-            isRiskEngineEnabled,
-            models,
-            interactionPackages);
-        AndroidQueryCache.Shared.StoreAppInventoryQuery(pageToken, query);
-        return query;
-    }
-
     private static Intent CreateQueryAppsResult(
         Intent request,
-        AndroidQueryCache.AppInventoryQuery inventory)
+        QueryAppsResponse response)
     {
+        var interactionPackages = response.InteractionPackages ?? [];
         var result = new Intent();
+        result.PutExtra(AndroidCommandContract.ResultAppsJson, response.AppsJson);
         if (!IsPagedQuery(request))
         {
-            result.PutExtra(
-                AndroidCommandContract.ResultAppsJson,
-                JsonSerializer.Serialize(inventory.Apps.ToList(), AndroidApiJsonContext.Default.ListAppServiceModel));
-            result.PutExtra(AndroidCommandContract.ResultInteractionPackages, inventory.InteractionPackages);
+            result.PutExtra(AndroidCommandContract.ResultInteractionPackages, interactionPackages);
             return result;
         }
 
-        var page = AppInventoryPayloadPager.CreatePage(
-            inventory.Apps,
-            request.GetIntExtra(AndroidCommandContract.ExtraQueryOffset, 0),
-            request.GetIntExtra(AndroidCommandContract.ExtraQueryLimit, DefaultQueryAppsPageLimit),
-            request.GetIntExtra(AndroidCommandContract.ExtraQueryMaxJsonBytes, DefaultQueryAppsMaxJsonBytes));
+        result.PutExtra(AndroidCommandContract.ResultNextQueryOffset, response.NextOffset);
+        result.PutExtra(AndroidCommandContract.ResultQueryHasMore, response.HasMore);
+        result.PutExtra(AndroidCommandContract.ResultQueryTotalCount, response.TotalCount);
 
-        result.PutExtra(AndroidCommandContract.ResultAppsJson, page.Json);
-        result.PutExtra(AndroidCommandContract.ResultNextQueryOffset, page.NextOffset);
-        result.PutExtra(AndroidCommandContract.ResultQueryHasMore, page.HasMore);
-        result.PutExtra(AndroidCommandContract.ResultQueryTotalCount, page.TotalCount);
-
-        if (page.Offset == 0)
-            result.PutExtra(AndroidCommandContract.ResultInteractionPackages, inventory.InteractionPackages);
+        if (interactionPackages.Length > 0)
+            result.PutExtra(AndroidCommandContract.ResultInteractionPackages, interactionPackages);
 
         Log.Debug(
             LogTag,
-            $"Query apps page prepared. offset={page.Offset}, nextOffset={page.NextOffset}, hasMore={page.HasMore}, pageCount={page.Apps.Count}, totalCount={page.TotalCount}, jsonBytes={page.JsonUtf8Bytes}.");
+            $"Query apps page prepared. nextOffset={response.NextOffset}, hasMore={response.HasMore}, totalCount={response.TotalCount}.");
         return result;
     }
 
@@ -131,6 +44,173 @@ public sealed partial class DummyActivity
                || request.HasExtra(AndroidCommandContract.ExtraQueryOffset)
                || request.HasExtra(AndroidCommandContract.ExtraQueryLimit)
                || request.HasExtra(AndroidCommandContract.ExtraQueryMaxJsonBytes);
+    }
+
+    private static string? CreateCommandRequestPayloadJson(AndroidCommandKind kind, Intent? intent)
+    {
+        var existingPayload = intent?.GetStringExtra(AndroidCommandIntentMapper.PayloadJsonExtraKey);
+        if (!string.IsNullOrWhiteSpace(existingPayload)) return existingPayload;
+
+        return kind switch
+        {
+            AndroidCommandKind.QueryApps => JsonSerializer.Serialize(new QueryAppsRequest(
+                intent?.GetBooleanExtra(AndroidCommandContract.ExtraShowAll, false) == true,
+                intent?.GetStringExtra(AndroidCommandContract.ExtraQueryPageToken),
+                intent?.GetIntExtra(AndroidCommandContract.ExtraQueryOffset, 0) ?? 0,
+                intent?.GetIntExtra(AndroidCommandContract.ExtraQueryLimit, DefaultQueryAppsPageLimit) ??
+                DefaultQueryAppsPageLimit,
+                intent?.GetIntExtra(AndroidCommandContract.ExtraQueryMaxJsonBytes, DefaultQueryAppsMaxJsonBytes) ??
+                DefaultQueryAppsMaxJsonBytes)),
+            AndroidCommandKind.QueryAppIcons => JsonSerializer.Serialize(new QueryAppIconsRequest(
+                intent?.GetStringArrayExtra(AndroidCommandContract.ExtraPackages) ?? [])),
+            _ => null
+        };
+    }
+
+    private static Intent CreateCommandResultIntent(
+        AndroidCommandKind kind,
+        string? payloadJson,
+        string diagnostics,
+        Intent? request)
+    {
+        var result = new Intent();
+        if (!string.IsNullOrWhiteSpace(payloadJson))
+            result.PutExtra(AndroidCommandIntentMapper.PayloadJsonExtraKey, payloadJson);
+        if (!string.IsNullOrWhiteSpace(diagnostics))
+            result.PutExtra(AndroidCommandIntentMapper.DiagnosticsExtraKey, diagnostics);
+
+        switch (kind)
+        {
+            case AndroidCommandKind.QueryApps:
+                if (DeserializePayload<QueryAppsResponse>(payloadJson) is { } appsResponse)
+                {
+                    var appsResult = CreateQueryAppsResult(request ?? result, appsResponse);
+                    if (!string.IsNullOrWhiteSpace(payloadJson))
+                        appsResult.PutExtra(AndroidCommandIntentMapper.PayloadJsonExtraKey, payloadJson);
+                    if (!string.IsNullOrWhiteSpace(diagnostics))
+                        appsResult.PutExtra(AndroidCommandIntentMapper.DiagnosticsExtraKey, diagnostics);
+                    return appsResult;
+                }
+
+                break;
+            case AndroidCommandKind.QueryAppIcons:
+                if (DeserializePayload<QueryAppIconsResponse>(payloadJson) is { Icons: { } icons })
+                    result.PutExtra(AndroidCommandContract.ResultIconsBundle, CreateIconsBundle(icons));
+                break;
+            case AndroidCommandKind.QueryLogs:
+                PutStringPayload(result, payloadJson, AndroidCommandContract.ResultLogsJson);
+                break;
+            case AndroidCommandKind.QueryCrossProfilePackages:
+                result.PutExtra(
+                    AndroidCommandContract.ResultInteractionPackages,
+                    ReadStringArrayPayload(payloadJson, AndroidCommandContract.ResultInteractionPackages));
+                break;
+            case AndroidCommandKind.QueryPermissions:
+                PutBooleanPayload(result, payloadJson, AndroidCommandContract.ResultUsageStatsAccess);
+                PutBooleanPayload(result, payloadJson, AndroidCommandContract.ResultPackageInstallAccess);
+                PutBooleanPayload(result, payloadJson, AndroidCommandContract.ResultAllFilesAccess);
+                break;
+        }
+
+        return result;
+    }
+
+    private static Bundle CreateIconsBundle(IReadOnlyDictionary<string, byte[]?> icons)
+    {
+        var bundle = new Bundle();
+        foreach (var (packageName, iconPng) in icons)
+            if (iconPng is { Length: > 0 })
+                bundle.PutByteArray(packageName, iconPng);
+
+        return bundle;
+    }
+
+    private static void PutStringPayload(Intent result, string? payloadJson, string propertyName)
+    {
+        var value = ReadStringPayload(payloadJson, propertyName);
+        if (!string.IsNullOrWhiteSpace(value))
+            result.PutExtra(propertyName, value);
+    }
+
+    private static void PutBooleanPayload(Intent result, string? payloadJson, string propertyName)
+    {
+        if (TryReadBooleanPayload(payloadJson, propertyName, out var value))
+            result.PutExtra(propertyName, value);
+    }
+
+    private static string? ReadStringPayload(string? payloadJson, string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(payloadJson)) return null;
+
+        try
+        {
+            using var document = JsonDocument.Parse(payloadJson);
+            return document.RootElement.TryGetProperty(propertyName, out var property)
+                   && property.ValueKind == JsonValueKind.String
+                ? property.GetString()
+                : null;
+        }
+        catch (JsonException exception)
+        {
+            Log.Warn(LogTag, $"Failed to parse command payload '{propertyName}': {exception.Message}");
+            return null;
+        }
+    }
+
+    private static bool TryReadBooleanPayload(string? payloadJson, string propertyName, out bool value)
+    {
+        value = false;
+        if (string.IsNullOrWhiteSpace(payloadJson)) return false;
+
+        try
+        {
+            using var document = JsonDocument.Parse(payloadJson);
+            if (!document.RootElement.TryGetProperty(propertyName, out var property)
+                || property.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
+                return false;
+
+            value = property.GetBoolean();
+            return true;
+        }
+        catch (JsonException exception)
+        {
+            Log.Warn(LogTag, $"Failed to parse command payload '{propertyName}': {exception.Message}");
+            return false;
+        }
+    }
+
+    private static string[] ReadStringArrayPayload(string? payloadJson, string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(payloadJson)) return [];
+
+        try
+        {
+            using var document = JsonDocument.Parse(payloadJson);
+            var root = document.RootElement;
+            if (root.ValueKind == JsonValueKind.Array)
+                return ReadStringArray(root);
+
+            return root.TryGetProperty(propertyName, out var property)
+                ? ReadStringArray(property)
+                : [];
+        }
+        catch (JsonException exception)
+        {
+            Log.Warn(LogTag, $"Failed to parse command payload '{propertyName}': {exception.Message}");
+            return [];
+        }
+    }
+
+    private static string[] ReadStringArray(JsonElement element)
+    {
+        if (element.ValueKind != JsonValueKind.Array) return [];
+
+        return element.EnumerateArray()
+            .Where(item => item.ValueKind == JsonValueKind.String)
+            .Select(item => item.GetString())
+            .OfType<string>()
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToArray();
     }
 
     private static void ClearAppInventoryQueryCache()
@@ -171,91 +251,19 @@ public sealed partial class DummyActivity
         }
     }
 
-    private async Task ActionQueryAppIconsAsync(CancellationToken cancellationToken)
+    private static T? DeserializePayload<T>(string? payloadJson)
     {
-        var packageManager = PackageManager;
-        var packageNames = Intent?.GetStringArrayExtra(AndroidCommandContract.ExtraPackages) ?? [];
-        if (packageNames.Length == 0 || packageManager is null)
-        {
-            FinishWithResult(Result.Canceled);
-            return;
-        }
+        if (string.IsNullOrWhiteSpace(payloadJson)) return default;
 
         try
         {
-            var icons = await Task.Run(() =>
-            {
-                var loadedIcons = new Dictionary<string, byte[]?>(StringComparer.Ordinal);
-                foreach (var packageName in packageNames.Distinct(StringComparer.Ordinal))
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    loadedIcons[packageName] = AndroidAppIconWarmupQueue.TryLoadCachedOrQueue(
-                        this,
-                        packageManager,
-                        packageName);
-                }
-
-                return loadedIcons;
-            }, cancellationToken).ConfigureAwait(false);
-
-            var result = new Intent();
-            var bundle = new Bundle();
-            foreach (var (packageName, iconPng) in icons)
-                if (iconPng is { Length: > 0 })
-                    bundle.PutByteArray(packageName, iconPng);
-
-            result.PutExtra(AndroidCommandContract.ResultIconsBundle, bundle);
-            FinishWithResult(Result.Ok, result);
+            return JsonSerializer.Deserialize<T>(payloadJson);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (JsonException exception)
         {
-            throw;
+            Log.Warn(LogTag, $"Failed to deserialize command payload as {typeof(T).Name}: {exception.Message}");
+            return default;
         }
-        catch (Exception exception)
-        {
-            Log.Warn(LogTag, $"Failed to query app icons: {exception}");
-            FinishWithResult(Result.Canceled);
-        }
-    }
-
-    private void ActionQueryLogs()
-    {
-        var result = new Intent();
-        result.PutExtra(
-            AndroidCommandContract.ResultLogsJson,
-            JsonSerializer.Serialize(
-                AndroidAppLogArchive.Load(this).ToList(),
-                AndroidApiJsonContext.Default.ListAppLogEntry));
-        FinishWithResult(Result.Ok, result);
-    }
-
-    private void ActionQueryCrossProfilePackages()
-    {
-        if (!_isProfileOwner || _policyManager is null)
-        {
-            FinishWithResult(Result.Canceled);
-            return;
-        }
-
-        var result = new Intent();
-        result.PutExtra(
-            AndroidCommandContract.ResultInteractionPackages,
-            AndroidPolicyApi.GetCrossProfilePackages(
-                _policyManager,
-                AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType)));
-        FinishWithResult(Result.Ok, result);
-    }
-
-    private void ActionQueryPermissions()
-    {
-        var result = new Intent();
-        result.PutExtra(AndroidCommandContract.ResultUsageStatsAccess,
-            AndroidUsageStatsAccessApi.HasAccess(this, LogTag));
-        result.PutExtra(AndroidCommandContract.ResultPackageInstallAccess,
-            AndroidPackageApi.CanRequestInstalls(this, LogTag));
-        result.PutExtra(AndroidCommandContract.ResultAllFilesAccess,
-            AndroidPermissionApi.HasAllFilesAccess(this));
-        FinishWithResult(Result.Ok, result);
     }
 
     private void ActionQueryUsageStatsAccess()

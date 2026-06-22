@@ -46,22 +46,22 @@ public sealed partial class DummyActivity
                     FinishWithProfileOwnerCheck();
                     break;
                 case AgnosiaActions.QueryApps:
-                    RunAction(ActionQueryAppsAsync, "Android не смог получить список приложений.");
+                    RunCommandCenterAction(AndroidCommandKind.QueryApps, "Android не смог получить список приложений.");
                     break;
                 case AgnosiaActions.QueryAppIcon:
                     RunAction(ActionQueryAppIconAsync, "Android не смог получить иконку приложения.");
                     break;
                 case AgnosiaActions.QueryAppIcons:
-                    RunAction(ActionQueryAppIconsAsync, "Android не смог получить иконки приложений.");
+                    RunCommandCenterAction(AndroidCommandKind.QueryAppIcons, "Android не смог получить иконки приложений.");
                     break;
                 case AgnosiaActions.QueryLogs:
-                    ActionQueryLogs();
+                    RunCommandCenterAction(AndroidCommandKind.QueryLogs, "Android не смог получить журнал.");
                     break;
                 case AgnosiaActions.QueryCrossProfilePackages:
-                    ActionQueryCrossProfilePackages();
+                    RunCommandCenterAction(AndroidCommandKind.QueryCrossProfilePackages, "Android не смог получить список межпрофильных пакетов.");
                     break;
                 case AgnosiaActions.QueryPermissions:
-                    ActionQueryPermissions();
+                    RunCommandCenterAction(AndroidCommandKind.QueryPermissions, "Android не смог получить разрешения.");
                     break;
                 case AgnosiaActions.QueryUsageStatsAccess:
                     ActionQueryUsageStatsAccess();
@@ -229,5 +229,51 @@ public sealed partial class DummyActivity
             Log.Error(LogTag, $"{fallbackErrorMessage} Details: {exception}");
             FinishWithError(fallbackErrorMessage);
         }
+    }
+
+    private void RunCommandCenterAction(AndroidCommandKind kind, string fallbackErrorMessage)
+    {
+        var payloadJson = CreateCommandRequestPayloadJson(kind, Intent);
+        var targetProfile = _isProfileOwner
+            ? AndroidCommandTargetProfile.Work
+            : AndroidCommandTargetProfile.Personal;
+        var envelope = new AndroidCommandEnvelope(
+            Guid.NewGuid(),
+            kind,
+            targetProfile,
+            AndroidCommandInteractivity.Silent,
+            AndroidCommandPriority.Refresh,
+            TimeSpan.FromSeconds(30),
+            payloadJson);
+
+        RunAction(
+            async cancellationToken =>
+            {
+                var contextFactory = ServiceRegistry.GetRequiredService<AndroidCommandExecutionContextFactory>();
+                var executor = ServiceRegistry.GetRequiredService<AndroidCommandHandlerExecutor>();
+                var context = contextFactory.Create(
+                    this,
+                    this,
+                    envelope,
+                    AndroidCommandTransportKind.Activity,
+                    "dummy-activity");
+                var result = await executor.ExecuteAsync(envelope, context, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (!result.Succeeded)
+                {
+                    FinishWithError(string.IsNullOrWhiteSpace(result.Message)
+                        ? fallbackErrorMessage
+                        : result.Message);
+                    return;
+                }
+
+                FinishWithResult(Result.Ok, CreateCommandResultIntent(
+                    kind,
+                    result.PayloadJson,
+                    result.Diagnostics,
+                    Intent));
+            },
+            fallbackErrorMessage);
     }
 }

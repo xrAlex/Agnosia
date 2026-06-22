@@ -16,11 +16,16 @@ public static class AndroidPackageApi
 
     public static bool CanRequestInstalls(Activity activity, string logTag)
     {
+        return CanRequestInstalls((Context)activity, logTag);
+    }
+
+    public static bool CanRequestInstalls(Context context, string logTag)
+    {
         if (!OperatingSystem.IsAndroidVersionAtLeast(26)) return true;
 
         try
         {
-            return activity.PackageManager?.CanRequestPackageInstalls() == true;
+            return context.PackageManager?.CanRequestPackageInstalls() == true;
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
