@@ -56,13 +56,30 @@ public sealed class AgnosiaServiceCollectionTests
         var handlerKinds = provider.GetServices<IAndroidCommandHandler>()
             .Select(handler => handler.Kind)
             .ToHashSet();
-        Assert.Contains(AndroidCommandKind.ProfilePing, handlerKinds);
-        Assert.Contains(AndroidCommandKind.QueryLogs, handlerKinds);
-        Assert.Contains(AndroidCommandKind.QueryPermissions, handlerKinds);
+        AssertContainsAll(
+            handlerKinds,
+            [
+                AndroidCommandKind.ProfilePing,
+                AndroidCommandKind.QueryAppIcon,
+                AndroidCommandKind.QueryAppIcons,
+                AndroidCommandKind.QueryApps,
+                AndroidCommandKind.QueryCrossProfilePackages,
+                AndroidCommandKind.QueryLogs,
+                AndroidCommandKind.QueryPermissions
+            ]);
         var transportKinds = provider.GetServices<IAndroidCommandTransport>()
             .Select(transport => transport.Kind)
             .ToHashSet();
         Assert.Contains(AndroidCommandTransportKind.DirectLocal, transportKinds);
         Assert.Contains(AndroidCommandTransportKind.SilentWorkProfile, transportKinds);
+    }
+
+    private static void AssertContainsAll<T>(
+        HashSet<T> actual,
+        IReadOnlyList<T> expected)
+        where T : notnull
+    {
+        foreach (var item in expected)
+            Assert.Contains(item, actual);
     }
 }

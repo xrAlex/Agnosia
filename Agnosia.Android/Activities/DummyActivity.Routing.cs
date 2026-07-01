@@ -43,13 +43,13 @@ public sealed partial class DummyActivity
             switch (action)
             {
                 case AgnosiaActions.ProfilePing:
-                    FinishWithProfileOwnerCheck();
+                    RunCommandCenterAction(AndroidCommandKind.ProfilePing, "Android не смог проверить рабочий профиль.");
                     break;
                 case AgnosiaActions.QueryApps:
                     RunCommandCenterAction(AndroidCommandKind.QueryApps, "Android не смог получить список приложений.");
                     break;
                 case AgnosiaActions.QueryAppIcon:
-                    RunAction(ActionQueryAppIconAsync, "Android не смог получить иконку приложения.");
+                    RunCommandCenterAction(AndroidCommandKind.QueryAppIcon, "Android не смог получить иконку приложения.");
                     break;
                 case AgnosiaActions.QueryAppIcons:
                     RunCommandCenterAction(AndroidCommandKind.QueryAppIcons, "Android не смог получить иконки приложений.");
@@ -64,19 +64,19 @@ public sealed partial class DummyActivity
                     RunCommandCenterAction(AndroidCommandKind.QueryPermissions, "Android не смог получить разрешения.");
                     break;
                 case AgnosiaActions.QueryUsageStatsAccess:
-                    ActionQueryUsageStatsAccess();
+                    RunCommandCenterAction(AndroidCommandKind.QueryPermissions, "Android не смог проверить доступ к истории использования.");
                     break;
                 case AgnosiaActions.RequestUsageStatsAccess:
                     ActionRequestUsageStatsAccess();
                     break;
                 case AgnosiaActions.QueryPackageInstallAccess:
-                    ActionQueryPackageInstallAccess();
+                    RunCommandCenterAction(AndroidCommandKind.QueryPermissions, "Android не смог проверить доступ к установке APK.");
                     break;
                 case AgnosiaActions.RequestPackageInstallAccess:
                     ActionRequestPackageInstallAccess();
                     break;
                 case AgnosiaActions.QueryAllFilesAccess:
-                    ActionQueryAllFilesAccess();
+                    RunCommandCenterAction(AndroidCommandKind.QueryPermissions, "Android не смог проверить доступ ко всем файлам.");
                     break;
                 case AgnosiaActions.RequestAllFilesAccess:
                     ActionRequestAllFilesAccess();
@@ -268,11 +268,15 @@ public sealed partial class DummyActivity
                     return;
                 }
 
-                FinishWithResult(Result.Ok, CreateCommandResultIntent(
+                var resultIntent = CreateCommandResultIntent(
                     kind,
                     result.PayloadJson,
                     result.Diagnostics,
-                    Intent));
+                    Intent);
+                if (kind == AndroidCommandKind.ProfilePing)
+                    TrySignResult(resultIntent);
+
+                FinishWithResult(Result.Ok, resultIntent);
             },
             fallbackErrorMessage);
     }

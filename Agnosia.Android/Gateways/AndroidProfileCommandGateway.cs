@@ -40,26 +40,20 @@ public static class AndroidProfileCommandGateway
         if (AndroidQueryCache.Shared.TryGetSuccessfulOwnerCheck(out var cachedOwnerCheck))
             return cachedOwnerCheck;
 
-        using var pingCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        pingCancellation.CancelAfter(ProfilePingTimeout);
-        try
-        {
-            var result = await commandRunner.StartActivityForResultAsync(
-                new Intent(AgnosiaActions.ProfilePing),
-                true,
-                pingCancellation.Token)
+        var envelope = new AndroidCommandEnvelope(
+            Guid.NewGuid(),
+            AndroidCommandKind.ProfilePing,
+            AndroidCommandTargetProfile.Work,
+            AndroidCommandInteractivity.Silent,
+            AndroidCommandPriority.UserBlocking,
+            ProfilePingTimeout,
+            null);
+        var commandResult = await ServiceRegistry.GetRequiredService<AndroidCommandCenter>()
+            .ExecuteAsync(envelope, cancellationToken)
             .ConfigureAwait(false);
-            var ownerCheck = InterpretProfilePingResult(result);
-            AndroidQueryCache.Shared.StoreOwnerCheckIfSuccessful(ownerCheck);
-            return ownerCheck;
-        }
-        catch (System.OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            Log.Warn(LogTag, "Timed out waiting for work-profile ping.");
-            return new WorkProfileOwnerCheckResult(
-                WorkProfileOwnerCheckKind.Unreachable,
-                $"profilePing=timeout:{ProfilePingTimeout.TotalMilliseconds:0}ms");
-        }
+        var ownerCheck = InterpretProfilePingResult(commandResult);
+        AndroidQueryCache.Shared.StoreOwnerCheckIfSuccessful(ownerCheck);
+        return ownerCheck;
     }
 
     private static async Task<WorkProfileOwnerCheckResult> TryRecoverAuthenticationAsync(
@@ -133,16 +127,28 @@ public static class AndroidProfileCommandGateway
                     cancellationToken)
                 .ConfigureAwait(false);
 
-        var intent = new Intent(AgnosiaActions.QueryAppIcon);
-        intent.PutExtra(AndroidCommandContract.ExtraPackage, app.PackageName);
-        var data = await AndroidProfileCommandTransport.StartForDataAsync(
-                commandRunner,
-                intent,
-                $"Failed to query work app icon for {app.PackageName}.",
-                cancellationToken)
+        var request = new QueryAppIconRequest(app.PackageName);
+        var envelope = new AndroidCommandEnvelope(
+            Guid.NewGuid(),
+            AndroidCommandKind.QueryAppIcon,
+            AndroidCommandTargetProfile.Work,
+            AndroidCommandInteractivity.Silent,
+            AndroidCommandPriority.Background,
+            TimeSpan.FromSeconds(30),
+            JsonSerializer.Serialize(request));
+        var result = await ServiceRegistry.GetRequiredService<AndroidCommandCenter>()
+            .ExecuteAsync(envelope, cancellationToken)
             .ConfigureAwait(false);
+        if (!result.Succeeded)
+        {
+            Log.Warn(LogTag, $"Failed to query work app icon through command center. package={app.PackageName}; diagnostics={result.Diagnostics}");
+            return null;
+        }
 
-        return data?.GetByteArrayExtra(AndroidCommandContract.ResultIconPng);
+        var response = DeserializeCommandPayload<QueryAppIconResponse>(
+            result.PayloadJson,
+            $"work app icon for {app.PackageName}");
+        return response?.IconPng;
     }
 
     internal static async Task<IReadOnlyDictionary<AppItemKey, byte[]?>> LoadAppIconsAsync(
@@ -815,6 +821,63 @@ public static class AndroidProfileCommandGateway
             string.IsNullOrWhiteSpace(error)
                 ? $"profilePing=result:{result.ResultCode}"
                 : $"profilePing=result:{result.ResultCode}; error={error}");
+    }
+
+    private static WorkProfileOwnerCheckResult InterpretProfilePingResult(AndroidCommandResultEnvelope result)
+    {
+        if (!result.Succeeded)
+            return new WorkProfileOwnerCheckResult(
+                WorkProfileOwnerCheckKind.Unreachable,
+                string.IsNullOrWhiteSpace(result.ErrorCode)
+                    ? $"profilePing=commandFailed; transport={result.Transport}; diagnostics={result.Diagnostics}"
+                    : $"profilePing={result.ErrorCode}; transport={result.Transport}; diagnostics={result.Diagnostics}");
+
+        if (string.IsNullOrWhiteSpace(result.PayloadJson))
+            return new WorkProfileOwnerCheckResult(
+                WorkProfileOwnerCheckKind.Unreachable,
+                $"profilePing=payloadMissing; transport={result.Transport}");
+
+        try
+        {
+            using var document = JsonDocument.Parse(result.PayloadJson);
+            var root = document.RootElement;
+            if (!root.TryGetProperty(AndroidCommandContract.ResultProfileOwnerCheckPerformed, out var performedProperty)
+                || performedProperty.ValueKind is not JsonValueKind.True and not JsonValueKind.False
+                || !performedProperty.GetBoolean())
+                return new WorkProfileOwnerCheckResult(
+                    WorkProfileOwnerCheckKind.Unreachable,
+                    $"profilePing=payloadIncomplete; transport={result.Transport}");
+
+            var isProfileOwner = root.TryGetProperty(AndroidCommandContract.ResultIsProfileOwner, out var ownerProperty)
+                                 && ownerProperty.ValueKind is JsonValueKind.True or JsonValueKind.False
+                                 && ownerProperty.GetBoolean();
+            var appVersionCode = root.TryGetProperty(AndroidCommandContract.ResultAppVersionCode, out var versionCodeProperty)
+                                 && versionCodeProperty.TryGetInt64(out var parsedVersionCode)
+                ? parsedVersionCode
+                : 0;
+            var appVersionName = root.TryGetProperty(AndroidCommandContract.ResultAppVersionName, out var versionNameProperty)
+                                 && versionNameProperty.ValueKind == JsonValueKind.String
+                ? versionNameProperty.GetString()
+                : null;
+
+            return isProfileOwner
+                ? new WorkProfileOwnerCheckResult(
+                    WorkProfileOwnerCheckKind.AppIsProfileOwner,
+                    $"commandCenter=true; transport={result.Transport}; {result.Diagnostics}",
+                    appVersionCode,
+                    appVersionName)
+                : new WorkProfileOwnerCheckResult(
+                    WorkProfileOwnerCheckKind.AppInstalledButNotOwner,
+                    $"commandCenter=true; transport={result.Transport}; {result.Diagnostics}",
+                    appVersionCode,
+                    appVersionName);
+        }
+        catch (JsonException exception)
+        {
+            return new WorkProfileOwnerCheckResult(
+                WorkProfileOwnerCheckKind.Unreachable,
+                $"profilePing=payloadInvalid:{exception.GetType().Name}; transport={result.Transport}");
+        }
     }
 
     private sealed record PackageSourceResolution(

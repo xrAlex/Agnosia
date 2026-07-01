@@ -148,7 +148,7 @@ Agnosia проверяет profile owner и применяет политики
 
 Во время провижининга Agnosia создаёт 32-байтный ключ, сохраняет его в личном профиле и передаёт в рабочий профиль через `DevicePolicyManager.ExtraProvisioningAdminExtrasBundle`. `AgnosiaDeviceAdminReceiver` в рабочем профиле сохраняет этот ключ, вызывает `setProfileEnabled`, регистрирует межпрофильные intent-фильтры и применяет ограничения. Личный профиль записывает факт провижининга через `ManagedProfileProvisionedReceiver` или финальную команду `FinalizeProvision`; если Android передал `UserHandle`, дополнительно сохраняются handle и serial рабочего пользователя.
 
-Проверка профиля не ограничивается одним флагом. `AndroidWorkProfileDiagnosticsReader` смотрит на `UserManager`, `CrossProfileApps`, quiet mode, состояние запуска пользователя, сохранённый serial и доступность cross-profile target. После этого `AndroidProfileCommandGateway` отправляет `ProfilePing` в рабочий профиль и проверяет, что ответ подписан тем же HMAC-ключом и что Agnosia действительно является profile owner. Если версия APK в рабочем профиле отличается от личной, `AndroidDashboardReader` пытается обновить Agnosia в рабочем профиле через тот же package-install поток.
+Проверка профиля не ограничивается одним флагом. `AndroidWorkProfileDiagnosticsReader` смотрит на `UserManager`, `CrossProfileApps`, quiet mode, состояние запуска пользователя, сохранённый serial и доступность cross-profile target. После этого `AndroidProfileCommandGateway` выполняет `ProfilePing` через `AndroidCommandCenter`: сначала пробуется тихий command transport, затем при отсутствии поддержанного тихого канала используется подписанный `DummyActivity` fallback. Для Activity fallback результат `ProfilePing` дополнительно проверяется HMAC-подписью того же ключа, чтобы подтвердить, что ответ пришёл из управляемого рабочего профиля. Если версия APK в рабочем профиле отличается от личной, `AndroidDashboardReader` пытается обновить Agnosia в рабочем профиле через тот же package-install поток.
 
 ## Модель угроз
 
@@ -168,11 +168,23 @@ Agnosia проектируется как инструмент снижения 
 
 ## Межпрофильные команды
 
-Android разделяет личный и рабочий профили, поэтому операции в рабочем профиле выполняются только внутри фактического целевого профиля. Тихие query-команды проходят через `AndroidCommandCenter`, но команда считается успешной только если она выполнилась в запрошенном Android-профиле. Локальное прямое выполнение и локальное выполнение через silent service допустимы только для текущего профиля. Тихое выполнение в рабочем профиле маршрутизируется через явный capability transport; если топология устройства или профиля не поддерживает проверенный тихий межпрофильный канал, command center откатывается к подписанному пути через `DummyActivity`.
+Android разделяет личный и рабочий профили, поэтому операции в рабочем профиле выполняются только внутри фактического целевого профиля. Тихие query-команды проходят через `AndroidCommandCenter`, но команда считается успешной только если она выполнилась в запрошенном Android-профиле. Локальное прямое выполнение и локальное выполнение через silent service допустимы только для текущего профиля. Тихое выполнение в рабочем профиле маршрутизируется через явный capability transport; в текущей Android work-profile топологии проекта этот capability честно возвращает `silent_work_transport_unavailable`, и command center откатывается к подписанному пути через `DummyActivity`.
 
 `DummyActivity` - совместимый fallback для мигрированных query-команд. Он не вызывает обратно `AndroidCommandCenter`; вместо этого он строит `AndroidCommandExecutionContext` из собственного контекста Activity/профиля и вызывает общий обработчик команд через `AndroidCommandHandlerExecutor`. Так бизнес-логика остаётся в одном источнике, а зависимость от `MainActivity` в рабочем профиле не появляется.
 
 Каждый результат команды фиксирует запрошенный профиль, фактический профиль выполнения, транспорт, цепочку fallback и источник контекста. Несовпадение запрошенного и фактического профиля считается ошибкой команды.
+
+```text
+Silent/read command
+   │ AndroidCommandEnvelope(kind, targetProfile, priority, payload)
+   ▼
+AndroidCommandCenter
+   ├─ DirectLocal / SilentService для текущего профиля
+   ├─ SilentWorkProfile capability для рабочего профиля
+   └─ Activity fallback → DummyActivity → AndroidCommandHandlerExecutor
+```
+
+Интерактивные и mutation-команды, которым нужен системный экран или Activity result, остаются Activity-потоком:
 
 ```text
 ViewModel
@@ -281,7 +293,7 @@ IPC построен без `.aidl`: используются `Android.OS.Messen
 | Установка APK | Рабочий | Нужна для копирования пользовательских приложений в рабочий профиль. |
 | Usage Stats | Рабочий | Нужен монитору скрытых приложений, чтобы понять, когда приложение покинуто. |
 
-`AndroidPermissionCoordinator` читает состояние этих доступов. Для доступов рабочего профиля он отправляет запросы в `DummyActivity`, потому что соответствующие настройки должны открываться в рабочем профиле.
+`AndroidPermissionCoordinator` читает состояние этих доступов через `AndroidCommandCenter`: boolean-запросы рабочего профиля объединяются в `QueryPermissions`, а legacy actions `QueryUsageStatsAccess`, `QueryPackageInstallAccess` и `QueryAllFilesAccess` в `DummyActivity` также используют общий handler. Запросы, которые должны открыть системные настройки, остаются Activity-потоком, потому что соответствующие экраны должны открываться в рабочем профиле.
 
 Флаг завершения онбординга хранится в локальном хранилище. View model периодически перепроверяет состояние профиля и разрешений, чтобы перевести пользователя на следующий шаг без ручного обновления экрана.
 
@@ -324,14 +336,15 @@ IPC построен без `.aidl`: используются `Android.OS.Messen
 
 ## Каталог приложений
 
-Каталог строится из двух независимых запросов: личный профиль читается локально, рабочий профиль опрашивается через `DummyActivity`. Оба результата приводятся к `AppSnapshot`, чтобы UI не зависел от Android-типов.
+Каталог строится из двух независимых запросов: личный профиль читается локально, рабочий профиль опрашивается через `AndroidCommandCenter`. При отсутствии поддержанного тихого work-profile capability command center использует `DummyActivity` как подписанный fallback, но app list, одиночные и batch-иконки, logs, permissions и cross-profile packages выполняются общими command handlers. Оба результата приводятся к `AppSnapshot`, чтобы UI не зависел от Android-типов.
 
 ```text
 AndroidDashboardReader.LoadAppInventoryAsync()
    ├─ QueryAppsAsync(Personal)
    │    └─ PackageManager.GetInstalledApplications(...)
    └─ QueryAppsAsync(Work)
-        └─ signed Intent → DummyActivity → PackageManager внутри work profile
+        └─ AndroidCommandCenter → handler в целевом профиле
+             └─ при unsupported SilentWorkProfile: signed DummyActivity fallback
 ```
 
 При чтении приложения Agnosia собирает:

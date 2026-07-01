@@ -60,6 +60,7 @@
         <Compile Include="Commands\AndroidCommandTargetProfile.cs"/>
         <Compile Include="Commands\AndroidCommandTransportKind.cs"/>
         <Compile Include="Commands\Handlers\ProfilePingCommandHandler.cs"/>
+        <Compile Include="Commands\Handlers\QueryAppIconCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\QueryAppIconsCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\QueryAppsCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\QueryCrossProfilePackagesCommandHandler.cs"/>

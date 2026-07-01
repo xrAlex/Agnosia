@@ -16,6 +16,7 @@ internal static class AndroidServiceCollectionExtensions
         services.AddSingleton<AndroidCommandCenter>();
         services.AddSingleton<AndroidCommandHandlerExecutor>();
         services.AddSingleton<IAndroidCommandHandler, ProfilePingCommandHandler>();
+        services.AddSingleton<IAndroidCommandHandler, QueryAppIconCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, QueryAppIconsCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, QueryAppsCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, QueryCrossProfilePackagesCommandHandler>();

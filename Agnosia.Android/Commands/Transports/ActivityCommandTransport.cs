@@ -38,6 +38,19 @@ internal sealed class ActivityCommandTransport(
                 $"result={result.ResultCode}; action={intent.Action ?? "<none>"}");
         }
 
+        if (envelope.Kind == AndroidCommandKind.ProfilePing
+            && !AuthenticationUtility.CheckIntent(result.Data))
+        {
+            return AndroidCommandResultEnvelope.Failure(
+                envelope.CorrelationId,
+                envelope.Kind,
+                Kind,
+                "Profile ping result was not signed by the target profile.",
+                "profile_ping_unsigned",
+                stopwatch.Elapsed,
+                $"result={result.ResultCode}; action={intent.Action ?? "<none>"}");
+        }
+
         var message = AndroidActivityResultApi.ExtractMessage(result);
         var diagnostics = AndroidCommandIntentMapper.ReadDiagnostics(result.Data);
         diagnostics = string.IsNullOrWhiteSpace(diagnostics)

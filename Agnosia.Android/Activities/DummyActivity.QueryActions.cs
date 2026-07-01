@@ -3,7 +3,6 @@ using Agnosia.Android.Commands.Handlers;
 using Android.Content;
 using Android.OS;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
-using OperationCanceledException = System.OperationCanceledException;
 
 namespace Agnosia.Android.Activities;
 
@@ -61,6 +60,8 @@ public sealed partial class DummyActivity
                 DefaultQueryAppsPageLimit,
                 intent?.GetIntExtra(AndroidCommandContract.ExtraQueryMaxJsonBytes, DefaultQueryAppsMaxJsonBytes) ??
                 DefaultQueryAppsMaxJsonBytes)),
+            AndroidCommandKind.QueryAppIcon => JsonSerializer.Serialize(new QueryAppIconRequest(
+                intent?.GetStringExtra(AndroidCommandContract.ExtraPackage))),
             AndroidCommandKind.QueryAppIcons => JsonSerializer.Serialize(new QueryAppIconsRequest(
                 intent?.GetStringArrayExtra(AndroidCommandContract.ExtraPackages) ?? [])),
             _ => null
@@ -81,6 +82,12 @@ public sealed partial class DummyActivity
 
         switch (kind)
         {
+            case AndroidCommandKind.ProfilePing:
+                PutBooleanPayload(result, payloadJson, AndroidCommandContract.ResultProfileOwnerCheckPerformed);
+                PutBooleanPayload(result, payloadJson, AndroidCommandContract.ResultIsProfileOwner);
+                PutLongPayload(result, payloadJson, AndroidCommandContract.ResultAppVersionCode);
+                PutStringPayload(result, payloadJson, AndroidCommandContract.ResultAppVersionName);
+                break;
             case AndroidCommandKind.QueryApps:
                 if (DeserializePayload<QueryAppsResponse>(payloadJson) is { } appsResponse)
                 {
@@ -92,6 +99,10 @@ public sealed partial class DummyActivity
                     return appsResult;
                 }
 
+                break;
+            case AndroidCommandKind.QueryAppIcon:
+                if (DeserializePayload<QueryAppIconResponse>(payloadJson) is { IconPng: { Length: > 0 } iconPng })
+                    result.PutExtra(AndroidCommandContract.ResultIconPng, iconPng);
                 break;
             case AndroidCommandKind.QueryAppIcons:
                 if (DeserializePayload<QueryAppIconsResponse>(payloadJson) is { Icons: { } icons })
@@ -129,6 +140,12 @@ public sealed partial class DummyActivity
     {
         var value = ReadStringPayload(payloadJson, propertyName);
         if (!string.IsNullOrWhiteSpace(value))
+            result.PutExtra(propertyName, value);
+    }
+
+    private static void PutLongPayload(Intent result, string? payloadJson, string propertyName)
+    {
+        if (TryReadLongPayload(payloadJson, propertyName, out var value))
             result.PutExtra(propertyName, value);
     }
 
@@ -179,6 +196,24 @@ public sealed partial class DummyActivity
         }
     }
 
+    private static bool TryReadLongPayload(string? payloadJson, string propertyName, out long value)
+    {
+        value = 0;
+        if (string.IsNullOrWhiteSpace(payloadJson)) return false;
+
+        try
+        {
+            using var document = JsonDocument.Parse(payloadJson);
+            return document.RootElement.TryGetProperty(propertyName, out var property)
+                   && property.TryGetInt64(out value);
+        }
+        catch (JsonException exception)
+        {
+            Log.Warn(LogTag, $"Failed to parse command payload '{propertyName}': {exception.Message}");
+            return false;
+        }
+    }
+
     private static string[] ReadStringArrayPayload(string? payloadJson, string propertyName)
     {
         if (string.IsNullOrWhiteSpace(payloadJson)) return [];
@@ -218,39 +253,6 @@ public sealed partial class DummyActivity
         AndroidQueryCache.Shared.ClearAppInventoryQueries();
     }
 
-    private async Task ActionQueryAppIconAsync(CancellationToken cancellationToken)
-    {
-        var intent = Intent;
-        var packageManager = PackageManager;
-        var packageName = intent?.GetStringExtra(AndroidCommandContract.ExtraPackage);
-        if (string.IsNullOrWhiteSpace(packageName) || packageManager is null)
-        {
-            FinishWithResult(Result.Canceled);
-            return;
-        }
-
-        try
-        {
-            var iconPng = await Task.Run(() => AndroidAppIconWarmupQueue.TryLoadCachedOrQueue(
-                this,
-                packageManager,
-                packageName), cancellationToken).ConfigureAwait(false);
-            var result = new Intent();
-            if (iconPng is { Length: > 0 }) result.PutExtra(AndroidCommandContract.ResultIconPng, iconPng);
-
-            FinishWithResult(Result.Ok, result);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            Log.Warn(LogTag, $"Failed to query app icon for {packageName}: {exception}");
-            FinishWithResult(Result.Canceled);
-        }
-    }
-
     private static T? DeserializePayload<T>(string? payloadJson)
     {
         if (string.IsNullOrWhiteSpace(payloadJson)) return default;
@@ -266,14 +268,6 @@ public sealed partial class DummyActivity
         }
     }
 
-    private void ActionQueryUsageStatsAccess()
-    {
-        var result = new Intent();
-        result.PutExtra(AndroidCommandContract.ResultUsageStatsAccess,
-            AndroidUsageStatsAccessApi.HasAccess(this, LogTag));
-        FinishWithResult(Result.Ok, result);
-    }
-
     private void ActionRequestUsageStatsAccess()
     {
         if (AndroidUsageStatsAccessApi.HasAccess(this, LogTag))
@@ -287,14 +281,6 @@ public sealed partial class DummyActivity
                 "Откройте Agnosia в настройках Android и включите доступ к истории использования.");
     }
 
-    private void ActionQueryPackageInstallAccess()
-    {
-        var result = new Intent();
-        result.PutExtra(AndroidCommandContract.ResultPackageInstallAccess,
-            AndroidPackageApi.CanRequestInstalls(this, LogTag));
-        FinishWithResult(Result.Ok, result);
-    }
-
     private void ActionRequestPackageInstallAccess()
     {
         if (AndroidPackageApi.CanRequestInstalls(this, LogTag))
@@ -305,14 +291,6 @@ public sealed partial class DummyActivity
 
         if (AndroidPackageApi.TryOpenUnknownSourcesSettings(this, LogTag, FinishWithError))
             FinishWithSuccessMessage("Включите установку APK из Agnosia в рабочем профиле.");
-    }
-
-    private void ActionQueryAllFilesAccess()
-    {
-        var result = new Intent();
-        result.PutExtra(AndroidCommandContract.ResultAllFilesAccess,
-            AndroidPermissionApi.HasAllFilesAccess(this));
-        FinishWithResult(Result.Ok, result);
     }
 
     private void ActionRequestAllFilesAccess()
