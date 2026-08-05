@@ -68,9 +68,9 @@ public sealed class DashboardWorkspaceScenarioTests
         Assert.False(owner.StatusIsError);
     }
 
-    // Проверяет запуск скрытого приложения рабочего профиля из shortcut flow.
+    // Проверяет, что service-only пакет рабочего профиля нельзя запустить как обычное приложение.
     [Fact]
-    public async Task LaunchCommand_launches_hidden_work_profile_app_from_shortcut_flow()
+    public void LaunchCommand_rejects_hidden_work_profile_app_without_front_door_activity()
     {
         var services = new TestPlatformServices
         {
@@ -89,13 +89,9 @@ public sealed class DashboardWorkspaceScenarioTests
             isHidden: true,
             canLaunch: false);
 
-        await app.LaunchCommand.ExecuteAsync(null);
-
-        var request = Assert.Single(services.LaunchRequests);
-        Assert.Equal("com.example.hidden", request.PackageName);
-        Assert.Equal(ProfileKind.Work, request.Profile);
-        Assert.True(request.IsHidden);
-        Assert.True(app.ShowLaunch);
+        Assert.Empty(services.LaunchRequests);
+        Assert.False(app.ShowLaunch);
+        Assert.False(app.LaunchCommand.CanExecute(null));
         Assert.False(owner.StatusIsError);
     }
 

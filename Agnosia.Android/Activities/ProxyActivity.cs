@@ -128,6 +128,7 @@ public sealed class ProxyActivity : Activity
 
     private async Task UnhideAndLaunchAsync(HiddenAppLaunchRequest request)
     {
+        TemporaryPackageVisibilityTransaction? visibilityTransaction = null;
         try
         {
             if (!AgnosiaUtilities.IsProfileOwner(this))
@@ -156,45 +157,79 @@ public sealed class ProxyActivity : Activity
             }
 
             var launchResult = GetLaunchResult(request);
-            if (!AndroidPolicyApi.TrySetApplicationHidden(
-                    policyManager,
-                    admin,
-                    request.PackageName,
-                    false,
-                    LogTag,
-                    out var error))
+            bool wasHidden;
+            try
+            {
+                wasHidden = policyManager.IsApplicationHidden(admin, request.PackageName);
+            }
+            catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
             {
                 FinishWithLaunchResult(
                     launchResult.Fail(
                         AndroidAppLaunchStage.CommandReceived,
                         AndroidAppLaunchIssueKind.HiddenOrSuspendedPackageState,
-                        "setApplicationHidden=false failed",
-                        error),
+                        $"isApplicationHidden=unavailable:{exception.GetType().Name}"),
                     true);
                 return;
             }
 
-            launchResult = launchResult.WithStage(AndroidAppLaunchStage.PackageUnhidden);
+            visibilityTransaction = new TemporaryPackageVisibilityTransaction(wasHidden);
+            if (wasHidden)
+            {
+                if (!AndroidPolicyApi.TrySetApplicationHidden(
+                        policyManager,
+                        admin,
+                        request.PackageName,
+                        false,
+                        LogTag,
+                        out var error))
+                {
+                    FinishWithLaunchResult(
+                        launchResult.Fail(
+                            AndroidAppLaunchStage.CommandReceived,
+                            AndroidAppLaunchIssueKind.HiddenOrSuspendedPackageState,
+                            "setApplicationHidden=false failed",
+                            error),
+                        true);
+                    return;
+                }
+
+                visibilityTransaction.MarkPackageUnhidden();
+                launchResult = launchResult.WithStage(AndroidAppLaunchStage.PackageUnhidden);
+            }
+
             _launchResult = launchResult;
             if (TryGetPackageLaunchBlockIssue(policyManager, admin, request.PackageName, out var blockDetail) is
                 { } blockIssue)
             {
+                var failedResult = launchResult.Fail(
+                    AndroidAppLaunchStage.PackageUnhidden,
+                    blockIssue,
+                    blockDetail);
+                failedResult = TryHideImmediately(
+                    request,
+                    "package_blocked",
+                    failedResult,
+                    visibilityTransaction);
                 FinishWithLaunchResult(
-                    launchResult.Fail(
-                        AndroidAppLaunchStage.PackageUnhidden,
-                        blockIssue,
-                        blockDetail),
+                    failedResult,
                     true);
                 return;
             }
 
             if (PackageManager is null)
             {
+                var failedResult = launchResult.Fail(
+                    AndroidAppLaunchStage.PackageUnhidden,
+                    AndroidAppLaunchIssueKind.PackageManagerUnavailable,
+                    "packageManager=missing");
+                failedResult = TryHideImmediately(
+                    request,
+                    "package_manager_missing",
+                    failedResult,
+                    visibilityTransaction);
                 FinishWithLaunchResult(
-                    launchResult.Fail(
-                        AndroidAppLaunchStage.PackageUnhidden,
-                        AndroidAppLaunchIssueKind.PackageManagerUnavailable,
-                        "packageManager=missing"),
+                    failedResult,
                     true);
                 return;
             }
@@ -215,11 +250,17 @@ public sealed class ProxyActivity : Activity
             {
                 var issue = TryGetPackageLaunchBlockIssue(policyManager, admin, request.PackageName, out blockDetail)
                             ?? AndroidAppLaunchIssueKind.MissingLauncherActivity;
+                var failedResult = launchResult.Fail(
+                    AndroidAppLaunchStage.PackageUnhidden,
+                    issue,
+                    blockDetail ?? "launchIntent=null");
+                failedResult = TryHideImmediately(
+                    request,
+                    "launch_intent_missing",
+                    failedResult,
+                    visibilityTransaction);
                 FinishWithLaunchResult(
-                    launchResult.Fail(
-                        AndroidAppLaunchStage.PackageUnhidden,
-                        issue,
-                        blockDetail ?? "launchIntent=null"),
+                    failedResult,
                     true);
                 return;
             }
@@ -256,6 +297,7 @@ public sealed class ProxyActivity : Activity
                         TaskId,
                         startedResult,
                         AndroidIntentExtras.ReadParentFrozenCallback(Intent));
+                    visibilityTransaction.Commit();
                     Log.Debug(LogTag, $"Monitor service request sent for {request.PackageName}.");
                     FinishWithLaunchResult(startedResult, false);
                 }
@@ -265,7 +307,11 @@ public sealed class ProxyActivity : Activity
                         AndroidAppLaunchStage.StartActivityFailedWithException,
                         AndroidAppLaunchIssueKind.MissingLauncherActivity,
                         exception.ToString());
-                    failedResult = TryHideImmediately(request, "activity_not_found", failedResult);
+                    failedResult = TryHideImmediately(
+                        request,
+                        "activity_not_found",
+                        failedResult,
+                        visibilityTransaction);
                     FinishWithLaunchResult(failedResult, true);
                 }
                 catch (Exception exception)
@@ -275,7 +321,11 @@ public sealed class ProxyActivity : Activity
                         AndroidAppLaunchStage.StartActivityFailedWithException,
                         AndroidAppLaunchResult.ClassifyStartActivityException(exception),
                         exception.ToString());
-                    failedResult = TryHideImmediately(request, "launch_failed", failedResult);
+                    failedResult = TryHideImmediately(
+                        request,
+                        "launch_failed",
+                        failedResult,
+                        visibilityTransaction);
                     FinishWithLaunchResult(failedResult, true);
                 }
             });
@@ -283,12 +333,18 @@ public sealed class ProxyActivity : Activity
         catch (Exception exception)
         {
             Log.Error(LogTag, $"Proxy flow failed for {request.PackageName}: {exception}");
+            var failedResult = GetLaunchResult(request).Fail(
+                AndroidAppLaunchStage.CommandReceived,
+                AndroidAppLaunchResult.ClassifyStartActivityException(exception),
+                exception.ToString(),
+                $"Android не смог подготовить {request.DisplayName} к запуску.");
+            failedResult = TryHideImmediately(
+                request,
+                "proxy_flow_failed",
+                failedResult,
+                visibilityTransaction);
             FinishWithLaunchResult(
-                GetLaunchResult(request).Fail(
-                    AndroidAppLaunchStage.CommandReceived,
-                    AndroidAppLaunchResult.ClassifyStartActivityException(exception),
-                    exception.ToString(),
-                    $"Android не смог подготовить {request.DisplayName} к запуску."),
+                failedResult,
                 true);
         }
     }
@@ -509,8 +565,11 @@ public sealed class ProxyActivity : Activity
     private AndroidAppLaunchResult TryHideImmediately(
         HiddenAppLaunchRequest request,
         string reason,
-        AndroidAppLaunchResult launchResult)
+        AndroidAppLaunchResult launchResult,
+        TemporaryPackageVisibilityTransaction? visibilityTransaction)
     {
+        if (visibilityTransaction?.RollbackRequired != true) return launchResult;
+
         try
         {
             if (!AgnosiaUtilities.IsProfileOwner(this)
@@ -530,6 +589,7 @@ public sealed class ProxyActivity : Activity
                     out _))
             {
                 Log.Info(LogTag, $"App {request.PackageName} hidden again directly. reason={reason}");
+                visibilityTransaction.Commit();
                 launchResult = launchResult.WithStage(
                     AndroidAppLaunchStage.PackageRehidden,
                     $"proxy_fallback:{reason}");

@@ -55,6 +55,7 @@ public static class AndroidCommandContract
     public const string ExtraCallbackPackage = "callback_package";
     public const string ExtraCallbackSignature = "callback_signature";
     public const string ExtraPackageInstallerOperation = "package_installer_operation";
+    public const string ExtraRestoreHiddenState = "restore_hidden_state";
     public const string PackageInstallerOperationInstall = "install";
     public const string PackageInstallerOperationUninstall = "uninstall";
     public const string ErrorSystemAppUnsupported = "system_app_unsupported";

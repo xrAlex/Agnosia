@@ -1,6 +1,7 @@
 using Agnosia.Android.Receivers;
 using Android.Content;
 using Exception = System.Exception;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Activities;
 
@@ -12,7 +13,10 @@ public sealed partial class DummyActivity
         if (_finishRequested) return;
 
         if (resultCode == Result.Canceled)
+        {
+            RestoreHiddenStateAfterFailedPackageRemoval(Intent, "package removal canceled by user");
             FinishWithError("Операция с пакетом отменена пользователем.");
+        }
     }
 
     private void ActionInstallPackage()
@@ -91,7 +95,11 @@ public sealed partial class DummyActivity
         if (isSystem && _isProfileOwner && _policyManager is not null)
         {
             var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
-            if (!TryClearHiddenStateBeforePackageRemoval(admin, packageName, out var unhideError))
+            if (!TryClearHiddenStateBeforePackageRemoval(
+                    admin,
+                    packageName,
+                    out _,
+                    out var unhideError))
             {
                 FinishWithError(unhideError ?? $"Android не смог восстановить {packageName} перед удалением.");
                 return;
@@ -116,27 +124,48 @@ public sealed partial class DummyActivity
         if (_isProfileOwner && _policyManager is not null)
         {
             var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
-            if (!TryClearHiddenStateBeforePackageRemoval(admin, packageName, out var unhideError))
+            if (!TryClearHiddenStateBeforePackageRemoval(
+                    admin,
+                    packageName,
+                    out var restoreHiddenState,
+                    out var unhideError))
             {
                 FinishWithError(unhideError ?? $"Android не смог восстановить {packageName} перед удалением.");
                 return;
             }
+
+            intent.PutExtra(AndroidCommandContract.ExtraRestoreHiddenState, restoreHiddenState);
         }
+
+        intent.PutExtra(AndroidCommandContract.ExtraCallbackPackage, packageName);
+        intent.PutExtra(
+            AndroidCommandContract.ExtraPackageInstallerOperation,
+            AndroidCommandContract.PackageInstallerOperationUninstall);
+
+        var shouldRestoreHiddenState = intent.GetBooleanExtra(
+            AndroidCommandContract.ExtraRestoreHiddenState,
+            false);
 
         var pendingIntent = AndroidPendingIntentApi.CreatePackageInstallerCallbackPendingIntent(
             this,
             typeof(PackageInstallerCallbackReceiver),
             AgnosiaActions.PackageInstallerCallback,
             packageName,
-            AndroidCommandContract.PackageInstallerOperationUninstall);
-        if (!AndroidPackageApi.TryStartUninstall(this, packageName, pendingIntent)) FinishWithResult(Result.Canceled);
+            AndroidCommandContract.PackageInstallerOperationUninstall,
+            shouldRestoreHiddenState);
+        if (AndroidPackageApi.TryStartUninstall(this, packageName, pendingIntent)) return;
+
+        RestoreHiddenStateAfterFailedPackageRemoval(intent, "package removal did not start");
+        FinishWithError($"Android не смог начать удаление {packageName}.");
     }
 
     private bool TryClearHiddenStateBeforePackageRemoval(
         ComponentName admin,
         string packageName,
+        out bool restoreHiddenState,
         out string? error)
     {
+        restoreHiddenState = false;
         error = null;
         if (_policyManager is null)
         {
@@ -151,7 +180,10 @@ public sealed partial class DummyActivity
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
-            return true;
+            Log.Warn(LogTag,
+                $"Could not read hidden state before package removal. package={packageName}, error={exception.GetType().Name}.");
+            error = $"Android не смог проверить состояние {packageName} перед удалением.";
+            return false;
         }
 
         if (!isHidden) return true;
@@ -163,9 +195,37 @@ public sealed partial class DummyActivity
                 false,
                 LogTag,
                 out error))
+        {
+            restoreHiddenState = true;
             return true;
+        }
 
         error ??= $"Android не смог восстановить {packageName} перед удалением.";
         return false;
+    }
+
+    private void RestoreHiddenStateAfterFailedPackageRemoval(Intent? source, string operation)
+    {
+        if (!string.Equals(
+                source?.GetStringExtra(AndroidCommandContract.ExtraPackageInstallerOperation),
+                AndroidCommandContract.PackageInstallerOperationUninstall,
+                StringComparison.Ordinal)
+            || !PackageRemovalVisibility.ShouldRollback(
+                source?.GetBooleanExtra(AndroidCommandContract.ExtraRestoreHiddenState, false) == true,
+                uninstallSucceeded: false)
+            || !_isProfileOwner
+            || _policyManager is null)
+            return;
+
+        var packageName = source?.GetStringExtra(AndroidCommandContract.ExtraCallbackPackage)
+                          ?? source?.GetStringExtra(AndroidCommandContract.ExtraPackage);
+        if (string.IsNullOrWhiteSpace(packageName))
+        {
+            Log.Warn(LogTag, $"Cannot restore hidden state after {operation}: package name is missing.");
+            return;
+        }
+
+        var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
+        RestoreHiddenStateAfterPolicyOperation(admin, packageName, operation);
     }
 }

@@ -332,7 +332,7 @@ IPC построен без `.aidl`: используются `Android.OS.Messen
 
 После копирования приложения из личного профиля Agnosia пытается сразу подготовить ярлык и скрыть рабочую копию. Для скрытых рабочих приложений это важный сценарий: пользователь запускает их через ярлык, а не из списка приложений рабочего профиля.
 
-Пользовательские приложения копируются не через файловый менеджер, а через `PackageInstaller.Session`: Agnosia берёт `SourceDir` и `SplitSourceDirs`, пишет все части APK в install session и ждёт callback. Если Android возвращает `PendingUserAction`, `DummyActivity` открывает системный экран подтверждения и продолжает операцию после результата. Перед удалением скрытого пакета Agnosia временно снимает hidden state, иначе системный uninstall может не увидеть пакет. Команда `MoveToWork` в UI является составной операцией: сначала clone в рабочий профиль, затем отдельная silent-команда `QueryPackageState` через `SilentWorkProfile` подтверждает `installed=true` и ожидаемое hidden-состояние (`true` для пользовательской и `false` для системной копии). Только после этого разрешён uninstall из личного профиля. Ошибка, недоверенный transport, несовпадение package/state или исключение сохраняют личную копию и обновляют dashboard; если уже разрешённое удаление не удалось, рабочая копия остаётся созданной, а статус сообщает о частичном успехе.
+Пользовательские приложения копируются не через файловый менеджер, а через `PackageInstaller.Session`: Agnosia берёт `SourceDir` и `SplitSourceDirs`, пишет все части APK в install session и ждёт callback. Если Android возвращает `PendingUserAction`, `DummyActivity` открывает системный экран подтверждения и продолжает операцию после результата. Перед удалением скрытого пакета Agnosia временно снимает hidden state, иначе системный uninstall может не увидеть пакет. Признак исходного hidden-состояния передаётся через callback `PendingIntent`: отмена, ошибка старта, ошибка подтверждения и любой failure status повторно скрывают пакет, а success завершает транзакцию без rollback. Команда `MoveToWork` в UI является составной операцией: сначала clone в рабочий профиль, затем отдельная silent-команда `QueryPackageState` через `SilentWorkProfile` подтверждает `installed=true` и ожидаемое hidden-состояние (`true` для пользовательской и `false` для системной копии). Только после этого разрешён uninstall из личного профиля. Ошибка, недоверенный transport, несовпадение package/state или исключение сохраняют личную копию и обновляют dashboard; если уже разрешённое удаление не удалось, рабочая копия остаётся созданной, а статус сообщает о частичном успехе.
 
 ## Каталог приложений
 
@@ -351,7 +351,7 @@ AndroidDashboardReader.LoadAppInventoryAsync()
 
 | Поле | Источник |
 | --- | --- |
-| Название, package name, launchability | `PackageManager` и launch intent. |
+| Название, package name, launchability | `PackageManager`: обычный launch intent и package-scoped `MAIN/INFO`/`MAIN/LAUNCHER` для hidden components. |
 | Системность и installed/hidden state | `ApplicationInfo`, `DevicePolicyManager.isApplicationHidden`. |
 | APK и split APK | `ApplicationInfo.SourceDir`, `SplitSourceDirs`. |
 | Runtime grant state | `PackageInfo.RequestedPermissionsFlags`. |
@@ -397,7 +397,7 @@ ProxyActivity
    └─ стартует HiddenAppSessionMonitorService
 ```
 
-Так Agnosia может открыть приложение, которое было скрыто через device policy, и затем вернуть его в скрытое состояние.
+Так Agnosia может открыть приложение, которое было скрыто через device policy, и затем вернуть его в скрытое состояние. До подтверждённого `StartActivity` и запуска monitor unhide считается незавершённой транзакцией: missing launcher, suspended state, отсутствие PackageManager или исключение немедленно возвращают исходное hidden-состояние. Для пакетов без front-door Activity кнопка Launch не показывается.
 
 Метаданные ярлыка хранятся в `SharedPreferences` под ключом `hidden_shortcut_metadata:{package}`. В них лежат shortcut id, package name, target activity, label, base64-иконка и случайный token. При запуске pinned shortcut `ProxyActivity` проверяет token, поэтому произвольный intent с тем же action не должен открыть скрытое приложение. Если ярлык уже закреплён, Agnosia обновляет его через `ShortcutManager.updateShortcuts()` и сразу скрывает пакет; если создаётся новый ярлык, launcher запрашивает подтверждение пользователя, а `ShortcutPinReceiver` завершает скрытие после callback-а.
 

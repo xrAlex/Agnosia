@@ -122,12 +122,18 @@ public sealed partial class DummyActivity
                 catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
                 {
                     Log.Warn(LogTag, $"Android не смог открыть подтверждение установки пакета. Details: {exception}");
+                    RestoreHiddenStateAfterFailedPackageRemoval(
+                        intent,
+                        "package removal confirmation did not open");
                     FinishWithError("Android не смог открыть подтверждение установки пакета.");
                 }
 
                 return;
             }
 
+            RestoreHiddenStateAfterFailedPackageRemoval(
+                intent,
+                "package removal confirmation intent missing");
             FinishWithError("Android запросил подтверждение установки, но не предоставил экран подтверждения.");
             return;
         }
@@ -147,6 +153,7 @@ public sealed partial class DummyActivity
             return;
         }
 
+        RestoreHiddenStateAfterFailedPackageRemoval(intent, "package removal failed");
         FinishWithError(string.IsNullOrWhiteSpace(statusMessage)
             ? "Android отклонил установку пакета."
             : $"Android отклонил установку пакета: {statusMessage}");

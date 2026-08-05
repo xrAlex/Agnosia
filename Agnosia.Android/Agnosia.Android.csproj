@@ -37,6 +37,7 @@
 
     <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
         <Compile Remove="**\*.cs"/>
+        <Compile Include="Activities\TemporaryPackageVisibilityTransaction.cs"/>
         <Compile Include="Permissions\AppPermissionRiskCatalog.cs"/>
         <Compile Include="Permissions\AppPermissionRiskCatalog.AnalysisContext.cs"/>
         <Compile Include="Permissions\AppPermissionRiskCatalog.PermissionCombinationRule.cs"/>
@@ -83,6 +84,7 @@
         <Compile Include="InternalsVisibleTo.cs"/>
         <Compile Include="Platform\AuthenticationKeyMaterial.cs"/>
         <Compile Include="Platform\AndroidPackageAccessPolicy.cs"/>
+        <Compile Include="Packages\PackageLaunchability.cs"/>
     </ItemGroup>
 
     <ItemGroup>

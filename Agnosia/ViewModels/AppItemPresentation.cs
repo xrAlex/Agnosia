@@ -91,7 +91,7 @@ internal static class AppItemPresentation
 
     public static bool ShouldShowLaunch(AppSnapshot snapshot)
     {
-        return snapshot.CanLaunch || snapshot.Profile == ProfileKind.Work;
+        return snapshot.CanLaunch;
     }
 
     public static string GetLaunchLabel(AppSnapshot snapshot)

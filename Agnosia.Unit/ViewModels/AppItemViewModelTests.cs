@@ -158,10 +158,22 @@ public sealed class AppItemViewModelTests
         Assert.False(app.CanClone);
         Assert.False(app.CanUninstall);
         Assert.False(app.ShowPermissionRiskIndicator);
-        Assert.True(app.ShowLaunch);
+        Assert.False(app.ShowLaunch);
         Assert.Equal("Isolated", app.StatusTagLabel);
         Assert.Equal("UnfreezeAndOpen", app.LaunchLabel);
         Assert.Equal("CopyToPersonal", app.CloneLabel);
+    }
+
+    [Fact]
+    public void Hidden_work_app_with_front_door_activity_exposes_launch()
+    {
+        var app = CreateApp(TestSnapshots.App(
+            ProfileKind.Work,
+            isHidden: true,
+            canLaunch: true));
+
+        Assert.True(app.ShowLaunch);
+        Assert.True(app.LaunchCommand.CanExecute(null));
     }
 
     [Fact]

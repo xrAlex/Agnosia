@@ -12,7 +12,8 @@ public static class AndroidPendingIntentApi
         Type receiverType,
         string action,
         string? packageName = null,
-        string? operation = null)
+        string? operation = null,
+        bool restoreHiddenState = false)
     {
         var intent = new Intent(context, receiverType);
         intent.SetAction(action);
@@ -21,6 +22,8 @@ public static class AndroidPendingIntentApi
 
         if (!string.IsNullOrWhiteSpace(operation))
             intent.PutExtra(AndroidCommandContract.ExtraPackageInstallerOperation, operation);
+
+        intent.PutExtra(AndroidCommandContract.ExtraRestoreHiddenState, restoreHiddenState);
 
         var requestCode = string.IsNullOrWhiteSpace(packageName) && string.IsNullOrWhiteSpace(operation)
             ? 0

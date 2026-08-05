@@ -219,7 +219,9 @@ public static class AndroidAppInventoryApi
             SplitApks = includeApkPaths ? app.SplitSourceDirs?.ToArray() ?? [] : [],
             IsSystem = isSystem,
             IsHidden = isHidden,
-            CanLaunch = packageManager.GetLaunchIntentForPackage(packageName) is not null,
+            CanLaunch = PackageLaunchability.CanLaunch(
+                isInstalled || isHidden,
+                new AndroidPackageLaunchQuery(packageManager, packageName)),
             IsInstalled = isInstalled,
             IsInternetBlocked = isInternetBlocked,
             PermissionRiskAvailable = permissionRiskAvailable,
@@ -652,6 +654,50 @@ public static class AndroidAppInventoryApi
                                           || AndroidRecoverableException.IsMatch(exception))
         {
             return null;
+        }
+    }
+
+    private sealed class AndroidPackageLaunchQuery(PackageManager packageManager, string packageName)
+        : IPackageLaunchQuery
+    {
+        private const PackageInfoFlags HiddenActivityFlags =
+            PackageInfoFlags.MatchDisabledComponents | PackageInfoFlags.MatchUninstalledPackages;
+
+        public bool HasDirectLaunchIntent()
+        {
+            return packageManager.GetLaunchIntentForPackage(packageName) is not null;
+        }
+
+        public bool HasInfoActivity()
+        {
+            return HasMainActivity(Intent.CategoryInfo);
+        }
+
+        public bool HasLauncherActivity()
+        {
+            return HasMainActivity(Intent.CategoryLauncher);
+        }
+
+        private bool HasMainActivity(string category)
+        {
+            try
+            {
+                var intent = new Intent(Intent.ActionMain);
+                intent.AddCategory(category);
+                intent.SetPackage(packageName);
+                return packageManager.QueryIntentActivities(intent, HiddenActivityFlags)
+                    .Any(match => string.Equals(
+                        match.ActivityInfo?.PackageName,
+                        packageName,
+                        StringComparison.Ordinal));
+            }
+            catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+            {
+                Log.Debug(
+                    LogTag,
+                    $"Could not query hidden package launch activity. package={packageName}, category={category}, error={exception.GetType().Name}.");
+                return false;
+            }
         }
     }
 
