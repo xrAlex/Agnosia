@@ -10,7 +10,8 @@ namespace Agnosia.Android.Commands;
 internal sealed class AndroidAppCommandCoordinator(
     AndroidActivityCommandGateway commandRunner,
     AndroidPermissionCoordinator permissionCoordinator,
-    AndroidCommandCenter commandCenter)
+    AndroidCommandCenter commandCenter,
+    VpnRestoreOwnershipCoordinator vpnRestoreOwnershipCoordinator)
 {
     private const string LogTag = "AgnosiaTransientVpn";
     private const string ActivityResultLogTag = "AgnosiaActivityResult";
@@ -261,16 +262,9 @@ internal sealed class AndroidAppCommandCoordinator(
                 : OperationResult.Failure(error ?? "Android не смог открыть это приложение.");
         }
 
-        var intent = new Intent(AgnosiaActions.UnfreezeAndLaunch);
-        intent.PutExtra(AndroidCommandContract.ExtraLaunchPackageName, app.PackageName);
-        intent.PutExtra(AndroidCommandContract.ExtraLaunchDisplayName, app.Label);
-        intent.PutExtra(AndroidCommandContract.ExtraIsSystem, app.IsSystem);
-        if (!app.IsSystem)
-            intent.PutExtra(
-                AndroidCommandContract.ExtraParentFrozenCallback,
-                commandRunner.CreateWorkAppFrozenCallbackPendingIntent(app.PackageName));
         if (app.IsSystem)
         {
+            var intent = CreateWorkLaunchIntent(app, null);
             var preflight = commandRunner.PreflightWorkLaunch(intent);
             return !preflight.Succeeded
                 ? preflight
@@ -278,10 +272,23 @@ internal sealed class AndroidAppCommandCoordinator(
                     .ConfigureAwait(false);
         }
 
-        return await WorkLaunchVpnTransaction.ExecuteAsync(
-                _ => Task.FromResult(commandRunner.PreflightWorkLaunch(intent)),
-                EnsurePersonalVpnDisabledBeforeWorkLaunchAsync,
-                token => commandRunner.RunVoidOperationAsync(intent, true, token, "Открываем приложение."),
+        return await vpnRestoreOwnershipCoordinator.ExecuteLaunchAsync(
+                app.PackageName,
+                (scope, token) =>
+                {
+                    var intent = CreateWorkLaunchIntent(app, scope.LaunchId);
+                    return WorkLaunchVpnTransaction.ExecuteAsync(
+                        _ => Task.FromResult(commandRunner.PreflightWorkLaunch(intent)),
+                        takeoverToken => EnsurePersonalVpnDisabledBeforeWorkLaunchAsync(scope, takeoverToken),
+                        launchToken => commandRunner.RunVoidOperationAsync(
+                            intent,
+                            true,
+                            launchToken,
+                            "Открываем приложение."),
+                        scope.RollbackAsync,
+                        () => scope.AcquiredRestoreObligation,
+                        token);
+                },
                 () => RollbackPersonalVpnAfterFailedWorkLaunchAsync(app.PackageName),
                 cancellationToken)
             .ConfigureAwait(false);
@@ -330,27 +337,49 @@ internal sealed class AndroidAppCommandCoordinator(
             cancellationToken);
     }
 
-    private async Task<OperationResult> EnsurePersonalVpnDisabledBeforeWorkLaunchAsync(
+    private Intent CreateWorkLaunchIntent(AppSnapshot app, string? launchId)
+    {
+        var intent = new Intent(AgnosiaActions.UnfreezeAndLaunch);
+        intent.PutExtra(AndroidCommandContract.ExtraLaunchPackageName, app.PackageName);
+        intent.PutExtra(AndroidCommandContract.ExtraLaunchDisplayName, app.Label);
+        intent.PutExtra(AndroidCommandContract.ExtraIsSystem, app.IsSystem);
+        if (app.IsSystem) return intent;
+        if (string.IsNullOrWhiteSpace(launchId))
+            throw new InvalidOperationException("A VPN restore launch identity is required.");
+
+        intent.PutExtra(
+            AndroidCommandContract.ExtraParentFrozenCallback,
+            commandRunner.CreateWorkAppFrozenCallbackPendingIntent(app.PackageName, launchId));
+        return intent;
+    }
+
+    private async Task<WorkLaunchVpnTakeoverResult> EnsurePersonalVpnDisabledBeforeWorkLaunchAsync(
+        VpnRestoreLaunchScope scope,
         CancellationToken cancellationToken)
     {
         var activity = commandRunner.CurrentActivity;
         var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
+        if (scope.HasInheritedRestoreObligation)
+        {
+            Log.Info(LogTag, "VPN restore ownership inherited from the active work launch.");
+            return WorkLaunchVpnTakeoverResult.NotRequired(
+                OperationResult.Success("VPN уже отключен предыдущей сессией Agnosia."));
+        }
+
         if (!storage.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch))
         {
-            storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
             Log.Info(LogTag, "Disable-VPN-before-launch is disabled in settings.");
-            return new OperationResult(true, string.Empty);
+            return WorkLaunchVpnTakeoverResult.NotRequired(OperationResult.Success(string.Empty));
         }
 
         Log.Info(LogTag, "VPN Guard is enabled for parent launch.");
         if (!await IsVpnActiveAsync(activity, cancellationToken).ConfigureAwait(false))
         {
-            storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
             Log.Info(LogTag, "No active VPN detected, continuing without the transient VPN service.");
-            return new OperationResult(true, string.Empty);
+            return WorkLaunchVpnTakeoverResult.NotRequired(OperationResult.Success(string.Empty));
         }
 
-        storage.SetBoolean(StorageKeys.HaveActiveVpnSession, true);
+        scope.MarkRestoreRequired();
 
         Intent? prepareIntent;
         try
@@ -360,7 +389,8 @@ internal sealed class AndroidAppCommandCoordinator(
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
             Log.Warn(LogTag, $"Failed to prepare VPN permission request before parent launch: {exception}");
-            return OperationResult.Failure("Android не смог открыть запрос доступа к VPN.");
+            return WorkLaunchVpnTakeoverResult.Acquired(
+                OperationResult.Failure("Android не смог открыть запрос доступа к VPN."));
         }
 
         if (prepareIntent is not null)
@@ -369,16 +399,16 @@ internal sealed class AndroidAppCommandCoordinator(
                 .ConfigureAwait(false);
 
             if (prepareResult.ResultCode != Result.Ok)
-                return OperationResult.Failure("Android не выдал Agnosia временное управление VPN.");
+                return WorkLaunchVpnTakeoverResult.Acquired(
+                    OperationResult.Failure("Android не выдал Agnosia временное управление VPN."));
         }
 
         activity = commandRunner.CurrentActivity;
         if (!await IsVpnActiveAsync(activity, cancellationToken).ConfigureAwait(false))
         {
-            storage.SetBoolean(StorageKeys.HaveActiveVpnSession, true);
             commandRunner.ShowVpnGuardOverlay();
             Log.Debug(LogTag, "Active VPN was cleared while preparing VPN control.");
-            return OperationResult.Success("VPN отключен.");
+            return WorkLaunchVpnTakeoverResult.Acquired(OperationResult.Success("VPN отключен."));
         }
 
         var vpnBaseline = AndroidVpnApi.GetVisibleVpnNetworkHandles(activity);
@@ -389,17 +419,17 @@ internal sealed class AndroidAppCommandCoordinator(
         if (!disconnectResult.Succeeded)
         {
             Log.Warn(LogTag, "Transient VpnService failed to disconnect the active VPN.");
-            return disconnectResult;
+            return WorkLaunchVpnTakeoverResult.Acquired(disconnectResult);
         }
 
         activity = commandRunner.CurrentActivity;
         if (await IsVpnActiveAsync(activity, vpnBaseline, cancellationToken).ConfigureAwait(false))
-            return OperationResult.Failure(
-                "VPN все еще активен в личном профиле. Сторонний клиент мог сразу подключиться снова.");
+            return WorkLaunchVpnTakeoverResult.Acquired(
+                OperationResult.Failure(
+                    "VPN все еще активен в личном профиле. Сторонний клиент мог сразу подключиться снова."));
 
-        storage.SetBoolean(StorageKeys.HaveActiveVpnSession, true);
         commandRunner.ShowVpnGuardOverlay();
-        return OperationResult.Success("VPN отключен.");
+        return WorkLaunchVpnTakeoverResult.Acquired(OperationResult.Success("VPN отключен."));
     }
 
     private Task<OperationResult> RollbackPersonalVpnAfterFailedWorkLaunchAsync(string packageName)

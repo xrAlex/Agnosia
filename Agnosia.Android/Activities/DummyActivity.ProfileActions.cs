@@ -62,9 +62,17 @@ public sealed partial class DummyActivity
         {
             cancellationToken.ThrowIfCancellationRequested();
             var trigger = Intent?.GetStringExtra(AndroidProfileCommandGateway.ExtraTrigger) ?? "work_app_frozen";
+            var packageName = Intent?.GetStringExtra(AndroidCommandContract.ExtraCallbackPackage);
+            if (string.IsNullOrWhiteSpace(packageName))
+            {
+                FinishWithError("Событие заморозки не содержит имя приложения.");
+                return;
+            }
 
             var result = await WorkAppFrozenHandler.RestoreParentVpnAndHideOverlayAsync(
                 this,
+                packageName,
+                null,
                 trigger,
                 LogTag,
                 cancellationToken).ConfigureAwait(false);

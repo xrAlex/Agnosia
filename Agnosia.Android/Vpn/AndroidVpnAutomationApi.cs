@@ -97,31 +97,19 @@ public static class AndroidVpnAutomationApi
             return Task.FromResult(OperationResult.Success(string.Empty));
         }
 
-        var hadActiveVpnSession = storage.GetBoolean(StorageKeys.HaveActiveVpnSession);
-        if (!hadActiveVpnSession)
-        {
-            Log.Debug(LogTag,
-                $"Enable-after-freeze is disabled, VPN was not enabled before it was disabled. trigger={trigger}, hadActiveVpnSession={hadActiveVpnSession}.");
-            return Task.FromResult(OperationResult.Success(string.Empty));
-        }
-
         if (AndroidVpnApi.IsVpnActive(context) && !ShouldIgnoreSingleVisibleLockdownVpn(context, trigger))
         {
-            storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
             Log.Debug(LogTag, $"VPN is already active; skipping enable-after-freeze command. trigger={trigger}.");
             return Task.FromResult(OperationResult.Success(string.Empty));
         }
 
         var definition = ResolveInstalledPackage(context, ResolveClient(AndroidSettingsStore.LoadVpnAfterWorkFreezeClient(storage)));
         Log.Debug(LogTag,
-            $"Starting VPN after work freeze. client={definition.DisplayName}, trigger={trigger}, hadActiveVpnSession={hadActiveVpnSession}.");
+            $"Starting VPN after work freeze. client={definition.DisplayName}, trigger={trigger}.");
 
         try
         {
-            var result = StartClient(context, definition, storage);
-            if (result.Succeeded) storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
-
-            return Task.FromResult(result);
+            return Task.FromResult(StartClient(context, definition, storage));
         }
         catch (ActivityNotFoundException)
         {

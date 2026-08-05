@@ -7,7 +7,8 @@ namespace Agnosia.Android.Modules;
 
 internal sealed partial class AndroidModuleCoordinator(
     AndroidActivityCommandGateway commandRunner,
-    AndroidPermissionCoordinator permissionCoordinator)
+    AndroidPermissionCoordinator permissionCoordinator,
+    VpnRestoreOwnershipCoordinator vpnRestoreOwnershipCoordinator)
 {
     private const string LogTag = "AgnosiaModules";
 
@@ -151,7 +152,8 @@ internal sealed partial class AndroidModuleCoordinator(
         var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
         storage.SetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch, enabled);
         storage.SetBoolean(StorageKeys.EnableVpnAfterWorkFreeze, enabled);
-        if (!enabled) storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
+        if (!enabled)
+            await vpnRestoreOwnershipCoordinator.ClearAsync(cancellationToken).ConfigureAwait(false);
 
         var syncResult = await TrySyncBooleanSettingAsync(
                 activity,

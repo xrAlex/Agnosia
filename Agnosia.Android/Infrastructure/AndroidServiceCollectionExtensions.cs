@@ -1,6 +1,7 @@
 using Agnosia.Android.Commands;
 using Agnosia.Android.Commands.Handlers;
 using Agnosia.Android.Commands.Transports;
+using Agnosia.Android.Vpn;
 #if AGNOSIA_ANDROID
 using Agnosia.Platform;
 #endif
@@ -32,6 +33,16 @@ internal static class AndroidServiceCollectionExtensions
         services.AddSingleton<IAndroidCommandTransport, ActivityCommandTransport>();
 
         services.AddSingleton<LocalStorageManager>();
+        services.AddSingleton(provider =>
+        {
+            var storage = provider.GetRequiredService<LocalStorageManager>();
+            return new VpnRestoreOwnershipCoordinator(
+                () => storage.GetString(StorageKeys.VpnRestoreOwnershipState),
+                raw => storage.SetString(StorageKeys.VpnRestoreOwnershipState, raw),
+                () => storage.Remove(StorageKeys.VpnRestoreOwnershipState),
+                () => storage.GetBoolean(StorageKeys.HaveActiveVpnSession),
+                () => storage.Remove(StorageKeys.HaveActiveVpnSession));
+        });
         services.AddSingleton<SettingsManager>();
         services.AddSingleton<IAndroidActivityHostAccessor, AndroidActivityHostAccessor>();
         services.AddSingleton(provider => new AndroidActivityCommandGateway(

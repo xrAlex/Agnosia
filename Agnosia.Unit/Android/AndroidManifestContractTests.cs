@@ -379,13 +379,13 @@ public sealed class AndroidManifestContractTests
             RepositoryPaths.Get("Agnosia.Android", "Commands", "AndroidAppCommandCoordinator.cs"));
         var inAppLaunch = Regex.Match(
             coordinatorSource,
-            @"private async Task<OperationResult> EnsurePersonalVpnDisabledBeforeWorkLaunchAsync[\s\S]*?\n    private async Task<ShortcutPreparationResult> PreparePinnedShortcutInParentAsync",
+            @"private async Task<WorkLaunchVpnTakeoverResult> EnsurePersonalVpnDisabledBeforeWorkLaunchAsync[\s\S]*?\n    private async Task<ShortcutPreparationResult> PreparePinnedShortcutInParentAsync",
             RegexOptions.Singleline).Value;
         var proxySource = File.ReadAllText(
             RepositoryPaths.Get("Agnosia.Android", "Activities", "ProxyActivity.cs"));
         var shortcutLaunch = Regex.Match(
             proxySource,
-            @"private async Task<OperationResult> PrepareShortcutVpnTakeoverAsync[\s\S]*?\n    private void LaunchVisibleSystemPackage",
+            @"private async Task<WorkLaunchVpnTakeoverResult> PrepareShortcutVpnTakeoverAsync[\s\S]*?\n    private void LaunchVisibleSystemPackage",
             RegexOptions.Singleline).Value;
 
         Assert.InRange(
@@ -398,6 +398,58 @@ public sealed class AndroidManifestContractTests
             shortcutLaunch.IndexOf("VpnService.Prepare(this)", StringComparison.Ordinal) - 1);
         Assert.Contains("VPN Guard is enabled for parent launch", inAppLaunch, StringComparison.Ordinal);
         Assert.Contains("VPN Guard is enabled for shortcut launch", shortcutLaunch, StringComparison.Ordinal);
+    }
+
+    // Ловит обход durable owner через прежний глобальный boolean в UI, shortcut или restore callback.
+    [Fact]
+    public void Vpn_restore_ownership_is_centralized_for_both_launch_paths_and_callbacks()
+    {
+        var storageKeysSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Storage", "StorageKeys.cs"));
+        var servicesSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Infrastructure", "AndroidServiceCollectionExtensions.cs"));
+        var coordinatorSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Commands", "AndroidAppCommandCoordinator.cs"));
+        var proxySource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Activities", "ProxyActivity.cs"));
+        var automationSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Vpn", "AndroidVpnAutomationApi.cs"));
+        var handlerSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Vpn", "WorkAppFrozenHandler.cs"));
+        var pendingIntentSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Packages", "AgnosiaPendingIntentFactory.cs"));
+        var authenticationSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Platform", "AuthenticationUtility.cs"));
+
+        Assert.Contains("VpnRestoreOwnershipState", storageKeysSource, StringComparison.Ordinal);
+        Assert.Contains("VpnRestoreOwnershipCoordinator", servicesSource, StringComparison.Ordinal);
+        Assert.Contains("vpnRestoreOwnershipCoordinator.ExecuteLaunchAsync", coordinatorSource, StringComparison.Ordinal);
+        Assert.Contains("scope.LaunchId", coordinatorSource, StringComparison.Ordinal);
+        Assert.Contains("GetRequiredService<VpnRestoreOwnershipCoordinator>()", proxySource, StringComparison.Ordinal);
+        Assert.Contains("scope.LaunchId", proxySource, StringComparison.Ordinal);
+        Assert.Contains("SignWorkAppFrozenCallback(intent, packageName, launchId)", pendingIntentSource,
+            StringComparison.Ordinal);
+        Assert.Contains("GetStableRequestCode(AgnosiaActions.WorkAppFrozen, packageName, launchId)",
+            pendingIntentSource,
+            StringComparison.Ordinal);
+        Assert.Contains("ExtraCallbackLaunchId", authenticationSource, StringComparison.Ordinal);
+        Assert.Contains("CompleteOwnerAsync", handlerSource, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "SetBoolean(StorageKeys.HaveActiveVpnSession",
+            coordinatorSource,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "SetBoolean(StorageKeys.HaveActiveVpnSession",
+            proxySource,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "GetBoolean(StorageKeys.HaveActiveVpnSession",
+            automationSource,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "SetBoolean(StorageKeys.HaveActiveVpnSession",
+            automationSource,
+            StringComparison.Ordinal);
     }
 
     [Fact]

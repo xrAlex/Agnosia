@@ -34,6 +34,8 @@ public sealed class WorkAppFrozenReceiver : BroadcastReceiver
 
         var pendingResult = GoAsync();
         var appContext = context.ApplicationContext ?? context;
+        var packageName = intent.GetStringExtra(AndroidCommandContract.ExtraCallbackPackage)!;
+        var launchId = intent.GetStringExtra(AndroidCommandContract.ExtraCallbackLaunchId);
         var trigger = intent.GetStringExtra(AndroidProfileCommandGateway.ExtraTrigger) ?? "work_app_frozen_broadcast";
         _ = Task.Run(async () =>
         {
@@ -43,6 +45,8 @@ public sealed class WorkAppFrozenReceiver : BroadcastReceiver
 
                 var result = await WorkAppFrozenHandler.RestoreParentVpnAndHideOverlayAsync(
                     appContext,
+                    packageName,
+                    launchId,
                     trigger,
                     LogTag).ConfigureAwait(false);
                 if (result.Succeeded)

@@ -14,7 +14,6 @@ namespace Agnosia.Android.Platform;
 public static class AuthenticationUtility
 {
     private const string IntentSignaturePayloadVersion = "AGNOSIA_INTENT_SIGNATURE_1";
-    private const string WorkAppFrozenCallbackPayloadVersion = "AGNOSIA_WORK_APP_FROZEN_CALLBACK_1";
     private const string ExtraAuthKey = "auth_key";
     private const string ExtraSignature = "signature";
     private const string ExtraTimestamp = "timestamp";
@@ -109,16 +108,17 @@ public static class AuthenticationUtility
         return FixedTimeEqualsHex(signature, expectedSignature);
     }
 
-    public static void SignWorkAppFrozenCallback(Intent intent, string packageName)
+    public static void SignWorkAppFrozenCallback(Intent intent, string packageName, string launchId)
     {
         var key = GetExistingKey();
         if (string.IsNullOrWhiteSpace(key))
             throw new InvalidOperationException("No stored Agnosia authentication key is available.");
 
         intent.PutExtra(AndroidCommandContract.ExtraCallbackPackage, packageName);
+        intent.PutExtra(AndroidCommandContract.ExtraCallbackLaunchId, launchId);
         intent.PutExtra(
             AndroidCommandContract.ExtraCallbackSignature,
-            SignPayload(key, CreateWorkAppFrozenCallbackPayload(packageName)));
+            SignPayload(key, WorkAppFrozenCallbackPayload.Create(packageName, launchId)));
     }
 
     public static bool CheckWorkAppFrozenCallback(Intent? intent)
@@ -133,8 +133,12 @@ public static class AuthenticationUtility
         var key = GetExistingKey();
         if (string.IsNullOrWhiteSpace(key)) return false;
 
+        var launchId = intent.GetStringExtra(AndroidCommandContract.ExtraCallbackLaunchId);
         var signature = intent.GetStringExtra(AndroidCommandContract.ExtraCallbackSignature);
-        var expectedSignature = SignPayload(key, CreateWorkAppFrozenCallbackPayload(packageName));
+        var payload = string.IsNullOrWhiteSpace(launchId)
+            ? WorkAppFrozenCallbackPayload.CreateLegacy(packageName)
+            : WorkAppFrozenCallbackPayload.Create(packageName, launchId);
+        var expectedSignature = SignPayload(key, payload);
         return FixedTimeEqualsHex(signature, expectedSignature);
     }
 
@@ -194,11 +198,6 @@ public static class AuthenticationUtility
                && !string.Equals(key, ExtraTimestamp, StringComparison.Ordinal)
                && !string.Equals(key, AndroidCommandContract.ExtraFileShuttleCallbackMessenger, StringComparison.Ordinal)
                && !string.Equals(key, AndroidCommandContract.ExtraParentFrozenCallback, StringComparison.Ordinal);
-    }
-
-    private static string CreateWorkAppFrozenCallbackPayload(string packageName)
-    {
-        return WorkAppFrozenCallbackPayloadVersion + "\n" + packageName;
     }
 
     private static string EncodeExtraValue(Bundle extras, string key)

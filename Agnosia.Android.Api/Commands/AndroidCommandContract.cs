@@ -53,6 +53,7 @@ public static class AndroidCommandContract
     public const string ResultError = "error";
     public const string ExtraParentFrozenCallback = "parent_frozen_callback";
     public const string ExtraCallbackPackage = "callback_package";
+    public const string ExtraCallbackLaunchId = "callback_launch_id";
     public const string ExtraCallbackSignature = "callback_signature";
     public const string ExtraPackageInstallerOperation = "package_installer_operation";
     public const string ExtraRestoreHiddenState = "restore_hidden_state";

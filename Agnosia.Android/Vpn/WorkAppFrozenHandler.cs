@@ -8,21 +8,30 @@ internal static class WorkAppFrozenHandler
 {
     public static async Task<OperationResult> RestoreParentVpnAndHideOverlayAsync(
         Context context,
+        string packageName,
+        string? launchId,
         string trigger,
         string logTag,
         CancellationToken cancellationToken = default)
     {
+        var ownerMatched = false;
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var result = await AndroidVpnAutomationApi.EnableConfiguredVpnAfterWorkFreezeAsync(context, trigger)
+            var coordinator = ServiceRegistry.GetRequiredService<VpnRestoreOwnershipCoordinator>();
+            var completion = await coordinator.CompleteOwnerAsync(
+                    packageName,
+                    launchId,
+                    () => AndroidVpnAutomationApi.EnableConfiguredVpnAfterWorkFreezeAsync(context, trigger),
+                    cancellationToken)
                 .ConfigureAwait(false);
+            ownerMatched = completion.OwnerMatched;
             cancellationToken.ThrowIfCancellationRequested();
-            return result;
+            return completion.Result;
         }
         finally
         {
-            HideOverlay(context, logTag);
+            if (ownerMatched) HideOverlay(context, logTag);
         }
     }
 

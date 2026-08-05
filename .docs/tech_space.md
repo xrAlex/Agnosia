@@ -489,7 +489,9 @@ VPN-логика решает две отдельные задачи:
              └─ failure/cancel/timeout → немедленно вернуть VPN
 ```
 
-Флаг `have_active_vpn_session` сохраняет обязательство вернуть VPN, который был активен до takeover. Обязательство записывается до `VpnService.prepare()`, потому что уже выдача права другому VPN-приложению может деактивировать прежнее соединение.
+Обязательство вернуть VPN хранится как versioned durable ownership-запись с `launchId` и package name. Координатор сериализует UI launch, pinned shortcut и callback одним process-wide async gate. Обязательство записывается до `VpnService.prepare()`, потому что уже выдача права другому VPN-приложению может деактивировать прежнее соединение. Прежний `have_active_vpn_session=true` при первом чтении мигрирует в новый формат.
+
+При повторном hidden-launch, пока VPN уже отключён Agnosia, новая сессия наследует restore obligation без повторного takeover. После подтверждённого запуска она заменяет прежнего owner; при failure/cancellation/exception прежний owner сохраняется и VPN не восстанавливается поверх ещё активной hidden-сессии.
 
 Отключение VPN встроено в два пути запуска: команду `LaunchAsync` из UI и запуск через pinned shortcut. Оба до takeover проверяют существование managed profile, quiet mode, разрешение cross-profile interaction и explicit target Agnosia. Если Android требует подтверждение `VpnService.prepare()`, пользователь видит системный экран. Если после transient VPN активный VPN всё ещё обнаруживается, запуск рабочего приложения прерывается, потому что сторонний клиент мог сразу подключиться обратно.
 
@@ -497,7 +499,7 @@ UI-путь получает подписанный `AndroidAppLaunchResult` ч�
 
 ### Восстановление VPN
 
-Когда рабочее приложение снова скрыто, рабочий профиль отправляет событие `WorkAppFrozen` в личный профиль. Обработчик `WorkAppFrozenHandler` вызывает `AndroidVpnAutomationApi.EnableConfiguredVpnAfterWorkFreezeAsync()` и скрывает overlay-индикатор.
+Когда рабочее приложение снова скрыто, рабочий профиль отправляет событие `WorkAppFrozen` в личный профиль. Callback содержит package и `launchId`, а подпись HMAC связывает оба значения. `WorkAppFrozenHandler` вызывает `AndroidVpnAutomationApi.EnableConfiguredVpnAfterWorkFreezeAsync()` и скрывает overlay только если callback совпал с текущим owner. Callback заменённой сессии игнорируется. Ownership очищается только после успешного restore либо если другой VPN уже активен.
 
 Поддерживаемые клиенты автоматизации:
 
@@ -519,6 +521,8 @@ UI-путь получает подписанный `AndroidAppLaunchResult` ч�
 `OverlayVpnService` умеет рисовать небольшой полупрозрачный квадрат 24 dp в правом верхнем углу экрана. Он задуман как технический индикатор VPN-сценария и работает только при выданном доступе `SYSTEM_ALERT_WINDOW`.
 
 Сервис не принимает ввод, не забирает фокус и показывается после успешного временного отключения VPN перед запуском рабочего приложения. Обработчик `WorkAppFrozen` всегда пытается скрыть overlay через bind к сервису после попытки вернуть VPN-клиент. Overlay остаётся вспомогательной возможностью: отсутствие видимого квадрата не блокирует отключение VPN, запуск рабочего приложения, заморозку или восстановление VPN.
+
+В этом сценарии `WorkAppFrozen` означает callback, прошедший проверку current owner: устаревший callback не скрывает overlay.
 
 ## Lockdown
 
@@ -656,6 +660,7 @@ Android-проект собирается как APK с `ApplicationId` `com.agn
 | Версия Agnosia в рабочем профиле устарела | Личный профиль пытается переустановить актуальный APK в рабочий профиль и повторить owner-check. |
 | Activity-команда стартует, пока `MainActivity` не resumed | Запрос ставится в очередь, а устаревшие фоновые icon-запросы могут быть отменены. |
 | Transient VPN не смог отключить активный VPN | Запуск рабочего приложения отменяется, чтобы не обещать скрытие VPN-состояния. |
+| Второй hidden-launch начат до завершения первого | Он наследует durable VPN restore obligation; после success становится новым owner, а устаревший callback первой сессии игнорируется. |
 | File Shuttle показывает пустой root | Проверяются `AgnosiaFileShuttleClient`, `AgnosiaDocumentsProvider`, `START_FILE_SHUTTLE_*`, `BAL_BLOCK`, timeout, `MANAGE_EXTERNAL_STORAGE` и состояние тумблера в обоих профилях. |
 
 ## Коротко о главном потоке

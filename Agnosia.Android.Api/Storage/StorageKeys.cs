@@ -26,4 +26,5 @@ public static class StorageKeys
     public const string HiddenShortcutMetadataPrefix = "hidden_shortcut_metadata:";
     public const string HiddenAppActiveSession = "hidden_app_active_session";
     public const string HaveActiveVpnSession = "have_active_vpn_session";
+    public const string VpnRestoreOwnershipState = "vpn_restore_ownership_state";
 }

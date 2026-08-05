@@ -14,9 +14,10 @@ public sealed class WorkLaunchVpnTransactionTests
 
         var result = await WorkLaunchVpnTransaction.ExecuteAsync(
             _ => Complete("preflight", OperationResult.Failure("profile unavailable")),
-            _ => Complete("takeover", OperationResult.Success("vpn disabled")),
+            _ => CompleteTakeover("takeover", WorkLaunchVpnTakeoverResult.Acquired(OperationResult.Success("vpn disabled"))),
             _ => Complete("launch", OperationResult.Success("session started")),
             () => Complete("rollback", OperationResult.Success("vpn restored")),
+            () => false,
             CancellationToken.None);
 
         Assert.False(result.Succeeded);
@@ -28,6 +29,14 @@ public sealed class WorkLaunchVpnTransactionTests
             calls.Add(call);
             return Task.FromResult(operationResult);
         }
+
+        Task<WorkLaunchVpnTakeoverResult> CompleteTakeover(
+            string call,
+            WorkLaunchVpnTakeoverResult takeoverResult)
+        {
+            calls.Add(call);
+            return Task.FromResult(takeoverResult);
+        }
     }
 
     // Ловит потерю rollback после quiet-mode/transfer/timeout failure downstream launch.
@@ -38,9 +47,10 @@ public sealed class WorkLaunchVpnTransactionTests
 
         var result = await WorkLaunchVpnTransaction.ExecuteAsync(
             _ => Complete("preflight", OperationResult.Success(string.Empty)),
-            _ => Complete("takeover", OperationResult.Success("vpn disabled")),
+            _ => CompleteTakeover("takeover", WorkLaunchVpnTakeoverResult.Acquired(OperationResult.Success("vpn disabled"))),
             _ => Complete("launch", OperationResult.Failure("transfer failed")),
             () => Complete("rollback", OperationResult.Success("vpn restored")),
+            () => false,
             CancellationToken.None);
 
         Assert.False(result.Succeeded);
@@ -53,6 +63,14 @@ public sealed class WorkLaunchVpnTransactionTests
             calls.Add(call);
             return Task.FromResult(operationResult);
         }
+
+        Task<WorkLaunchVpnTakeoverResult> CompleteTakeover(
+            string call,
+            WorkLaunchVpnTakeoverResult takeoverResult)
+        {
+            calls.Add(call);
+            return Task.FromResult(takeoverResult);
+        }
     }
 
     // Ловит отказ rollback, когда takeover уже мог отключить VPN, но сам вернул failure.
@@ -63,9 +81,10 @@ public sealed class WorkLaunchVpnTransactionTests
 
         var result = await WorkLaunchVpnTransaction.ExecuteAsync(
             _ => Complete("preflight", OperationResult.Success(string.Empty)),
-            _ => Complete("takeover", OperationResult.Failure("disconnect failed")),
+            _ => CompleteTakeover("takeover", WorkLaunchVpnTakeoverResult.Acquired(OperationResult.Failure("disconnect failed"))),
             _ => Complete("launch", OperationResult.Success("session started")),
             () => Complete("rollback", OperationResult.Success("vpn restored")),
+            () => false,
             CancellationToken.None);
 
         Assert.False(result.Succeeded);
@@ -78,6 +97,14 @@ public sealed class WorkLaunchVpnTransactionTests
             calls.Add(call);
             return Task.FromResult(operationResult);
         }
+
+        Task<WorkLaunchVpnTakeoverResult> CompleteTakeover(
+            string call,
+            WorkLaunchVpnTakeoverResult takeoverResult)
+        {
+            calls.Add(call);
+            return Task.FromResult(takeoverResult);
+        }
     }
 
     // Ловит пропуск rollback, когда launch отменён после takeover.
@@ -89,13 +116,14 @@ public sealed class WorkLaunchVpnTransactionTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             WorkLaunchVpnTransaction.ExecuteAsync(
                 _ => Task.FromResult(OperationResult.Success(string.Empty)),
-                _ => Task.FromResult(OperationResult.Success("vpn disabled")),
+                _ => Task.FromResult(WorkLaunchVpnTakeoverResult.Acquired(OperationResult.Success("vpn disabled"))),
                 _ => Task.FromCanceled<OperationResult>(new CancellationToken(canceled: true)),
                 () =>
                 {
                     rolledBack = true;
                     return Task.FromResult(OperationResult.Success("vpn restored"));
                 },
+                () => false,
                 CancellationToken.None));
 
         Assert.True(rolledBack);
@@ -110,13 +138,14 @@ public sealed class WorkLaunchVpnTransactionTests
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             WorkLaunchVpnTransaction.ExecuteAsync(
                 _ => Task.FromResult(OperationResult.Success(string.Empty)),
-                _ => Task.FromResult(OperationResult.Success("vpn disabled")),
+                _ => Task.FromResult(WorkLaunchVpnTakeoverResult.Acquired(OperationResult.Success("vpn disabled"))),
                 _ => throw new InvalidOperationException("launch crashed"),
                 () =>
                 {
                     rolledBack = true;
                     return Task.FromResult(OperationResult.Success("vpn restored"));
                 },
+                () => false,
                 CancellationToken.None));
 
         Assert.Equal("launch crashed", exception.Message);
@@ -131,17 +160,92 @@ public sealed class WorkLaunchVpnTransactionTests
 
         var result = await WorkLaunchVpnTransaction.ExecuteAsync(
             _ => Task.FromResult(OperationResult.Success(string.Empty)),
-            _ => Task.FromResult(OperationResult.Success("vpn disabled")),
+            _ => Task.FromResult(WorkLaunchVpnTakeoverResult.Acquired(OperationResult.Success("vpn disabled"))),
             _ => Task.FromResult(OperationResult.Success("session started")),
             () =>
             {
                 rolledBack = true;
                 return Task.FromResult(OperationResult.Success("vpn restored"));
             },
+            () => false,
             CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal("session started", result.Message);
         Assert.False(rolledBack);
+    }
+
+    // Ловит преждевременное восстановление VPN владельца A после ошибки унаследованного запуска B.
+    [Fact]
+    public async Task ExecuteAsync_does_not_roll_back_inherited_owner_after_launch_failure()
+    {
+        var rolledBack = false;
+
+        var result = await WorkLaunchVpnTransaction.ExecuteAsync(
+            _ => Task.FromResult(OperationResult.Success(string.Empty)),
+            _ => Task.FromResult(WorkLaunchVpnTakeoverResult.NotRequired(OperationResult.Success("inherited"))),
+            _ => Task.FromResult(OperationResult.Failure("launch failed")),
+            () =>
+            {
+                rolledBack = true;
+                return Task.FromResult(OperationResult.Success("restored"));
+            },
+            () => false,
+            CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("launch failed", result.Message);
+        Assert.False(rolledBack);
+    }
+
+    // Ловит rollback для операции, которая не получила и не унаследовала VPN ownership.
+    [Fact]
+    public async Task ExecuteAsync_does_not_roll_back_when_takeover_was_not_required_and_failed()
+    {
+        var rolledBack = false;
+
+        var result = await WorkLaunchVpnTransaction.ExecuteAsync(
+            _ => Task.FromResult(OperationResult.Success(string.Empty)),
+            _ => Task.FromResult(WorkLaunchVpnTakeoverResult.NotRequired(OperationResult.Failure("not required"))),
+            _ => Task.FromResult(OperationResult.Success("session started")),
+            () =>
+            {
+                rolledBack = true;
+                return Task.FromResult(OperationResult.Success("restored"));
+            },
+            () => false,
+            CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("not required", result.Message);
+        Assert.False(rolledBack);
+    }
+
+    // Ловит потерю rollback, если takeover бросил исключение уже после durable ownership claim.
+    [Fact]
+    public async Task ExecuteAsync_rolls_back_takeover_exception_after_ownership_claim()
+    {
+        var ownershipClaimed = false;
+        var rolledBack = false;
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            WorkLaunchVpnTransaction.ExecuteAsync(
+                _ => Task.FromResult(OperationResult.Success(string.Empty)),
+                _ =>
+                {
+                    ownershipClaimed = true;
+                    throw new InvalidOperationException("takeover crashed");
+                },
+                _ => Task.FromResult(OperationResult.Success("session started")),
+                () =>
+                {
+                    rolledBack = true;
+                    return Task.FromResult(OperationResult.Success("restored"));
+                },
+                () => ownershipClaimed,
+                CancellationToken.None));
+
+        Assert.Equal("takeover crashed", exception.Message);
+        Assert.True(rolledBack);
     }
 }

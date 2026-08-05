@@ -46,13 +46,14 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
         return AndroidProfileCommandGateway.CanReachWorkProfileAsync(this, cancellationToken);
     }
 
-    public PendingIntent CreateWorkAppFrozenCallbackPendingIntent(string packageName)
+    public PendingIntent CreateWorkAppFrozenCallbackPendingIntent(string packageName, string launchId)
     {
         var host = getActivityHost();
         return AgnosiaPendingIntentFactory.CreateWorkAppFrozenBroadcastPendingIntent(
             host.CurrentActivity,
             host.WorkAppFrozenReceiverType,
-            packageName);
+            packageName,
+            launchId);
     }
 
     public Task<OperationResult> DisconnectPreparedVpnAsync(CancellationToken cancellationToken)

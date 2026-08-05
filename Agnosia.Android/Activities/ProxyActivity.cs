@@ -365,21 +365,31 @@ public sealed class ProxyActivity : Activity
 
             if (IsSystemWorkProfileRequest(request))
             {
-                ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, false);
                 Log.Debug(LogTag, $"Shortcut launch: skipping VPN Guard for system work-profile app {request.PackageName}.");
                 var systemLaunchResult = await ForwardLaunchToManagedProfileAsync(
                         request,
                         isSystem: true,
+                        launchId: null,
                         cancellationToken)
                     .ConfigureAwait(false);
                 FinishForwardedLaunch(systemLaunchResult);
                 return;
             }
 
-            var launchResult = await WorkLaunchVpnTransaction.ExecuteAsync(
-                    _ => Task.FromResult(OperationResult.Success(string.Empty)),
-                    PrepareShortcutVpnTakeoverAsync,
-                    token => ForwardLaunchToManagedProfileAfterPreflightAsync(request, token),
+            var vpnRestoreOwnershipCoordinator =
+                ServiceRegistry.GetRequiredService<VpnRestoreOwnershipCoordinator>();
+            var launchResult = await vpnRestoreOwnershipCoordinator.ExecuteLaunchAsync(
+                    request.PackageName,
+                    (scope, token) => WorkLaunchVpnTransaction.ExecuteAsync(
+                        _ => Task.FromResult(OperationResult.Success(string.Empty)),
+                        takeoverToken => PrepareShortcutVpnTakeoverAsync(scope, takeoverToken),
+                        launchToken => ForwardLaunchToManagedProfileAfterPreflightAsync(
+                            request,
+                            scope.LaunchId,
+                            launchToken),
+                        scope.RollbackAsync,
+                        () => scope.AcquiredRestoreObligation,
+                        token),
                     () => WorkAppFrozenHandler.RollbackFailedWorkLaunchAsync(
                         this,
                         $"shortcut_launch_rollback:{request.PackageName}",
@@ -395,62 +405,72 @@ public sealed class ProxyActivity : Activity
         }
     }
 
-    private async Task<OperationResult> PrepareShortcutVpnTakeoverAsync(CancellationToken cancellationToken)
+    private async Task<WorkLaunchVpnTakeoverResult> PrepareShortcutVpnTakeoverAsync(
+        VpnRestoreLaunchScope scope,
+        CancellationToken cancellationToken)
     {
         var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
+        if (scope.HasInheritedRestoreObligation)
+        {
+            Log.Info(LogTag, "Shortcut launch inherited VPN restore ownership.");
+            return WorkLaunchVpnTakeoverResult.NotRequired(
+                OperationResult.Success("VPN уже отключен предыдущей сессией Agnosia."));
+        }
+
         if (!storage.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch))
         {
-            storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
             Log.Debug(LogTag, "Disable-VPN-before-shortcut-launch is disabled in settings.");
-            return OperationResult.Success(string.Empty);
+            return WorkLaunchVpnTakeoverResult.NotRequired(OperationResult.Success(string.Empty));
         }
 
         Log.Info(LogTag, $"VPN Guard is enabled for shortcut launch. package={_request?.PackageName ?? "<none>"}.");
         if (!AndroidVpnApi.IsVpnActive(this))
         {
-            storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
             Log.Info(LogTag, "Shortcut launch: no active VPN detected.");
-            return OperationResult.Success(string.Empty);
+            return WorkLaunchVpnTakeoverResult.NotRequired(OperationResult.Success(string.Empty));
         }
 
-        storage.SetBoolean(StorageKeys.HaveActiveVpnSession, true);
+        scope.MarkRestoreRequired();
         var prepareIntent = VpnService.Prepare(this);
         if (prepareIntent is not null)
         {
             Log.Info(LogTag, "Shortcut launch: Android confirmation is required for VPN control.");
             var resultCode = await RequestVpnPreparationAsync(prepareIntent, cancellationToken).ConfigureAwait(false);
             if (resultCode != Result.Ok)
-                return OperationResult.Failure("Android не выдал Agnosia временное управление VPN.");
+                return WorkLaunchVpnTakeoverResult.Acquired(
+                    OperationResult.Failure("Android не выдал Agnosia временное управление VPN."));
         }
 
         if (!AndroidVpnApi.IsVpnActive(this))
         {
             OverlayVpnService.ShowOverlay(this);
             Log.Debug(LogTag, "Shortcut launch: active VPN was cleared while preparing VPN control.");
-            return OperationResult.Success("VPN отключен.");
+            return WorkLaunchVpnTakeoverResult.Acquired(OperationResult.Success("VPN отключен."));
         }
 
         _vpnDisconnectBaseline = AndroidVpnApi.GetVisibleVpnNetworkHandles(this);
         var result = await TransientVpnDisconnectService.DisconnectPreparedVpnAsync(this, cancellationToken)
             .ConfigureAwait(false);
         if (!result.Succeeded)
-            return result;
+            return WorkLaunchVpnTakeoverResult.Acquired(result);
 
         if (AndroidVpnApi.IsVpnActive(this, _vpnDisconnectBaseline))
-            return OperationResult.Failure(
-                "VPN все еще активен в личном профиле. Сторонний клиент мог сразу подключиться снова.");
+            return WorkLaunchVpnTakeoverResult.Acquired(
+                OperationResult.Failure(
+                    "VPN все еще активен в личном профиле. Сторонний клиент мог сразу подключиться снова."));
 
         OverlayVpnService.ShowOverlay(this);
-        return OperationResult.Success("VPN отключен.");
+        return WorkLaunchVpnTakeoverResult.Acquired(OperationResult.Success("VPN отключен."));
     }
 
     private Task<OperationResult> ForwardLaunchToManagedProfileAfterPreflightAsync(
         HiddenAppLaunchRequest request,
+        string launchId,
         CancellationToken cancellationToken)
     {
         var failure = WorkProfileLaunchPreflight.TryCreateFailure(this, GetLaunchResult(request));
         return failure is null
-            ? ForwardLaunchToManagedProfileAsync(request, isSystem: false, cancellationToken)
+            ? ForwardLaunchToManagedProfileAsync(request, isSystem: false, launchId, cancellationToken)
             : Task.FromResult(failure.ToOperationResult());
     }
 
@@ -543,6 +563,7 @@ public sealed class ProxyActivity : Activity
     private async Task<OperationResult> ForwardLaunchToManagedProfileAsync(
         HiddenAppLaunchRequest request,
         bool isSystem,
+        string? launchId,
         CancellationToken cancellationToken)
     {
         if (_pendingWorkLaunch is not null)
@@ -565,12 +586,17 @@ public sealed class ProxyActivity : Activity
         var isSystemLaunch = isSystem || request.IsSystem;
         proxyIntent.PutExtra(AndroidCommandContract.ExtraIsSystem, isSystemLaunch);
         if (!isSystemLaunch)
+        {
+            if (string.IsNullOrWhiteSpace(launchId))
+                return OperationResult.Failure("Agnosia не создала идентификатор восстановления VPN.");
             proxyIntent.PutExtra(
                 AndroidCommandContract.ExtraParentFrozenCallback,
                 AgnosiaPendingIntentFactory.CreateWorkAppFrozenBroadcastPendingIntent(
                     this,
                     typeof(WorkAppFrozenReceiver),
-                    request.PackageName));
+                    request.PackageName,
+                    launchId));
+        }
         proxyIntent.SetComponent(
             new ComponentName(this, Java.Lang.Class.FromType(typeof(ProxyActivity))));
         AuthenticationUtility.SignIntent(proxyIntent);
@@ -686,6 +712,7 @@ public sealed class ProxyActivity : Activity
                 launchResult.Log(LogTag);
                 var result = AndroidProfileCommandGateway.NotifyParentWorkAppFrozen(
                     this,
+                    request.PackageName,
                     $"proxy_fallback:{reason}:{request.PackageName}");
                 if (!result.Succeeded)
                     Log.Warn(LogTag,

@@ -85,12 +85,17 @@
         <Compile Include="Infrastructure\AndroidServiceCollectionExtensions.cs"/>
         <Compile Include="InternalsVisibleTo.cs"/>
         <Compile Include="Platform\AuthenticationKeyMaterial.cs"/>
+        <Compile Include="Platform\WorkAppFrozenCallbackPayload.cs"/>
         <Compile Include="Platform\AndroidPackageAccessPolicy.cs"/>
         <Compile Include="Packages\PackageLaunchability.cs"/>
         <Compile Include="Services\HiddenAppUsageEventPolicy.cs"/>
         <Compile Include="Services\HiddenAppSessionStoreCodec.cs"/>
         <Compile Include="Services\HiddenAppSessionStoreJsonContext.cs"/>
         <Compile Include="Services\HiddenAppSessionStoreState.cs"/>
+        <Compile Include="Vpn\VpnRestoreOwnershipCodec.cs"/>
+        <Compile Include="Vpn\VpnRestoreOwnershipCoordinator.cs"/>
+        <Compile Include="Vpn\VpnRestoreOwnershipJsonContext.cs"/>
+        <Compile Include="Vpn\VpnRestoreOwnershipState.cs"/>
         <Compile Include="Vpn\WorkLaunchVpnTransaction.cs"/>
     </ItemGroup>
 

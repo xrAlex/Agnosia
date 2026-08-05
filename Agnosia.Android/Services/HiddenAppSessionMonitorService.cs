@@ -586,6 +586,7 @@ public sealed partial class HiddenAppSessionMonitorService : Service
         Log.Debug(LogTag, $"Notifying parent profile about frozen app {session.PackageName}. reason={reason}");
         var result = AndroidProfileCommandGateway.NotifyParentWorkAppFrozen(
             this,
+            session.PackageName,
             $"session_hide:{reason}:{session.PackageName}");
         if (!result.Succeeded)
         {
