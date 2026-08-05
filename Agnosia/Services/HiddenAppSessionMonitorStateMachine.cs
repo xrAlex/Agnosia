@@ -90,7 +90,7 @@ internal sealed class HiddenAppSessionMonitorStateMachine
             _phase = HiddenAppSessionMonitorPhase.Completed;
             
             return Complete(
-                HiddenAppSessionCompletionKind.AfterTargetTaskRecheck,
+                HiddenAppSessionCompletionKind.ConfirmedInvisible,
                 "user_backgrounded_or_closed",
                 "confirmed_inactivity_delay_elapsed",
                 observation,
@@ -129,14 +129,6 @@ internal sealed class HiddenAppSessionMonitorStateMachine
             "inactivity_not_confirmed",
             false,
             shouldRaiseTransientWarning);
-    }
-
-    public void PostponeCompletionBecauseTargetTaskStillPresent(DateTimeOffset now)
-    {
-        _inactiveSince = null;
-        _hasSeenTarget = true;
-        _phase = HiddenAppSessionMonitorPhase.TargetForegroundOrDelegated;
-        _lastForegroundAt = now;
     }
 
     private HiddenAppSessionTransition MoveToTargetForegroundOrDelegated(
@@ -244,7 +236,7 @@ internal enum HiddenAppSessionCompletionKind
 {
     None,
     Immediate,
-    AfterTargetTaskRecheck
+    ConfirmedInvisible
 }
 
 internal sealed record HiddenAppSessionTransition(

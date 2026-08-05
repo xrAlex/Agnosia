@@ -405,6 +405,8 @@ ProxyActivity
 
 `HiddenAppSessionMonitorService` отслеживает сессию скрытого приложения после запуска через ярлык. Логика принятия решения вынесена в `HiddenAppSessionMonitorStateMachine`, что позволяет тестировать её отдельно от Android-сервиса.
 
+Для пользовательского hidden-пакета запуск имеет fail-closed preflight непосредственно в рабочем профиле: `ProxyActivity` проверяет Usage Access до чтения hidden-состояния и до `setApplicationHidden(..., false)`. Если доступ отозван или его состояние нельзя подтвердить, target не раскрывается, Activity и monitor не запускаются, а пользователь получает указание включить доступ к истории использования в рабочем профиле. Системные work-приложения, которые Agnosia не скрывает и не сопровождает monitor-сессией, сохраняют прямой путь запуска.
+
 ```text
 WaitingForTargetForeground
         │
@@ -421,14 +423,15 @@ InactiveCandidate
 Completed → setApplicationHidden(..., true)
 ```
 
-Сервис не прячет приложение по одному слабому признаку. Он сверяет несколько источников:
+Сервис не прячет приложение по одному слабому признаку. Он использует только доступные приложению документированные сигналы:
 
 | Источник | Что даёт |
 | --- | --- |
-| `UsageStatsManager.queryEvents()` | События foreground/background, resumed/paused. |
-| `ActivityManager.AppTasks` | Проверку, что task приложения всё ещё существует и относится к целевому пакету. |
+| `UsageStatsManager.queryEvents()` | `ACTIVITY_RESUMED` подтверждает активность; только `ACTIVITY_STOPPED`/`ACTIVITY_DESTROYED` подтверждают невидимость. `ACTIVITY_PAUSED` не завершает сессию, потому что Activity может оставаться видимой в multi-window. |
 | `PowerManager.IsInteractive` | Немедленную заморозку при неактивном экране. |
 | Список системных экранов | Settings, PermissionController, PackageInstaller, DocumentsUI и похожие делегированные flows не завершают сессию. |
+
+`ActivityManager.AppTasks`, proxy `TaskId` и `OnTaskRemoved()` Agnosia не используются как наблюдение: Android возвращает `AppTasks` только вызывающего приложения, тогда как target работает под другим UID и в другом task. Выход из delegated flow начинает скрытие только после ранее подтверждённого `STOPPED`/`DESTROYED`; одного `PAUSED` недостаточно. Если Usage Access отозван уже во время сессии, monitor не скрывает пакет по неподтверждённому таймауту, а сохраняет active-сессию до screen-lock safety net или явной заморозки.
 
 Тайминги монитора:
 
@@ -633,8 +636,8 @@ Android-проект собирается как APK с `ApplicationId` `com.agn
 | Тихий транспорт рабочего профиля недоступен | `AndroidCommandCenter` записывает `silent_work_transport_unavailable` с причиной вроде `canInteractAcrossProfiles=false`, `targetUser=missing` или `bind=false` и откатывается к подписанному `DummyActivity`; для рабочих команд он не должен возвращать данные личного профиля. |
 | APK после установки ещё не виден | `DummyActivity` ждёт доступности пакета с retry перед подготовкой ярлыка. |
 | Скрытие после установки не прошло сразу | Повторные попытки скрытия выполняются ограниченное время. |
-| Монитор не видит foreground-событие | Приложение не скрывается по неподтверждённому таймауту, а оставляется видимым до более надёжного сигнала. |
-| Активная task всё ещё относится к целевому приложению | Заморозка откладывается, даже если UsageStats показал неактивность. |
+| Usage Access отсутствует до запуска | Запуск user work-пакета отклоняется до unhide; приложение остаётся скрытым. |
+| Usage Access потерян во время сессии | Приложение не скрывается по неподтверждённому таймауту; durable active-сессия сохраняется до screen-lock safety net или явной заморозки. |
 | Сервис был перезапущен | Versioned durable snapshot восстанавливает active-сессию и очередь неподтверждённых re-hide; retry продолжается в foreground до `IsApplicationHidden == true`. |
 | Логирование повреждено или отключено | Повреждённый JSON журнала очищается, при отключении логирования записи удаляются. |
 | Версия Agnosia в рабочем профиле устарела | Личный профиль пытается переустановить актуальный APK в рабочий профиль и повторить owner-check. |

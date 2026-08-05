@@ -95,6 +95,21 @@ public sealed class AndroidAppLaunchResultTests
         Assert.False(result.ToOperationResult().Succeeded);
     }
 
+    // Проверяет fail-closed сообщение до запуска приложения без Usage Access.
+    [Fact]
+    public void Fail_with_usage_access_denied_reports_safe_preflight_failure()
+    {
+        var result = CreateReceivedResult().Fail(
+            AndroidAppLaunchStage.CommandReceived,
+            AndroidAppLaunchIssueKind.UsageAccessDenied,
+            "usageStatsAccess=denied");
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(AndroidAppLaunchIssueKind.UsageAccessDenied, result.Issue);
+        Assert.Contains("не может безопасно открыть", result.Message, StringComparison.Ordinal);
+        Assert.Contains("рабочем профиле", result.Message, StringComparison.Ordinal);
+    }
+
     // Проверяет запись failed stage, issue и message в итоговый OperationResult.
     [Fact]
     public void Fail_records_failed_stage_issue_and_operation_failure()

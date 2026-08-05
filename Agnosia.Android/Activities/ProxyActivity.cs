@@ -157,6 +157,16 @@ public sealed class ProxyActivity : Activity
             }
 
             var launchResult = GetLaunchResult(request);
+            var preflight = HiddenAppLaunchPreflight.RequireUsageAccess(
+                launchResult,
+                AndroidUsageStatsAccessApi.HasAccess(this, LogTag, false));
+            if (!preflight.CanProceed)
+            {
+                FinishWithLaunchResult(preflight.LaunchResult, true);
+                return;
+            }
+
+            launchResult = preflight.LaunchResult;
             bool wasHidden;
             try
             {
@@ -280,11 +290,6 @@ public sealed class ProxyActivity : Activity
                 {
                     StartActivity(launchIntent);
                     var startedResult = resultToStart.WithStage(AndroidAppLaunchStage.StartActivityAttempted);
-                    if (!AndroidUsageStatsAccessApi.HasAccess(this, LogTag, false))
-                        startedResult = startedResult.WithIssue(
-                            AndroidAppLaunchIssueKind.UsageAccessDenied,
-                            "usageStatsAccess=denied");
-
                     _launchResult = startedResult;
                     Log.Debug(
                         LogTag,

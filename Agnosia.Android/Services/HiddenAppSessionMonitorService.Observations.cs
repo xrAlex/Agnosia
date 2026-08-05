@@ -10,14 +10,6 @@ public sealed partial class HiddenAppSessionMonitorService
         string? TopPackage,
         bool IsSystemDelegatedFlow);
 
-    private sealed record TaskSessionObservation(
-        int TaskId,
-        string? BasePackage,
-        string? BaseActivity,
-        string? TopPackage,
-        string? TopActivity,
-        bool IsSystemDelegatedFlow);
-
     private sealed record UsageObservationSnapshot(
         bool IsForeground,
         bool ConfirmedInactive,
@@ -38,11 +30,4 @@ public sealed partial class HiddenAppSessionMonitorService
         int ForegroundEvents,
         string Reason);
 
-    private sealed record TaskObservationSnapshot(
-        int TaskId,
-        string? BasePackage,
-        string? BaseActivity,
-        string? TopPackage,
-        string? TopActivity,
-        bool IsSystemDelegatedFlow);
 }

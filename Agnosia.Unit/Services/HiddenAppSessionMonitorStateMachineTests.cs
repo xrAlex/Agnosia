@@ -38,7 +38,7 @@ public sealed class HiddenAppSessionMonitorStateMachineTests
 
         Assert.Equal(HiddenAppSessionTransitionAction.Complete, completed.Action);
         Assert.Equal(HiddenAppSessionMonitorPhase.Completed, completed.Phase);
-        Assert.Equal(HiddenAppSessionCompletionKind.AfterTargetTaskRecheck, completed.CompletionKind);
+        Assert.Equal(HiddenAppSessionCompletionKind.ConfirmedInvisible, completed.CompletionKind);
         Assert.Equal("user_backgrounded_or_closed", completed.CompletionReason);
         Assert.Equal("confirmed_inactivity_delay_elapsed", completed.DecisionReason);
         Assert.Equal(TimeSpan.FromSeconds(10), completed.InactiveFor);
@@ -90,33 +90,6 @@ public sealed class HiddenAppSessionMonitorStateMachineTests
         Assert.Equal(HiddenAppSessionMonitorPhase.InactiveCandidate, pending.Phase);
         Assert.Equal("confirmed_inactivity_delay_pending", pending.DecisionReason);
         Assert.Equal(TimeSpan.FromSeconds(8), pending.InactiveFor);
-    }
-
-    // Проверяет повторный запуск задержки, если task target-приложения еще присутствует.
-    [Fact]
-    public void PostponeCompletionBecauseTargetTaskStillPresent_restarts_hide_delay()
-    {
-        var stateMachine = CreateStateMachine();
-        stateMachine.MoveNext(StartedAt.AddSeconds(1), true, TargetForeground());
-        var inactiveSince = StartedAt.AddSeconds(2);
-        var completionCandidate = stateMachine.MoveNext(
-            inactiveSince.AddSeconds(10),
-            true,
-            ConfirmedInactive(inactiveSince));
-        Assert.Equal(HiddenAppSessionTransitionAction.Complete, completionCandidate.Action);
-
-        var postponedAt = inactiveSince.AddSeconds(10);
-        stateMachine.PostponeCompletionBecauseTargetTaskStillPresent(postponedAt);
-
-        var pendingAgain = stateMachine.MoveNext(
-            postponedAt.AddSeconds(9),
-            true,
-            ConfirmedInactive(postponedAt));
-
-        Assert.Equal(HiddenAppSessionTransitionAction.KeepAlive, pendingAgain.Action);
-        Assert.Equal(HiddenAppSessionMonitorPhase.InactiveCandidate, pendingAgain.Phase);
-        Assert.Equal("confirmed_inactivity_delay_pending", pendingAgain.DecisionReason);
-        Assert.Equal(TimeSpan.FromSeconds(9), pendingAgain.InactiveFor);
     }
 
     // Проверяет, что системный экран, открытый из target-приложения, продлевает сессию.

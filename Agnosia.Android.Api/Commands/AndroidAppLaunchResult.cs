@@ -239,7 +239,7 @@ public sealed record AndroidAppLaunchResult(
             AndroidAppLaunchIssueKind.HiddenOrSuspendedPackageState =>
                 $"Android оставил {displayName} скрытым или приостановленным; запуск невозможен.",
             AndroidAppLaunchIssueKind.UsageAccessDenied =>
-                $"Попытка запуска {displayName} выполнена, но Agnosia не может подтвердить передний план: включите доступ к истории использования в рабочем профиле.",
+                $"Agnosia не может безопасно открыть {displayName}: включите доступ к истории использования в рабочем профиле и повторите запуск.",
             AndroidAppLaunchIssueKind.WorkProfileUnavailable =>
                 $"Рабочий профиль не ответил на команду запуска {displayName}.",
             AndroidAppLaunchIssueKind.DevicePolicyManagerUnavailable =>

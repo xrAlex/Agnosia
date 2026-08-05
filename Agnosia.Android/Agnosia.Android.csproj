@@ -37,6 +37,7 @@
 
     <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
         <Compile Remove="**\*.cs"/>
+        <Compile Include="Activities\HiddenAppLaunchPreflight.cs"/>
         <Compile Include="Activities\TemporaryPackageVisibilityTransaction.cs"/>
         <Compile Include="Permissions\AppPermissionRiskCatalog.cs"/>
         <Compile Include="Permissions\AppPermissionRiskCatalog.AnalysisContext.cs"/>
@@ -85,6 +86,7 @@
         <Compile Include="Platform\AuthenticationKeyMaterial.cs"/>
         <Compile Include="Platform\AndroidPackageAccessPolicy.cs"/>
         <Compile Include="Packages\PackageLaunchability.cs"/>
+        <Compile Include="Services\HiddenAppUsageEventPolicy.cs"/>
         <Compile Include="Services\HiddenAppSessionStoreCodec.cs"/>
         <Compile Include="Services\HiddenAppSessionStoreJsonContext.cs"/>
         <Compile Include="Services\HiddenAppSessionStoreState.cs"/>
