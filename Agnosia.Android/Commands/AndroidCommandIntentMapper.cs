@@ -52,6 +52,48 @@ internal static class AndroidCommandIntentMapper
         };
     }
 
+    public static bool TryFromAction(string? action, out AndroidCommandKind kind)
+    {
+        var resolved = action switch
+        {
+            AgnosiaActions.ProfilePing => AndroidCommandKind.ProfilePing,
+            AgnosiaActions.QueryApps => AndroidCommandKind.QueryApps,
+            AgnosiaActions.QueryAppIcon => AndroidCommandKind.QueryAppIcon,
+            AgnosiaActions.QueryAppIcons => AndroidCommandKind.QueryAppIcons,
+            AgnosiaActions.QueryLogs => AndroidCommandKind.QueryLogs,
+            AgnosiaActions.QueryCrossProfilePackages => AndroidCommandKind.QueryCrossProfilePackages,
+            AgnosiaActions.QueryPermissions => AndroidCommandKind.QueryPermissions,
+            AgnosiaActions.QueryUsageStatsAccess => AndroidCommandKind.QueryUsageStatsAccess,
+            AgnosiaActions.QueryPackageInstallAccess => AndroidCommandKind.QueryPackageInstallAccess,
+            AgnosiaActions.QueryAllFilesAccess => AndroidCommandKind.QueryAllFilesAccess,
+            AgnosiaActions.RequestUsageStatsAccess => AndroidCommandKind.RequestUsageStatsAccess,
+            AgnosiaActions.RequestPackageInstallAccess => AndroidCommandKind.RequestPackageInstallAccess,
+            AgnosiaActions.RequestAllFilesAccess => AndroidCommandKind.RequestAllFilesAccess,
+            AgnosiaActions.InstallPackage => AndroidCommandKind.InstallPackage,
+            AgnosiaActions.UninstallPackage => AndroidCommandKind.UninstallPackage,
+            AgnosiaActions.FreezePackage => AndroidCommandKind.FreezePackage,
+            AgnosiaActions.UnfreezePackage => AndroidCommandKind.UnfreezePackage,
+            AgnosiaActions.RevokeRuntimePermissions => AndroidCommandKind.RevokeRuntimePermissions,
+            AgnosiaActions.SetLockdownEnabled => AndroidCommandKind.SetLockdownEnabled,
+            AgnosiaActions.SetLockdownInternetAccess => AndroidCommandKind.SetLockdownInternetAccess,
+            AgnosiaActions.PrepareHiddenShortcut => AndroidCommandKind.PrepareHiddenShortcut,
+            AgnosiaActions.CreateHiddenShortcut => AndroidCommandKind.CreateHiddenShortcut,
+            AgnosiaActions.UnfreezeAndLaunch => AndroidCommandKind.UnfreezeAndLaunch,
+            AgnosiaActions.LaunchAppProxy => AndroidCommandKind.LaunchAppProxy,
+            AgnosiaActions.SetCrossProfileInteraction => AndroidCommandKind.SetCrossProfileInteraction,
+            AgnosiaActions.StartFileShuttleParentToWork => AndroidCommandKind.StartFileShuttleParentToWork,
+            AgnosiaActions.StartFileShuttleWorkToParent => AndroidCommandKind.StartFileShuttleWorkToParent,
+            AgnosiaActions.SynchronizePreference => AndroidCommandKind.SynchronizePreference,
+            AgnosiaActions.WorkAppFrozen => AndroidCommandKind.WorkAppFrozen,
+            AgnosiaActions.FinalizeProvision => AndroidCommandKind.FinalizeProvision,
+            AgnosiaActions.PackageInstallerCallback => AndroidCommandKind.PackageInstallerCallback,
+            _ => (AndroidCommandKind?)null
+        };
+
+        kind = resolved.GetValueOrDefault();
+        return resolved.HasValue;
+    }
+
 #if AGNOSIA_ANDROID
     public static Intent ToIntent(AndroidCommandEnvelope envelope)
     {

@@ -13,6 +13,7 @@ internal enum AndroidCommandKind
     QueryUsageStatsAccess,
     QueryPackageInstallAccess,
     QueryAllFilesAccess,
+    QueryPackageState,
     RequestUsageStatsAccess,
     RequestPackageInstallAccess,
     RequestAllFilesAccess,

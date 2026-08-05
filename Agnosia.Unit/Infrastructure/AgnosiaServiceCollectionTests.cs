@@ -66,7 +66,8 @@ public sealed class AgnosiaServiceCollectionTests
                 AndroidCommandKind.QueryApps,
                 AndroidCommandKind.QueryCrossProfilePackages,
                 AndroidCommandKind.QueryLogs,
-                AndroidCommandKind.QueryPermissions
+                AndroidCommandKind.QueryPermissions,
+                AndroidCommandKind.QueryPackageState
             ]);
         var transportKinds = provider.GetServices<IAndroidCommandTransport>()
             .Select(transport => transport.Kind)

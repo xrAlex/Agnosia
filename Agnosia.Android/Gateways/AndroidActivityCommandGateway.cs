@@ -1,8 +1,10 @@
 using Agnosia.Models;
 using Android.Content;
+using Android.OS;
 using Java.Lang;
 
 using Exception = System.Exception;
+using OperationCanceledException = System.OperationCanceledException;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Gateways;
@@ -112,6 +114,26 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
         bool useWorkProfile,
         CancellationToken cancellationToken)
     {
+        if (!AndroidCommandIntentMapper.TryFromAction(intent.Action, out var kind))
+            return AndroidActivityResultApi.CreateCanceledResult(
+                "Android не распознал внутреннюю команду Agnosia.");
+
+        return await StartActivityForResultAsync(
+                intent,
+                useWorkProfile,
+                Guid.NewGuid(),
+                kind,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    internal async Task<AndroidActivityResult> StartActivityForResultAsync(
+        Intent intent,
+        bool useWorkProfile,
+        Guid correlationId,
+        AndroidCommandKind kind,
+        CancellationToken cancellationToken)
+    {
         try
         {
             var host = getActivityHost();
@@ -126,18 +148,35 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
 
             if (useWorkProfile)
             {
-                AgnosiaUtilities.TransferIntentToProfile(activity, intent);
-                return await RunWorkProfileActivityCommandAsync(
+                var crossProfileApps = AndroidSystemApi.GetCrossProfileApps(activity);
+                if (crossProfileApps is null || !crossProfileApps.CanInteractAcrossProfiles())
+                    return AndroidActivityResultApi.CreateCanceledResult(
+                        "Agnosia не разрешено напрямую обращаться к рабочему профилю.");
+
+                var targetUser = crossProfileApps.TargetUserProfiles
+                    .OfType<UserHandle>()
+                    .FirstOrDefault();
+                if (targetUser is null)
+                    return AndroidActivityResultApi.CreateCanceledResult(
+                        "Android не нашёл доступный рабочий профиль Agnosia.");
+
+                intent.SetComponent(new ComponentName(activity, Class.FromType(host.CommandActivityType)));
+                PrepareAuthenticatedCommand(intent, correlationId, kind);
+                var result = await RunWorkProfileActivityCommandAsync(
                         host,
                         intent,
+                        targetUser,
                         isLaunchCommand,
                         cancellationToken)
                     .ConfigureAwait(false);
+                return ValidateAuthenticatedResult(result, correlationId, kind);
             }
 
             intent.SetComponent(new ComponentName(activity, Class.FromType(host.CommandActivityType)));
-            AuthenticationUtility.SignIntent(intent);
-            return await RunLocalActivityCommandAsync(host, intent, cancellationToken).ConfigureAwait(false);
+            PrepareAuthenticatedCommand(intent, correlationId, kind);
+            var localResult = await RunLocalActivityCommandAsync(host, intent, cancellationToken)
+                .ConfigureAwait(false);
+            return ValidateAuthenticatedResult(localResult, correlationId, kind);
         }
         catch (OperationCanceledException)
         {
@@ -183,6 +222,7 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
     private static async Task<AndroidActivityResult> RunWorkProfileActivityCommandAsync(
         IAndroidActivityHost host,
         Intent intent,
+        UserHandle targetUser,
         bool isLaunchCommand,
         CancellationToken cancellationToken)
     {
@@ -194,7 +234,11 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
             Log.Debug(
                 ActivityResultLogTag,
                 $"Starting work-profile activity command. action={GetActionForLog(intent)}, timeoutMs={profileCommandTimeout.TotalMilliseconds:0}.");
-            var result = await host.StartForResultAsync(intent, timeoutCancellation.Token).ConfigureAwait(false);
+            var result = await host.StartCrossProfileForResultAsync(
+                    intent,
+                    targetUser,
+                    timeoutCancellation.Token)
+                .ConfigureAwait(false);
             Log.Debug(
                 ActivityResultLogTag,
                 FormatActivityCommandCompleted("Work-profile", intent, result));
@@ -238,6 +282,41 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
     private static string GetActionForLog(Intent intent)
     {
         return intent.Action ?? "<none>";
+    }
+
+    private static void PrepareAuthenticatedCommand(
+        Intent intent,
+        Guid correlationId,
+        AndroidCommandKind kind)
+    {
+        intent.PutExtra(AndroidCommandContract.ExtraCommandCorrelationId, correlationId.ToString("D"));
+        intent.PutExtra(AndroidCommandContract.ExtraCommandKind, kind.ToString());
+        AuthenticationUtility.SignIntent(intent);
+    }
+
+    private static AndroidActivityResult ValidateAuthenticatedResult(
+        AndroidActivityResult result,
+        Guid correlationId,
+        AndroidCommandKind kind)
+    {
+        var data = result.Data;
+        if (data is null
+            || !string.Equals(data.Action, AgnosiaActions.CommandResult, StringComparison.Ordinal)
+            || !AuthenticationUtility.CheckIntent(data))
+            return AndroidActivityResultApi.CreateCanceledResult(
+                "Рабочий профиль не вернул подписанный результат Agnosia.");
+
+        var identity = ActivityCommandResultIdentity.Validate(
+            correlationId,
+            kind,
+            (int)result.ResultCode,
+            data.GetStringExtra(AndroidCommandContract.ExtraCommandCorrelationId),
+            data.GetStringExtra(AndroidCommandContract.ExtraCommandKind),
+            data.GetIntExtra(AndroidCommandContract.ResultCommandResultCode, int.MinValue));
+        return identity.Succeeded
+            ? result
+            : AndroidActivityResultApi.CreateCanceledResult(
+                "Рабочий профиль вернул результат другой команды Agnosia.");
     }
 
     private static bool IsLaunchCommand(Intent intent)

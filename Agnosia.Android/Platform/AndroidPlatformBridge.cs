@@ -143,6 +143,13 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         return _appCommandCoordinator.CloneAsync(app, cancellationToken);
     }
 
+    public Task<OperationResult> VerifyWorkCopyAsync(
+        AppSnapshot app,
+        CancellationToken cancellationToken = default)
+    {
+        return _appCommandCoordinator.VerifyWorkCopyAsync(app, cancellationToken);
+    }
+
     public Task<OperationResult> UninstallAsync(AppSnapshot app, CancellationToken cancellationToken = default)
     {
         return _appCommandCoordinator.UninstallAsync(app, cancellationToken);

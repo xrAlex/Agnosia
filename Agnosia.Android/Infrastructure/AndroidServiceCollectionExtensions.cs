@@ -23,6 +23,7 @@ internal static class AndroidServiceCollectionExtensions
         services.AddSingleton<IAndroidCommandHandler, QueryCrossProfilePackagesCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, QueryLogsCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, QueryPermissionsCommandHandler>();
+        services.AddSingleton<IAndroidCommandHandler, QueryPackageStateCommandHandler>();
 #if AGNOSIA_ANDROID
         services.AddSingleton<AndroidCommandExecutionContextFactory>();
         services.AddSingleton<IAndroidCommandTransport, DirectLocalCommandTransport>();

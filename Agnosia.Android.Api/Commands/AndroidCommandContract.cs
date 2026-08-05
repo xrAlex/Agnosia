@@ -27,6 +27,9 @@ public static class AndroidCommandContract
     public const string ExtraQueryLimit = "query_limit";
     public const string ExtraQueryMaxJsonBytes = "query_max_json_bytes";
     public const string ExtraQueryPageToken = "query_page_token";
+    public const string ExtraCommandCorrelationId = "agnosia.command.correlation_id";
+    public const string ExtraCommandKind = "agnosia.command.kind";
+    public const string ResultCommandResultCode = "agnosia.command.result_code";
     public const string ResultAppsJson = "apps_json";
     public const string ResultNextQueryOffset = "next_query_offset";
     public const string ResultQueryHasMore = "query_has_more";

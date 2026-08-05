@@ -976,6 +976,14 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             }
 
             shouldRefresh = true;
+            var verificationResult = await _appCommandService.VerifyWorkCopyAsync(snapshot);
+            if (!verificationResult.Succeeded)
+            {
+                StatusIsError = true;
+                StatusMessage = ResolveOperationMessage(verificationResult.Message, "MoveToWorkFailed");
+                return;
+            }
+
             var uninstallResult = await _appCommandService.UninstallAsync(snapshot);
             StatusIsError = !uninstallResult.Succeeded;
             StatusMessage = uninstallResult.Succeeded

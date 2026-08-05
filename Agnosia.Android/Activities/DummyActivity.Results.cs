@@ -48,6 +48,18 @@ public sealed partial class DummyActivity
         if (_finishRequested || _destroyCancellation.IsCancellationRequested) return;
 
         _finishRequested = true;
+        if (_hasAuthenticatedCommand)
+        {
+            data ??= new Intent();
+            data.SetAction(AgnosiaActions.CommandResult);
+            data.PutExtra(
+                AndroidCommandContract.ExtraCommandCorrelationId,
+                _commandCorrelationId.ToString("D"));
+            data.PutExtra(AndroidCommandContract.ExtraCommandKind, _commandKind.ToString());
+            data.PutExtra(AndroidCommandContract.ResultCommandResultCode, (int)resultCode);
+            TrySignResult(data);
+        }
+
         Log.Debug(
             LogTag,
             $"Finishing action={Intent?.Action ?? "<none>"} with result={resultCode}, hasData={data is not null}.");
@@ -57,6 +69,24 @@ public sealed partial class DummyActivity
             SetResult(resultCode, data);
 
         Finish();
+    }
+
+    private bool TryCaptureAuthenticatedCommand(string action)
+    {
+        if (!AndroidCommandIntentMapper.TryFromAction(action, out var actionKind)
+            || !Guid.TryParse(
+                Intent?.GetStringExtra(AndroidCommandContract.ExtraCommandCorrelationId),
+                out var correlationId)
+            || !Enum.TryParse<AndroidCommandKind>(
+                Intent?.GetStringExtra(AndroidCommandContract.ExtraCommandKind),
+                out var declaredKind)
+            || declaredKind != actionKind)
+            return false;
+
+        _commandCorrelationId = correlationId;
+        _commandKind = declaredKind;
+        _hasAuthenticatedCommand = true;
+        return true;
     }
 
     internal void HandlePackageInstallerCallback(Intent? intent)

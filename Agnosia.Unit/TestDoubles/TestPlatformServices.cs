@@ -48,6 +48,8 @@ public sealed class TestPlatformServices :
 
     public Func<AppSnapshot, CancellationToken, Task<OperationResult>>? CloneHandler { get; set; }
 
+    public Func<AppSnapshot, CancellationToken, Task<OperationResult>>? VerifyWorkCopyHandler { get; set; }
+
     public Func<AppSnapshot, CancellationToken, Task<OperationResult>>? UninstallHandler { get; set; }
 
     public Func<AppSnapshot, bool, CancellationToken, Task<OperationResult>>? SetFrozenHandler { get; set; }
@@ -78,7 +80,11 @@ public sealed class TestPlatformServices :
 
     public List<AppSnapshot> CloneRequests { get; } = [];
 
+    public List<AppSnapshot> VerifyWorkCopyRequests { get; } = [];
+
     public List<AppSnapshot> UninstallRequests { get; } = [];
+
+    public List<string> AppCommandCalls { get; } = [];
 
     public List<(AppSnapshot App, bool Hidden)> SetFrozenRequests { get; } = [];
 
@@ -208,6 +214,7 @@ public sealed class TestPlatformServices :
 
     public Task<OperationResult> CloneAsync(AppSnapshot app, CancellationToken cancellationToken = default)
     {
+        AppCommandCalls.Add("Clone");
         CloneRequests.Add(app);
 
         return CloneHandler is null
@@ -215,8 +222,21 @@ public sealed class TestPlatformServices :
             : CloneHandler(app, cancellationToken);
     }
 
+    public Task<OperationResult> VerifyWorkCopyAsync(
+        AppSnapshot app,
+        CancellationToken cancellationToken = default)
+    {
+        AppCommandCalls.Add("VerifyWorkCopy");
+        VerifyWorkCopyRequests.Add(app);
+
+        return VerifyWorkCopyHandler is null
+            ? Task.FromResult(DefaultOperationResult)
+            : VerifyWorkCopyHandler(app, cancellationToken);
+    }
+
     public Task<OperationResult> UninstallAsync(AppSnapshot app, CancellationToken cancellationToken = default)
     {
+        AppCommandCalls.Add("Uninstall");
         UninstallRequests.Add(app);
 
         return UninstallHandler is null

@@ -63,6 +63,9 @@ public sealed partial class DummyActivity : Activity
     private readonly CancellationTokenSource _destroyCancellation = new();
     private bool _isProfileOwner;
     private bool _finishRequested;
+    private bool _hasAuthenticatedCommand;
+    private Guid _commandCorrelationId;
+    private AndroidCommandKind _commandKind;
     private AndroidAppLaunchResult? _pendingProxyLaunchResult;
 
     protected override void OnCreate(Bundle? savedInstanceState)

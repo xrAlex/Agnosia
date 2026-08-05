@@ -5,6 +5,7 @@ using Agnosia.Android.Receivers;
 using Agnosia.Models;
 using Android.Content;
 using Android.Content.PM;
+using Android.OS;
 using Android.Views;
 using Avalonia.Android;
 using Avalonia.Controls;
@@ -31,6 +32,9 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
     private static readonly Lock RequestSync = new();
     private static readonly Dictionary<int, TaskCompletionSource<AndroidActivityResult>> PendingResults = [];
     private static readonly Queue<ActivityStartRequest> PendingActivityStarts = [];
+    private readonly SemaphoreSlim _crossProfileActivityGate = new(1, 1);
+    private TaskCompletionSource<AndroidActivityResult>? _pendingCrossProfileResult;
+    private CrossProfileActivityStartRequest? _pendingCrossProfileStart;
     private static int _nextRequestCode = 4100;
     private static bool _startupMitigationsApplied;
     private bool _isResumed;
@@ -127,6 +131,7 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         ServiceRegistry.NotifyPrimaryActivityResumed();
         ApplyPreferredDisplayMode();
         DrainPendingActivityStarts();
+        StartPendingCrossProfileActivity();
     }
 
     protected override void OnPause()
@@ -150,6 +155,7 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
 
     protected override void OnDestroy()
     {
+        CancelPendingCrossProfileActivity("Основной экран Agnosia был закрыт.");
         if (ReferenceEquals(Current, this))
         {
             Current = null;
@@ -249,6 +255,14 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         CancellationToken cancellationToken)
     {
         return StartForResultAsync(intent, cancellationToken);
+    }
+
+    Task<AndroidActivityResult> IAndroidActivityHost.StartCrossProfileForResultAsync(
+        Intent intent,
+        UserHandle targetUser,
+        CancellationToken cancellationToken)
+    {
+        return StartCrossProfileForResultAsync(intent, targetUser, cancellationToken);
     }
 
     Task<OperationResult> IAndroidActivityHost.DisconnectPreparedVpnAsync(CancellationToken cancellationToken)

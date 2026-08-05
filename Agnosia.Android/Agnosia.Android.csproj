@@ -59,7 +59,11 @@
         <Compile Include="Commands\AndroidCommandResultEnvelope.cs"/>
         <Compile Include="Commands\AndroidCommandTargetProfile.cs"/>
         <Compile Include="Commands\AndroidCommandTransportKind.cs"/>
+        <Compile Include="Commands\ActivityCommandResultIdentity.cs"/>
         <Compile Include="Commands\AuthenticationRecoveryRequest.cs"/>
+        <Compile Include="Commands\PackageStateQuery.cs"/>
+        <Compile Include="Commands\PackageStateResult.cs"/>
+        <Compile Include="Commands\PackageStateResultInterpreter.cs"/>
         <Compile Include="Commands\Handlers\ProfilePingCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\RecoverAuthenticationCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\QueryAppIconCommandHandler.cs"/>
@@ -68,6 +72,7 @@
         <Compile Include="Commands\Handlers\QueryCrossProfilePackagesCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\QueryLogsCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\QueryPermissionsCommandHandler.cs"/>
+        <Compile Include="Commands\Handlers\QueryPackageStateCommandHandler.cs"/>
         <Compile Include="Commands\Transports\AndroidCommandReplyTimeoutPolicy.cs"/>
         <Compile Include="Commands\Transports\DirectLocalCommandTransport.cs"/>
         <Compile Include="Commands\Transports\SilentWorkProfileCommandTransport.cs"/>

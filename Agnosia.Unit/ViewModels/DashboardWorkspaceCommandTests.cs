@@ -92,7 +92,9 @@ public sealed class DashboardWorkspaceCommandTests
         await app.MoveToWorkCommand.ExecuteAsync(null);
 
         Assert.Single(services.CloneRequests);
+        Assert.Single(services.VerifyWorkCopyRequests);
         Assert.Single(services.UninstallRequests);
+        Assert.Equal(["Clone", "VerifyWorkCopy", "Uninstall"], services.AppCommandCalls);
         Assert.Equal(1, services.DashboardProfileLoadCount);
         Assert.False(viewModel.StatusIsError);
         Assert.Equal("MovedToWork", viewModel.StatusMessage);
@@ -112,10 +114,57 @@ public sealed class DashboardWorkspaceCommandTests
         await app.MoveToWorkCommand.ExecuteAsync(null);
 
         Assert.Single(services.CloneRequests);
+        Assert.Empty(services.VerifyWorkCopyRequests);
         Assert.Empty(services.UninstallRequests);
         Assert.Equal(0, services.DashboardProfileLoadCount);
         Assert.True(viewModel.StatusIsError);
         Assert.Equal("CloneRejected", viewModel.StatusMessage);
+    }
+
+    // Проверяет, что личная копия сохраняется, пока рабочий профиль независимо не подтвердит clone.
+    [Fact]
+    public async Task MoveToWorkCommand_does_not_uninstall_when_work_copy_is_not_confirmed()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            CloneHandler = (_, _) => Task.FromResult(OperationResult.Success("")),
+            VerifyWorkCopyHandler = (_, _) => Task.FromResult(OperationResult.Failure("WorkCopyNotConfirmed"))
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+        var app = CreatePersonalApp(viewModel);
+
+        await app.MoveToWorkCommand.ExecuteAsync(null);
+
+        Assert.Single(services.CloneRequests);
+        Assert.Single(services.VerifyWorkCopyRequests);
+        Assert.Empty(services.UninstallRequests);
+        Assert.Equal(["Clone", "VerifyWorkCopy"], services.AppCommandCalls);
+        Assert.Equal(1, services.DashboardProfileLoadCount);
+        Assert.True(viewModel.StatusIsError);
+        Assert.Equal("WorkCopyNotConfirmed", viewModel.StatusMessage);
+    }
+
+    // Проверяет fail-closed поведение move при исключении во время независимой проверки.
+    [Fact]
+    public async Task MoveToWorkCommand_does_not_uninstall_when_work_copy_verification_throws()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            CloneHandler = (_, _) => Task.FromResult(OperationResult.Success("")),
+            VerifyWorkCopyHandler = (_, _) => throw new InvalidOperationException("verification unavailable")
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+        var app = CreatePersonalApp(viewModel);
+
+        await app.MoveToWorkCommand.ExecuteAsync(null);
+
+        Assert.Single(services.VerifyWorkCopyRequests);
+        Assert.Empty(services.UninstallRequests);
+        Assert.Equal(1, services.DashboardProfileLoadCount);
+        Assert.True(viewModel.StatusIsError);
+        Assert.Equal("MoveToWorkFailed", viewModel.StatusMessage);
     }
 
     // Проверяет статус частичного успеха move, когда clone успешен, а uninstall упал.
@@ -134,6 +183,7 @@ public sealed class DashboardWorkspaceCommandTests
         await app.MoveToWorkCommand.ExecuteAsync(null);
 
         Assert.Single(services.CloneRequests);
+        Assert.Single(services.VerifyWorkCopyRequests);
         Assert.Single(services.UninstallRequests);
         Assert.Equal(1, services.DashboardProfileLoadCount);
         Assert.True(viewModel.StatusIsError);

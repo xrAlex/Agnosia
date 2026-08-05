@@ -19,6 +19,8 @@ internal sealed class ActivityCommandTransport(
         var result = await gateway.StartActivityForResultAsync(
                 intent,
                 useWorkProfile,
+                envelope.CorrelationId,
+                envelope.Kind,
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -34,19 +36,6 @@ internal sealed class ActivityCommandTransport(
                     ? "Android activity command was canceled."
                     : error,
                 "activity_result_canceled",
-                stopwatch.Elapsed,
-                $"result={result.ResultCode}; action={intent.Action ?? "<none>"}");
-        }
-
-        if (envelope.Kind == AndroidCommandKind.ProfilePing
-            && !AuthenticationUtility.CheckIntent(result.Data))
-        {
-            return AndroidCommandResultEnvelope.Failure(
-                envelope.CorrelationId,
-                envelope.Kind,
-                Kind,
-                "Profile ping result was not signed by the target profile.",
-                "profile_ping_unsigned",
                 stopwatch.Elapsed,
                 $"result={result.ResultCode}; action={intent.Action ?? "<none>"}");
         }

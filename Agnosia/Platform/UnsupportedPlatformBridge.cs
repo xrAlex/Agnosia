@@ -119,6 +119,13 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
         return AndroidOnlyFailureTask;
     }
 
+    public Task<OperationResult> VerifyWorkCopyAsync(
+        AppSnapshot app,
+        CancellationToken cancellationToken = default)
+    {
+        return AndroidOnlyFailureTask;
+    }
+
     public Task<OperationResult> UninstallAsync(AppSnapshot app, CancellationToken cancellationToken = default)
     {
         return AndroidOnlyFailureTask;

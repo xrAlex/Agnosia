@@ -11,15 +11,137 @@ public partial class MainActivity
         base.OnActivityResult(requestCode, resultCode, data);
 
         TaskCompletionSource<AndroidActivityResult>? completionSource;
+        TaskCompletionSource<AndroidActivityResult>? crossProfileCompletionSource = null;
         lock (RequestSync)
         {
             PendingResults.Remove(requestCode, out completionSource);
+            if (completionSource is null && _pendingCrossProfileResult is not null)
+            {
+                crossProfileCompletionSource = _pendingCrossProfileResult;
+                _pendingCrossProfileResult = null;
+                _pendingCrossProfileStart = null;
+            }
         }
 
         Log.Debug(
             LogTag,
-            $"Activity result received. requestCode={requestCode}, result={resultCode}, matchedPending={completionSource is not null}, hasData={data is not null}.");
+            $"Activity result received. requestCode={requestCode}, result={resultCode}, matchedPending={completionSource is not null}, matchedCrossProfile={crossProfileCompletionSource is not null}, hasData={data is not null}.");
         completionSource?.TrySetResult(new AndroidActivityResult(resultCode, data));
+        crossProfileCompletionSource?.TrySetResult(new AndroidActivityResult(resultCode, data));
+    }
+
+    private async Task<AndroidActivityResult> StartCrossProfileForResultAsync(
+        Intent intent,
+        UserHandle targetUser,
+        CancellationToken cancellationToken)
+    {
+        await _crossProfileActivityGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        var completionSource = new TaskCompletionSource<AndroidActivityResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        try
+        {
+            lock (RequestSync)
+            {
+                if (_pendingCrossProfileResult is not null)
+                    throw new InvalidOperationException("A cross-profile activity result is already pending.");
+
+                _pendingCrossProfileResult = completionSource;
+                _pendingCrossProfileStart = new CrossProfileActivityStartRequest(
+                    intent,
+                    targetUser,
+                    completionSource);
+            }
+
+            using var cancellationRegistration = cancellationToken.Register(
+                () => CancelCrossProfileActivity(completionSource, cancellationToken));
+            RunOnUiThread(StartPendingCrossProfileActivity);
+            return await completionSource.Task.ConfigureAwait(false);
+        }
+        finally
+        {
+            lock (RequestSync)
+            {
+                if (ReferenceEquals(_pendingCrossProfileResult, completionSource))
+                    _pendingCrossProfileResult = null;
+                if (ReferenceEquals(_pendingCrossProfileStart?.CompletionSource, completionSource))
+                    _pendingCrossProfileStart = null;
+            }
+
+            _crossProfileActivityGate.Release();
+        }
+    }
+
+    private void StartPendingCrossProfileActivity()
+    {
+        CrossProfileActivityStartRequest? request;
+        lock (RequestSync)
+        {
+            if (!_isResumed || _pendingCrossProfileStart is null) return;
+
+            request = _pendingCrossProfileStart;
+            _pendingCrossProfileStart = null;
+        }
+
+        try
+        {
+            var crossProfileApps = AndroidSystemApi.GetCrossProfileApps(this)
+                                   ?? throw new InvalidOperationException(
+                                       "Android cross-profile API is unavailable.");
+            Log.Debug(
+                LogTag,
+                $"Starting explicit cross-profile activity. action={request.Intent.Action ?? "<none>"}, target={request.TargetUser}.");
+            crossProfileApps.StartActivity(request.Intent, request.TargetUser, this);
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn(LogTag, $"Failed to start explicit cross-profile activity: {exception}");
+            CompleteCrossProfileActivity(
+                request.CompletionSource,
+                AndroidActivityResultApi.CreateCanceledResult(
+                    "Android не смог открыть действие Agnosia в рабочем профиле."));
+        }
+    }
+
+    private void CancelPendingCrossProfileActivity(string message)
+    {
+        TaskCompletionSource<AndroidActivityResult>? completionSource;
+        lock (RequestSync)
+        {
+            completionSource = _pendingCrossProfileResult;
+            _pendingCrossProfileResult = null;
+            _pendingCrossProfileStart = null;
+        }
+
+        completionSource?.TrySetResult(AndroidActivityResultApi.CreateCanceledResult(message));
+    }
+
+    private void CancelCrossProfileActivity(
+        TaskCompletionSource<AndroidActivityResult> completionSource,
+        CancellationToken cancellationToken)
+    {
+        lock (RequestSync)
+        {
+            if (ReferenceEquals(_pendingCrossProfileResult, completionSource))
+                _pendingCrossProfileResult = null;
+            if (ReferenceEquals(_pendingCrossProfileStart?.CompletionSource, completionSource))
+                _pendingCrossProfileStart = null;
+        }
+
+        completionSource.TrySetCanceled(cancellationToken);
+    }
+
+    private void CompleteCrossProfileActivity(
+        TaskCompletionSource<AndroidActivityResult> completionSource,
+        AndroidActivityResult result)
+    {
+        lock (RequestSync)
+        {
+            if (ReferenceEquals(_pendingCrossProfileResult, completionSource))
+                _pendingCrossProfileResult = null;
+        }
+
+        completionSource.TrySetResult(result);
     }
 
     private Task<AndroidActivityResult> StartForResultAsync(
@@ -229,5 +351,10 @@ public partial class MainActivity
     private sealed record ActivityStartRequest(
         Intent Intent,
         int RequestCode,
+        TaskCompletionSource<AndroidActivityResult> CompletionSource);
+
+    private sealed record CrossProfileActivityStartRequest(
+        Intent Intent,
+        UserHandle TargetUser,
         TaskCompletionSource<AndroidActivityResult> CompletionSource);
 }

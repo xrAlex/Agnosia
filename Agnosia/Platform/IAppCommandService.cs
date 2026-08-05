@@ -6,6 +6,8 @@ public interface IAppCommandService
 {
     Task<OperationResult> CloneAsync(AppSnapshot app, CancellationToken cancellationToken = default);
 
+    Task<OperationResult> VerifyWorkCopyAsync(AppSnapshot app, CancellationToken cancellationToken = default);
+
     Task<OperationResult> UninstallAsync(AppSnapshot app, CancellationToken cancellationToken = default);
 
     Task<OperationResult> SetFrozenAsync(AppSnapshot app, bool hidden, CancellationToken cancellationToken = default);

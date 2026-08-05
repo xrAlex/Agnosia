@@ -6,6 +6,12 @@ namespace Agnosia.Unit.Android.Commands;
 
 public sealed class AndroidCommandIntentMapperTests
 {
+    private static readonly HashSet<AndroidCommandKind> BinderOnlyKinds =
+    [
+        AndroidCommandKind.RecoverAuthentication,
+        AndroidCommandKind.QueryPackageState
+    ];
+
     public static TheoryData<string, string> RequiredActionMappings => new()
     {
         { nameof(AndroidCommandKind.ProfilePing), AgnosiaActions.ProfilePing },
@@ -43,7 +49,7 @@ public sealed class AndroidCommandIntentMapperTests
         var targetProfileActions = AgnosiaActions.TargetProfileActivityActions.ToHashSet(StringComparer.Ordinal);
 
         foreach (var kind in Enum.GetValues<AndroidCommandKind>()
-                     .Where(kind => kind != AndroidCommandKind.RecoverAuthentication))
+                     .Where(kind => !BinderOnlyKinds.Contains(kind)))
         {
             var action = AndroidCommandIntentMapper.ToAction(kind);
 
@@ -51,10 +57,36 @@ public sealed class AndroidCommandIntentMapperTests
         }
     }
 
-    [Fact]
-    public void ToAction_RejectsBinderOnlyAuthenticationRecovery()
+    [Theory]
+    [InlineData(nameof(AndroidCommandKind.RecoverAuthentication))]
+    [InlineData(nameof(AndroidCommandKind.QueryPackageState))]
+    public void ToAction_RejectsBinderOnlyCommands(string kindName)
     {
+        var kind = Enum.Parse<AndroidCommandKind>(kindName);
+
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => AndroidCommandIntentMapper.ToAction(AndroidCommandKind.RecoverAuthentication));
+            () => AndroidCommandIntentMapper.ToAction(kind));
+    }
+
+    [Fact]
+    public void TryFromAction_RoundTripsEveryActivityCommandKind()
+    {
+        foreach (var kind in Enum.GetValues<AndroidCommandKind>()
+                     .Where(kind => !BinderOnlyKinds.Contains(kind)))
+        {
+            var action = AndroidCommandIntentMapper.ToAction(kind);
+
+            Assert.True(AndroidCommandIntentMapper.TryFromAction(action, out var actual));
+            Assert.Equal(kind, actual);
+        }
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("agnosia.action.UNKNOWN")]
+    public void TryFromAction_RejectsUnknownActions(string? action)
+    {
+        Assert.False(AndroidCommandIntentMapper.TryFromAction(action, out _));
     }
 }

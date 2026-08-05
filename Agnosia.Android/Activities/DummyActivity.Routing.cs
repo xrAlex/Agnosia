@@ -22,11 +22,19 @@ public sealed partial class DummyActivity
         }
 
         Log.Debug(LogTag, $"Handling signed action={action}, isProfileOwner={_isProfileOwner}.");
-        if (!AuthenticationUtility.CheckIntent(Intent)
+        var hasAuthenticatedIntent = AuthenticationUtility.CheckIntent(Intent);
+        if (!hasAuthenticatedIntent
             && !AuthenticationUtility.CheckWorkAppFrozenCallback(Intent))
         {
             Log.Warn(LogTag,
                 $"Rejected signed action={action}: authentication check failed. isProfileOwner={_isProfileOwner}.");
+            Finish();
+            return;
+        }
+
+        if (hasAuthenticatedIntent && !TryCaptureAuthenticatedCommand(action))
+        {
+            Log.Warn(LogTag, $"Rejected signed action={action}: command identity is invalid.");
             Finish();
             return;
         }
@@ -175,7 +183,7 @@ public sealed partial class DummyActivity
             ? AndroidCommandTargetProfile.Work
             : AndroidCommandTargetProfile.Personal;
         var envelope = new AndroidCommandEnvelope(
-            Guid.NewGuid(),
+            _commandCorrelationId,
             kind,
             targetProfile,
             AndroidCommandInteractivity.Silent,
@@ -210,9 +218,6 @@ public sealed partial class DummyActivity
                     result.PayloadJson,
                     result.Diagnostics,
                     Intent);
-                if (kind == AndroidCommandKind.ProfilePing)
-                    TrySignResult(resultIntent);
-
                 FinishWithResult(Result.Ok, resultIntent);
             },
             fallbackErrorMessage);

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Agnosia.Models;
 using Android.Content;
 using Android.Content.PM;
@@ -8,7 +9,8 @@ namespace Agnosia.Android.Commands;
 
 internal sealed class AndroidAppCommandCoordinator(
     AndroidActivityCommandGateway commandRunner,
-    AndroidPermissionCoordinator permissionCoordinator)
+    AndroidPermissionCoordinator permissionCoordinator,
+    AndroidCommandCenter commandCenter)
 {
     private const string LogTag = "AgnosiaTransientVpn";
     private const string ActivityResultLogTag = "AgnosiaActivityResult";
@@ -119,6 +121,30 @@ internal sealed class AndroidAppCommandCoordinator(
             app.PackageName);
 
         return OperationResult.Success($"{result.Message} {shortcutResult.Message}");
+    }
+
+    public async Task<OperationResult> VerifyWorkCopyAsync(
+        AppSnapshot app,
+        CancellationToken cancellationToken)
+    {
+        if (app.Profile != ProfileKind.Personal)
+            return OperationResult.Failure(
+                "Проверка рабочей копии доступна только для приложения личного профиля.");
+
+        var envelope = new AndroidCommandEnvelope(
+            Guid.NewGuid(),
+            AndroidCommandKind.QueryPackageState,
+            AndroidCommandTargetProfile.Work,
+            AndroidCommandInteractivity.Silent,
+            AndroidCommandPriority.UserBlocking,
+            TimeSpan.FromSeconds(30),
+            JsonSerializer.Serialize(new PackageStateQuery(app.PackageName)));
+        var result = await commandCenter.ExecuteAsync(envelope, cancellationToken).ConfigureAwait(false);
+
+        return PackageStateResultInterpreter.Interpret(
+            result,
+            app.PackageName,
+            expectedHidden: !app.IsSystem);
     }
 
     public async Task<OperationResult> SetFrozenAsync(

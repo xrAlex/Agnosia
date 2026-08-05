@@ -118,15 +118,52 @@ public sealed class AndroidCommandMigrationContractTests
     }
 
     [Fact]
-    public void Profile_ping_activity_fallback_verifies_and_signs_results()
+    public void Work_activity_commands_use_explicit_cross_profile_apps_transport()
     {
-        var activityTransportSource = ReadAndroidSource("Commands", "Transports", "ActivityCommandTransport.cs");
-        var dummyRoutingSource = ReadAndroidSource("Activities", "DummyActivity.Routing.cs");
+        var gatewaySource = ReadAndroidSource("Gateways", "AndroidActivityCommandGateway.cs");
+        var hostSource = ReadAndroidSource("Gateways", "IAndroidActivityHost.cs");
+        var startMethod = MatchRequired(
+            gatewaySource,
+            @"public async Task<AndroidActivityResult> StartActivityForResultAsync[\s\S]*?\n    private static AndroidActivityResult CreateWorkProfileTimeoutResult");
 
-        Assert.Contains("profile_ping_unsigned", activityTransportSource, StringComparison.Ordinal);
-        Assert.Contains("AuthenticationUtility.CheckIntent(result.Data)", activityTransportSource, StringComparison.Ordinal);
-        Assert.Contains("if (kind == AndroidCommandKind.ProfilePing)", dummyRoutingSource, StringComparison.Ordinal);
-        Assert.Contains("TrySignResult(resultIntent)", dummyRoutingSource, StringComparison.Ordinal);
+        Assert.Contains("AndroidSystemApi.GetCrossProfileApps", startMethod, StringComparison.Ordinal);
+        Assert.Contains("CanInteractAcrossProfiles", startMethod, StringComparison.Ordinal);
+        Assert.Contains("intent.SetComponent", startMethod, StringComparison.Ordinal);
+        Assert.Contains("StartCrossProfileForResultAsync", startMethod, StringComparison.Ordinal);
+        Assert.DoesNotContain("TransferIntentToProfile", startMethod, StringComparison.Ordinal);
+        Assert.Contains("StartCrossProfileForResultAsync", hostSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Activity_command_gateway_authenticates_every_remote_result()
+    {
+        var gatewaySource = ReadAndroidSource("Gateways", "AndroidActivityCommandGateway.cs");
+        var activityTransportSource = ReadAndroidSource("Commands", "Transports", "ActivityCommandTransport.cs");
+        var dummyResultsSource = ReadAndroidSource("Activities", "DummyActivity.Results.cs");
+
+        Assert.Contains("AuthenticationUtility.CheckIntent(data)", gatewaySource, StringComparison.Ordinal);
+        Assert.Contains("ActivityCommandResultIdentity.Validate", gatewaySource, StringComparison.Ordinal);
+        Assert.DoesNotContain("envelope.Kind == AndroidCommandKind.ProfilePing", activityTransportSource,
+            StringComparison.Ordinal);
+        Assert.Contains("AgnosiaActions.CommandResult", dummyResultsSource, StringComparison.Ordinal);
+        Assert.Contains("AndroidCommandContract.ExtraCommandCorrelationId", dummyResultsSource,
+            StringComparison.Ordinal);
+        Assert.Contains("AndroidCommandContract.ExtraCommandKind", dummyResultsSource, StringComparison.Ordinal);
+        Assert.Contains("AndroidCommandContract.ResultCommandResultCode", dummyResultsSource,
+            StringComparison.Ordinal);
+        Assert.Contains("TrySignResult(data)", dummyResultsSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Activity_command_preserves_handler_kind_when_result_identity_uses_action_kind()
+    {
+        var source = ReadAndroidSource("Activities", "DummyActivity.Routing.cs");
+        var method = MatchRequired(
+            source,
+            @"private void RunCommandCenterAction[\s\S]*?\n    }");
+
+        Assert.Matches(@"_commandCorrelationId,\s+kind,", method);
+        Assert.DoesNotMatch(@"_commandCorrelationId,\s+_commandKind,", method);
     }
 
     [Fact]
