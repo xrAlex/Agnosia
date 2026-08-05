@@ -5,6 +5,7 @@ namespace Agnosia.Unit.AndroidApi.Platform;
 
 public sealed class AndroidPackageAccessPolicyTests
 {
+    private const string AgnosiaPackage = "com.agnosia.app";
     private const string RequiredCrossProfilePackage = "ru.sberbankmobile";
 
     // Проверяет hard-coded policy package, которому нужен cross-profile interaction.
@@ -36,7 +37,16 @@ public sealed class AndroidPackageAccessPolicyTests
     {
         var result = AndroidPackageAccessPolicy.ApplyRequiredCrossProfilePackages(null);
 
-        Assert.Equal([RequiredCrossProfilePackage], result);
+        Assert.Equal([AgnosiaPackage, RequiredCrossProfilePackage], result);
+    }
+
+    // Проверяет, что сам Agnosia package allowlist-ится для запроса INTERACT_ACROSS_PROFILES.
+    [Fact]
+    public void ApplyRequiredCrossProfilePackages_adds_agnosia_package_for_cross_profile_consent()
+    {
+        var result = AndroidPackageAccessPolicy.ApplyRequiredCrossProfilePackages([]);
+
+        Assert.Contains(AgnosiaPackage, result);
     }
 
     // Проверяет фильтрацию blank значений, dedupe и сортировку итогового списка.
@@ -55,6 +65,7 @@ public sealed class AndroidPackageAccessPolicyTests
         Assert.Equal(
             [
                 "a.example",
+                AgnosiaPackage,
                 RequiredCrossProfilePackage,
                 "z.example"
             ],

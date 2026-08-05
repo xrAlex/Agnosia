@@ -22,6 +22,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private static readonly PermissionKind[] AppPermissionKinds =
     [
         PermissionKind.WorkProfile,
+        PermissionKind.CrossProfileInteraction,
         PermissionKind.UsageStats,
         PermissionKind.Notifications,
         PermissionKind.PackageInstall
@@ -1450,6 +1451,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private static bool ShouldRefreshPermissionOnResume(PermissionKind kind)
     {
         return kind is PermissionKind.Notifications
+            or PermissionKind.CrossProfileInteraction
             or PermissionKind.UsageStats
             or PermissionKind.PackageInstall
             or PermissionKind.PersonalAllFiles
@@ -1624,7 +1626,15 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private async Task ReloadPermissionsCoreAsync()
     {
-        var snapshots = await LoadPermissionsOnWorkerAsync().ConfigureAwait(false);
+        IReadOnlyList<PermissionSnapshot> snapshots;
+        try
+        {
+            snapshots = await LoadPermissionsOnWorkerAsync().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
 
         await InvokeOnUiThreadActionAsync(
                 () => ApplyPermissionSnapshots(snapshots),

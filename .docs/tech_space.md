@@ -168,9 +168,9 @@ Agnosia проектируется как инструмент снижения 
 
 ## Межпрофильные команды
 
-Android разделяет личный и рабочий профили, поэтому операции в рабочем профиле выполняются только внутри фактического целевого профиля. Тихие query-команды проходят через `AndroidCommandCenter`, но команда считается успешной только если она выполнилась в запрошенном Android-профиле. Локальное прямое выполнение и локальное выполнение через silent service допустимы только для текущего профиля. Тихое выполнение в рабочем профиле маршрутизируется через явный capability transport; в текущей Android work-profile топологии проекта этот capability честно возвращает `silent_work_transport_unavailable`, и command center откатывается к подписанному пути через `DummyActivity`.
+Android разделяет личный и рабочий профили, поэтому операции в рабочем профиле выполняются только внутри фактического целевого профиля. Тихие query-команды проходят через `AndroidCommandCenter`, но команда считается успешной только если она выполнилась в запрошенном Android-профиле. Локальное прямое выполнение и локальное выполнение через silent service допустимы только для текущего профиля. Тихое выполнение в рабочем профиле маршрутизируется через `SilentWorkProfileCommandTransport`: когда системе разрешён `INTERACT_ACROSS_PROFILES`, он биндуется к `SilentCommandService` рабочего профиля через `Context.BindServiceAsUser(...)` и обменивается `AndroidCommandEnvelope`/`AndroidCommandResultEnvelope` через `Messenger`. Если API, пользовательское согласие, quiet mode или OEM/admin policy не позволяют bind, command center откатывается к подписанному пути через `DummyActivity`.
 
-`DummyActivity` - совместимый fallback для мигрированных query-команд. Он не вызывает обратно `AndroidCommandCenter`; вместо этого он строит `AndroidCommandExecutionContext` из собственного контекста Activity/профиля и вызывает общий обработчик команд через `AndroidCommandHandlerExecutor`. Так бизнес-логика остаётся в одном источнике, а зависимость от `MainActivity` в рабочем профиле не появляется.
+`DummyActivity` - совместимый fallback для мигрированных query-команд. Он не вызывает обратно `AndroidCommandCenter`; вместо этого он строит `AndroidCommandExecutionContext` из собственного контекста Activity/профиля и вызывает общий обработчик команд через `AndroidCommandHandlerExecutor`. Так бизнес-логика остаётся в одном источнике, а зависимость от `MainActivity` в рабочем профиле не появляется. Fallback Activity использует отдельную non-dimmed translucent theme, чтобы неизбежный Activity-путь не затемнял экран во время коротких read-команд.
 
 Каждый результат команды фиксирует запрошенный профиль, фактический профиль выполнения, транспорт, цепочку fallback и источник контекста. Несовпадение запрошенного и фактического профиля считается ошибкой команды.
 
@@ -180,7 +180,7 @@ Silent/read command
    ▼
 AndroidCommandCenter
    ├─ DirectLocal / SilentService для текущего профиля
-   ├─ SilentWorkProfile capability для рабочего профиля
+   ├─ SilentWorkProfile bindServiceAsUser + Messenger для рабочего профиля
    └─ Activity fallback → DummyActivity → AndroidCommandHandlerExecutor
 ```
 
@@ -336,7 +336,7 @@ IPC построен без `.aidl`: используются `Android.OS.Messen
 
 ## Каталог приложений
 
-Каталог строится из двух независимых запросов: личный профиль читается локально, рабочий профиль опрашивается через `AndroidCommandCenter`. При отсутствии поддержанного тихого work-profile capability command center использует `DummyActivity` как подписанный fallback, но app list, одиночные и batch-иконки, logs, permissions и cross-profile packages выполняются общими command handlers. Оба результата приводятся к `AppSnapshot`, чтобы UI не зависел от Android-типов.
+Каталог строится из двух независимых запросов: личный профиль читается локально, рабочий профиль опрашивается через `AndroidCommandCenter`. При доступном cross-profile bind command center использует `SilentCommandService` рабочего профиля без Activity; при отсутствии поддержанного тихого work-profile capability command center использует `DummyActivity` как подписанный fallback. App list, одиночные и batch-иконки, logs, permissions и cross-profile packages выполняются общими command handlers. Оба результата приводятся к `AppSnapshot`, чтобы UI не зависел от Android-типов.
 
 ```text
 AndroidDashboardReader.LoadAppInventoryAsync()
@@ -344,7 +344,7 @@ AndroidDashboardReader.LoadAppInventoryAsync()
    │    └─ PackageManager.GetInstalledApplications(...)
    └─ QueryAppsAsync(Work)
         └─ AndroidCommandCenter → handler в целевом профиле
-             └─ при unsupported SilentWorkProfile: signed DummyActivity fallback
+             └─ при недоступном SilentWorkProfile bind: signed DummyActivity fallback
 ```
 
 При чтении приложения Agnosia собирает:
@@ -628,7 +628,7 @@ Android-проект собирается как APK с `ApplicationId` `com.agn
 | --- | --- |
 | Рабочий профиль создан, но не отвечает | Приложение помечает профиль как требующий удаления или повторной настройки. |
 | Потерян HMAC-ключ | Запускается recovery-команда, которая принимает новый ключ только внутри profile owner. |
-| Тихий транспорт рабочего профиля недоступен | `AndroidCommandCenter` записывает `silent_work_transport_unavailable` и откатывается к подписанному `DummyActivity`; для рабочих команд он не должен возвращать данные личного профиля. |
+| Тихий транспорт рабочего профиля недоступен | `AndroidCommandCenter` записывает `silent_work_transport_unavailable` с причиной вроде `canInteractAcrossProfiles=false`, `targetUser=missing` или `bind=false` и откатывается к подписанному `DummyActivity`; для рабочих команд он не должен возвращать данные личного профиля. |
 | APK после установки ещё не виден | `DummyActivity` ждёт доступности пакета с retry перед подготовкой ярлыка. |
 | Скрытие после установки не прошло сразу | Повторные попытки скрытия выполняются ограниченное время. |
 | Монитор не видит foreground-событие | Приложение не скрывается по неподтверждённому таймауту, а оставляется видимым до более надёжного сигнала. |

@@ -10,7 +10,7 @@ namespace Agnosia.Android.Activities;
 
 [Activity(
     Name = "com.agnosia.app.DummyActivity",
-    Theme = "@android:style/Theme.Translucent.NoTitleBar",
+    Theme = "@style/Agnosia.CommandFallbackTheme",
     Exported = true,
     Permission = "com.agnosia.app.permission.CROSS_PROFILE_COMMAND",
     ExcludeFromRecents = true,

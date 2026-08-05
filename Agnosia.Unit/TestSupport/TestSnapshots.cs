@@ -81,6 +81,7 @@ internal static class TestSnapshots
         PermissionKind[] requiredKinds =
         [
             PermissionKind.WorkProfile,
+            PermissionKind.CrossProfileInteraction,
             PermissionKind.UsageStats,
             PermissionKind.Notifications,
             PermissionKind.PackageInstall

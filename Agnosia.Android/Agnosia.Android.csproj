@@ -66,6 +66,7 @@
         <Compile Include="Commands\Handlers\QueryCrossProfilePackagesCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\QueryLogsCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\QueryPermissionsCommandHandler.cs"/>
+        <Compile Include="Commands\Transports\AndroidCommandReplyTimeoutPolicy.cs"/>
         <Compile Include="Commands\Transports\DirectLocalCommandTransport.cs"/>
         <Compile Include="Commands\Transports\SilentWorkProfileCommandTransport.cs"/>
         <Compile Include="Gateways\AndroidQueryCache.cs"/>

@@ -14,7 +14,7 @@ internal sealed class AndroidPermissionCoordinator(
         var activity = commandRunner.CurrentActivity;
         AgnosiaRuntime.Initialize(activity);
 
-        var (profileDiagnostics, hasSetup, notificationPermissionGranted, vpnControlGranted, personalAllFilesGranted, overlayPermissionGranted) = await ReadPermissionLocalStateAsync(activity, cancellationToken).ConfigureAwait(false);
+        var (profileDiagnostics, hasSetup, crossProfileInteractionGranted, crossProfileInteractionCanRequest, notificationPermissionGranted, vpnControlGranted, personalAllFilesGranted, overlayPermissionGranted) = await ReadPermissionLocalStateAsync(activity, cancellationToken).ConfigureAwait(false);
         var hasWorkProfileTarget = profileDiagnostics.CommandTargetResolvable;
         var workProfileAvailable = hasWorkProfileTarget
                                    && profileDiagnostics.AvailableToCrossProfileApps
@@ -29,6 +29,9 @@ internal sealed class AndroidPermissionCoordinator(
         return
         [
             PermissionCatalog.CreateWorkProfileSnapshot(hasSetup, workProfileAvailable),
+            PermissionCatalog.CreateCrossProfileInteractionSnapshot(
+                crossProfileInteractionGranted,
+                crossProfileInteractionCanRequest),
             PermissionCatalog.CreateSnapshot(
                 PermissionKind.Notifications,
                 notificationPermissionGranted,
@@ -70,6 +73,8 @@ internal sealed class AndroidPermissionCoordinator(
         return permission switch
         {
             PermissionKind.WorkProfile => await startProvisioningAsync(cancellationToken).ConfigureAwait(false),
+            PermissionKind.CrossProfileInteraction => await RequestCrossProfileInteractionAsync(cancellationToken)
+                .ConfigureAwait(false),
             PermissionKind.UsageStats => await RequestUsageStatsAccessAsync(cancellationToken).ConfigureAwait(false),
             PermissionKind.Notifications => AndroidPermissionApi.RequestNotificationPermission(activity),
             PermissionKind.VpnControl => await RequestVpnControlAsync(cancellationToken).ConfigureAwait(false),
@@ -95,6 +100,33 @@ internal sealed class AndroidPermissionCoordinator(
 
         var requestResult = await RequestUsageStatsAccessAsync(cancellationToken).ConfigureAwait(false);
         if (requestResult.Succeeded) storage.SetBoolean(StorageKeys.UsageStatsAccessPrompted, true);
+    }
+
+    private async Task<OperationResult> RequestCrossProfileInteractionAsync(CancellationToken cancellationToken)
+    {
+        var activity = commandRunner.CurrentActivity;
+        var crossProfileApps = AndroidSystemApi.GetCrossProfileApps(activity);
+        if (crossProfileApps is null)
+            return OperationResult.Failure("Android не предоставил API межпрофильного взаимодействия.");
+
+        if (crossProfileApps.CanInteractAcrossProfiles())
+            return OperationResult.Success("Межпрофильное взаимодействие уже включено.");
+
+        if (!crossProfileApps.CanRequestInteractAcrossProfiles())
+            return OperationResult.Failure(
+                "Android не даёт открыть системный запрос межпрофильного доступа для Agnosia как владельца рабочего профиля. Для отладочного устройства выдайте INTERACT_ACROSS_PROFILES через adb appops.");
+
+        var result = await commandRunner.StartExternalActivityForResultAsync(
+                crossProfileApps.CreateRequestInteractAcrossProfilesIntent(),
+                cancellationToken)
+            .ConfigureAwait(false);
+        var error = AndroidActivityResultApi.ExtractError(result);
+        if (!string.IsNullOrWhiteSpace(error))
+            return OperationResult.Failure(error);
+
+        return crossProfileApps.CanInteractAcrossProfiles()
+            ? OperationResult.Success("Межпрофильное взаимодействие включено.")
+            : OperationResult.Success("Включите межпрофильное взаимодействие для Agnosia на системном экране.");
     }
 
     private async Task<OperationResult> RequestUsageStatsAccessAsync(CancellationToken cancellationToken)
@@ -180,6 +212,7 @@ internal sealed class AndroidPermissionCoordinator(
             cancellationToken.ThrowIfCancellationRequested();
 
             var profileDiagnostics = AndroidWorkProfileDiagnosticsReader.Read(activity);
+            var crossProfileApps = AndroidSystemApi.GetCrossProfileApps(activity);
             var hasWorkProfileTarget = profileDiagnostics.CommandTargetResolvable;
             var hasSetup = ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.HasSetup)
                            || hasWorkProfileTarget
@@ -187,6 +220,8 @@ internal sealed class AndroidPermissionCoordinator(
             return new PermissionLocalState(
                 profileDiagnostics,
                 hasSetup,
+                crossProfileApps?.CanInteractAcrossProfiles() == true,
+                crossProfileApps?.CanRequestInteractAcrossProfiles() == true,
                 AndroidPermissionApi.HasNotificationPermission(activity),
                 IsVpnControlGranted(activity),
                 AndroidPermissionApi.HasAllFilesAccess(activity),
@@ -217,6 +252,8 @@ internal sealed class AndroidPermissionCoordinator(
     private sealed record PermissionLocalState(
         WorkProfileDiagnostics ProfileDiagnostics,
         bool HasSetup,
+        bool CrossProfileInteractionGranted,
+        bool CrossProfileInteractionCanRequest,
         bool NotificationPermissionGranted,
         bool VpnControlGranted,
         bool PersonalAllFilesGranted,

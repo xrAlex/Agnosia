@@ -55,6 +55,7 @@ public sealed class AndroidManifestContractTests
                 "android.permission.REQUEST_INSTALL_PACKAGES",
                 "android.permission.REQUEST_DELETE_PACKAGES",
                 "android.permission.MANAGE_EXTERNAL_STORAGE",
+                "android.permission.INTERACT_ACROSS_PROFILES",
                 "android.permission.POST_NOTIFICATIONS",
                 "android.permission.SYSTEM_ALERT_WINDOW"
             ]);
@@ -143,6 +144,8 @@ public sealed class AndroidManifestContractTests
     {
         var source = File.ReadAllText(
             RepositoryPaths.Get("Agnosia.Android", "Services", "SilentCommandService.cs"));
+        var messengerClientSource = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Commands", "Transports", "SilentCommandMessengerClient.cs"));
 
         Assert.Contains("[Service(", source, StringComparison.Ordinal);
         Assert.Contains("Name = \"com.agnosia.app.SilentCommandService\"", source, StringComparison.Ordinal);
@@ -150,7 +153,9 @@ public sealed class AndroidManifestContractTests
         Assert.Contains("Permission = \"com.agnosia.app.permission.CROSS_PROFILE_COMMAND\"", source,
             StringComparison.Ordinal);
         Assert.Contains("public override IBinder OnBind", source, StringComparison.Ordinal);
-        Assert.Contains("public Task<AndroidCommandResultEnvelope> ExecuteAsync", source, StringComparison.Ordinal);
+        Assert.Contains("new Messenger", source, StringComparison.Ordinal);
+        Assert.Contains("ReplyTo", source, StringComparison.Ordinal);
+        Assert.Contains("Message.Obtain", messengerClientSource, StringComparison.Ordinal);
         Assert.Contains("ServiceRegistry.GetRequiredService<AndroidCommandHandlerExecutor>()", source,
             StringComparison.Ordinal);
         Assert.Contains("ServiceRegistry.GetRequiredService<AndroidCommandExecutionContextFactory>()", source,
@@ -160,6 +165,22 @@ public sealed class AndroidManifestContractTests
         Assert.DoesNotContain("TargetProfile = AndroidCommandTargetProfile.Personal", source,
             StringComparison.Ordinal);
         Assert.DoesNotContain("new DirectLocalCommandTransport(", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Dummy_activity_uses_non_dimmed_command_fallback_theme()
+    {
+        var activitySource = ReadAndroidSource("Activities\\DummyActivity.cs");
+        var stylesSource = ReadAndroidSource("Resources\\values\\styles.xml");
+
+        Assert.Contains("Theme = \"@style/Agnosia.CommandFallbackTheme\"", activitySource, StringComparison.Ordinal);
+        Assert.Contains("<style name=\"Agnosia.CommandFallbackTheme\"", stylesSource, StringComparison.Ordinal);
+        Assert.Contains("<item name=\"android:backgroundDimEnabled\">false</item>", stylesSource,
+            StringComparison.Ordinal);
+        Assert.Contains("<item name=\"android:windowDisablePreview\">true</item>", stylesSource,
+            StringComparison.Ordinal);
+        Assert.Contains("<item name=\"android:windowNoTitle\">true</item>", stylesSource,
+            StringComparison.Ordinal);
     }
 
     // Проверяет, что cross-profile File Shuttle стартует через PendingIntent с BAL opt-in.
@@ -286,6 +307,39 @@ public sealed class AndroidManifestContractTests
         Assert.Contains("VpnService.Prepare(activity)", localStateReader, StringComparison.Ordinal);
         Assert.DoesNotContain("VpnControlPrepared", source, StringComparison.Ordinal);
         Assert.Contains("VpnService.Prepare(activity)", requestVpnControl, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Cross_profile_interaction_permission_uses_android_consent_intent()
+    {
+        var source = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android", "Permissions", "AndroidPermissionCoordinator.cs"));
+        var loadPermissions = Regex.Match(
+            source,
+            @"public async Task<IReadOnlyList<PermissionSnapshot>> LoadPermissionsAsync[\s\S]*?\n    public async Task<OperationResult> RequestPermissionAsync",
+            RegexOptions.Singleline).Value;
+        var requestPermission = Regex.Match(
+            source,
+            @"public async Task<OperationResult> RequestPermissionAsync[\s\S]*?\n    public async Task EnsureUsageStatsAccessRequestedAsync",
+            RegexOptions.Singleline).Value;
+        var localStateReader = Regex.Match(
+            source,
+            @"private static Task<PermissionLocalState> ReadPermissionLocalStateAsync[\s\S]*?\n    public OperationResult OpenAppDetailsSettings",
+            RegexOptions.Singleline).Value;
+        var requestCrossProfileInteraction = Regex.Match(
+            source,
+            @"private async Task<OperationResult> RequestCrossProfileInteractionAsync[\s\S]*?\n    private async Task<OperationResult> RequestUsageStatsAccessAsync",
+            RegexOptions.Singleline).Value;
+
+        Assert.Contains("CreateCrossProfileInteractionSnapshot", loadPermissions, StringComparison.Ordinal);
+        Assert.Contains("CanInteractAcrossProfiles()", localStateReader, StringComparison.Ordinal);
+        Assert.Contains("CanRequestInteractAcrossProfiles()", localStateReader, StringComparison.Ordinal);
+        Assert.Contains("PermissionKind.CrossProfileInteraction", requestPermission, StringComparison.Ordinal);
+        Assert.Contains("CanRequestInteractAcrossProfiles()", requestCrossProfileInteraction, StringComparison.Ordinal);
+        Assert.Contains("CreateRequestInteractAcrossProfilesIntent()", requestCrossProfileInteraction,
+            StringComparison.Ordinal);
+        Assert.Contains("StartExternalActivityForResultAsync", requestCrossProfileInteraction,
+            StringComparison.Ordinal);
     }
 
     [Fact]

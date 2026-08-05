@@ -42,6 +42,8 @@ public sealed class TestPlatformServices :
 
     public Func<PermissionKind, CancellationToken, Task<OperationResult>>? RequestPermissionHandler { get; set; }
 
+    public Func<CancellationToken, Task<IReadOnlyList<PermissionSnapshot>>>? LoadPermissionsHandler { get; set; }
+
     public Func<CancellationToken, Task<OperationResult>>? CompleteOnboardingHandler { get; set; }
 
     public Func<AppSnapshot, CancellationToken, Task<OperationResult>>? CloneHandler { get; set; }
@@ -154,7 +156,9 @@ public sealed class TestPlatformServices :
     {
         PermissionLoadCount++;
 
-        return Task.FromResult(Permissions);
+        return LoadPermissionsHandler is null
+            ? Task.FromResult(Permissions)
+            : LoadPermissionsHandler(cancellationToken);
     }
 
     public Task<OperationResult> RequestPermissionAsync(
