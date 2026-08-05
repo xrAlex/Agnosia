@@ -18,7 +18,6 @@ public static class AuthenticationUtility
     private const string ExtraAuthKey = "auth_key";
     private const string ExtraSignature = "signature";
     private const string ExtraTimestamp = "timestamp";
-    private const int AuthKeyByteLength = 32;
     private static readonly TimeSpan IntentSignatureMaximumAge = TimeSpan.FromSeconds(30);
 
     public static void SignIntent(Intent intent)
@@ -41,14 +40,14 @@ public static class AuthenticationUtility
 
     public static string CreateAndStoreKey()
     {
-        var key = CreateKey();
+        var key = AuthenticationKeyMaterial.Create();
         ServiceRegistry.GetRequiredService<LocalStorageManager>().SetString(StorageKeys.AuthKey, key);
         return key;
     }
 
     public static bool TryStoreProvisioningKey(string? key)
     {
-        if (string.IsNullOrWhiteSpace(key) || !IsValidKey(key)) return false;
+        if (!AuthenticationKeyMaterial.IsValid(key)) return false;
 
         ServiceRegistry.GetRequiredService<LocalStorageManager>().SetString(StorageKeys.AuthKey, key);
         return true;
@@ -144,11 +143,6 @@ public static class AuthenticationUtility
         ServiceRegistry.GetRequiredService<LocalStorageManager>().Remove(StorageKeys.AuthKey);
     }
 
-    private static string CreateKey()
-    {
-        return Convert.ToHexString(RandomNumberGenerator.GetBytes(AuthKeyByteLength));
-    }
-
     private static bool TryGetValidStoredKey(bool removeMissingKey, out string key)
     {
         var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
@@ -161,7 +155,7 @@ public static class AuthenticationUtility
             return false;
         }
 
-        if (IsValidKey(storedKey))
+        if (AuthenticationKeyMaterial.IsValid(storedKey))
         {
             key = storedKey;
             return true;
@@ -191,18 +185,6 @@ public static class AuthenticationUtility
             payload.Append(key).Append('=').Append(EncodeExtraValue(extras, key)).Append('\n');
 
         return payload.ToString();
-    }
-
-    private static bool IsValidKey(string hexKey)
-    {
-        try
-        {
-            return Convert.FromHexString(hexKey).Length == AuthKeyByteLength;
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
     }
 
     private static bool IsSignedExtra(string key)

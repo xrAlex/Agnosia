@@ -3,7 +3,6 @@ namespace Agnosia.Android.Api.Commands;
 public static class AgnosiaActions
 {
     public const string FinalizeProvision = "agnosia.action.FINALIZE_PROVISION";
-    public const string RecoverAuthentication = "agnosia.action.RECOVER_AUTHENTICATION";
     public const string ProfilePing = "agnosia.action.TRY_START_SERVICE";
     public const string QueryApps = "agnosia.action.QUERY_APPS";
     public const string QueryAppIcon = "agnosia.action.QUERY_APP_ICON";
@@ -40,7 +39,6 @@ public static class AgnosiaActions
     public static readonly string[] ParentToManagedCommandActions =
     [
         ProfilePing,
-        RecoverAuthentication,
         QueryApps,
         QueryAppIcon,
         QueryAppIcons,
@@ -79,7 +77,6 @@ public static class AgnosiaActions
     public static readonly string[] TargetProfileActivityActions =
     [
         FinalizeProvision,
-        RecoverAuthentication,
         ProfilePing,
         QueryApps,
         QueryAppIcon,

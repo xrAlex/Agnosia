@@ -38,15 +38,23 @@ public sealed class AndroidCommandIntentMapperTests
     }
 
     [Fact]
-    public void ToAction_MapsEveryCommandKindToTargetProfileActivityAction()
+    public void ToAction_MapsEveryActivityCommandKindToTargetProfileActivityAction()
     {
         var targetProfileActions = AgnosiaActions.TargetProfileActivityActions.ToHashSet(StringComparer.Ordinal);
 
-        foreach (var kind in Enum.GetValues<AndroidCommandKind>())
+        foreach (var kind in Enum.GetValues<AndroidCommandKind>()
+                     .Where(kind => kind != AndroidCommandKind.RecoverAuthentication))
         {
             var action = AndroidCommandIntentMapper.ToAction(kind);
 
             Assert.Contains(action, targetProfileActions);
         }
+    }
+
+    [Fact]
+    public void ToAction_RejectsBinderOnlyAuthenticationRecovery()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => AndroidCommandIntentMapper.ToAction(AndroidCommandKind.RecoverAuthentication));
     }
 }

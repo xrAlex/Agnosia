@@ -148,7 +148,7 @@ Agnosia проверяет profile owner и применяет политики
 
 Во время провижининга Agnosia создаёт 32-байтный ключ, сохраняет его в личном профиле и передаёт в рабочий профиль через `DevicePolicyManager.ExtraProvisioningAdminExtrasBundle`. `AgnosiaDeviceAdminReceiver` в рабочем профиле сохраняет этот ключ, вызывает `setProfileEnabled`, регистрирует межпрофильные intent-фильтры и применяет ограничения. Личный профиль записывает факт провижининга через `ManagedProfileProvisionedReceiver` или финальную команду `FinalizeProvision`; если Android передал `UserHandle`, дополнительно сохраняются handle и serial рабочего пользователя.
 
-Проверка профиля не ограничивается одним флагом. `AndroidWorkProfileDiagnosticsReader` смотрит на `UserManager`, `CrossProfileApps`, quiet mode, состояние запуска пользователя, сохранённый serial и доступность cross-profile target. После этого `AndroidProfileCommandGateway` выполняет `ProfilePing` через `AndroidCommandCenter`: сначала пробуется тихий command transport, затем при отсутствии поддержанного тихого канала используется подписанный `DummyActivity` fallback. Для Activity fallback результат `ProfilePing` дополнительно проверяется HMAC-подписью того же ключа, чтобы подтвердить, что ответ пришёл из управляемого рабочего профиля. Если версия APK в рабочем профиле отличается от личной, `AndroidDashboardReader` пытается обновить Agnosia в рабочем профиле через тот же package-install поток.
+Проверка профиля не ограничивается одним флагом. `AndroidWorkProfileDiagnosticsReader` смотрит на `UserManager`, `CrossProfileApps`, quiet mode, состояние запуска пользователя, сохранённый serial и доступность cross-profile target. После этого `AndroidProfileCommandGateway` выполняет `ProfilePing` через `AndroidCommandCenter`: сначала пробуется тихий command transport, затем при отсутствии поддержанного тихого канала используется подписанный `DummyActivity` fallback. Для Activity fallback результат `ProfilePing` дополнительно проверяется HMAC-подписью того же ключа, чтобы подтвердить, что ответ пришёл из управляемого рабочего профиля. Если локальный ключ потерян, recovery идёт отдельно и только через explicit `BindServiceAsUser` к `SilentCommandService` рабочего профиля, защищённому signature-permission. Activity fallback для recovery запрещён; личный профиль сохраняет новый ключ только после подтверждённого ответа profile owner. Если cross-profile bind недоступен, восстановление завершается fail closed. Если версия APK в рабочем профиле отличается от личной, `AndroidDashboardReader` пытается обновить Agnosia в рабочем профиле через тот же package-install поток.
 
 ## Модель угроз
 
@@ -210,9 +210,9 @@ Result Intent → ViewModel обновляет состояние
 | HMAC-SHA256 | Подписывает action, timestamp и значимые extras. |
 | TTL подписи | Команда считается свежей только ограниченное время. |
 | Специальный callback | Для события `WorkAppFrozen` используется отдельная подпись по пакету приложения. |
-| Recovery | Если ключ потерян, личный профиль может передать новый ключ только установленному profile owner. |
+| Recovery | Если ключ потерян, новый ключ передаётся только explicit bound service той же подписанной установки в рабочем профиле; Activity intent не используется. |
 
-`DummyActivity` не выполняет обычные команды без валидной подписи. Исключение - восстановление аутентификации, где сначала проверяется, что Activity запущена внутри profile owner.
+`DummyActivity` не выполняет команды без валидной подписи. Восстановление аутентификации не входит в его intent-фильтр и выполняется отдельным `RecoverAuthenticationCommandHandler` только через `SilentWorkProfileCommandTransport`.
 
 Команды разделены по направлениям:
 
@@ -627,7 +627,7 @@ Android-проект собирается как APK с `ApplicationId` `com.agn
 | Ситуация | Поведение |
 | --- | --- |
 | Рабочий профиль создан, но не отвечает | Приложение помечает профиль как требующий удаления или повторной настройки. |
-| Потерян HMAC-ключ | Запускается recovery-команда, которая принимает новый ключ только внутри profile owner. |
+| Потерян HMAC-ключ | Recovery использует explicit cross-user bind к защищённому signature-permission сервису. Handler принимает ключ только внутри profile owner, Activity fallback запрещён, а при недоступном `INTERACT_ACROSS_PROFILES` операция завершается fail closed. |
 | Тихий транспорт рабочего профиля недоступен | `AndroidCommandCenter` записывает `silent_work_transport_unavailable` с причиной вроде `canInteractAcrossProfiles=false`, `targetUser=missing` или `bind=false` и откатывается к подписанному `DummyActivity`; для рабочих команд он не должен возвращать данные личного профиля. |
 | APK после установки ещё не виден | `DummyActivity` ждёт доступности пакета с retry перед подготовкой ярлыка. |
 | Скрытие после установки не прошло сразу | Повторные попытки скрытия выполняются ограниченное время. |

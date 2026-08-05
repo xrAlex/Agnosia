@@ -18,7 +18,6 @@ namespace Agnosia.Android.Activities;
 [IntentFilter(
 [
     AgnosiaActions.FinalizeProvision,
-    AgnosiaActions.RecoverAuthentication,
     AgnosiaActions.ProfilePing,
     AgnosiaActions.QueryApps,
     AgnosiaActions.QueryAppIcon,

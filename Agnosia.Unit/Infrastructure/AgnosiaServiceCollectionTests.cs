@@ -60,6 +60,7 @@ public sealed class AgnosiaServiceCollectionTests
             handlerKinds,
             [
                 AndroidCommandKind.ProfilePing,
+                AndroidCommandKind.RecoverAuthentication,
                 AndroidCommandKind.QueryAppIcon,
                 AndroidCommandKind.QueryAppIcons,
                 AndroidCommandKind.QueryApps,

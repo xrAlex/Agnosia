@@ -23,7 +23,6 @@ public static class AndroidCommandContract
     public const string ExtraShortcutIconBase64 = "iconBase64";
     public const string ExtraShortcutToken = "shortcutToken";
     public const string ExtraTrigger = "trigger";
-    public const string ExtraReplacementAuthKey = "replacement_auth_key";
     public const string ExtraQueryOffset = "query_offset";
     public const string ExtraQueryLimit = "query_limit";
     public const string ExtraQueryMaxJsonBytes = "query_max_json_bytes";

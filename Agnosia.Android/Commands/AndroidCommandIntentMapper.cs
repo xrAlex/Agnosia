@@ -47,7 +47,6 @@ internal static class AndroidCommandIntentMapper
             AndroidCommandKind.SynchronizePreference => AgnosiaActions.SynchronizePreference,
             AndroidCommandKind.WorkAppFrozen => AgnosiaActions.WorkAppFrozen,
             AndroidCommandKind.FinalizeProvision => AgnosiaActions.FinalizeProvision,
-            AndroidCommandKind.RecoverAuthentication => AgnosiaActions.RecoverAuthentication,
             AndroidCommandKind.PackageInstallerCallback => AgnosiaActions.PackageInstallerCallback,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "No Android action is mapped for command kind.")
         };
@@ -144,7 +143,6 @@ internal static class AndroidCommandIntentMapper
         PutString(root, intent, AndroidCommandContract.ExtraShortcutIconBase64, "IconBase64", "ShortcutIconBase64");
         PutString(root, intent, AndroidCommandContract.ExtraShortcutToken, "ShortcutToken");
         PutString(root, intent, AndroidCommandContract.ExtraTrigger, "Trigger");
-        PutString(root, intent, AndroidCommandContract.ExtraReplacementAuthKey, "ReplacementAuthKey");
         PutInt(root, intent, AndroidCommandContract.ExtraQueryOffset, "Offset");
         PutInt(root, intent, AndroidCommandContract.ExtraQueryLimit, "Limit");
         PutInt(root, intent, AndroidCommandContract.ExtraQueryMaxJsonBytes, "MaxJsonBytes");

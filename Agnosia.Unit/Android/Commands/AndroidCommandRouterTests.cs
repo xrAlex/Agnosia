@@ -6,6 +6,20 @@ namespace Agnosia.Unit.Android.Commands;
 public sealed class AndroidCommandRouterTests
 {
     [Fact]
+    public void GetRoute_AuthenticationRecovery_UsesOnlyBoundWorkProfileTransport()
+    {
+        var envelope = CreateEnvelope(
+            AndroidCommandKind.RecoverAuthentication,
+            AndroidCommandTargetProfile.Work,
+            AndroidCommandInteractivity.Silent,
+            AndroidCommandPriority.UserBlocking);
+
+        var route = AndroidCommandRouter.GetRoute(envelope);
+
+        Assert.Equal([AndroidCommandTransportKind.SilentWorkProfile], route.Transports);
+    }
+
+    [Fact]
     public void GetRoute_SilentWorkCommand_UsesWorkSilentThenActivityFallback()
     {
         var envelope = CreateEnvelope(

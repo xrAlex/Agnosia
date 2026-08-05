@@ -51,7 +51,7 @@ public static class AndroidProfileCommandGateway
         var commandResult = await ServiceRegistry.GetRequiredService<AndroidCommandCenter>()
             .ExecuteAsync(envelope, cancellationToken)
             .ConfigureAwait(false);
-        var ownerCheck = InterpretProfilePingResult(commandResult);
+        var ownerCheck = WorkProfileOwnerCheckInterpreter.Interpret(commandResult);
         AndroidQueryCache.Shared.StoreOwnerCheckIfSuccessful(ownerCheck);
         return ownerCheck;
     }
@@ -67,21 +67,47 @@ public static class AndroidProfileCommandGateway
                 WorkProfileOwnerCheckKind.TargetUnavailable,
                 "authKey=missing; crossProfileTarget=missing");
 
-        var replacementAuthKey = AuthenticationUtility.CreateAndStoreKey();
+        var replacementAuthKey = AuthenticationKeyMaterial.Create();
         using var pingCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         pingCancellation.CancelAfter(ProfilePingTimeout);
 
         try
         {
-            var intent = new Intent(AgnosiaActions.RecoverAuthentication);
-            intent.PutExtra(AndroidCommandContract.ExtraReplacementAuthKey, replacementAuthKey);
-            var result = await commandRunner.StartUnsignedWorkProfileActivityForResultAsync(
-                    intent,
-                    pingCancellation.Token)
+            var envelope = new AndroidCommandEnvelope(
+                Guid.NewGuid(),
+                AndroidCommandKind.RecoverAuthentication,
+                AndroidCommandTargetProfile.Work,
+                AndroidCommandInteractivity.Silent,
+                AndroidCommandPriority.UserBlocking,
+                ProfilePingTimeout,
+                JsonSerializer.Serialize(new AuthenticationRecoveryRequest(replacementAuthKey)));
+            var result = await ServiceRegistry.GetRequiredService<AndroidCommandCenter>()
+                .ExecuteAsync(envelope, pingCancellation.Token)
                 .ConfigureAwait(false);
-            var ownerCheck = InterpretProfilePingResult(result);
+
+            if (result.Succeeded && result.Transport != AndroidCommandTransportKind.SilentWorkProfile)
+            {
+                AuthenticationUtility.Reset();
+                return new WorkProfileOwnerCheckResult(
+                    WorkProfileOwnerCheckKind.Unreachable,
+                    $"authKey=recoveryUntrustedTransport:{result.Transport}");
+            }
+
+            var ownerCheck = WorkProfileOwnerCheckInterpreter.Interpret(result);
             if (ownerCheck.Kind == WorkProfileOwnerCheckKind.AppIsProfileOwner)
-                return ownerCheck with { DiagnosticReason = "authKey=recovered; " + ownerCheck.DiagnosticReason };
+            {
+                if (AuthenticationUtility.TryStoreProvisioningKey(replacementAuthKey))
+                    return ownerCheck with
+                    {
+                        DiagnosticReason = "authKey=recoveredViaBoundService; " + ownerCheck.DiagnosticReason
+                    };
+
+                AuthenticationUtility.Reset();
+                AndroidQueryCache.Shared.ClearOwnerCheck();
+                return new WorkProfileOwnerCheckResult(
+                    WorkProfileOwnerCheckKind.AuthenticationKeyMissing,
+                    "authKey=localPersistenceFailed");
+            }
 
             AuthenticationUtility.Reset();
             AndroidQueryCache.Shared.ClearOwnerCheck();
@@ -821,63 +847,6 @@ public static class AndroidProfileCommandGateway
             string.IsNullOrWhiteSpace(error)
                 ? $"profilePing=result:{result.ResultCode}"
                 : $"profilePing=result:{result.ResultCode}; error={error}");
-    }
-
-    private static WorkProfileOwnerCheckResult InterpretProfilePingResult(AndroidCommandResultEnvelope result)
-    {
-        if (!result.Succeeded)
-            return new WorkProfileOwnerCheckResult(
-                WorkProfileOwnerCheckKind.Unreachable,
-                string.IsNullOrWhiteSpace(result.ErrorCode)
-                    ? $"profilePing=commandFailed; transport={result.Transport}; diagnostics={result.Diagnostics}"
-                    : $"profilePing={result.ErrorCode}; transport={result.Transport}; diagnostics={result.Diagnostics}");
-
-        if (string.IsNullOrWhiteSpace(result.PayloadJson))
-            return new WorkProfileOwnerCheckResult(
-                WorkProfileOwnerCheckKind.Unreachable,
-                $"profilePing=payloadMissing; transport={result.Transport}");
-
-        try
-        {
-            using var document = JsonDocument.Parse(result.PayloadJson);
-            var root = document.RootElement;
-            if (!root.TryGetProperty(AndroidCommandContract.ResultProfileOwnerCheckPerformed, out var performedProperty)
-                || performedProperty.ValueKind is not JsonValueKind.True and not JsonValueKind.False
-                || !performedProperty.GetBoolean())
-                return new WorkProfileOwnerCheckResult(
-                    WorkProfileOwnerCheckKind.Unreachable,
-                    $"profilePing=payloadIncomplete; transport={result.Transport}");
-
-            var isProfileOwner = root.TryGetProperty(AndroidCommandContract.ResultIsProfileOwner, out var ownerProperty)
-                                 && ownerProperty.ValueKind is JsonValueKind.True or JsonValueKind.False
-                                 && ownerProperty.GetBoolean();
-            var appVersionCode = root.TryGetProperty(AndroidCommandContract.ResultAppVersionCode, out var versionCodeProperty)
-                                 && versionCodeProperty.TryGetInt64(out var parsedVersionCode)
-                ? parsedVersionCode
-                : 0;
-            var appVersionName = root.TryGetProperty(AndroidCommandContract.ResultAppVersionName, out var versionNameProperty)
-                                 && versionNameProperty.ValueKind == JsonValueKind.String
-                ? versionNameProperty.GetString()
-                : null;
-
-            return isProfileOwner
-                ? new WorkProfileOwnerCheckResult(
-                    WorkProfileOwnerCheckKind.AppIsProfileOwner,
-                    $"commandCenter=true; transport={result.Transport}; {result.Diagnostics}",
-                    appVersionCode,
-                    appVersionName)
-                : new WorkProfileOwnerCheckResult(
-                    WorkProfileOwnerCheckKind.AppInstalledButNotOwner,
-                    $"commandCenter=true; transport={result.Transport}; {result.Diagnostics}",
-                    appVersionCode,
-                    appVersionName);
-        }
-        catch (JsonException exception)
-        {
-            return new WorkProfileOwnerCheckResult(
-                WorkProfileOwnerCheckKind.Unreachable,
-                $"profilePing=payloadInvalid:{exception.GetType().Name}; transport={result.Transport}");
-        }
     }
 
     private sealed record PackageSourceResolution(

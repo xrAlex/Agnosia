@@ -11,6 +11,15 @@ public sealed class AndroidManifestContractTests
 {
     private static readonly XNamespace Android = "http://schemas.android.com/apk/res/android";
 
+    [Fact]
+    public void Authentication_recovery_is_not_exposed_as_a_cross_profile_activity_action()
+    {
+        const string legacyRecoveryAction = "agnosia.action.RECOVER_AUTHENTICATION";
+
+        Assert.DoesNotContain(legacyRecoveryAction, AgnosiaActions.ParentToManagedCommandActions);
+        Assert.DoesNotContain(legacyRecoveryAction, AgnosiaActions.TargetProfileActivityActions);
+    }
+
     // Проверяет, что action-группы синхронизированы с IntentFilter Android-активностей.
     [Fact]
     public void Target_profile_activity_actions_are_declared_by_android_intent_filters()
