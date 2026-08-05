@@ -1,6 +1,4 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
-using Agnosia.Android.Serialization;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Services;
@@ -9,12 +7,12 @@ public sealed partial class HiddenAppSessionMonitorService
 {
     public static bool HasPersistedSessionForScreenLock()
     {
-        return TryLoadPersistedSession(out _);
+        return TryLoadPersistedState(out var state) && !state.IsEmpty;
     }
 
-    private static void PersistSession(HiddenAppSessionState? session)
+    private static void PersistState(HiddenAppSessionStoreState state)
     {
-        if (session is null)
+        if (state.IsEmpty)
         {
             ServiceRegistry.GetRequiredService<LocalStorageManager>().Remove(StorageKeys.HiddenAppActiveSession);
             return;
@@ -22,31 +20,28 @@ public sealed partial class HiddenAppSessionMonitorService
 
         ServiceRegistry.GetRequiredService<LocalStorageManager>().SetString(
             StorageKeys.HiddenAppActiveSession,
-            JsonSerializer.Serialize(session, AndroidJsonContext.Default.HiddenAppSessionState));
+            HiddenAppSessionStoreCodec.Serialize(state));
     }
 
-    private static bool TryLoadPersistedSession(out HiddenAppSessionState session)
+    private static bool TryLoadPersistedState(out HiddenAppSessionStoreState state)
     {
         var raw = ServiceRegistry.GetRequiredService<LocalStorageManager>().GetString(StorageKeys.HiddenAppActiveSession);
         if (string.IsNullOrWhiteSpace(raw))
         {
-            session = HiddenAppSessionState.Empty;
+            state = HiddenAppSessionStoreState.Empty;
             return false;
         }
 
-        try
+        if (HiddenAppSessionStoreCodec.TryDeserialize(raw, out state))
         {
-            session = JsonSerializer.Deserialize(raw, AndroidJsonContext.Default.HiddenAppSessionState)
-                      ?? HiddenAppSessionState.Empty;
-            return !string.IsNullOrWhiteSpace(session.PackageName) && session.TaskId >= 0;
+            PersistState(state);
+            return !state.IsEmpty;
         }
-        catch (JsonException exception)
-        {
-            Log.Warn(LogTag, $"Failed to restore hidden-app session: {exception.Message}");
-            ServiceRegistry.GetRequiredService<LocalStorageManager>().Remove(StorageKeys.HiddenAppActiveSession);
-            session = HiddenAppSessionState.Empty;
-            return false;
-        }
+
+        Log.Warn(LogTag, "Failed to restore hidden-app session state: payload is invalid.");
+        ServiceRegistry.GetRequiredService<LocalStorageManager>().Remove(StorageKeys.HiddenAppActiveSession);
+        state = HiddenAppSessionStoreState.Empty;
+        return false;
     }
 
     private static AndroidAppLaunchResult GetSessionLaunchResult(HiddenAppSessionState session)
@@ -56,14 +51,7 @@ public sealed partial class HiddenAppSessionMonitorService
 
 }
 
-internal sealed record HiddenAppSessionState(
-    string PackageName,
-    string DisplayName,
-    int TaskId,
-    long StartedAtUnixTimeMilliseconds = 0,
-    AndroidAppLaunchResult? LaunchResult = null)
+internal sealed partial record HiddenAppSessionState
 {
-    public static HiddenAppSessionState Empty { get; } = new(string.Empty, string.Empty, -1);
-
     [JsonIgnore] public PendingIntent? ParentFrozenCallback { get; init; }
 }

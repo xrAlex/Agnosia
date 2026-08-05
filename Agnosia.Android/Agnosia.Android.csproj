@@ -85,6 +85,9 @@
         <Compile Include="Platform\AuthenticationKeyMaterial.cs"/>
         <Compile Include="Platform\AndroidPackageAccessPolicy.cs"/>
         <Compile Include="Packages\PackageLaunchability.cs"/>
+        <Compile Include="Services\HiddenAppSessionStoreCodec.cs"/>
+        <Compile Include="Services\HiddenAppSessionStoreJsonContext.cs"/>
+        <Compile Include="Services\HiddenAppSessionStoreState.cs"/>
     </ItemGroup>
 
     <ItemGroup>
