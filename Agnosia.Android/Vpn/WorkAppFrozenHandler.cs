@@ -26,6 +26,22 @@ internal static class WorkAppFrozenHandler
         }
     }
 
+    public static async Task<OperationResult> RollbackFailedWorkLaunchAsync(
+        Context context,
+        string trigger,
+        string logTag)
+    {
+        try
+        {
+            return await AndroidVpnAutomationApi.RestoreConfiguredVpnAfterFailedWorkLaunchAsync(context, trigger)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            HideOverlay(context, logTag);
+        }
+    }
+
     private static void HideOverlay(Context context, string logTag)
     {
         try

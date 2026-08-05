@@ -385,7 +385,7 @@ public sealed class AndroidManifestContractTests
             RepositoryPaths.Get("Agnosia.Android", "Activities", "ProxyActivity.cs"));
         var shortcutLaunch = Regex.Match(
             proxySource,
-            @"private async Task PrepareVpnIfNeededAndForwardAsync[\s\S]*?\n    private async Task DisconnectVpnAndForwardAsync",
+            @"private async Task<OperationResult> PrepareShortcutVpnTakeoverAsync[\s\S]*?\n    private void LaunchVisibleSystemPackage",
             RegexOptions.Singleline).Value;
 
         Assert.InRange(

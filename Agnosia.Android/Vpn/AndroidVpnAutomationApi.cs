@@ -74,9 +74,24 @@ public static class AndroidVpnAutomationApi
 
     public static Task<OperationResult> EnableConfiguredVpnAfterWorkFreezeAsync(Context context, string trigger)
     {
+        return RestoreConfiguredVpnAsync(context, trigger, requireEnableAfterFreeze: true);
+    }
+
+    public static Task<OperationResult> RestoreConfiguredVpnAfterFailedWorkLaunchAsync(
+        Context context,
+        string trigger)
+    {
+        return RestoreConfiguredVpnAsync(context, trigger, requireEnableAfterFreeze: false);
+    }
+
+    private static Task<OperationResult> RestoreConfiguredVpnAsync(
+        Context context,
+        string trigger,
+        bool requireEnableAfterFreeze)
+    {
         AgnosiaRuntime.Initialize(context);
         var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
-        if (!storage.GetBoolean(StorageKeys.EnableVpnAfterWorkFreeze))
+        if (requireEnableAfterFreeze && !storage.GetBoolean(StorageKeys.EnableVpnAfterWorkFreeze))
         {
             Log.Debug(LogTag, $"Enable-after-freeze is disabled. trigger={trigger}.");
             return Task.FromResult(OperationResult.Success(string.Empty));

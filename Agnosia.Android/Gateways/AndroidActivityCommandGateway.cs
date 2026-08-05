@@ -127,6 +127,16 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
             .ConfigureAwait(false);
     }
 
+    public OperationResult PreflightWorkLaunch(Intent intent)
+    {
+        var launchResult = CreateLaunchResult(intent);
+        var failure = WorkProfileLaunchPreflight.TryCreateFailure(CurrentActivity, launchResult);
+        if (failure is null) return OperationResult.Success(string.Empty);
+
+        failure.Log(ActivityResultLogTag);
+        return failure.ToOperationResult();
+    }
+
     internal async Task<AndroidActivityResult> StartActivityForResultAsync(
         Intent intent,
         bool useWorkProfile,
@@ -143,8 +153,12 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
 
             if (useWorkProfile
                 && isLaunchCommand
-                && TryCreatePreflightLaunchFailure(activity, intent) is { } preflightFailure)
-                return preflightFailure;
+                && WorkProfileLaunchPreflight.TryCreateFailure(activity, CreateLaunchResult(intent)) is
+                    { } preflightFailure)
+            {
+                preflightFailure.Log(ActivityResultLogTag);
+                return preflightFailure.ToActivityResult();
+            }
 
             if (useWorkProfile)
             {
@@ -338,27 +352,4 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
             intent.GetStringExtra(AndroidCommandContract.ExtraLaunchDisplayName));
     }
 
-    private static AndroidActivityResult? TryCreatePreflightLaunchFailure(Activity activity, Intent intent)
-    {
-        try
-        {
-            var diagnostics = AndroidWorkProfileDiagnosticsReader.Read(activity);
-            if (diagnostics.QuietModeEnabled == true)
-            {
-                var launchResult = CreateLaunchResult(intent)
-                    .Fail(
-                        AndroidAppLaunchStage.CommandReceived,
-                        AndroidAppLaunchIssueKind.QuietMode,
-                        diagnostics.ToLogString());
-                launchResult.Log(ActivityResultLogTag);
-                return launchResult.ToActivityResult();
-            }
-        }
-        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
-        {
-            Log.Warn(ActivityResultLogTag, $"Could not read work-profile launch preflight diagnostics: {exception}");
-        }
-
-        return null;
-    }
 }

@@ -463,24 +463,37 @@ VPN-логика решает две отдельные задачи:
 `TransientVpnDisconnectService` - короткоживущий `VpnService`. Если Android уже выдал Agnosia право управлять VPN, сервис создаёт минимальный VPN-интерфейс и сразу закрывает его. Android переключает активный VPN на Agnosia, прежний VPN-клиент теряет активное соединение, после закрытия интерфейса VPN остаётся выключенным.
 
 ```text
-Проверить активный VPN
+Проверить work profile / quiet mode / cross-profile target
    │
-   ├─ VPN нет → запускать рабочее приложение
+   ├─ preflight failure → не трогать VPN, вернуть ошибку
    │
-   └─ VPN есть
+   └─ preflight success
         ▼
-      VpnService.prepare()
-        ▼
-      transient interface 10.73.0.1/32, MTU 1280
-        ▼ 350 ms
-      закрыть interface
-        ▼ 120 ms
-      запускать рабочее приложение
+      Проверить активный VPN
+        │
+        ├─ VPN нет → запускать рабочее приложение
+        │
+        └─ VPN есть
+             ▼
+           сохранить обязательство rollback
+             ▼
+           VpnService.prepare()
+             ▼
+           transient interface 10.73.0.1/32, MTU 1280
+             ▼ 350 ms
+           закрыть interface
+             ▼ 120 ms
+           запуск с ожиданием work Activity-result
+             │
+             ├─ session confirmed → commit до WorkAppFrozen
+             └─ failure/cancel/timeout → немедленно вернуть VPN
 ```
 
-Флаг `have_active_vpn_session` сохраняет, был ли VPN активен до отключения. Он нужен для последующего восстановления.
+Флаг `have_active_vpn_session` сохраняет обязательство вернуть VPN, который был активен до takeover. Обязательство записывается до `VpnService.prepare()`, потому что уже выдача права другому VPN-приложению может деактивировать прежнее соединение.
 
-Отключение VPN встроено в два пути запуска: команду `LaunchAsync` из UI и запуск через pinned shortcut. В обоих случаях сначала проверяется настройка `disable_vpn_before_work_launch`, затем активный VPN через `ConnectivityManager`. Если Android требует подтверждение `VpnService.prepare()`, пользователь видит системный экран. Если после transient VPN активный VPN всё ещё обнаруживается, запуск рабочего приложения прерывается, потому что сторонний клиент мог сразу подключиться обратно.
+Отключение VPN встроено в два пути запуска: команду `LaunchAsync` из UI и запуск через pinned shortcut. Оба до takeover проверяют существование managed profile, quiet mode, разрешение cross-profile interaction и explicit target Agnosia. Если Android требует подтверждение `VpnService.prepare()`, пользователь видит системный экран. Если после transient VPN активный VPN всё ещё обнаруживается, запуск рабочего приложения прерывается, потому что сторонний клиент мог сразу подключиться обратно.
+
+UI-путь получает подписанный `AndroidAppLaunchResult` через существующий command gateway. Shortcut-путь запускает explicit work `ProxyActivity` через `CrossProfileApps.startActivity(intent, targetUser, callingActivity)` и ждёт Activity-result до 30 секунд. Только успешный результат после принятого Android запроса на запуск hidden-session monitor завершает launch transaction. Любой downstream failure, cancellation, timeout или exception вызывает `RollbackFailedWorkLaunchAsync`: выбранный VPN-клиент запускается независимо от обычной настройки enable-after-freeze, а overlay скрывается.
 
 ### Восстановление VPN
 

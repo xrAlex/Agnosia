@@ -63,6 +63,7 @@
         <Compile Include="Commands\AndroidCommandTransportKind.cs"/>
         <Compile Include="Commands\ActivityCommandResultIdentity.cs"/>
         <Compile Include="Commands\AuthenticationRecoveryRequest.cs"/>
+        <Compile Include="Commands\WorkProfileLaunchPreflight.cs"/>
         <Compile Include="Commands\PackageStateQuery.cs"/>
         <Compile Include="Commands\PackageStateResult.cs"/>
         <Compile Include="Commands\PackageStateResultInterpreter.cs"/>
@@ -90,6 +91,7 @@
         <Compile Include="Services\HiddenAppSessionStoreCodec.cs"/>
         <Compile Include="Services\HiddenAppSessionStoreJsonContext.cs"/>
         <Compile Include="Services\HiddenAppSessionStoreState.cs"/>
+        <Compile Include="Vpn\WorkLaunchVpnTransaction.cs"/>
     </ItemGroup>
 
     <ItemGroup>

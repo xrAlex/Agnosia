@@ -58,7 +58,7 @@ public sealed partial class HiddenAppSessionMonitorService : Service
     private long _nextUsageEventsQueryBeginUnixTimeMilliseconds;
     private bool _usageEventsProblemWarningLogged;
 
-    public static void StartMonitoring(
+    public static bool StartMonitoring(
         Context context,
         string packageName,
         string displayName,
@@ -71,7 +71,7 @@ public sealed partial class HiddenAppSessionMonitorService : Service
         if (parentFrozenCallback is not null)
             intent.PutExtra(AndroidCommandContract.ExtraParentFrozenCallback, parentFrozenCallback);
 
-        AndroidServiceApi.TryStartForegroundService(
+        return AndroidServiceApi.TryStartForegroundService(
             context,
             intent,
             LogTag,

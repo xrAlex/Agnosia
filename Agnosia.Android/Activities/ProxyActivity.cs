@@ -1,6 +1,7 @@
 using Agnosia.Android.Infrastructure;
 using Agnosia.Android.Receivers;
 using Agnosia.Android.Services;
+using Agnosia.Models;
 using Android.App.Admin;
 using Android.Content;
 using Android.Content.PM;
@@ -27,16 +28,17 @@ public sealed class ProxyActivity : Activity
 {
     private const string LogTag = "AgnosiaProxyActivity";
     private const int PrepareVpnRequestCode = 7100;
-    private const int LaunchRequestCode = 7101;
     private const int LaunchResolveAttempts = 12;
     private const int LaunchResolveDelayMilliseconds = 120;
+    private static readonly TimeSpan WorkLaunchTimeout = TimeSpan.FromSeconds(30);
 
     private bool _launchStarted;
-    private bool _rehideStarted;
     private HiddenAppLaunchRequest? _request;
-    private HiddenAppLaunchRequest? _pendingVpnDisconnectRequest;
     private IReadOnlySet<long> _vpnDisconnectBaseline = new HashSet<long>();
     private AndroidAppLaunchResult? _launchResult;
+    private CancellationTokenSource _flowCts = new();
+    private TaskCompletionSource<Result>? _pendingVpnPreparation;
+    private TaskCompletionSource<AndroidActivityResult>? _pendingWorkLaunch;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -50,14 +52,20 @@ public sealed class ProxyActivity : Activity
         base.OnNewIntent(intent);
         if (intent is null) return;
 
+        CancelPendingFlow();
         Intent = intent;
         _launchStarted = false;
-        _rehideStarted = false;
         _request = null;
-        _pendingVpnDisconnectRequest = null;
         _vpnDisconnectBaseline = new HashSet<long>();
         _launchResult = null;
         TryStartProxyFlow();
+    }
+
+    protected override void OnDestroy()
+    {
+        CancelPendingFlow();
+        _flowCts.Dispose();
+        base.OnDestroy();
     }
 
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
@@ -67,29 +75,13 @@ public sealed class ProxyActivity : Activity
             LogTag,
             $"Proxy activity result received. requestCode={requestCode}, result={resultCode}, activePackage={_request?.PackageName ?? "<none>"}, hasData={data is not null}.");
 
-        if (requestCode == PrepareVpnRequestCode)
+        if (requestCode == PrepareVpnRequestCode && _pendingVpnPreparation is not null)
         {
-            if (_pendingVpnDisconnectRequest is not { } vpnRequest)
-            {
-                Finish();
-                return;
-            }
-
-            if (resultCode != Result.Ok)
-            {
-                ShowErrorAndFinish("Android не выдал Agnosia временное управление VPN.");
-                return;
-            }
-
-            RunInBackground(
-                () => DisconnectVpnAndForwardAsync(vpnRequest),
-                "Agnosia не смог отключить VPN перед запуском ярлыка.");
+            _pendingVpnPreparation?.TrySetResult(resultCode);
             return;
         }
 
-        if (requestCode != LaunchRequestCode || _request is null) return;
-
-        RehideAndFinish(_request);
+        _pendingWorkLaunch?.TrySetResult(new AndroidActivityResult(resultCode, data));
     }
 
     private void TryStartProxyFlow()
@@ -122,18 +114,20 @@ public sealed class ProxyActivity : Activity
             .WithDisplayName(request.DisplayName);
 
         RunInBackground(
-            () => UnhideAndLaunchAsync(request),
+            () => UnhideAndLaunchAsync(request, _flowCts.Token),
             $"Android не смог подготовить {request.DisplayName} к запуску.");
     }
 
-    private async Task UnhideAndLaunchAsync(HiddenAppLaunchRequest request)
+    private async Task UnhideAndLaunchAsync(
+        HiddenAppLaunchRequest request,
+        CancellationToken cancellationToken)
     {
         TemporaryPackageVisibilityTransaction? visibilityTransaction = null;
         try
         {
             if (!AgnosiaUtilities.IsProfileOwner(this))
             {
-                await PrepareVpnIfNeededAndForwardAsync(request).ConfigureAwait(false);
+                await PrepareVpnIfNeededAndForwardAsync(request, cancellationToken).ConfigureAwait(false);
                 return;
             }
 
@@ -253,7 +247,7 @@ public sealed class ProxyActivity : Activity
                 launchIntent = CreateLaunchIntent(request);
                 if (launchIntent is not null) break;
 
-                await Task.Delay(LaunchResolveDelayMilliseconds).ConfigureAwait(false);
+                await Task.Delay(LaunchResolveDelayMilliseconds, cancellationToken).ConfigureAwait(false);
             }
 
             if (launchIntent is null)
@@ -295,13 +289,15 @@ public sealed class ProxyActivity : Activity
                         LogTag,
                         $"StartActivity returned for {request.PackageName}. component={launchIntent.Component?.FlattenToShortString() ?? "<none>"}, flags={launchIntent.Flags}, proxyTaskId={TaskId}.");
                     Log.Debug(LogTag, $"Starting hidden-session monitor for {request.PackageName}, taskId={TaskId}.");
-                    HiddenAppSessionMonitorService.StartMonitoring(
-                        this,
-                        request.PackageName,
-                        request.DisplayName,
-                        TaskId,
-                        startedResult,
-                        AndroidIntentExtras.ReadParentFrozenCallback(Intent));
+                    if (!HiddenAppSessionMonitorService.StartMonitoring(
+                            this,
+                            request.PackageName,
+                            request.DisplayName,
+                            TaskId,
+                            startedResult,
+                            AndroidIntentExtras.ReadParentFrozenCallback(Intent)))
+                        throw new InvalidOperationException(
+                            $"Android did not accept the hidden-session monitor for {request.PackageName}.");
                     visibilityTransaction.Commit();
                     Log.Debug(LogTag, $"Monitor service request sent for {request.PackageName}.");
                     FinishWithLaunchResult(startedResult, false);
@@ -354,45 +350,43 @@ public sealed class ProxyActivity : Activity
         }
     }
 
-    private async Task PrepareVpnIfNeededAndForwardAsync(HiddenAppLaunchRequest request)
+    private async Task PrepareVpnIfNeededAndForwardAsync(
+        HiddenAppLaunchRequest request,
+        CancellationToken cancellationToken)
     {
         try
         {
+            if (WorkProfileLaunchPreflight.TryCreateFailure(this, GetLaunchResult(request)) is { } preflightFailure)
+            {
+                preflightFailure.Log(LogTag);
+                FinishWithLaunchResult(preflightFailure, true);
+                return;
+            }
+
             if (IsSystemWorkProfileRequest(request))
             {
                 ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, false);
                 Log.Debug(LogTag, $"Shortcut launch: skipping VPN Guard for system work-profile app {request.PackageName}.");
-                ForwardLaunchToManagedProfile(request, isSystem: true);
+                var systemLaunchResult = await ForwardLaunchToManagedProfileAsync(
+                        request,
+                        isSystem: true,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                FinishForwardedLaunch(systemLaunchResult);
                 return;
             }
 
-            if (!ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch))
-            {
-                ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, false);
-                Log.Debug(LogTag, "Disable-VPN-before-shortcut-launch is disabled in settings.");
-                ForwardLaunchToManagedProfile(request);
-                return;
-            }
-
-            Log.Info(LogTag, $"VPN Guard is enabled for shortcut launch. package={request.PackageName}.");
-            if (!AndroidVpnApi.IsVpnActive(this))
-            {
-                ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, false);
-                Log.Info(LogTag, "Shortcut launch: no active VPN detected.");
-                ForwardLaunchToManagedProfile(request);
-                return;
-            }
-
-            var prepareIntent = VpnService.Prepare(this);
-            if (prepareIntent is not null)
-            {
-                Log.Info(LogTag, "Shortcut launch: Android confirmation is required for VPN control.");
-                _pendingVpnDisconnectRequest = request;
-                RunOnUiThread(() => StartActivityForResult(prepareIntent, PrepareVpnRequestCode));
-                return;
-            }
-
-            await DisconnectVpnAndForwardAsync(request).ConfigureAwait(false);
+            var launchResult = await WorkLaunchVpnTransaction.ExecuteAsync(
+                    _ => Task.FromResult(OperationResult.Success(string.Empty)),
+                    PrepareShortcutVpnTakeoverAsync,
+                    token => ForwardLaunchToManagedProfileAfterPreflightAsync(request, token),
+                    () => WorkAppFrozenHandler.RollbackFailedWorkLaunchAsync(
+                        this,
+                        $"shortcut_launch_rollback:{request.PackageName}",
+                        LogTag),
+                    cancellationToken)
+                .ConfigureAwait(false);
+            FinishForwardedLaunch(launchResult);
         }
         catch (Exception exception)
         {
@@ -401,38 +395,63 @@ public sealed class ProxyActivity : Activity
         }
     }
 
-    private async Task DisconnectVpnAndForwardAsync(HiddenAppLaunchRequest request)
+    private async Task<OperationResult> PrepareShortcutVpnTakeoverAsync(CancellationToken cancellationToken)
     {
-        ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, false);
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
+        if (!storage.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch))
+        {
+            storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
+            Log.Debug(LogTag, "Disable-VPN-before-shortcut-launch is disabled in settings.");
+            return OperationResult.Success(string.Empty);
+        }
+
+        Log.Info(LogTag, $"VPN Guard is enabled for shortcut launch. package={_request?.PackageName ?? "<none>"}.");
         if (!AndroidVpnApi.IsVpnActive(this))
         {
-            ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, true);
+            storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
+            Log.Info(LogTag, "Shortcut launch: no active VPN detected.");
+            return OperationResult.Success(string.Empty);
+        }
+
+        storage.SetBoolean(StorageKeys.HaveActiveVpnSession, true);
+        var prepareIntent = VpnService.Prepare(this);
+        if (prepareIntent is not null)
+        {
+            Log.Info(LogTag, "Shortcut launch: Android confirmation is required for VPN control.");
+            var resultCode = await RequestVpnPreparationAsync(prepareIntent, cancellationToken).ConfigureAwait(false);
+            if (resultCode != Result.Ok)
+                return OperationResult.Failure("Android не выдал Agnosia временное управление VPN.");
+        }
+
+        if (!AndroidVpnApi.IsVpnActive(this))
+        {
             OverlayVpnService.ShowOverlay(this);
-            _pendingVpnDisconnectRequest = null;
             Log.Debug(LogTag, "Shortcut launch: active VPN was cleared while preparing VPN control.");
-            ForwardLaunchToManagedProfile(request);
-            return;
+            return OperationResult.Success("VPN отключен.");
         }
 
         _vpnDisconnectBaseline = AndroidVpnApi.GetVisibleVpnNetworkHandles(this);
-        var result = await TransientVpnDisconnectService.DisconnectPreparedVpnAsync(this).ConfigureAwait(false);
+        var result = await TransientVpnDisconnectService.DisconnectPreparedVpnAsync(this, cancellationToken)
+            .ConfigureAwait(false);
         if (!result.Succeeded)
-        {
-            ShowErrorAndFinish(result.Message);
-            return;
-        }
+            return result;
 
         if (AndroidVpnApi.IsVpnActive(this, _vpnDisconnectBaseline))
-        {
-            ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, false);
-            ShowErrorAndFinish("VPN все еще активен в личном профиле. Сторонний клиент мог сразу подключиться снова.");
-            return;
-        }
+            return OperationResult.Failure(
+                "VPN все еще активен в личном профиле. Сторонний клиент мог сразу подключиться снова.");
 
-        ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(StorageKeys.HaveActiveVpnSession, true);
         OverlayVpnService.ShowOverlay(this);
-        _pendingVpnDisconnectRequest = null;
-        ForwardLaunchToManagedProfile(request);
+        return OperationResult.Success("VPN отключен.");
+    }
+
+    private Task<OperationResult> ForwardLaunchToManagedProfileAfterPreflightAsync(
+        HiddenAppLaunchRequest request,
+        CancellationToken cancellationToken)
+    {
+        var failure = WorkProfileLaunchPreflight.TryCreateFailure(this, GetLaunchResult(request));
+        return failure is null
+            ? ForwardLaunchToManagedProfileAsync(request, isSystem: false, cancellationToken)
+            : Task.FromResult(failure.ToOperationResult());
     }
 
     private void LaunchVisibleSystemPackage(HiddenAppLaunchRequest request)
@@ -488,45 +507,131 @@ public sealed class ProxyActivity : Activity
         });
     }
 
-    private void ForwardLaunchToManagedProfile(HiddenAppLaunchRequest request, bool isSystem = false)
+    private async Task<Result> RequestVpnPreparationAsync(
+        Intent prepareIntent,
+        CancellationToken cancellationToken)
     {
+        if (_pendingVpnPreparation is not null)
+            throw new InvalidOperationException("A VPN preparation request is already pending.");
+
+        var completionSource = new TaskCompletionSource<Result>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        _pendingVpnPreparation = completionSource;
         RunOnUiThread(() =>
         {
             try
             {
-                var proxyIntent = HiddenAppShortcutManager.CreateInternalLaunchIntent(request.PackageName,
-                    request.TargetActivity,
-                    request.DisplayName);
-                var isSystemLaunch = isSystem || request.IsSystem;
-                proxyIntent.PutExtra(AndroidCommandContract.ExtraIsSystem, isSystemLaunch);
-                if (!isSystemLaunch)
-                    proxyIntent.PutExtra(
-                        AndroidCommandContract.ExtraParentFrozenCallback,
-                        AgnosiaPendingIntentFactory.CreateWorkAppFrozenBroadcastPendingIntent(
-                            this,
-                            typeof(WorkAppFrozenReceiver),
-                            request.PackageName));
-                proxyIntent.AddFlags(ActivityFlags.NewTask);
-                if (AgnosiaUtilities.TryTransferToProfileAndStartActivity(
-                        this,
-                        proxyIntent,
-                        LogTag,
-                        $"Android не смог открыть {request.DisplayName} в рабочем профиле.",
-                        out var error))
-                {
-                    Finish();
-                    return;
-                }
-
-                ShowErrorAndFinish(error ?? $"Android не смог открыть {request.DisplayName} в рабочем профиле.");
+                StartActivityForResult(prepareIntent, PrepareVpnRequestCode);
             }
             catch (Exception exception)
             {
-                Log.Error(LogTag,
-                    $"Failed to forward launch of {request.PackageName} to the work profile: {exception}");
-                ShowErrorAndFinish($"Android не смог открыть {request.DisplayName} в рабочем профиле.");
+                completionSource.TrySetException(exception);
             }
         });
+
+        try
+        {
+            return await completionSource.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (ReferenceEquals(_pendingVpnPreparation, completionSource))
+                _pendingVpnPreparation = null;
+        }
+    }
+
+    private async Task<OperationResult> ForwardLaunchToManagedProfileAsync(
+        HiddenAppLaunchRequest request,
+        bool isSystem,
+        CancellationToken cancellationToken)
+    {
+        if (_pendingWorkLaunch is not null)
+            return OperationResult.Failure("Запуск другого рабочего приложения уже ожидает подтверждения.");
+
+        var crossProfileApps = AndroidSystemApi.GetCrossProfileApps(this);
+        if (crossProfileApps is null || !crossProfileApps.CanInteractAcrossProfiles())
+            return OperationResult.Failure("Agnosia не разрешено напрямую обращаться к рабочему профилю.");
+
+        var targetUser = crossProfileApps.TargetUserProfiles
+            .OfType<UserHandle>()
+            .FirstOrDefault();
+        if (targetUser is null)
+            return OperationResult.Failure("Android не нашёл доступный рабочий профиль Agnosia.");
+
+        var proxyIntent = HiddenAppShortcutManager.CreateInternalLaunchIntent(
+            request.PackageName,
+            request.TargetActivity,
+            request.DisplayName);
+        var isSystemLaunch = isSystem || request.IsSystem;
+        proxyIntent.PutExtra(AndroidCommandContract.ExtraIsSystem, isSystemLaunch);
+        if (!isSystemLaunch)
+            proxyIntent.PutExtra(
+                AndroidCommandContract.ExtraParentFrozenCallback,
+                AgnosiaPendingIntentFactory.CreateWorkAppFrozenBroadcastPendingIntent(
+                    this,
+                    typeof(WorkAppFrozenReceiver),
+                    request.PackageName));
+        proxyIntent.SetComponent(
+            new ComponentName(this, Java.Lang.Class.FromType(typeof(ProxyActivity))));
+        AuthenticationUtility.SignIntent(proxyIntent);
+
+        var completionSource = new TaskCompletionSource<AndroidActivityResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        _pendingWorkLaunch = completionSource;
+        RunOnUiThread(() =>
+        {
+            try
+            {
+                Log.Debug(
+                    LogTag,
+                    $"Starting shortcut work launch for result. package={request.PackageName}, target={targetUser}.");
+                crossProfileApps.StartActivity(proxyIntent, targetUser, this);
+            }
+            catch (Exception exception)
+            {
+                Log.Warn(LogTag, $"Failed to start shortcut work launch: {exception}");
+                completionSource.TrySetException(exception);
+            }
+        });
+
+        try
+        {
+            var activityResult = await completionSource.Task
+                .WaitAsync(WorkLaunchTimeout, cancellationToken)
+                .ConfigureAwait(false);
+            return AndroidActivityResultApi.ToVoidOperationResult(activityResult, "Открываем приложение.");
+        }
+        catch (TimeoutException)
+        {
+            return OperationResult.Failure("Рабочий профиль не подтвердил запуск приложения вовремя.");
+        }
+        finally
+        {
+            if (ReferenceEquals(_pendingWorkLaunch, completionSource))
+                _pendingWorkLaunch = null;
+        }
+    }
+
+    private void FinishForwardedLaunch(OperationResult result)
+    {
+        if (result.Succeeded)
+        {
+            RunOnUiThread(Finish);
+            return;
+        }
+
+        ShowErrorAndFinish(result.Message);
+    }
+
+    private void CancelPendingFlow()
+    {
+        _flowCts.Cancel();
+        _pendingVpnPreparation?.TrySetCanceled(_flowCts.Token);
+        _pendingWorkLaunch?.TrySetCanceled(_flowCts.Token);
+        _pendingVpnPreparation = null;
+        _pendingWorkLaunch = null;
+        _flowCts.Dispose();
+        _flowCts = new CancellationTokenSource();
     }
 
     private Intent? CreateLaunchIntent(HiddenAppLaunchRequest request)
@@ -545,26 +650,6 @@ public sealed class ProxyActivity : Activity
             | ActivityFlags.ClearTop
             | ActivityFlags.SingleTop);
         return launchIntent;
-    }
-
-    private void RehideAndFinish(HiddenAppLaunchRequest request)
-    {
-        if (_rehideStarted) return;
-
-        _rehideStarted = true;
-
-        try
-        {
-            Log.Info(
-                LogTag,
-                $"Launch flow finished for {request.PackageName}. Waiting for the session monitor to re-hide it after the app is minimized or closed.");
-        }
-        catch (Exception exception)
-        {
-            Log.Warn(LogTag, $"Failed to finalize proxy flow for {request.PackageName}: {exception}");
-        }
-
-        Finish();
     }
 
     private AndroidAppLaunchResult TryHideImmediately(

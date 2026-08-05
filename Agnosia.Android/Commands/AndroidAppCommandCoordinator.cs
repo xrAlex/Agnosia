@@ -261,13 +261,6 @@ internal sealed class AndroidAppCommandCoordinator(
                 : OperationResult.Failure(error ?? "Android не смог открыть это приложение.");
         }
 
-        if (!app.IsSystem)
-        {
-            var vpnPreparationResult = await EnsurePersonalVpnDisabledBeforeWorkLaunchAsync(cancellationToken)
-                .ConfigureAwait(false);
-            if (!vpnPreparationResult.Succeeded) return vpnPreparationResult;
-        }
-
         var intent = new Intent(AgnosiaActions.UnfreezeAndLaunch);
         intent.PutExtra(AndroidCommandContract.ExtraLaunchPackageName, app.PackageName);
         intent.PutExtra(AndroidCommandContract.ExtraLaunchDisplayName, app.Label);
@@ -276,7 +269,21 @@ internal sealed class AndroidAppCommandCoordinator(
             intent.PutExtra(
                 AndroidCommandContract.ExtraParentFrozenCallback,
                 commandRunner.CreateWorkAppFrozenCallbackPendingIntent(app.PackageName));
-        return await commandRunner.RunVoidOperationAsync(intent, true, cancellationToken, "Открываем приложение.")
+        if (app.IsSystem)
+        {
+            var preflight = commandRunner.PreflightWorkLaunch(intent);
+            return !preflight.Succeeded
+                ? preflight
+                : await commandRunner.RunVoidOperationAsync(intent, true, cancellationToken, "Открываем приложение.")
+                    .ConfigureAwait(false);
+        }
+
+        return await WorkLaunchVpnTransaction.ExecuteAsync(
+                _ => Task.FromResult(commandRunner.PreflightWorkLaunch(intent)),
+                EnsurePersonalVpnDisabledBeforeWorkLaunchAsync,
+                token => commandRunner.RunVoidOperationAsync(intent, true, token, "Открываем приложение."),
+                () => RollbackPersonalVpnAfterFailedWorkLaunchAsync(app.PackageName),
+                cancellationToken)
             .ConfigureAwait(false);
     }
 
@@ -343,6 +350,8 @@ internal sealed class AndroidAppCommandCoordinator(
             return new OperationResult(true, string.Empty);
         }
 
+        storage.SetBoolean(StorageKeys.HaveActiveVpnSession, true);
+
         Intent? prepareIntent;
         try
         {
@@ -364,7 +373,6 @@ internal sealed class AndroidAppCommandCoordinator(
         }
 
         activity = commandRunner.CurrentActivity;
-        storage.SetBoolean(StorageKeys.HaveActiveVpnSession, false);
         if (!await IsVpnActiveAsync(activity, cancellationToken).ConfigureAwait(false))
         {
             storage.SetBoolean(StorageKeys.HaveActiveVpnSession, true);
@@ -392,6 +400,14 @@ internal sealed class AndroidAppCommandCoordinator(
         storage.SetBoolean(StorageKeys.HaveActiveVpnSession, true);
         commandRunner.ShowVpnGuardOverlay();
         return OperationResult.Success("VPN отключен.");
+    }
+
+    private Task<OperationResult> RollbackPersonalVpnAfterFailedWorkLaunchAsync(string packageName)
+    {
+        return WorkAppFrozenHandler.RollbackFailedWorkLaunchAsync(
+            commandRunner.CurrentActivity,
+            $"ui_launch_rollback:{packageName}",
+            LogTag);
     }
 
     private async Task<ShortcutPreparationResult> PreparePinnedShortcutInParentAsync(
