@@ -4,6 +4,13 @@ internal static class AndroidCommandRouter
 {
     public static AndroidCommandRoute GetRoute(AndroidCommandEnvelope envelope)
     {
+        if (envelope.Kind == AndroidCommandKind.WorkAppFrozen)
+            return new AndroidCommandRoute(
+                envelope.TargetProfile == AndroidCommandTargetProfile.Personal
+                && envelope.Interactivity == AndroidCommandInteractivity.Silent
+                    ? [AndroidCommandTransportKind.SilentParentProfile]
+                    : []);
+
         if (envelope.Kind is AndroidCommandKind.RecoverAuthentication
             or AndroidCommandKind.QueryPackageState)
             return new AndroidCommandRoute(

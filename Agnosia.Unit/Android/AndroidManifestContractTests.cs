@@ -20,6 +20,13 @@ public sealed class AndroidManifestContractTests
         Assert.DoesNotContain(legacyRecoveryAction, AgnosiaActions.TargetProfileActivityActions);
     }
 
+    [Fact]
+    public void Work_app_frozen_is_not_exposed_as_a_cross_profile_activity_action()
+    {
+        Assert.DoesNotContain(AgnosiaActions.WorkAppFrozen, AgnosiaActions.ManagedToParentCommandActions);
+        Assert.DoesNotContain(AgnosiaActions.WorkAppFrozen, AgnosiaActions.TargetProfileActivityActions);
+    }
+
     // Проверяет, что action-группы синхронизированы с IntentFilter Android-активностей.
     [Fact]
     public void Target_profile_activity_actions_are_declared_by_android_intent_filters()

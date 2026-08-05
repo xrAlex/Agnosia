@@ -25,11 +25,13 @@ internal static class AndroidServiceCollectionExtensions
         services.AddSingleton<IAndroidCommandHandler, QueryLogsCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, QueryPermissionsCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, QueryPackageStateCommandHandler>();
+        services.AddSingleton<IAndroidCommandHandler, WorkAppFrozenCommandHandler>();
 #if AGNOSIA_ANDROID
         services.AddSingleton<AndroidCommandExecutionContextFactory>();
         services.AddSingleton<IAndroidCommandTransport, DirectLocalCommandTransport>();
         services.AddSingleton<IAndroidCommandTransport, SilentServiceCommandTransport>();
         services.AddSingleton<IAndroidCommandTransport, SilentWorkProfileCommandTransport>();
+        services.AddSingleton<IAndroidCommandTransport, SilentParentProfileCommandTransport>();
         services.AddSingleton<IAndroidCommandTransport, ActivityCommandTransport>();
 
         services.AddSingleton<LocalStorageManager>();
@@ -71,6 +73,7 @@ internal static class AndroidServiceCollectionExtensions
 #else
         services.AddSingleton<IAndroidCommandTransport, DirectLocalCommandTransport>();
         services.AddSingleton<IAndroidCommandTransport, SilentWorkProfileCommandTransport>();
+        services.AddSingleton<IAndroidCommandTransport, SilentParentProfileCommandTransport>();
 #endif
 
         return services;

@@ -58,6 +58,20 @@ internal static class SilentCommandMessengerClient
                     $"replyTimeoutMs={GetReplyTimeout(envelope).TotalMilliseconds:0}");
             }
 
+            var identity = CommandResultEnvelopeIdentity.Validate(envelope, result);
+            if (!identity.Succeeded)
+            {
+                stopwatch.Stop();
+                return AndroidCommandResultEnvelope.Failure(
+                    envelope.CorrelationId,
+                    envelope.Kind,
+                    transport,
+                    "Silent command service returned a result for a different command.",
+                    identity.ErrorCode!,
+                    stopwatch.Elapsed,
+                    $"actualCorrelationId={result.CorrelationId}; actualKind={result.Kind}");
+            }
+
             stopwatch.Stop();
             return AsTransportResult(result, transport, stopwatch.Elapsed);
         }

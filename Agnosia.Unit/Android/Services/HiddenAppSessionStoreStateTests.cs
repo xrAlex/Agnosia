@@ -92,9 +92,9 @@ public sealed class HiddenAppSessionStoreStateTests
     {
         var first = CreatePending("session-a", "com.example.a");
         var second = CreatePending("session-b", "com.example.b");
-        var state = new HiddenAppSessionStoreState(null, [first, second]);
+        var state = new HiddenAppSessionStoreState(null, [first, second], []);
 
-        var confirmed = state.ConfirmHidden(first.Session.SessionId);
+        var confirmed = state.ConfirmHidden(first.Session.SessionId, Now);
 
         Assert.Equal(second.Session.SessionId, Assert.Single(confirmed.PendingHides).Session.SessionId);
     }
@@ -104,12 +104,94 @@ public sealed class HiddenAppSessionStoreStateTests
     {
         var active = CreateSession("session-new", "com.example.same");
         var stalePending = CreatePending("session-old", "com.example.same");
-        var state = new HiddenAppSessionStoreState(active, [stalePending]);
+        var state = new HiddenAppSessionStoreState(active, [stalePending], []);
 
-        var confirmed = state.ConfirmHidden(stalePending.Session.SessionId);
+        var confirmed = state.ConfirmHidden(stalePending.Session.SessionId, Now);
 
         Assert.Equal(active.SessionId, confirmed.ActiveSession?.SessionId);
         Assert.Empty(confirmed.PendingHides);
+    }
+
+    // Ловит потерю callback-обязательства между подтверждённым re-hide и доставкой в personal profile.
+    [Fact]
+    public void ConfirmHidden_moves_callback_identity_to_pending_parent_notification()
+    {
+        var session = CreateSession("session-a", "com.example.a") with
+        {
+            ParentCallbackLaunchId = "launch-a"
+        };
+        var state = HiddenAppSessionStoreState.Empty
+            .StartOrReplace(session, Now)
+            .BeginCompletion(session.SessionId, "target_inactive", Now);
+
+        var confirmed = state.ConfirmHidden(session.SessionId, Now);
+
+        Assert.Empty(confirmed.PendingHides);
+        var notification = Assert.Single(confirmed.PendingParentNotifications);
+        Assert.Equal(session.SessionId, notification.Session.SessionId);
+        Assert.Equal("launch-a", notification.Session.ParentCallbackLaunchId);
+        Assert.Equal("target_inactive", notification.Reason);
+        Assert.Equal(0, notification.FailedAttempts);
+        Assert.Equal(Now.ToUnixTimeMilliseconds(), notification.NextAttemptAtUnixTimeMilliseconds);
+        Assert.False(confirmed.IsEmpty);
+    }
+
+    // Ловит преждевременное восстановление VPN предыдущей сессии после передачи ownership новой.
+    [Fact]
+    public void ConfirmHidden_for_replaced_session_does_not_notify_parent()
+    {
+        var session = CreateSession("session-a", "com.example.a") with
+        {
+            ParentCallbackLaunchId = "launch-a"
+        };
+        var state = HiddenAppSessionStoreState.Empty
+            .StartOrReplace(session, Now)
+            .BeginCompletion(session.SessionId, HiddenAppSessionStoreState.SessionReplacedReason, Now);
+
+        var confirmed = state.ConfirmHidden(session.SessionId, Now);
+
+        Assert.True(confirmed.IsEmpty);
+        Assert.Empty(confirmed.PendingHides);
+        Assert.Empty(confirmed.PendingParentNotifications);
+    }
+
+    // Ловит busy-loop доставки и потерю durable записи после временной недоступности personal profile.
+    [Fact]
+    public void RecordParentNotificationFailure_keeps_notification_and_schedules_retry()
+    {
+        var session = CreateSession("session-a", "com.example.a") with
+        {
+            ParentCallbackLaunchId = "launch-a"
+        };
+        var state = HiddenAppSessionStoreState.Empty
+            .StartOrReplace(session, Now)
+            .BeginCompletion(session.SessionId, "target_inactive", Now)
+            .ConfirmHidden(session.SessionId, Now);
+
+        var failed = state.RecordParentNotificationFailure(session.SessionId, Now);
+
+        var notification = Assert.Single(failed.PendingParentNotifications);
+        Assert.Equal(1, notification.FailedAttempts);
+        Assert.Equal(Now.AddSeconds(1).ToUnixTimeMilliseconds(), notification.NextAttemptAtUnixTimeMilliseconds);
+        Assert.Empty(failed.GetDueParentNotifications(Now));
+        Assert.Equal(
+            session.SessionId,
+            Assert.Single(failed.GetDueParentNotifications(Now.AddSeconds(1))).Session.SessionId);
+    }
+
+    // Ловит удаление чужого callback при повторном запуске того же package с другой session identity.
+    [Fact]
+    public void ConfirmParentNotification_removes_only_matching_session_identity()
+    {
+        var first = CreateParentNotification("session-a", "com.example.same", "launch-a");
+        var second = CreateParentNotification("session-b", "com.example.same", "launch-b");
+        var state = new HiddenAppSessionStoreState(null, [], [first, second]);
+
+        var confirmed = state.ConfirmParentNotification(first.Session.SessionId);
+
+        var remaining = Assert.Single(confirmed.PendingParentNotifications);
+        Assert.Equal(second.Session.SessionId, remaining.Session.SessionId);
+        Assert.Equal("launch-b", remaining.Session.ParentCallbackLaunchId);
     }
 
     [Fact]
@@ -117,7 +199,7 @@ public sealed class HiddenAppSessionStoreStateTests
     {
         var active = CreateSession("session-active", "com.example.active");
         var pending = CreatePending("session-pending", "com.example.pending");
-        var state = new HiddenAppSessionStoreState(active, [pending]);
+        var state = new HiddenAppSessionStoreState(active, [pending], []);
 
         var prepared = state.PrepareForScreenLock(Now);
 
@@ -146,6 +228,18 @@ public sealed class HiddenAppSessionStoreStateTests
     {
         return new HiddenAppPendingHideState(
             CreateSession(sessionId, packageName),
+            "test",
+            0,
+            Now.ToUnixTimeMilliseconds());
+    }
+
+    private static HiddenAppPendingParentNotificationState CreateParentNotification(
+        string sessionId,
+        string packageName,
+        string launchId)
+    {
+        return new HiddenAppPendingParentNotificationState(
+            CreateSession(sessionId, packageName) with { ParentCallbackLaunchId = launchId },
             "test",
             0,
             Now.ToUnixTimeMilliseconds());

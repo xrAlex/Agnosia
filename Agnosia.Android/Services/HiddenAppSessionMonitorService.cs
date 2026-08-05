@@ -51,6 +51,7 @@ public sealed partial class HiddenAppSessionMonitorService : Service
     private readonly Lock _sync = new();
     private CancellationTokenSource? _monitorCts;
     private CancellationTokenSource? _pendingHideRetryCts;
+    private CancellationTokenSource? _parentNotificationRetryCts;
     private HiddenAppSessionStoreState _storeState = HiddenAppSessionStoreState.Empty;
     private ComponentName? _adminComponent;
     private UsageObservationSnapshot? _lastUsageObservationSnapshot;
@@ -64,12 +65,15 @@ public sealed partial class HiddenAppSessionMonitorService : Service
         string displayName,
         int taskId,
         AndroidAppLaunchResult launchResult,
-        PendingIntent? parentFrozenCallback = null)
+        PendingIntent? parentFrozenCallback = null,
+        string? parentCallbackLaunchId = null)
     {
         Log.Info(LogTag, $"StartMonitoring requested for {packageName}, taskId={taskId}.");
         var intent = CreateCommandIntent(context, ActionStart, packageName, displayName, taskId, launchResult);
         if (parentFrozenCallback is not null)
             intent.PutExtra(AndroidCommandContract.ExtraParentFrozenCallback, parentFrozenCallback);
+        if (!string.IsNullOrWhiteSpace(parentCallbackLaunchId))
+            intent.PutExtra(AndroidCommandContract.ExtraCallbackLaunchId, parentCallbackLaunchId);
 
         return AndroidServiceApi.TryStartForegroundService(
             context,
@@ -109,7 +113,7 @@ public sealed partial class HiddenAppSessionMonitorService : Service
             var outcome = TryHidePackage(context, pending, ref admin);
             state = outcome == HiddenAppHideAttemptResult.Failed
                 ? state.RecordHideFailure(pending.Session.SessionId, now)
-                : state.ConfirmHidden(pending.Session.SessionId);
+                : state.ConfirmHidden(pending.Session.SessionId, now);
             PersistState(state);
             if (outcome != HiddenAppHideAttemptResult.Failed)
             {
@@ -119,11 +123,14 @@ public sealed partial class HiddenAppSessionMonitorService : Service
             }
         }
 
-        if (!state.IsEmpty)
+        if (state.PendingHides.Length > 0)
         {
             EnsurePendingHideRetryRunning(context);
             return false;
         }
+
+        if (state.PendingParentNotifications.Length > 0)
+            EnsurePendingHideRetryRunning(context);
 
         return true;
     }
@@ -190,6 +197,7 @@ public sealed partial class HiddenAppSessionMonitorService : Service
         {
             CancelMonitorLocked();
             CancelPendingHideRetryLocked();
+            CancelParentNotificationRetryLocked();
         }
 
         base.OnDestroy();
@@ -219,6 +227,7 @@ public sealed partial class HiddenAppSessionMonitorService : Service
             _monitorCts = new CancellationTokenSource();
             _ = Task.Run(() => MonitorSessionSafelyAsync(session, _monitorCts.Token));
             EnsurePendingHideRetryLocked();
+            EnsureParentNotificationRetryLocked();
         }
 
         _lastUsageObservationSnapshot = null;
@@ -257,6 +266,7 @@ public sealed partial class HiddenAppSessionMonitorService : Service
             _storeState = state;
             CancelMonitorLocked();
             CancelPendingHideRetryLocked();
+            CancelParentNotificationRetryLocked();
         }
 
         StartForegroundServiceNotification(state);
@@ -269,11 +279,12 @@ public sealed partial class HiddenAppSessionMonitorService : Service
             }
 
             EnsurePendingHideRetryLocked();
+            EnsureParentNotificationRetryLocked();
         }
 
         Log.Info(
             LogTag,
-            $"Restored hidden-session state. active={state.ActiveSession?.PackageName ?? "<none>"}, pendingHides={state.PendingHides.Length}.");
+            $"Restored hidden-session state. active={state.ActiveSession?.PackageName ?? "<none>"}, pendingHides={state.PendingHides.Length}, pendingParentNotifications={state.PendingParentNotifications.Length}.");
     }
 
     private async Task MonitorSessionSafelyAsync(HiddenAppSessionState session, CancellationToken cancellationToken)
@@ -484,8 +495,9 @@ public sealed partial class HiddenAppSessionMonitorService : Service
             if (active is not null
                 && string.Equals(active.PackageName, pending.Session.PackageName, StringComparison.Ordinal))
             {
-                _storeState = _storeState.ConfirmHidden(pending.Session.SessionId);
+                _storeState = _storeState.ConfirmHidden(pending.Session.SessionId, DateTimeOffset.UtcNow);
                 PersistState(_storeState);
+                EnsureParentNotificationRetryLocked();
                 return;
             }
 
@@ -502,13 +514,15 @@ public sealed partial class HiddenAppSessionMonitorService : Service
         HiddenAppSessionStoreState updatedState;
         lock (_sync)
         {
+            var now = DateTimeOffset.UtcNow;
             updatedState = outcome == HiddenAppHideAttemptResult.Failed
-                ? _storeState.RecordHideFailure(pending.Session.SessionId, DateTimeOffset.UtcNow)
-                : _storeState.ConfirmHidden(pending.Session.SessionId);
+                ? _storeState.RecordHideFailure(pending.Session.SessionId, now)
+                : _storeState.ConfirmHidden(pending.Session.SessionId, now);
             if (ReferenceEquals(updatedState, _storeState)) return;
 
             _storeState = updatedState;
             PersistState(updatedState);
+            EnsureParentNotificationRetryLocked();
         }
 
         if (outcome == HiddenAppHideAttemptResult.Failed)
@@ -581,18 +595,11 @@ public sealed partial class HiddenAppSessionMonitorService : Service
                 $"Screen-lock freeze completed for {session.PackageName}; notifying parent profile so VPN restore is not dependent on the parent lock receiver.");
         }
 
-        if (TryNotifyParentWithPendingIntent(session, reason)) return;
+        if (!string.IsNullOrWhiteSpace(session.ParentCallbackLaunchId)) return;
 
-        Log.Debug(LogTag, $"Notifying parent profile about frozen app {session.PackageName}. reason={reason}");
-        var result = AndroidProfileCommandGateway.NotifyParentWorkAppFrozen(
-            this,
-            session.PackageName,
-            $"session_hide:{reason}:{session.PackageName}");
-        if (!result.Succeeded)
-        {
+        if (!TryNotifyParentWithPendingIntent(session, reason))
             Log.Warn(LogTag,
-                $"Could not notify parent profile about frozen app {session.PackageName}: {result.Message}");
-        }
+                $"Legacy hidden session {session.SessionId} has no durable parent callback identity.");
     }
 
     private void StopServiceIfIdleOrUpdateNotification(HiddenAppSessionStoreState state)
@@ -607,6 +614,7 @@ public sealed partial class HiddenAppSessionMonitorService : Service
         {
             if (!_storeState.IsEmpty) return;
             CancelPendingHideRetryLocked();
+            CancelParentNotificationRetryLocked();
         }
 
         StopForeground(StopForegroundFlags.Remove);
@@ -699,9 +707,10 @@ public sealed partial class HiddenAppSessionMonitorService : Service
                 startedAt > 0 ? startedAt : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 launchResult)
             with
-        {
-            ParentFrozenCallback = AndroidIntentExtras.ReadParentFrozenCallback(intent)
-        };
+            {
+                ParentFrozenCallback = AndroidIntentExtras.ReadParentFrozenCallback(intent),
+                ParentCallbackLaunchId = AndroidIntentExtras.ReadParentCallbackLaunchId(intent)
+            };
         return true;
     }
 

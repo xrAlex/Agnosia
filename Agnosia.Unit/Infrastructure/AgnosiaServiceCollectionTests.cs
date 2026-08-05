@@ -67,13 +67,15 @@ public sealed class AgnosiaServiceCollectionTests
                 AndroidCommandKind.QueryCrossProfilePackages,
                 AndroidCommandKind.QueryLogs,
                 AndroidCommandKind.QueryPermissions,
-                AndroidCommandKind.QueryPackageState
+                AndroidCommandKind.QueryPackageState,
+                AndroidCommandKind.WorkAppFrozen
             ]);
         var transportKinds = provider.GetServices<IAndroidCommandTransport>()
             .Select(transport => transport.Kind)
             .ToHashSet();
         Assert.Contains(AndroidCommandTransportKind.DirectLocal, transportKinds);
         Assert.Contains(AndroidCommandTransportKind.SilentWorkProfile, transportKinds);
+        Assert.Contains(AndroidCommandTransportKind.SilentParentProfile, transportKinds);
     }
 
     private static void AssertContainsAll<T>(

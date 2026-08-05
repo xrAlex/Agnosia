@@ -6,6 +6,12 @@ namespace Agnosia.Android.Infrastructure;
 
 internal static class AndroidIntentExtras
 {
+    public static string? ReadParentCallbackLaunchId(Intent? intent)
+    {
+        var launchId = intent?.GetStringExtra(AndroidCommandContract.ExtraCallbackLaunchId);
+        return string.IsNullOrWhiteSpace(launchId) ? null : launchId;
+    }
+
     public static PendingIntent? ReadParentFrozenCallback(Intent? intent)
     {
         if (intent is null) return null;

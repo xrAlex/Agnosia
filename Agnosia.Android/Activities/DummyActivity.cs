@@ -45,7 +45,6 @@ namespace Agnosia.Android.Activities;
     AgnosiaActions.StartFileShuttleParentToWork,
     AgnosiaActions.StartFileShuttleWorkToParent,
     AgnosiaActions.SynchronizePreference,
-    AgnosiaActions.WorkAppFrozen,
     AgnosiaActions.PackageInstallerCallback
 ], Categories = [Intent.CategoryDefault])]
 public sealed partial class DummyActivity : Activity
@@ -491,6 +490,8 @@ public sealed partial class DummyActivity : Activity
             var proxyIntent = HiddenAppShortcutManager.CreateInternalLaunchIntent(packageName, label: displayName);
             if (AndroidIntentExtras.ReadParentFrozenCallback(Intent) is { } parentFrozenCallback)
                 proxyIntent.PutExtra(AndroidCommandContract.ExtraParentFrozenCallback, parentFrozenCallback);
+            if (AndroidIntentExtras.ReadParentCallbackLaunchId(Intent) is { } parentCallbackLaunchId)
+                proxyIntent.PutExtra(AndroidCommandContract.ExtraCallbackLaunchId, parentCallbackLaunchId);
 
             launchResult.WriteToIntent(proxyIntent);
             AuthenticationUtility.SignIntent(proxyIntent);

@@ -350,6 +350,7 @@ internal sealed class AndroidAppCommandCoordinator(
         intent.PutExtra(
             AndroidCommandContract.ExtraParentFrozenCallback,
             commandRunner.CreateWorkAppFrozenCallbackPendingIntent(app.PackageName, launchId));
+        intent.PutExtra(AndroidCommandContract.ExtraCallbackLaunchId, launchId);
         return intent;
     }
 

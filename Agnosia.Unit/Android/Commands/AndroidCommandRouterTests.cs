@@ -63,6 +63,42 @@ public sealed class AndroidCommandRouterTests
         Assert.Equal([AndroidCommandTransportKind.DirectLocal], route.Transports);
     }
 
+    // Ловит возврат к BAL-зависимому Activity fallback для durable work-freeze callback.
+    [Fact]
+    public void GetRoute_WorkAppFrozenToPersonal_UsesOnlySilentParentTransport()
+    {
+        var envelope = CreateEnvelope(
+            AndroidCommandKind.WorkAppFrozen,
+            AndroidCommandTargetProfile.Personal,
+            AndroidCommandInteractivity.Silent,
+            AndroidCommandPriority.Mutation);
+
+        var route = AndroidCommandRouter.GetRoute(envelope);
+
+        Assert.Equal([AndroidCommandTransportKind.SilentParentProfile], route.Transports);
+    }
+
+    [Fact]
+    public void GetRoute_WorkAppFrozenWithInvalidDirectionOrInteractivity_HasNoFallback()
+    {
+        var invalidRequests = new[]
+        {
+            CreateEnvelope(
+                AndroidCommandKind.WorkAppFrozen,
+                AndroidCommandTargetProfile.Work,
+                AndroidCommandInteractivity.Silent,
+                AndroidCommandPriority.Mutation),
+            CreateEnvelope(
+                AndroidCommandKind.WorkAppFrozen,
+                AndroidCommandTargetProfile.Personal,
+                AndroidCommandInteractivity.Interactive,
+                AndroidCommandPriority.Mutation)
+        };
+
+        foreach (var request in invalidRequests)
+            Assert.Empty(AndroidCommandRouter.GetRoute(request).Transports);
+    }
+
     [Fact]
     public void GetRoute_InteractiveWorkCommand_UsesActivityOnly()
     {

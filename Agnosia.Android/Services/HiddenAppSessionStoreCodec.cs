@@ -20,11 +20,31 @@ internal static class HiddenAppSessionStoreCodec
             using var document = JsonDocument.Parse(raw);
             if (TryGetProperty(document.RootElement, nameof(HiddenAppSessionStoreState.Version), out var versionElement))
             {
-                if (!versionElement.TryGetInt32(out var version)
-                    || version != HiddenAppSessionStoreState.CurrentVersion)
+                if (!versionElement.TryGetInt32(out var version))
                 {
                     return false;
                 }
+
+                if (version == 1)
+                {
+                    var versionOne = JsonSerializer.Deserialize(
+                        raw,
+                        HiddenAppSessionStoreJsonContext.Default.LegacyHiddenAppSessionStoreStateV1);
+                    if (versionOne?.PendingHides is null
+                        || (versionOne.ActiveSession is not null && !IsValid(versionOne.ActiveSession))
+                        || versionOne.PendingHides.Any(pending => pending is null || !IsValid(pending.Session)))
+                    {
+                        return false;
+                    }
+
+                    state = new HiddenAppSessionStoreState(
+                        versionOne.ActiveSession,
+                        versionOne.PendingHides,
+                        []);
+                    return true;
+                }
+
+                if (version != HiddenAppSessionStoreState.CurrentVersion) return false;
 
                 var parsed = JsonSerializer.Deserialize(
                     raw,
@@ -54,6 +74,7 @@ internal static class HiddenAppSessionStoreCodec
                     legacy.TaskId,
                     legacy.StartedAtUnixTimeMilliseconds,
                     legacy.LaunchResult),
+                [],
                 []);
             return true;
         }
@@ -70,8 +91,19 @@ internal static class HiddenAppSessionStoreCodec
     private static bool IsValid(HiddenAppSessionStoreState state)
     {
         return state.PendingHides is not null
+               && state.PendingParentNotifications is not null
                && (state.ActiveSession is null || IsValid(state.ActiveSession))
-               && state.PendingHides.All(pending => pending is not null && IsValid(pending.Session));
+               && state.PendingHides.All(pending => pending is not null && IsValid(pending.Session))
+               && state.PendingParentNotifications.All(IsValid);
+    }
+
+    private static bool IsValid(HiddenAppPendingParentNotificationState notification)
+    {
+        return notification is not null
+               && IsValid(notification.Session)
+               && !string.IsNullOrWhiteSpace(notification.Session.ParentCallbackLaunchId)
+               && !string.IsNullOrWhiteSpace(notification.Reason)
+               && notification.FailedAttempts >= 0;
     }
 
     private static bool IsValid(HiddenAppSessionState session)
@@ -102,3 +134,8 @@ internal sealed record LegacyHiddenAppSessionState(
     int TaskId,
     long StartedAtUnixTimeMilliseconds = 0,
     AndroidAppLaunchResult? LaunchResult = null);
+
+internal sealed record LegacyHiddenAppSessionStoreStateV1(
+    HiddenAppSessionState? ActiveSession,
+    HiddenAppPendingHideState[] PendingHides,
+    int Version);

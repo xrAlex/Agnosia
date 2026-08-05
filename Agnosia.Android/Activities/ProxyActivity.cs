@@ -295,7 +295,8 @@ public sealed class ProxyActivity : Activity
                             request.DisplayName,
                             TaskId,
                             startedResult,
-                            AndroidIntentExtras.ReadParentFrozenCallback(Intent)))
+                            AndroidIntentExtras.ReadParentFrozenCallback(Intent),
+                            AndroidIntentExtras.ReadParentCallbackLaunchId(Intent)))
                         throw new InvalidOperationException(
                             $"Android did not accept the hidden-session monitor for {request.PackageName}.");
                     visibilityTransaction.Commit();
@@ -596,6 +597,7 @@ public sealed class ProxyActivity : Activity
                     typeof(WorkAppFrozenReceiver),
                     request.PackageName,
                     launchId));
+            proxyIntent.PutExtra(AndroidCommandContract.ExtraCallbackLaunchId, launchId);
         }
         proxyIntent.SetComponent(
             new ComponentName(this, Java.Lang.Class.FromType(typeof(ProxyActivity))));
@@ -710,13 +712,9 @@ public sealed class ProxyActivity : Activity
                     AndroidAppLaunchStage.PackageRehidden,
                     $"proxy_fallback:{reason}");
                 launchResult.Log(LogTag);
-                var result = AndroidProfileCommandGateway.NotifyParentWorkAppFrozen(
-                    this,
-                    request.PackageName,
-                    $"proxy_fallback:{reason}:{request.PackageName}");
-                if (!result.Succeeded)
-                    Log.Warn(LogTag,
-                        $"Could not notify parent profile about fallback freeze for {request.PackageName}: {result.Message}");
+                Log.Debug(
+                    LogTag,
+                    $"Personal launch transaction will roll back VPN after fallback re-hide for {request.PackageName}.");
             }
         }
         catch (Exception exception)

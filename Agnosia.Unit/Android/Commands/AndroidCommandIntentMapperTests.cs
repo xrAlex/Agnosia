@@ -9,7 +9,8 @@ public sealed class AndroidCommandIntentMapperTests
     private static readonly HashSet<AndroidCommandKind> BinderOnlyKinds =
     [
         AndroidCommandKind.RecoverAuthentication,
-        AndroidCommandKind.QueryPackageState
+        AndroidCommandKind.QueryPackageState,
+        AndroidCommandKind.WorkAppFrozen
     ];
 
     public static TheoryData<string, string> RequiredActionMappings => new()
@@ -60,6 +61,7 @@ public sealed class AndroidCommandIntentMapperTests
     [Theory]
     [InlineData(nameof(AndroidCommandKind.RecoverAuthentication))]
     [InlineData(nameof(AndroidCommandKind.QueryPackageState))]
+    [InlineData(nameof(AndroidCommandKind.WorkAppFrozen))]
     public void ToAction_RejectsBinderOnlyCommands(string kindName)
     {
         var kind = Enum.Parse<AndroidCommandKind>(kindName);
@@ -85,6 +87,7 @@ public sealed class AndroidCommandIntentMapperTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("agnosia.action.UNKNOWN")]
+    [InlineData(AgnosiaActions.WorkAppFrozen)]
     public void TryFromAction_RejectsUnknownActions(string? action)
     {
         Assert.False(AndroidCommandIntentMapper.TryFromAction(action, out _));

@@ -45,7 +45,6 @@ internal static class AndroidCommandIntentMapper
             AndroidCommandKind.StartFileShuttleParentToWork => AgnosiaActions.StartFileShuttleParentToWork,
             AndroidCommandKind.StartFileShuttleWorkToParent => AgnosiaActions.StartFileShuttleWorkToParent,
             AndroidCommandKind.SynchronizePreference => AgnosiaActions.SynchronizePreference,
-            AndroidCommandKind.WorkAppFrozen => AgnosiaActions.WorkAppFrozen,
             AndroidCommandKind.FinalizeProvision => AgnosiaActions.FinalizeProvision,
             AndroidCommandKind.PackageInstallerCallback => AgnosiaActions.PackageInstallerCallback,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "No Android action is mapped for command kind.")
@@ -84,7 +83,6 @@ internal static class AndroidCommandIntentMapper
             AgnosiaActions.StartFileShuttleParentToWork => AndroidCommandKind.StartFileShuttleParentToWork,
             AgnosiaActions.StartFileShuttleWorkToParent => AndroidCommandKind.StartFileShuttleWorkToParent,
             AgnosiaActions.SynchronizePreference => AndroidCommandKind.SynchronizePreference,
-            AgnosiaActions.WorkAppFrozen => AndroidCommandKind.WorkAppFrozen,
             AgnosiaActions.FinalizeProvision => AndroidCommandKind.FinalizeProvision,
             AgnosiaActions.PackageInstallerCallback => AndroidCommandKind.PackageInstallerCallback,
             _ => (AndroidCommandKind?)null

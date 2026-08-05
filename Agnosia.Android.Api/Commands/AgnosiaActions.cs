@@ -70,7 +70,6 @@ public static class AgnosiaActions
 
     public static readonly string[] ManagedToParentCommandActions =
     [
-        WorkAppFrozen,
         StartFileShuttleWorkToParent,
         FinalizeProvision
     ];
@@ -106,7 +105,6 @@ public static class AgnosiaActions
         StartFileShuttleParentToWork,
         StartFileShuttleWorkToParent,
         SynchronizePreference,
-        WorkAppFrozen,
         PackageInstallerCallback
     ];
 

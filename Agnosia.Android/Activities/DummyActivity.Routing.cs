@@ -23,8 +23,7 @@ public sealed partial class DummyActivity
 
         Log.Debug(LogTag, $"Handling signed action={action}, isProfileOwner={_isProfileOwner}.");
         var hasAuthenticatedIntent = AuthenticationUtility.CheckIntent(Intent);
-        if (!hasAuthenticatedIntent
-            && !AuthenticationUtility.CheckWorkAppFrozenCallback(Intent))
+        if (!hasAuthenticatedIntent)
         {
             Log.Warn(LogTag,
                 $"Rejected signed action={action}: authentication check failed. isProfileOwner={_isProfileOwner}.");
@@ -123,9 +122,6 @@ public sealed partial class DummyActivity
                     break;
                 case AgnosiaActions.SynchronizePreference:
                     ActionSynchronizePreference();
-                    break;
-                case AgnosiaActions.WorkAppFrozen:
-                    RunAction(ActionWorkAppFrozenAsync, "Android не смог обработать событие заморозки приложения.");
                     break;
                 case AgnosiaActions.FinalizeProvision:
                     ActionFinalizeProvision();

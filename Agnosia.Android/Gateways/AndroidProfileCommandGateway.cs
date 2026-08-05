@@ -540,21 +540,6 @@ public static class AndroidProfileCommandGateway
             $"Android не смог скрыть {packageName} в рабочем профиле.");
     }
 
-    public static OperationResult NotifyParentWorkAppFrozen(
-        Context context,
-        string packageName,
-        string trigger)
-    {
-        var intent = new Intent(AgnosiaActions.WorkAppFrozen);
-        intent.PutExtra(AndroidCommandContract.ExtraCallbackPackage, packageName);
-        intent.PutExtra(AndroidCommandContract.ExtraTrigger, trigger);
-        return StartOtherProfileActivity(
-            context,
-            intent,
-            "Основной профиль получил событие заморозки приложения.",
-            "Android не смог передать событие заморозки приложения в основной профиль.");
-    }
-
     private static async Task<bool> QueryWorkPermissionBooleanAsync(
         AndroidActivityCommandGateway commandRunner,
         string action,

@@ -50,52 +50,6 @@ public sealed partial class DummyActivity
         FinishWithResult(Result.Ok);
     }
 
-    private async Task ActionWorkAppFrozenAsync(CancellationToken cancellationToken)
-    {
-        if (_isProfileOwner)
-        {
-            Finish();
-            return;
-        }
-
-        try
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var trigger = Intent?.GetStringExtra(AndroidProfileCommandGateway.ExtraTrigger) ?? "work_app_frozen";
-            var packageName = Intent?.GetStringExtra(AndroidCommandContract.ExtraCallbackPackage);
-            if (string.IsNullOrWhiteSpace(packageName))
-            {
-                FinishWithError("Событие заморозки не содержит имя приложения.");
-                return;
-            }
-
-            var result = await WorkAppFrozenHandler.RestoreParentVpnAndHideOverlayAsync(
-                this,
-                packageName,
-                null,
-                trigger,
-                LogTag,
-                cancellationToken).ConfigureAwait(false);
-            if (result.Succeeded)
-            {
-                FinishWithSuccessMessage(result.Message);
-                return;
-            }
-
-            Log.Warn(LogTag, $"Work-app frozen event handling failed. trigger={trigger}, message={result.Message}");
-            FinishWithError(result.Message);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            Log.Error(LogTag, $"Failed to handle work-app frozen event: {exception}");
-            FinishWithError("Android не смог обработать событие заморозки приложения.");
-        }
-    }
-
     private void ActionFinalizeProvision()
     {
         if (_isProfileOwner)
