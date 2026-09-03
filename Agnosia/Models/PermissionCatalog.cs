@@ -11,12 +11,6 @@ internal static class PermissionCatalog
                 "Нужен для изоляции клонированных приложений, скрытия пакетов и управления политиками рабочего пространства",
                 "Подключен",
                 "Создать профиль"),
-            [PermissionKind.CrossProfileInteraction] = new(
-                "Межпрофильное взаимодействие",
-                "Основной профиль",
-                "Позволяет Agnosia выполнять тихие команды рабочего профиля без запуска служебного Activity",
-                "Получено",
-                "Открыть настройки"),
             [PermissionKind.Notifications] = new(
                 "Уведомления",
                 "Основной профиль",
@@ -109,19 +103,6 @@ internal static class PermissionCatalog
             hasSetup && workProfileAvailable,
             !hasSetup || !workProfileAvailable,
             hasSetup ? "Проверить профиль" : definition.RequestLabel);
-    }
-
-    public static PermissionSnapshot CreateCrossProfileInteractionSnapshot(
-        bool isGranted,
-        bool canRequestThroughSettings)
-    {
-        var definition = GetDefinition(PermissionKind.CrossProfileInteraction);
-        return CreateSnapshot(
-            PermissionKind.CrossProfileInteraction,
-            definition,
-            isGranted,
-            !isGranted,
-            canRequestThroughSettings ? definition.RequestLabel : "Проверить доступ");
     }
 
     public static AgnosiaModuleRequirement CreateRequirement(

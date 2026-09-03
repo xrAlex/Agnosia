@@ -6,31 +6,12 @@ namespace Agnosia.Unit.Android.Commands;
 public sealed class AndroidCommandCenterTests
 {
     [Fact]
-    public async Task ExecuteAsync_UsesFirstSuccessfulTransport()
+    public async Task ExecuteAsync_UsesActivityTransportForWorkCommand()
     {
         var envelope = CreateEnvelope(AndroidCommandKind.QueryPermissions);
         var center = new AndroidCommandCenter(
             new AndroidCommandScheduler(),
             [
-                new TestTransport(AndroidCommandTransportKind.SilentWorkProfile, succeeds: true),
-                new TestTransport(AndroidCommandTransportKind.Activity, succeeds: true)
-            ]);
-
-        var result = await center.ExecuteAsync(envelope, CancellationToken.None);
-
-        Assert.True(result.Succeeded);
-        Assert.Equal(AndroidCommandTransportKind.SilentWorkProfile, result.Transport);
-        Assert.Equal("SilentWorkProfile ok", result.Message);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_FallsBackToActivity_WhenWorkSilentTransportIsUnavailable()
-    {
-        var envelope = CreateEnvelope(AndroidCommandKind.QueryPermissions);
-        var center = new AndroidCommandCenter(
-            new AndroidCommandScheduler(),
-            [
-                new TestTransport(AndroidCommandTransportKind.SilentWorkProfile, succeeds: false),
                 new TestTransport(AndroidCommandTransportKind.Activity, succeeds: true)
             ]);
 
@@ -38,7 +19,7 @@ public sealed class AndroidCommandCenterTests
 
         Assert.True(result.Succeeded);
         Assert.Equal(AndroidCommandTransportKind.Activity, result.Transport);
-        Assert.Contains("fallbackFrom=SilentWorkProfile", result.Diagnostics, StringComparison.Ordinal);
+        Assert.Equal("Activity ok", result.Message);
     }
 
     [Fact]
@@ -48,7 +29,6 @@ public sealed class AndroidCommandCenterTests
         var center = new AndroidCommandCenter(
             new AndroidCommandScheduler(),
             [
-                new TestTransport(AndroidCommandTransportKind.SilentWorkProfile, succeeds: false),
                 new TestTransport(AndroidCommandTransportKind.Activity, succeeds: false)
             ]);
 
@@ -60,21 +40,19 @@ public sealed class AndroidCommandCenterTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_FallsBackWhenTransportThrows()
+    public async Task ExecuteAsync_ReturnsFailureWhenActivityTransportThrows()
     {
         var envelope = CreateEnvelope(AndroidCommandKind.QueryPermissions);
         var center = new AndroidCommandCenter(
             new AndroidCommandScheduler(),
             [
-                new ThrowingTransport(AndroidCommandTransportKind.SilentWorkProfile),
-                new TestTransport(AndroidCommandTransportKind.Activity, succeeds: true)
+                new ThrowingTransport(AndroidCommandTransportKind.Activity)
             ]);
 
         var result = await center.ExecuteAsync(envelope, CancellationToken.None);
 
-        Assert.True(result.Succeeded);
+        Assert.False(result.Succeeded);
         Assert.Equal(AndroidCommandTransportKind.Activity, result.Transport);
-        Assert.Contains("fallbackFrom=SilentWorkProfile", result.Diagnostics, StringComparison.Ordinal);
         Assert.Contains("transport_exception", result.Diagnostics, StringComparison.Ordinal);
     }
 
@@ -85,13 +63,13 @@ public sealed class AndroidCommandCenterTests
             Guid.NewGuid(),
             AndroidCommandKind.QueryPermissions,
             AndroidCommandTargetProfile.Work,
-            AndroidCommandInteractivity.Silent,
+            AndroidCommandInteractivity.NonInteractive,
             AndroidCommandPriority.UserBlocking,
             TimeSpan.FromMilliseconds(25),
             null);
         var center = new AndroidCommandCenter(
             new AndroidCommandScheduler(),
-            [new HangingTransport(AndroidCommandTransportKind.SilentWorkProfile)]);
+            [new HangingTransport(AndroidCommandTransportKind.Activity)]);
 
         var result = await center.ExecuteAsync(envelope, CancellationToken.None);
 
@@ -107,7 +85,7 @@ public sealed class AndroidCommandCenterTests
         await cancellation.CancelAsync();
         var center = new AndroidCommandCenter(
             new AndroidCommandScheduler(),
-            [new CancelingTransport(AndroidCommandTransportKind.SilentWorkProfile)]);
+            [new CancelingTransport(AndroidCommandTransportKind.Activity)]);
 
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
             center.ExecuteAsync(envelope, cancellation.Token));
@@ -119,7 +97,7 @@ public sealed class AndroidCommandCenterTests
         var envelope = CreateEnvelope(AndroidCommandKind.QueryPermissions);
         var center = new AndroidCommandCenter(
             new AndroidCommandScheduler(),
-            [new TestTransport(AndroidCommandTransportKind.SilentWorkProfile, succeeds: true, "actualProfile=Work")]);
+            [new TestTransport(AndroidCommandTransportKind.Activity, succeeds: true, "actualProfile=Work")]);
 
         var result = await center.ExecuteAsync(envelope, CancellationToken.None);
 
@@ -133,7 +111,7 @@ public sealed class AndroidCommandCenterTests
             Guid.NewGuid(),
             kind,
             AndroidCommandTargetProfile.Work,
-            AndroidCommandInteractivity.Silent,
+            AndroidCommandInteractivity.NonInteractive,
             AndroidCommandPriority.Refresh,
             TimeSpan.FromSeconds(30),
             null);

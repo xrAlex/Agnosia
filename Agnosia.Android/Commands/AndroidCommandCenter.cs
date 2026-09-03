@@ -118,7 +118,6 @@ internal sealed class AndroidCommandCenter
     {
         var completed = AppendDiagnostics(result, diagnostics);
         LogCompletion(envelope, completed, diagnostics);
-        LogSilentFallbackIfNeeded(envelope, completed, diagnostics);
         return completed;
     }
 
@@ -146,20 +145,6 @@ internal sealed class AndroidCommandCenter
             $"Command completed. correlationId={envelope.CorrelationId}; kind={envelope.Kind}; priority={envelope.Priority}; interactivity={envelope.Interactivity}; targetProfile={envelope.TargetProfile}; transport={result.Transport}; fallbackFrom={FormatFallbacks(diagnostics)}; elapsedMs={result.Elapsed.TotalMilliseconds:0}; succeeded={result.Succeeded}; errorCode={result.ErrorCode ?? "<none>"}");
     }
 
-    private static void LogSilentFallbackIfNeeded(
-        AndroidCommandEnvelope envelope,
-        AndroidCommandResultEnvelope result,
-        IReadOnlyCollection<string> diagnostics)
-    {
-        if (result.Transport != AndroidCommandTransportKind.Activity
-            || !diagnostics.Any(static item => item.StartsWith("fallbackFrom=SilentWorkProfile", StringComparison.Ordinal)))
-            return;
-
-        LogWarn(
-            LogTag,
-            $"Silent command fell back to Activity. correlationId={envelope.CorrelationId}; kind={envelope.Kind}; targetProfile={envelope.TargetProfile}; diagnostics={string.Join(";", diagnostics)}");
-    }
-
     private static string FormatFallbacks(IReadOnlyCollection<string> diagnostics)
     {
         if (diagnostics.Count == 0) return "<none>";
@@ -181,13 +166,4 @@ internal sealed class AndroidCommandCenter
 #endif
     }
 
-    private static void LogWarn(string tag, string message)
-    {
-#if AGNOSIA_ANDROID
-        Log.Warn(tag, message);
-#else
-        _ = tag;
-        _ = message;
-#endif
-    }
 }

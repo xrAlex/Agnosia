@@ -252,7 +252,7 @@ public sealed class AndroidCommandSchedulerTests
             Guid.NewGuid(),
             kind,
             AndroidCommandTargetProfile.Work,
-            AndroidCommandInteractivity.Silent,
+            AndroidCommandInteractivity.NonInteractive,
             priority,
             TimeSpan.FromSeconds(30),
             null);

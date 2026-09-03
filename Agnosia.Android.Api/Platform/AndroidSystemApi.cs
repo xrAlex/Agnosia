@@ -57,11 +57,6 @@ public static class AndroidSystemApi
         return GetSystemService<UserManager>(context, UserServiceName);
     }
 
-    public static CrossProfileApps? GetCrossProfileApps(Context context)
-    {
-        return GetSystemService<CrossProfileApps>(context, Context.CrossProfileAppsService);
-    }
-
     public static PackageInfoFlags GetQueryIntentActivityFlags()
     {
         return PackageInfoFlags.MatchAll;

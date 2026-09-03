@@ -11,8 +11,8 @@ public sealed class WorkProfileOwnerCheckInterpreterTests
     {
         var result = AndroidCommandResultEnvelope.Success(
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
-            AndroidCommandKind.RecoverAuthentication,
-            AndroidCommandTransportKind.SilentWorkProfile,
+            AndroidCommandKind.ProfilePing,
+            AndroidCommandTransportKind.Activity,
             """
             {
               "profile_owner_check_performed": true,
@@ -21,7 +21,7 @@ public sealed class WorkProfileOwnerCheckInterpreterTests
               "app_version_name": "0.9"
             }
             """,
-            "Recovered.",
+            "Checked.",
             TimeSpan.FromMilliseconds(15),
             "actual=Work");
 
@@ -30,7 +30,7 @@ public sealed class WorkProfileOwnerCheckInterpreterTests
         Assert.Equal(WorkProfileOwnerCheckKind.AppIsProfileOwner, ownerCheck.Kind);
         Assert.Equal(42, ownerCheck.AppVersionCode);
         Assert.Equal("0.9", ownerCheck.AppVersionName);
-        Assert.Contains("transport=SilentWorkProfile", ownerCheck.DiagnosticReason, StringComparison.Ordinal);
+        Assert.Contains("transport=Activity", ownerCheck.DiagnosticReason, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -38,19 +38,19 @@ public sealed class WorkProfileOwnerCheckInterpreterTests
     {
         var result = AndroidCommandResultEnvelope.Failure(
             Guid.Parse("22222222-2222-2222-2222-222222222222"),
-            AndroidCommandKind.RecoverAuthentication,
-            AndroidCommandTransportKind.SilentWorkProfile,
+            AndroidCommandKind.ProfilePing,
+            AndroidCommandTransportKind.Activity,
             "Unavailable.",
-            "silent_work_transport_unavailable",
+            "activity_transport_unavailable",
             TimeSpan.Zero,
-            "canInteractAcrossProfiles=false");
+            "commandTargetResolvable=false");
 
         var ownerCheck = WorkProfileOwnerCheckInterpreter.Interpret(result);
 
         Assert.Equal(WorkProfileOwnerCheckKind.Unreachable, ownerCheck.Kind);
-        Assert.Contains("profilePing=silent_work_transport_unavailable", ownerCheck.DiagnosticReason,
+        Assert.Contains("profilePing=activity_transport_unavailable", ownerCheck.DiagnosticReason,
             StringComparison.Ordinal);
-        Assert.Contains("canInteractAcrossProfiles=false", ownerCheck.DiagnosticReason, StringComparison.Ordinal);
+        Assert.Contains("commandTargetResolvable=false", ownerCheck.DiagnosticReason, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -58,10 +58,10 @@ public sealed class WorkProfileOwnerCheckInterpreterTests
     {
         var result = AndroidCommandResultEnvelope.Success(
             Guid.Parse("33333333-3333-3333-3333-333333333333"),
-            AndroidCommandKind.RecoverAuthentication,
-            AndroidCommandTransportKind.SilentWorkProfile,
+            AndroidCommandKind.ProfilePing,
+            AndroidCommandTransportKind.Activity,
             "{\"is_profile_owner\":true}",
-            "Recovered.",
+            "Checked.",
             TimeSpan.Zero,
             string.Empty);
 

@@ -29,8 +29,9 @@ public static class AndroidProfileCommandGateway
         cancellationToken.ThrowIfCancellationRequested();
         var activity = commandRunner.CurrentActivity;
         if (string.IsNullOrWhiteSpace(AuthenticationUtility.GetExistingKey()))
-            return await TryRecoverAuthenticationAsync(commandRunner, cancellationToken)
-                .ConfigureAwait(false);
+            return new WorkProfileOwnerCheckResult(
+                WorkProfileOwnerCheckKind.AuthenticationKeyMissing,
+                "authKey=missing");
 
         if (!AgnosiaUtilities.HasWorkProfileTarget(activity))
             return new WorkProfileOwnerCheckResult(
@@ -44,7 +45,7 @@ public static class AndroidProfileCommandGateway
             Guid.NewGuid(),
             AndroidCommandKind.ProfilePing,
             AndroidCommandTargetProfile.Work,
-            AndroidCommandInteractivity.Silent,
+            AndroidCommandInteractivity.NonInteractive,
             AndroidCommandPriority.UserBlocking,
             ProfilePingTimeout,
             null);
@@ -54,74 +55,6 @@ public static class AndroidProfileCommandGateway
         var ownerCheck = WorkProfileOwnerCheckInterpreter.Interpret(commandResult);
         AndroidQueryCache.Shared.StoreOwnerCheckIfSuccessful(ownerCheck);
         return ownerCheck;
-    }
-
-    private static async Task<WorkProfileOwnerCheckResult> TryRecoverAuthenticationAsync(
-        AndroidActivityCommandGateway commandRunner,
-        CancellationToken cancellationToken)
-    {
-        AndroidQueryCache.Shared.ClearOwnerCheck();
-        var activity = commandRunner.CurrentActivity;
-        if (!AgnosiaUtilities.HasWorkProfileTarget(activity))
-            return new WorkProfileOwnerCheckResult(
-                WorkProfileOwnerCheckKind.TargetUnavailable,
-                "authKey=missing; crossProfileTarget=missing");
-
-        var replacementAuthKey = AuthenticationKeyMaterial.Create();
-        using var pingCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        pingCancellation.CancelAfter(ProfilePingTimeout);
-
-        try
-        {
-            var envelope = new AndroidCommandEnvelope(
-                Guid.NewGuid(),
-                AndroidCommandKind.RecoverAuthentication,
-                AndroidCommandTargetProfile.Work,
-                AndroidCommandInteractivity.Silent,
-                AndroidCommandPriority.UserBlocking,
-                ProfilePingTimeout,
-                JsonSerializer.Serialize(new AuthenticationRecoveryRequest(replacementAuthKey)));
-            var result = await ServiceRegistry.GetRequiredService<AndroidCommandCenter>()
-                .ExecuteAsync(envelope, pingCancellation.Token)
-                .ConfigureAwait(false);
-
-            if (result.Succeeded && result.Transport != AndroidCommandTransportKind.SilentWorkProfile)
-            {
-                AuthenticationUtility.Reset();
-                return new WorkProfileOwnerCheckResult(
-                    WorkProfileOwnerCheckKind.Unreachable,
-                    $"authKey=recoveryUntrustedTransport:{result.Transport}");
-            }
-
-            var ownerCheck = WorkProfileOwnerCheckInterpreter.Interpret(result);
-            if (ownerCheck.Kind == WorkProfileOwnerCheckKind.AppIsProfileOwner)
-            {
-                if (AuthenticationUtility.TryStoreProvisioningKey(replacementAuthKey))
-                    return ownerCheck with
-                    {
-                        DiagnosticReason = "authKey=recoveredViaBoundService; " + ownerCheck.DiagnosticReason
-                    };
-
-                AuthenticationUtility.Reset();
-                AndroidQueryCache.Shared.ClearOwnerCheck();
-                return new WorkProfileOwnerCheckResult(
-                    WorkProfileOwnerCheckKind.AuthenticationKeyMissing,
-                    "authKey=localPersistenceFailed");
-            }
-
-            AuthenticationUtility.Reset();
-            AndroidQueryCache.Shared.ClearOwnerCheck();
-            return ownerCheck with { DiagnosticReason = "authKey=recoveryFailed; " + ownerCheck.DiagnosticReason };
-        }
-        catch (System.OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            AuthenticationUtility.Reset();
-            AndroidQueryCache.Shared.ClearOwnerCheck();
-            Log.Warn(LogTag, "Timed out waiting for work-profile authentication recovery.");
-            return new WorkProfileOwnerCheckResult(
-                WorkProfileOwnerCheckKind.AuthenticationKeyMissing,
-                $"authKey=recoveryTimeout:{ProfilePingTimeout.TotalMilliseconds:0}ms");
-        }
     }
 
     internal static async Task<ProfileAppsQueryResult?> QueryAppsAsync(
@@ -158,7 +91,7 @@ public static class AndroidProfileCommandGateway
             Guid.NewGuid(),
             AndroidCommandKind.QueryAppIcon,
             AndroidCommandTargetProfile.Work,
-            AndroidCommandInteractivity.Silent,
+            AndroidCommandInteractivity.NonInteractive,
             AndroidCommandPriority.Background,
             TimeSpan.FromSeconds(30),
             JsonSerializer.Serialize(request));
@@ -229,7 +162,7 @@ public static class AndroidProfileCommandGateway
             Guid.NewGuid(),
             AndroidCommandKind.QueryAppIcons,
             AndroidCommandTargetProfile.Work,
-            AndroidCommandInteractivity.Silent,
+            AndroidCommandInteractivity.NonInteractive,
             AndroidCommandPriority.Background,
             TimeSpan.FromSeconds(30),
             JsonSerializer.Serialize(request));
@@ -274,7 +207,7 @@ public static class AndroidProfileCommandGateway
         AndroidActivityCommandGateway commandRunner,
         CancellationToken cancellationToken)
     {
-        var result = await ExecuteSilentWorkRefreshCommandAsync(
+        var result = await ExecuteWorkRefreshCommandAsync(
                 AndroidCommandKind.QueryCrossProfilePackages,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -292,7 +225,7 @@ public static class AndroidProfileCommandGateway
         AndroidActivityCommandGateway commandRunner,
         CancellationToken cancellationToken)
     {
-        var result = await ExecuteSilentWorkRefreshCommandAsync(
+        var result = await ExecuteWorkRefreshCommandAsync(
                 AndroidCommandKind.QueryLogs,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -312,7 +245,7 @@ public static class AndroidProfileCommandGateway
         AndroidActivityCommandGateway commandRunner,
         CancellationToken cancellationToken)
     {
-        var commandResult = await ExecuteSilentWorkRefreshCommandAsync(
+        var commandResult = await ExecuteWorkRefreshCommandAsync(
                 AndroidCommandKind.QueryPermissions,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -555,7 +488,7 @@ public static class AndroidProfileCommandGateway
         return value;
     }
 
-    private static Task<AndroidCommandResultEnvelope> ExecuteSilentWorkRefreshCommandAsync(
+    private static Task<AndroidCommandResultEnvelope> ExecuteWorkRefreshCommandAsync(
         AndroidCommandKind kind,
         CancellationToken cancellationToken)
     {
@@ -563,7 +496,7 @@ public static class AndroidProfileCommandGateway
             Guid.NewGuid(),
             kind,
             AndroidCommandTargetProfile.Work,
-            AndroidCommandInteractivity.Silent,
+            AndroidCommandInteractivity.NonInteractive,
             AndroidCommandPriority.Refresh,
             TimeSpan.FromSeconds(10),
             null);

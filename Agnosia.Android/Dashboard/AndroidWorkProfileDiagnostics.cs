@@ -12,18 +12,15 @@ internal static class AndroidWorkProfileDiagnosticsReader
     {
         var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
         var userManager = AndroidSystemApi.GetUserManager(context);
-        var crossProfileApps = AndroidSystemApi.GetCrossProfileApps(context);
         var notes = new List<string>();
 
         var currentUser = GetCurrentUser(notes);
         var currentUserSerial = GetUserSerial(userManager, currentUser, notes);
         var userProfiles = ReadUserProfiles(userManager, notes);
-        var targetProfiles = ReadTargetProfiles(crossProfileApps, notes);
         var storedManagedProfileSerial = storage.GetLong(StorageKeys.ManagedProfileUserSerial, -1);
         var managedProfile = SelectManagedProfile(
             userManager,
             userProfiles,
-            targetProfiles,
             currentUser,
             storedManagedProfileSerial,
             notes);
@@ -34,11 +31,7 @@ internal static class AndroidWorkProfileDiagnosticsReader
             storedManagedProfileSerial,
             notes);
         var managedProfileExists = managedProfile is not null
-                                   || userProfiles.Any(profile => !IsSameUser(userManager, currentUser, profile, notes))
-                                   || targetProfiles.Count > 0;
-        var availableToCrossProfileApps = managedProfile is not null
-            ? targetProfiles.Any(target => IsSameUser(userManager, managedProfile, target, notes))
-            : targetProfiles.Count > 0;
+                                   || userProfiles.Any(profile => !IsSameUser(userManager, currentUser, profile, notes));
         var commandTargetResolvable = TryHasWorkProfileTarget(context, notes);
         var quietModeEnabled = managedProfile is null
             ? null
@@ -52,7 +45,6 @@ internal static class AndroidWorkProfileDiagnosticsReader
 
         return new WorkProfileDiagnostics(
             managedProfileExists,
-            availableToCrossProfileApps,
             quietModeEnabled,
             userRunning,
             userUnlocked,
@@ -61,7 +53,6 @@ internal static class AndroidWorkProfileDiagnosticsReader
             managedProfileSerial,
             ToSafeHandleString(managedProfile),
             userProfiles.Count,
-            targetProfiles.Count,
             string.Join(",", notes.Distinct(StringComparer.Ordinal)));
     }
 
@@ -98,31 +89,9 @@ internal static class AndroidWorkProfileDiagnosticsReader
         }
     }
 
-    private static IReadOnlyList<UserHandle> ReadTargetProfiles(
-        global::Android.Content.PM.CrossProfileApps? crossProfileApps,
-        List<string> notes)
-    {
-        if (crossProfileApps is null)
-        {
-            notes.Add("targetProfiles=unavailable:crossProfileAppsMissing");
-            return [];
-        }
-
-        try
-        {
-            return crossProfileApps.TargetUserProfiles.ToArray() ?? [];
-        }
-        catch (Exception exception)
-        {
-            notes.Add($"targetProfiles=error:{exception.GetType().Name}");
-            return [];
-        }
-    }
-
     private static UserHandle? SelectManagedProfile(
         UserManager? userManager,
         IReadOnlyList<UserHandle> userProfiles,
-        IReadOnlyList<UserHandle> targetProfiles,
         UserHandle? currentUser,
         long storedManagedProfileSerial,
         List<string> notes)
@@ -132,9 +101,7 @@ internal static class AndroidWorkProfileDiagnosticsReader
             && !IsSameUser(userManager, currentUser, storedUser, notes))
             return storedUser;
 
-        return targetProfiles.Count > 0 
-            ? targetProfiles[0] 
-            : userProfiles.FirstOrDefault(profile => !IsSameUser(userManager, currentUser, profile, notes));
+        return userProfiles.FirstOrDefault(profile => !IsSameUser(userManager, currentUser, profile, notes));
     }
 
     private static UserHandle? TryGetUserForSerial(
@@ -278,7 +245,6 @@ internal static class AndroidWorkProfileDiagnosticsReader
 
 internal sealed record WorkProfileDiagnostics(
     bool ManagedProfileExists,
-    bool AvailableToCrossProfileApps,
     bool? QuietModeEnabled,
     bool? UserRunning,
     bool? UserUnlocked,
@@ -287,13 +253,11 @@ internal sealed record WorkProfileDiagnostics(
     long? ManagedProfileUserSerial,
     string? ManagedProfileHandle,
     int UserProfileCount,
-    int TargetProfileCount,
     string Notes)
 {
     public string ToLogString()
     {
         return $"managedProfileExists={ManagedProfileExists}; " +
-               $"crossProfileAvailable={AvailableToCrossProfileApps}; " +
                $"quietMode={FormatNullable(QuietModeEnabled)}; " +
                $"userRunning={FormatNullable(UserRunning)}; " +
                $"userUnlocked={FormatNullable(UserUnlocked)}; " +
@@ -301,7 +265,7 @@ internal sealed record WorkProfileDiagnostics(
                $"currentUserSerial={CurrentUserSerial?.ToString() ?? "unknown"}; " +
                $"managedUserSerial={ManagedProfileUserSerial?.ToString() ?? "unknown"}; " +
                $"managedHandle={ManagedProfileHandle ?? "unknown"}; " +
-               $"userProfiles={UserProfileCount}; targetProfiles={TargetProfileCount}; " +
+               $"userProfiles={UserProfileCount}; " +
                $"notes={Notes}";
     }
 

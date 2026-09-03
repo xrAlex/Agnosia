@@ -54,7 +54,7 @@ public sealed class AndroidCommandHandlerExecutorTests
             Guid.NewGuid(),
             kind,
             targetProfile,
-            AndroidCommandInteractivity.Silent,
+            AndroidCommandInteractivity.NonInteractive,
             AndroidCommandPriority.Refresh,
             TimeSpan.FromSeconds(30),
             null);

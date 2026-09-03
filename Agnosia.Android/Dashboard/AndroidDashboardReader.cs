@@ -226,7 +226,6 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
     private static bool CanAttemptWorkProfileOwnerCheck(WorkProfileDiagnostics profileDiagnostics)
     {
         return profileDiagnostics.CommandTargetResolvable
-               && profileDiagnostics.AvailableToCrossProfileApps
                && profileDiagnostics.QuietModeEnabled != true;
     }
 
@@ -271,7 +270,6 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         return profileDiagnostics.ManagedProfileExists
                && profileDiagnostics.QuietModeEnabled == true
                && profileDiagnostics.UserRunning == false
-               && !profileDiagnostics.AvailableToCrossProfileApps
                && !profileDiagnostics.CommandTargetResolvable;
     }
 
@@ -282,7 +280,6 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         return profileDiagnostics.ManagedProfileExists
                && profileDiagnostics.UserRunning == true
                && profileDiagnostics.QuietModeEnabled != true
-               && !profileDiagnostics.AvailableToCrossProfileApps
                && !profileDiagnostics.CommandTargetResolvable
                && ownerCheck.Kind == WorkProfileOwnerCheckKind.TargetUnavailable;
     }
@@ -324,7 +321,6 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         WorkProfileOwnerCheckResult ownerCheck)
     {
         return profileDiagnostics.ManagedProfileExists
-               || profileDiagnostics.AvailableToCrossProfileApps
                || profileDiagnostics.CommandTargetResolvable
                || ownerCheck.Kind is WorkProfileOwnerCheckKind.AuthenticationKeyMissing
                    or WorkProfileOwnerCheckKind.Unreachable
@@ -361,7 +357,6 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
     {
         return new WorkProfileDiagnostics(
             false,
-            false,
             null,
             null,
             null,
@@ -369,7 +364,6 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             null,
             null,
             null,
-            0,
             0,
             "notRead");
     }

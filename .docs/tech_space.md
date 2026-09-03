@@ -148,7 +148,7 @@ Agnosia проверяет profile owner и применяет политики
 
 Во время провижининга Agnosia создаёт 32-байтный ключ, сохраняет его в личном профиле и передаёт в рабочий профиль через `DevicePolicyManager.ExtraProvisioningAdminExtrasBundle`. `AgnosiaDeviceAdminReceiver` в рабочем профиле сохраняет этот ключ, вызывает `setProfileEnabled`, регистрирует межпрофильные intent-фильтры и применяет ограничения. Личный профиль записывает факт провижининга через `ManagedProfileProvisionedReceiver` или финальную команду `FinalizeProvision`; если Android передал `UserHandle`, дополнительно сохраняются handle и serial рабочего пользователя.
 
-Проверка профиля не ограничивается одним флагом. `AndroidWorkProfileDiagnosticsReader` смотрит на `UserManager`, `CrossProfileApps`, quiet mode, состояние запуска пользователя, сохранённый serial и доступность cross-profile target. После этого `AndroidProfileCommandGateway` выполняет `ProfilePing` через `AndroidCommandCenter`: сначала пробуется тихий command transport, затем при отсутствии поддержанного тихого канала используется подписанный `DummyActivity` fallback. Все result-bearing Activity-команды в рабочий профиль запускаются через `CrossProfileApps.StartActivity` с explicit-компонентом `DummyActivity` той же установки; DPM intent-forwarder для них не используется. Каждый Activity-result подписывается HMAC вместе с `correlationId`, видом команды и Android result code, а gateway при несовпадении любого поля завершает запрос fail closed. Если локальный ключ потерян, recovery идёт отдельно и только через explicit `BindServiceAsUser` к `SilentCommandService` рабочего профиля, защищённому signature-permission. Activity fallback для recovery запрещён; личный профиль сохраняет новый ключ только после подтверждённого ответа profile owner. Если cross-profile bind недоступен, восстановление завершается fail closed. Если версия APK в рабочем профиле отличается от личной, `AndroidDashboardReader` пытается обновить Agnosia в рабочем профиле через тот же package-install поток.
+Проверка профиля не ограничивается одним флагом. `AndroidWorkProfileDiagnosticsReader` смотрит на `UserManager`, quiet mode, состояние запуска пользователя, сохранённый serial и доступность DPM cross-profile target. После этого `AndroidProfileCommandGateway` выполняет `ProfilePing` через `AndroidCommandCenter` и подписанный `DummyActivity`, который открывается через системный DPM intent-forwarder. Каждый Activity-result подписывается HMAC вместе с `correlationId`, видом команды и Android result code, а gateway при несовпадении любого поля завершает запрос fail closed. Отдельного silent service и автоматической ротации потерянного ключа нет: при отсутствии ключа профиль требует повторной настройки. Если версия APK в рабочем профиле отличается от личной, `AndroidDashboardReader` пытается обновить Agnosia в рабочем профиле через тот же package-install поток.
 
 ## Модель угроз
 
@@ -168,20 +168,19 @@ Agnosia проектируется как инструмент снижения 
 
 ## Межпрофильные команды
 
-Android разделяет личный и рабочий профили, поэтому операции в рабочем профиле выполняются только внутри фактического целевого профиля. Тихие query-команды проходят через `AndroidCommandCenter`, но команда считается успешной только если она выполнилась в запрошенном Android-профиле. Локальное прямое выполнение и локальное выполнение через silent service допустимы только для текущего профиля. Тихое выполнение в рабочем профиле маршрутизируется через `SilentWorkProfileCommandTransport`: когда системе разрешён `INTERACT_ACROSS_PROFILES`, он биндуется к `SilentCommandService` рабочего профиля через `Context.BindServiceAsUser(...)` и обменивается `AndroidCommandEnvelope`/`AndroidCommandResultEnvelope` через `Messenger`. Если API, пользовательское согласие, quiet mode или OEM/admin policy не позволяют bind, command center откатывается к подписанному пути через `DummyActivity`.
+Android разделяет личный и рабочий профили, поэтому операции в рабочем профиле выполняются только внутри фактического целевого профиля. Команды проходят через `AndroidCommandCenter`, но команда считается успешной только если она выполнилась в запрошенном Android-профиле. Локальные команды используют `DirectLocal`; все команды в рабочий профиль используют подписанный `DummyActivity`, перенесённый системным DPM intent-forwarder. Разрешение `INTERACT_ACROSS_PROFILES`, `BindServiceAsUser` и Messenger-service для команд не используются.
 
-`DummyActivity` - совместимый fallback для мигрированных query-команд. Он не вызывает обратно `AndroidCommandCenter`; вместо этого он строит `AndroidCommandExecutionContext` из собственного контекста Activity/профиля и вызывает общий обработчик команд через `AndroidCommandHandlerExecutor`. Так бизнес-логика остаётся в одном источнике, а зависимость от `MainActivity` в рабочем профиле не появляется. Fallback Activity использует отдельную non-dimmed translucent theme, чтобы неизбежный Activity-путь не затемнял экран во время коротких read-команд.
+`DummyActivity` строит `AndroidCommandExecutionContext` из собственного контекста Activity/профиля и вызывает общий обработчик команд через `AndroidCommandHandlerExecutor`. Так бизнес-логика остаётся в одном источнике, а зависимость от `MainActivity` в рабочем профиле не появляется. Activity использует отдельную non-dimmed translucent theme, чтобы неизбежный переход не затемнял экран во время коротких read-команд.
 
 Каждый результат команды фиксирует запрошенный профиль, фактический профиль выполнения, транспорт, цепочку fallback и источник контекста. Несовпадение запрошенного и фактического профиля считается ошибкой команды.
 
 ```text
-Silent/read command
+Android command
    │ AndroidCommandEnvelope(kind, targetProfile, priority, payload)
    ▼
 AndroidCommandCenter
-   ├─ DirectLocal / SilentService для текущего профиля
-   ├─ SilentWorkProfile bindServiceAsUser + Messenger для рабочего профиля
-   └─ Activity fallback → DummyActivity → AndroidCommandHandlerExecutor
+   ├─ DirectLocal для личного профиля
+   └─ Activity → DPM intent-forwarder → DummyActivity → AndroidCommandHandlerExecutor
 ```
 
 Интерактивные и mutation-команды, которым нужен системный экран или Activity result, остаются Activity-потоком:
@@ -209,17 +208,17 @@ Result Intent → ViewModel обновляет состояние
 | 32-байтный ключ | Создаётся при провижининге и хранится локально в обоих профилях. |
 | HMAC-SHA256 | Подписывает action, timestamp и значимые extras. |
 | TTL подписи | Команда считается свежей только ограниченное время. |
-| Специальный callback | Immutable `PendingIntent` для совместимости подписывает package и `launchId`; durable `WorkAppFrozen` доставляется через explicit signature-protected bound service. |
-| Recovery | Если ключ потерян, новый ключ передаётся только explicit bound service той же подписанной установки в рабочем профиле; Activity intent не используется. |
+| Специальный callback | Immutable `PendingIntent` подписывает package и `launchId` и возвращает событие заморозки из рабочего профиля в личный без command service. |
+| Recovery | Если ключ потерян, межпрофильные команды завершаются fail closed и требуется повторная настройка рабочего профиля. |
 
-`DummyActivity` не выполняет команды без валидной подписи. Восстановление аутентификации не входит в его intent-фильтр и выполняется отдельным `RecoverAuthenticationCommandHandler` только через `SilentWorkProfileCommandTransport`.
+`DummyActivity` не выполняет команды без валидной подписи.
 
 Команды разделены по направлениям:
 
 | Направление | Примеры action | Назначение |
 | --- | --- | --- |
 | Личный → рабочий | `QueryApps`, `InstallPackage`, `FreezePackage`, `UnfreezeAndLaunch`, `SetCrossProfileInteraction` | Управление приложениями и чтение состояния рабочего профиля. |
-| Рабочий → личный | `WorkAppFrozen` через `SilentParentProfile`, `FinalizeProvision` через Activity | Подтверждаемое завершение hidden-сессии и завершение настройки. |
+| Рабочий → личный | Freeze-callback через подписанный `PendingIntent`, `FinalizeProvision` через Activity | Завершение hidden-сессии и настройки. |
 | Локальные | `PackageInstallerCallback` | Обработка callback-ов внутри текущего профиля без cross-profile маршрута. |
 
 `AndroidActivityCommandGateway` отвечает за общий lifecycle команд: подписывает intent, переносит его в нужный профиль через cross-profile forwarder, запускает `DummyActivity` через `StartActivityForResult` и переводит `Result.Ok`/`Result.Canceled` в `OperationResult`. Обычные команды ждут ответ до 30 секунд, установка пакетов - до 3 минут. Если `MainActivity` временно не resumed, запросы складываются в небольшую очередь; устаревшие запросы иконок могут быть отброшены, чтобы не перегружать Activity-result канал.
@@ -324,7 +323,7 @@ IPC построен без `.aidl`: используются `Android.OS.Messen
 | --- | --- |
 | Копировать в рабочий профиль | Для пользовательских приложений передаётся APK и split APK в `PackageInstaller`; для системных вызывается `enableSystemApp`. |
 | Копировать в личный профиль | Запускается package operation из рабочего профиля обратно в личный. |
-| Переместить в рабочий профиль | Копирование в рабочий профиль, независимое подтверждение его состояния через доверенный binder-канал, затем удаление из личного. |
+| Переместить в рабочий профиль | Копирование в рабочий профиль, независимое подтверждение его состояния через подписанный Activity-result, затем удаление из личного. |
 | Скрыть / восстановить | В рабочем профиле вызывается `setApplicationHidden`. |
 | Удалить | Пользовательские приложения удаляются через `PackageInstaller`; системные в рабочем профиле скрываются. |
 | Отозвать runtime-разрешения | Только для пользовательских приложений рабочего профиля. |
@@ -332,11 +331,11 @@ IPC построен без `.aidl`: используются `Android.OS.Messen
 
 После копирования приложения из личного профиля Agnosia пытается сразу подготовить ярлык и скрыть рабочую копию. Для скрытых рабочих приложений это важный сценарий: пользователь запускает их через ярлык, а не из списка приложений рабочего профиля.
 
-Пользовательские приложения копируются не через файловый менеджер, а через `PackageInstaller.Session`: Agnosia берёт `SourceDir` и `SplitSourceDirs`, пишет все части APK в install session и ждёт callback. Если Android возвращает `PendingUserAction`, `DummyActivity` открывает системный экран подтверждения и продолжает операцию после результата. Перед удалением скрытого пакета Agnosia временно снимает hidden state, иначе системный uninstall может не увидеть пакет. Признак исходного hidden-состояния передаётся через callback `PendingIntent`: отмена, ошибка старта, ошибка подтверждения и любой failure status повторно скрывают пакет, а success завершает транзакцию без rollback. Команда `MoveToWork` в UI является составной операцией: сначала clone в рабочий профиль, затем отдельная silent-команда `QueryPackageState` через `SilentWorkProfile` подтверждает `installed=true` и ожидаемое hidden-состояние (`true` для пользовательской и `false` для системной копии). Только после этого разрешён uninstall из личного профиля. Ошибка, недоверенный transport, несовпадение package/state или исключение сохраняют личную копию и обновляют dashboard; если уже разрешённое удаление не удалось, рабочая копия остаётся созданной, а статус сообщает о частичном успехе.
+Пользовательские приложения копируются не через файловый менеджер, а через `PackageInstaller.Session`: Agnosia берёт `SourceDir` и `SplitSourceDirs`, пишет все части APK в install session и ждёт callback. Если Android возвращает `PendingUserAction`, `DummyActivity` открывает системный экран подтверждения и продолжает операцию после результата. Перед удалением скрытого пакета Agnosia временно снимает hidden state, иначе системный uninstall может не увидеть пакет. Признак исходного hidden-состояния передаётся через callback `PendingIntent`: отмена, ошибка старта, ошибка подтверждения и любой failure status повторно скрывают пакет, а success завершает транзакцию без rollback. Команда `MoveToWork` в UI является составной операцией: сначала clone в рабочий профиль, затем `QueryPackageState` через подписанный `DummyActivity` подтверждает `installed=true` и ожидаемое hidden-состояние (`true` для пользовательской и `false` для системной копии). Только после этого разрешён uninstall из личного профиля. Ошибка, несовпадение package/state или исключение сохраняют личную копию и обновляют dashboard; если уже разрешённое удаление не удалось, рабочая копия остаётся созданной, а статус сообщает о частичном успехе.
 
 ## Каталог приложений
 
-Каталог строится из двух независимых запросов: личный профиль читается локально, рабочий профиль опрашивается через `AndroidCommandCenter`. При доступном cross-profile bind command center использует `SilentCommandService` рабочего профиля без Activity; при отсутствии поддержанного тихого work-profile capability command center использует `DummyActivity` как подписанный fallback. App list, одиночные и batch-иконки, logs, permissions и cross-profile packages выполняются общими command handlers. Оба результата приводятся к `AppSnapshot`, чтобы UI не зависел от Android-типов.
+Каталог строится из двух независимых запросов: личный профиль читается локально, рабочий профиль опрашивается через `AndroidCommandCenter` и подписанный `DummyActivity`. App list, одиночные и batch-иконки, logs, permissions и cross-profile packages выполняются общими command handlers. Оба результата приводятся к `AppSnapshot`, чтобы UI не зависел от Android-типов.
 
 ```text
 AndroidDashboardReader.LoadAppInventoryAsync()
@@ -344,7 +343,7 @@ AndroidDashboardReader.LoadAppInventoryAsync()
    │    └─ PackageManager.GetInstalledApplications(...)
    └─ QueryAppsAsync(Work)
         └─ AndroidCommandCenter → handler в целевом профиле
-             └─ при недоступном SilentWorkProfile bind: signed DummyActivity fallback
+             └─ DPM intent-forwarder → signed DummyActivity
 ```
 
 При чтении приложения Agnosia собирает:
@@ -445,11 +444,11 @@ Completed → setApplicationHidden(..., true)
 | User background hide delay | 10 s | Задержка перед скрытием после подтверждённого ухода пользователя. |
 | Initial fast polling window | 10 s | Более частое наблюдение сразу после старта. |
 
-При завершении monitor сначала переводит active-сессию в durable pending-hide и только затем вызывает device policy. После подтверждённого `IsApplicationHidden == true` обычная сессия атомарно переходит в pending parent notification; запись не исчезает между re-hide и callback. Отказ DPM, binder transport либо personal VPN restore оставляет соответствующее обязательство в snapshot с exponential backoff 1/2/4/8/16/30 секунд. Пока существует active-сессия или любая очередь, foreground service остаётся активным. Причина `session_replaced` по-прежнему не создаёт callback: VPN ownership уже передан новой сессии.
+При завершении monitor сначала переводит active-сессию в durable pending-hide и только затем вызывает device policy. Отказ DPM оставляет hide-обязательство в snapshot с exponential backoff 1/2/4/8/16/30 секунд. После подтверждённого `IsApplicationHidden == true` рабочий профиль отправляет переданный при запуске подписанный `PendingIntent` личного профиля. Пока существует active-сессия или hide-очередь, foreground service остаётся активным. Причина `session_replaced` не создаёт callback: VPN ownership уже передан новой сессии.
 
-При блокировке экрана `WorkProfileLockFreezeService` и `LockFreezeCleanupJobService` переводят сохранённую active-сессию в ту же pending-hide очередь и пытаются скрыть все записи. Подтверждённый re-hide ставит parent notification в durable очередь до возврата из cleanup; safety net явно запускает foreground retry service для любой оставшейся hide- или delivery-записи.
+При блокировке экрана `WorkProfileLockFreezeService` и `LockFreezeCleanupJobService` переводят сохранённую active-сессию в ту же pending-hide очередь и пытаются скрыть все записи. Safety net явно запускает foreground retry service для любой оставшейся hide-записи.
 
-После успешной заморозки рабочий профиль отправляет `WorkAppFrozen` через `SilentParentProfileCommandTransport`: explicit `BindServiceAsUser` к `SilentCommandService` той же подписанной установки в personal profile. Payload содержит package, `launchId` и trigger; command result подтверждает фактическую обработку. Activity/BAL fallback отсутствует. Доставка имеет семантику at-least-once: если personal profile уже восстановил VPN, а work process погиб до сохранения ACK, повторный callback идемпотентно подтверждается как stale и удаляет только прежнюю delivery-запись.
+После успешной заморозки рабочий профиль вызывает immutable `PendingIntent`, созданный личным профилем для конкретных package и `launchId`. `WorkAppFrozenReceiver` проверяет HMAC, восстанавливает VPN только для актуального владельца launch identity и скрывает overlay. Activity/BAL-переход для callback не нужен. Если work process перезапущен и утратил неперсистентный token, callback нельзя восстановить без новой сессии.
 
 ## VPN-сценарии
 
@@ -493,13 +492,13 @@ VPN-логика решает две отдельные задачи:
 
 При повторном hidden-launch, пока VPN уже отключён Agnosia, новая сессия наследует restore obligation без повторного takeover. После подтверждённого запуска она заменяет прежнего owner; при failure/cancellation/exception прежний owner сохраняется и VPN не восстанавливается поверх ещё активной hidden-сессии.
 
-Отключение VPN встроено в два пути запуска: команду `LaunchAsync` из UI и запуск через pinned shortcut. Оба до takeover проверяют существование managed profile, quiet mode, разрешение cross-profile interaction и explicit target Agnosia. Если Android требует подтверждение `VpnService.prepare()`, пользователь видит системный экран. Если после transient VPN активный VPN всё ещё обнаруживается, запуск рабочего приложения прерывается, потому что сторонний клиент мог сразу подключиться обратно.
+Отключение VPN встроено в два пути запуска: команду `LaunchAsync` из UI и запуск через pinned shortcut. Оба до takeover проверяют существование managed profile, quiet mode и доступность explicit DPM target Agnosia. Если Android требует подтверждение `VpnService.prepare()`, пользователь видит системный экран. Если после transient VPN активный VPN всё ещё обнаруживается, запуск рабочего приложения прерывается, потому что сторонний клиент мог сразу подключиться обратно.
 
-UI-путь получает подписанный `AndroidAppLaunchResult` через существующий command gateway. Shortcut-путь запускает explicit work `ProxyActivity` через `CrossProfileApps.startActivity(intent, targetUser, callingActivity)` и ждёт Activity-result до 30 секунд. Только успешный результат после принятого Android запроса на запуск hidden-session monitor завершает launch transaction. Любой downstream failure, cancellation, timeout или exception вызывает `RollbackFailedWorkLaunchAsync`: выбранный VPN-клиент запускается независимо от обычной настройки enable-after-freeze, а overlay скрывается.
+UI-путь получает подписанный `AndroidAppLaunchResult` через существующий command gateway. Shortcut-путь переносит explicit intent для work `ProxyActivity` системным DPM intent-forwarder и ждёт Activity-result до 30 секунд. Только успешный результат после принятого Android запроса на запуск hidden-session monitor завершает launch transaction. Любой downstream failure, cancellation, timeout или exception вызывает `RollbackFailedWorkLaunchAsync`: выбранный VPN-клиент запускается независимо от обычной настройки enable-after-freeze, а overlay скрывается.
 
 ### Восстановление VPN
 
-Когда рабочее приложение снова скрыто, personal `WorkAppFrozenCommandHandler` получает package и `launchId` по signature-protected binder-каналу. `WorkAppFrozenHandler` вызывает `AndroidVpnAutomationApi.EnableConfiguredVpnAfterWorkFreezeAsync()` и скрывает overlay только если callback совпал с текущим owner. Callback заменённой сессии идемпотентно игнорируется. Ownership очищается только после успешного restore либо если другой VPN уже активен; failure возвращается work profile и сохраняет durable delivery для retry.
+Когда рабочее приложение снова скрыто, рабочий профиль отправляет созданный личным профилем immutable `PendingIntent` с подписанными package и `launchId`. `WorkAppFrozenReceiver` проверяет подпись, а `WorkAppFrozenHandler` вызывает `AndroidVpnAutomationApi.EnableConfiguredVpnAfterWorkFreezeAsync()` и скрывает overlay только если callback совпал с текущим owner. Callback заменённой сессии идемпотентно игнорируется. Ownership очищается только после успешного restore либо если другой VPN уже активен. Отдельной service-очереди и межпрофильного retry больше нет: потерянный после перезапуска рабочего процесса token автоматически восстановить нельзя.
 
 Поддерживаемые клиенты автоматизации:
 
@@ -547,14 +546,14 @@ Android-проект остаётся тонким entry point, но содер�
 | `ProxyActivity` | Запускает временно показанное рабочее приложение и стартует монитор скрытой сессии. |
 | `AgnosiaDeviceAdminReceiver` | Административный receiver для profile owner-политик. |
 | `ManagedProfileProvisionedReceiver` | Обрабатывает завершение создания managed profile. |
-| `WorkAppFrozenReceiver` | Обрабатывает подписанный immutable `PendingIntent` старого/внутрипроцессного callback-пути; durable completion использует command handler. |
+| `WorkAppFrozenReceiver` | Принимает подписанный immutable `PendingIntent` после подтверждённой заморозки приложения и завершает личную часть hidden-сессии. |
 | `PackageInstallerCallbackReceiver` | Получает результат установки или удаления APK. |
 | `ShortcutPinReceiver` | Получает callback создания pinned shortcut. |
 | `LockFreezeStartupReceiver` | Запускает cleanup после загрузки устройства. |
 | `HiddenAppSessionMonitorService` | Foreground-сервис мониторинга скрытого приложения. |
 | `WorkProfileLockFreezeService` | Следит за блокировкой экрана и завершает активную скрытую сессию. |
 | `LockFreezeCleanupJobService` | Safety net для подчищения зависших сессий. |
-| `OverlayVpnService` | Реализует показ overlay-индикатора после временного отключения VPN и скрытие после `WorkAppFrozen`. |
+| `OverlayVpnService` | Реализует показ overlay-индикатора после временного отключения VPN и скрытие после callback в `WorkAppFrozenReceiver`. |
 | `TransientVpnDisconnectService` | Коротко занимает VPN-слот, чтобы отключить активный сторонний VPN. |
 | `LockdownVpnService` | Always-on VPN endpoint для Lockdown; исключает незаблокированные рабочие пакеты из технического VPN. |
 
@@ -649,13 +648,13 @@ Android-проект собирается как APK с `ApplicationId` `com.agn
 | Ситуация | Поведение |
 | --- | --- |
 | Рабочий профиль создан, но не отвечает | Приложение помечает профиль как требующий удаления или повторной настройки. |
-| Потерян HMAC-ключ | Recovery использует explicit cross-user bind к защищённому signature-permission сервису. Handler принимает ключ только внутри profile owner, Activity fallback запрещён, а при недоступном `INTERACT_ACROSS_PROFILES` операция завершается fail closed. |
-| Тихий транспорт рабочего профиля недоступен | `AndroidCommandCenter` записывает `silent_work_transport_unavailable` с причиной вроде `canInteractAcrossProfiles=false`, `targetUser=missing` или `bind=false` и откатывается к подписанному `DummyActivity`; для рабочих команд он не должен возвращать данные личного профиля. |
+| Потерян HMAC-ключ | Межпрофильные команды завершаются fail closed; пользователь повторно настраивает рабочий профиль. |
+| DPM Activity-target рабочего профиля недоступен | Команда завершается ошибкой без локального выполнения данных рабочего профиля. |
 | APK после установки ещё не виден | `DummyActivity` ждёт доступности пакета с retry перед подготовкой ярлыка. |
 | Скрытие после установки не прошло сразу | Повторные попытки скрытия выполняются ограниченное время. |
 | Usage Access отсутствует до запуска | Запуск user work-пакета отклоняется до unhide; приложение остаётся скрытым. |
 | Usage Access потерян во время сессии | Приложение не скрывается по неподтверждённому таймауту; durable active-сессия сохраняется до screen-lock safety net или явной заморозки. |
-| Сервис был перезапущен | Versioned durable snapshot восстанавливает active-сессию, pending-hide и pending parent notification; retry продолжается до подтверждённого hidden-state и binder ACK. |
+| Сервис был перезапущен | Versioned durable snapshot восстанавливает active-сессию и pending-hide; retry продолжается до подтверждённого hidden-state, но потерянный callback `PendingIntent` восстановить нельзя. |
 | Логирование повреждено или отключено | Повреждённый JSON журнала очищается, при отключении логирования записи удаляются. |
 | Версия Agnosia в рабочем профиле устарела | Личный профиль пытается переустановить актуальный APK в рабочий профиль и повторить owner-check. |
 | Activity-команда стартует, пока `MainActivity` не resumed | Запрос ставится в очередь, а устаревшие фоновые icon-запросы могут быть отменены. |

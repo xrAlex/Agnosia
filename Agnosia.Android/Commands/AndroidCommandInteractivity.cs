@@ -2,6 +2,6 @@ namespace Agnosia.Android.Commands;
 
 internal enum AndroidCommandInteractivity
 {
-    Silent,
+    NonInteractive,
     Interactive
 }

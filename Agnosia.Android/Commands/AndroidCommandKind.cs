@@ -3,7 +3,6 @@ namespace Agnosia.Android.Commands;
 internal enum AndroidCommandKind
 {
     ProfilePing,
-    RecoverAuthentication,
     QueryApps,
     QueryAppIcon,
     QueryAppIcons,
@@ -32,7 +31,6 @@ internal enum AndroidCommandKind
     StartFileShuttleParentToWork,
     StartFileShuttleWorkToParent,
     SynchronizePreference,
-    WorkAppFrozen,
     FinalizeProvision,
     PackageInstallerCallback
 }

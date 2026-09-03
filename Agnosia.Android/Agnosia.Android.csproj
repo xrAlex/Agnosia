@@ -63,14 +63,11 @@
         <Compile Include="Commands\AndroidCommandTransportKind.cs"/>
         <Compile Include="Commands\ActivityCommandResultIdentity.cs"/>
         <Compile Include="Commands\CommandResultEnvelopeIdentity.cs"/>
-        <Compile Include="Commands\AuthenticationRecoveryRequest.cs"/>
         <Compile Include="Commands\WorkProfileLaunchPreflight.cs"/>
-        <Compile Include="Commands\WorkAppFrozenCommandPayload.cs"/>
         <Compile Include="Commands\PackageStateQuery.cs"/>
         <Compile Include="Commands\PackageStateResult.cs"/>
         <Compile Include="Commands\PackageStateResultInterpreter.cs"/>
         <Compile Include="Commands\Handlers\ProfilePingCommandHandler.cs"/>
-        <Compile Include="Commands\Handlers\RecoverAuthenticationCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\QueryAppIconCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\QueryAppIconsCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\QueryAppsCommandHandler.cs"/>
@@ -78,11 +75,7 @@
         <Compile Include="Commands\Handlers\QueryLogsCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\QueryPermissionsCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\QueryPackageStateCommandHandler.cs"/>
-        <Compile Include="Commands\Handlers\WorkAppFrozenCommandHandler.cs"/>
-        <Compile Include="Commands\Transports\AndroidCommandReplyTimeoutPolicy.cs"/>
         <Compile Include="Commands\Transports\DirectLocalCommandTransport.cs"/>
-        <Compile Include="Commands\Transports\SilentWorkProfileCommandTransport.cs"/>
-        <Compile Include="Commands\Transports\SilentParentProfileCommandTransport.cs"/>
         <Compile Include="Gateways\AndroidQueryCache.cs"/>
         <Compile Include="Gateways\WorkProfileOwnerCheckInterpreter.cs"/>
         <Compile Include="Gateways\WorkProfileOwnerCheckResult.cs"/>
@@ -93,7 +86,6 @@
         <Compile Include="Platform\AndroidPackageAccessPolicy.cs"/>
         <Compile Include="Packages\PackageLaunchability.cs"/>
         <Compile Include="Services\HiddenAppUsageEventPolicy.cs"/>
-        <Compile Include="Services\HiddenAppParentNotificationDelivery.cs"/>
         <Compile Include="Services\HiddenAppSessionStoreCodec.cs"/>
         <Compile Include="Services\HiddenAppSessionStoreJsonContext.cs"/>
         <Compile Include="Services\HiddenAppSessionStoreState.cs"/>

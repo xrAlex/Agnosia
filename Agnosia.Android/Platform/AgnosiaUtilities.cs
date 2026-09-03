@@ -81,18 +81,9 @@ public static class AgnosiaUtilities
 
     public static bool HasAssociatedProfile(Context context)
     {
-        if (AndroidSystemApi.GetCrossProfileApps(context) is not { } crossProfileApps) return false;
-
-        var targetProfiles = crossProfileApps.TargetUserProfiles;
-        if (targetProfiles.Count == 0) return false;
-
-        if (!AndroidApiLevel.IsAtLeastVanillaIceCream()) return true;
-
-        foreach (var userHandle in targetProfiles)
-            if (crossProfileApps.IsManagedProfile(userHandle))
-                return true;
-
-        return false;
+        var userManager = AndroidSystemApi.GetUserManager(context);
+        var currentUser = global::Android.OS.Process.MyUserHandle();
+        return userManager?.UserProfiles?.Any(profile => !profile.Equals(currentUser)) == true;
     }
 
     public static void MarkWorkProfileReady()

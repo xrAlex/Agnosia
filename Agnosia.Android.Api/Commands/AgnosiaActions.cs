@@ -16,6 +16,7 @@ public static class AgnosiaActions
     public const string QueryPackageInstallAccess = "agnosia.action.QUERY_PACKAGE_INSTALL_ACCESS";
     public const string RequestPackageInstallAccess = "agnosia.action.REQUEST_PACKAGE_INSTALL_ACCESS";
     public const string QueryAllFilesAccess = "agnosia.action.QUERY_ALL_FILES_ACCESS";
+    public const string QueryPackageState = "agnosia.action.QUERY_PACKAGE_STATE";
     public const string RequestAllFilesAccess = "agnosia.action.REQUEST_ALL_FILES_ACCESS";
     public const string InstallPackage = "agnosia.action.INSTALL_PACKAGE";
     public const string UninstallPackage = "agnosia.action.UNINSTALL_PACKAGE";
@@ -51,6 +52,7 @@ public static class AgnosiaActions
         QueryPackageInstallAccess,
         RequestPackageInstallAccess,
         QueryAllFilesAccess,
+        QueryPackageState,
         RequestAllFilesAccess,
         InstallPackage,
         UninstallPackage,
@@ -89,6 +91,7 @@ public static class AgnosiaActions
         QueryPackageInstallAccess,
         RequestPackageInstallAccess,
         QueryAllFilesAccess,
+        QueryPackageState,
         RequestAllFilesAccess,
         InstallPackage,
         UninstallPackage,

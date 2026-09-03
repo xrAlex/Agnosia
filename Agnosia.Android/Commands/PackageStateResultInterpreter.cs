@@ -15,7 +15,7 @@ internal static class PackageStateResultInterpreter
                 ? "Рабочий профиль не подтвердил состояние приложения."
                 : result.Message);
 
-        if (result.Transport != AndroidCommandTransportKind.SilentWorkProfile)
+        if (result.Transport != AndroidCommandTransportKind.Activity)
             return OperationResult.Failure(
                 "Состояние рабочей копии получено по недоверенному каналу.");
 

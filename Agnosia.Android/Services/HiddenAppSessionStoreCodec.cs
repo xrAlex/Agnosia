@@ -39,8 +39,7 @@ internal static class HiddenAppSessionStoreCodec
 
                     state = new HiddenAppSessionStoreState(
                         versionOne.ActiveSession,
-                        versionOne.PendingHides,
-                        []);
+                        versionOne.PendingHides);
                     return true;
                 }
 
@@ -74,7 +73,6 @@ internal static class HiddenAppSessionStoreCodec
                     legacy.TaskId,
                     legacy.StartedAtUnixTimeMilliseconds,
                     legacy.LaunchResult),
-                [],
                 []);
             return true;
         }
@@ -91,19 +89,8 @@ internal static class HiddenAppSessionStoreCodec
     private static bool IsValid(HiddenAppSessionStoreState state)
     {
         return state.PendingHides is not null
-               && state.PendingParentNotifications is not null
                && (state.ActiveSession is null || IsValid(state.ActiveSession))
-               && state.PendingHides.All(pending => pending is not null && IsValid(pending.Session))
-               && state.PendingParentNotifications.All(IsValid);
-    }
-
-    private static bool IsValid(HiddenAppPendingParentNotificationState notification)
-    {
-        return notification is not null
-               && IsValid(notification.Session)
-               && !string.IsNullOrWhiteSpace(notification.Session.ParentCallbackLaunchId)
-               && !string.IsNullOrWhiteSpace(notification.Reason)
-               && notification.FailedAttempts >= 0;
+               && state.PendingHides.All(pending => pending is not null && IsValid(pending.Session));
     }
 
     private static bool IsValid(HiddenAppSessionState session)

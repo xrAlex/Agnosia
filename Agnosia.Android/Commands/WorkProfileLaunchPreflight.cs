@@ -16,8 +16,7 @@ internal static partial class WorkProfileLaunchPreflight
 
         if (availability.ManagedProfileExists
             && availability.QuietModeEnabled == false
-            && (availability.CanInteractAcrossProfiles
-                || availability.CommandTargetResolvable))
+            && availability.CommandTargetResolvable)
             return null;
 
         return launchResult.Fail(
@@ -25,7 +24,6 @@ internal static partial class WorkProfileLaunchPreflight
             AndroidAppLaunchIssueKind.WorkProfileUnavailable,
             $"managedProfileExists={availability.ManagedProfileExists}; " +
             $"quietMode={availability.QuietModeEnabled?.ToString() ?? "unknown"}; " +
-            $"canInteractAcrossProfiles={availability.CanInteractAcrossProfiles}; " +
             $"commandTargetResolvable={availability.CommandTargetResolvable}");
     }
 }
@@ -33,5 +31,4 @@ internal static partial class WorkProfileLaunchPreflight
 internal sealed record WorkProfileLaunchAvailability(
     bool ManagedProfileExists,
     bool? QuietModeEnabled,
-    bool CanInteractAcrossProfiles,
     bool CommandTargetResolvable);

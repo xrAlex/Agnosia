@@ -164,36 +164,13 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
             if (useWorkProfile)
             {
                 PrepareAuthenticatedCommand(intent, correlationId, kind);
-                var crossProfileApps = AndroidSystemApi.GetCrossProfileApps(activity);
-                var targetUser = crossProfileApps?.CanInteractAcrossProfiles() == true
-                    ? crossProfileApps.TargetUserProfiles.OfType<UserHandle>().FirstOrDefault()
-                    : null;
-
-                AndroidActivityResult result;
-                if (targetUser is not null)
-                {
-                    intent.SetComponent(new ComponentName(activity, Class.FromType(host.CommandActivityType)));
-                    result = await RunWorkProfileActivityCommandAsync(
-                            host,
-                            intent,
-                            targetUser,
-                            isLaunchCommand,
-                            cancellationToken)
-                        .ConfigureAwait(false);
-                }
-                else
-                {
-                    Log.Info(
-                        ActivityResultLogTag,
-                        $"Explicit cross-profile activity is unavailable; using the DPM intent forwarder. action={GetActionForLog(intent)}.");
-                    AgnosiaUtilities.TransferIntentToProfile(activity, intent);
-                    result = await RunForwardedWorkProfileActivityCommandAsync(
-                            host,
-                            intent,
-                            isLaunchCommand,
-                            cancellationToken)
-                        .ConfigureAwait(false);
-                }
+                AgnosiaUtilities.TransferIntentToProfile(activity, intent);
+                var result = await RunForwardedWorkProfileActivityCommandAsync(
+                        host,
+                        intent,
+                        isLaunchCommand,
+                        cancellationToken)
+                    .ConfigureAwait(false);
 
                 return ValidateAuthenticatedResult(result, correlationId, kind);
             }
@@ -243,40 +220,6 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
             ActivityResultLogTag,
             FormatActivityCommandCompleted("Local", intent, result));
         return result;
-    }
-
-    private static async Task<AndroidActivityResult> RunWorkProfileActivityCommandAsync(
-        IAndroidActivityHost host,
-        Intent intent,
-        UserHandle targetUser,
-        bool isLaunchCommand,
-        CancellationToken cancellationToken)
-    {
-        var profileCommandTimeout = GetProfileCommandTimeout(intent);
-        using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCancellation.CancelAfter(profileCommandTimeout);
-        try
-        {
-            Log.Debug(
-                ActivityResultLogTag,
-                $"Starting work-profile activity command. action={GetActionForLog(intent)}, timeoutMs={profileCommandTimeout.TotalMilliseconds:0}.");
-            var result = await host.StartCrossProfileForResultAsync(
-                    intent,
-                    targetUser,
-                    timeoutCancellation.Token)
-                .ConfigureAwait(false);
-            Log.Debug(
-                ActivityResultLogTag,
-                FormatActivityCommandCompleted("Work-profile", intent, result));
-            return result;
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            Log.Warn(
-                ActivityResultLogTag,
-                $"Timed out waiting for work-profile activity result. action={GetActionForLog(intent)}, timeoutMs={profileCommandTimeout.TotalMilliseconds:0}.");
-            return CreateWorkProfileTimeoutResult(intent, isLaunchCommand, profileCommandTimeout);
-        }
     }
 
     private static async Task<AndroidActivityResult> RunForwardedWorkProfileActivityCommandAsync(

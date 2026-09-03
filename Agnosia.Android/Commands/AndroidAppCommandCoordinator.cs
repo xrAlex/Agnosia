@@ -136,7 +136,7 @@ internal sealed class AndroidAppCommandCoordinator(
             Guid.NewGuid(),
             AndroidCommandKind.QueryPackageState,
             AndroidCommandTargetProfile.Work,
-            AndroidCommandInteractivity.Silent,
+            AndroidCommandInteractivity.NonInteractive,
             AndroidCommandPriority.UserBlocking,
             TimeSpan.FromSeconds(30),
             JsonSerializer.Serialize(new PackageStateQuery(app.PackageName)));

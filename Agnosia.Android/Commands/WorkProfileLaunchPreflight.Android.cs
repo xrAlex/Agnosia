@@ -12,13 +12,9 @@ internal static partial class WorkProfileLaunchPreflight
         try
         {
             var diagnostics = AndroidWorkProfileDiagnosticsReader.Read(context);
-            var crossProfileApps = AndroidSystemApi.GetCrossProfileApps(context);
-            var canInteractAcrossProfiles = diagnostics.AvailableToCrossProfileApps
-                                            && crossProfileApps?.CanInteractAcrossProfiles() == true;
             var availability = new WorkProfileLaunchAvailability(
                 diagnostics.ManagedProfileExists,
                 diagnostics.QuietModeEnabled,
-                canInteractAcrossProfiles,
                 diagnostics.CommandTargetResolvable);
             return Evaluate(launchResult, availability);
         }

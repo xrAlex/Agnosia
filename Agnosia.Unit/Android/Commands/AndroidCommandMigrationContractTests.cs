@@ -12,59 +12,12 @@ public sealed class AndroidCommandMigrationContractTests
         var source = ReadAndroidSource("Gateways", "AndroidProfileCommandGateway.cs");
         var method = MatchRequired(
             source,
-            @"internal static async Task<WorkProfileOwnerCheckResult> CheckWorkProfileOwnerAsync[\s\S]*?\n    private static async Task<WorkProfileOwnerCheckResult> TryRecoverAuthenticationAsync");
+            @"internal static async Task<WorkProfileOwnerCheckResult> CheckWorkProfileOwnerAsync[\s\S]*?\n    internal static async Task<ProfileAppsQueryResult\?> QueryAppsAsync");
 
         Assert.Contains("AndroidCommandKind.ProfilePing", method, StringComparison.Ordinal);
         Assert.Contains("ServiceRegistry.GetRequiredService<AndroidCommandCenter>()", method, StringComparison.Ordinal);
         Assert.DoesNotContain("new Intent(AgnosiaActions.ProfilePing)", method, StringComparison.Ordinal);
         Assert.DoesNotContain("StartActivityForResultAsync", method, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Authentication_recovery_uses_only_silent_command_center_transport()
-    {
-        var source = ReadAndroidSource("Gateways", "AndroidProfileCommandGateway.cs");
-        var method = MatchRequired(
-            source,
-            @"private static async Task<WorkProfileOwnerCheckResult> TryRecoverAuthenticationAsync[\s\S]*?\n    internal static async Task<ProfileAppsQueryResult\?> QueryAppsAsync");
-
-        Assert.Contains("AndroidCommandKind.RecoverAuthentication", method, StringComparison.Ordinal);
-        Assert.Contains("AndroidCommandInteractivity.Silent", method, StringComparison.Ordinal);
-        Assert.Contains("AuthenticationKeyMaterial.Create()", method, StringComparison.Ordinal);
-        Assert.Contains("ServiceRegistry.GetRequiredService<AndroidCommandCenter>()", method, StringComparison.Ordinal);
-        Assert.DoesNotContain("new Intent", method, StringComparison.Ordinal);
-        Assert.DoesNotContain("StartUnsignedWorkProfileActivityForResultAsync", method, StringComparison.Ordinal);
-        Assert.DoesNotContain("CreateAndStoreKey", method, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Authentication_recovery_has_no_unsigned_activity_entry_point()
-    {
-        var activityGateway = ReadAndroidSource("Gateways", "AndroidActivityCommandGateway.cs");
-        var utilities = ReadAndroidSource("Platform", "AgnosiaUtilities.cs");
-        var dummyActivity = ReadAndroidSource("Activities", "DummyActivity.cs");
-        var dummyRouting = ReadAndroidSource("Activities", "DummyActivity.Routing.cs");
-
-        Assert.DoesNotContain("StartUnsignedWorkProfileActivityForResultAsync", activityGateway,
-            StringComparison.Ordinal);
-        Assert.DoesNotContain("TransferIntentToProfileWithoutAuthentication", utilities, StringComparison.Ordinal);
-        Assert.DoesNotContain("AgnosiaActions.RecoverAuthentication", dummyActivity, StringComparison.Ordinal);
-        Assert.DoesNotContain("ActionRecoverAuthentication", dummyRouting, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Authentication_recovery_restarts_work_profile_policy_safety_nets_after_key_rotation()
-    {
-        var handler = ReadAndroidSource("Commands", "Handlers", "RecoverAuthenticationCommandHandler.cs");
-
-        Assert.Contains("AuthenticationUtility.TryStoreProvisioningKey", handler, StringComparison.Ordinal);
-        Assert.Contains("AndroidStartup.EnsureWorkProfilePoliciesAndStartLockFreezeMonitor", handler,
-            StringComparison.Ordinal);
-        Assert.InRange(
-            handler.IndexOf("AuthenticationUtility.TryStoreProvisioningKey", StringComparison.Ordinal),
-            0,
-            handler.IndexOf("AndroidStartup.EnsureWorkProfilePoliciesAndStartLockFreezeMonitor",
-                StringComparison.Ordinal) - 1);
     }
 
     [Fact]
@@ -107,7 +60,7 @@ public sealed class AndroidCommandMigrationContractTests
     }
 
     [Fact]
-    public void Silent_query_gateways_do_not_start_legacy_query_activities()
+    public void Work_query_gateways_use_command_center_instead_of_legacy_intents()
     {
         var profileGatewaySource = ReadAndroidSource("Gateways", "AndroidProfileCommandGateway.cs");
         var appsPagerSource = ReadAndroidSource("Gateways", "AndroidProfileAppsPager.cs");
@@ -118,7 +71,7 @@ public sealed class AndroidCommandMigrationContractTests
     }
 
     [Fact]
-    public void Work_activity_commands_prefer_explicit_cross_profile_apps_and_fallback_to_authenticated_dpm_forwarder()
+    public void Work_activity_commands_use_authenticated_dpm_forwarder()
     {
         var gatewaySource = ReadAndroidSource("Gateways", "AndroidActivityCommandGateway.cs");
         var hostSource = ReadAndroidSource("Gateways", "IAndroidActivityHost.cs");
@@ -126,10 +79,9 @@ public sealed class AndroidCommandMigrationContractTests
             gatewaySource,
             @"public async Task<AndroidActivityResult> StartActivityForResultAsync[\s\S]*?\n    private static AndroidActivityResult CreateWorkProfileTimeoutResult");
 
-        Assert.Contains("AndroidSystemApi.GetCrossProfileApps", startMethod, StringComparison.Ordinal);
-        Assert.Contains("CanInteractAcrossProfiles", startMethod, StringComparison.Ordinal);
-        Assert.Contains("intent.SetComponent", startMethod, StringComparison.Ordinal);
-        Assert.Contains("StartCrossProfileForResultAsync", startMethod, StringComparison.Ordinal);
+        Assert.DoesNotContain("AndroidSystemApi.GetCrossProfileApps", startMethod, StringComparison.Ordinal);
+        Assert.DoesNotContain("CanInteractAcrossProfiles", startMethod, StringComparison.Ordinal);
+        Assert.DoesNotContain("StartCrossProfileForResultAsync", startMethod, StringComparison.Ordinal);
         Assert.Contains("AgnosiaUtilities.TransferIntentToProfile(activity, intent)", startMethod,
             StringComparison.Ordinal);
         Assert.Contains("RunForwardedWorkProfileActivityCommandAsync", startMethod, StringComparison.Ordinal);
@@ -137,7 +89,7 @@ public sealed class AndroidCommandMigrationContractTests
             startMethod.IndexOf("PrepareAuthenticatedCommand", StringComparison.Ordinal),
             0,
             startMethod.IndexOf("AgnosiaUtilities.TransferIntentToProfile", StringComparison.Ordinal) - 1);
-        Assert.Contains("StartCrossProfileForResultAsync", hostSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("StartCrossProfileForResultAsync", hostSource, StringComparison.Ordinal);
     }
 
     [Fact]

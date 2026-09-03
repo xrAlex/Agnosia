@@ -33,7 +33,7 @@ internal static class AndroidProfileAppsPager
                 Guid.NewGuid(),
                 AndroidCommandKind.QueryApps,
                 AndroidCommandTargetProfile.Work,
-                AndroidCommandInteractivity.Silent,
+                AndroidCommandInteractivity.NonInteractive,
                 AndroidCommandPriority.Refresh,
                 TimeSpan.FromSeconds(30),
                 JsonSerializer.Serialize(request));

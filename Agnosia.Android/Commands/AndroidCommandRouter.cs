@@ -4,21 +4,6 @@ internal static class AndroidCommandRouter
 {
     public static AndroidCommandRoute GetRoute(AndroidCommandEnvelope envelope)
     {
-        if (envelope.Kind == AndroidCommandKind.WorkAppFrozen)
-            return new AndroidCommandRoute(
-                envelope.TargetProfile == AndroidCommandTargetProfile.Personal
-                && envelope.Interactivity == AndroidCommandInteractivity.Silent
-                    ? [AndroidCommandTransportKind.SilentParentProfile]
-                    : []);
-
-        if (envelope.Kind is AndroidCommandKind.RecoverAuthentication
-            or AndroidCommandKind.QueryPackageState)
-            return new AndroidCommandRoute(
-                envelope.TargetProfile == AndroidCommandTargetProfile.Work
-                && envelope.Interactivity == AndroidCommandInteractivity.Silent
-                    ? [AndroidCommandTransportKind.SilentWorkProfile]
-                    : []);
-
         if (envelope.Interactivity == AndroidCommandInteractivity.Interactive)
             return new AndroidCommandRoute([AndroidCommandTransportKind.Activity]);
 
@@ -27,7 +12,7 @@ internal static class AndroidCommandRouter
             AndroidCommandTargetProfile.Personal => new AndroidCommandRoute(
                 [AndroidCommandTransportKind.DirectLocal]),
             AndroidCommandTargetProfile.Work => new AndroidCommandRoute(
-                [AndroidCommandTransportKind.SilentWorkProfile, AndroidCommandTransportKind.Activity]),
+                [AndroidCommandTransportKind.Activity]),
             _ => new AndroidCommandRoute([AndroidCommandTransportKind.Activity])
         };
     }

@@ -27,6 +27,7 @@ public sealed class ProxyActivity : Activity
 {
     private const string LogTag = "AgnosiaProxyActivity";
     private const int PrepareVpnRequestCode = 7100;
+    private const int WorkLaunchRequestCode = 7101;
     private const int LaunchResolveAttempts = 12;
     private const int LaunchResolveDelayMilliseconds = 120;
     private static readonly TimeSpan WorkLaunchTimeout = TimeSpan.FromSeconds(30);
@@ -575,16 +576,6 @@ public sealed class ProxyActivity : Activity
         if (_pendingWorkLaunch is not null)
             return OperationResult.Failure("Запуск другого рабочего приложения уже ожидает подтверждения.");
 
-        var crossProfileApps = AndroidSystemApi.GetCrossProfileApps(this);
-        if (crossProfileApps is null || !crossProfileApps.CanInteractAcrossProfiles())
-            return OperationResult.Failure("Agnosia не разрешено напрямую обращаться к рабочему профилю.");
-
-        var targetUser = crossProfileApps.TargetUserProfiles
-            .OfType<UserHandle>()
-            .FirstOrDefault();
-        if (targetUser is null)
-            return OperationResult.Failure("Android не нашёл доступный рабочий профиль Agnosia.");
-
         var proxyIntent = HiddenAppShortcutManager.CreateInternalLaunchIntent(
             request.PackageName,
             request.TargetActivity,
@@ -604,9 +595,7 @@ public sealed class ProxyActivity : Activity
                     launchId));
             proxyIntent.PutExtra(AndroidCommandContract.ExtraCallbackLaunchId, launchId);
         }
-        proxyIntent.SetComponent(
-            new ComponentName(this, Java.Lang.Class.FromType(typeof(ProxyActivity))));
-        AuthenticationUtility.SignIntent(proxyIntent);
+        AgnosiaUtilities.TransferIntentToProfile(this, proxyIntent);
 
         var completionSource = new TaskCompletionSource<AndroidActivityResult>(
             TaskCreationOptions.RunContinuationsAsynchronously);
@@ -617,8 +606,8 @@ public sealed class ProxyActivity : Activity
             {
                 Log.Debug(
                     LogTag,
-                    $"Starting shortcut work launch for result. package={request.PackageName}, target={targetUser}.");
-                crossProfileApps.StartActivity(proxyIntent, targetUser, this);
+                    $"Starting DPM-forwarded shortcut work launch for result. package={request.PackageName}.");
+                StartActivityForResult(proxyIntent, WorkLaunchRequestCode);
             }
             catch (Exception exception)
             {

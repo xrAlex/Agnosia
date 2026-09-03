@@ -24,7 +24,7 @@ public sealed class PackageStateResultInterpreterTests
         var result = AndroidCommandResultEnvelope.Failure(
             Guid.NewGuid(),
             AndroidCommandKind.QueryPackageState,
-            AndroidCommandTransportKind.SilentWorkProfile,
+            AndroidCommandTransportKind.Activity,
             "Work profile unavailable",
             "transport_failed",
             TimeSpan.Zero,
@@ -54,7 +54,7 @@ public sealed class PackageStateResultInterpreterTests
     {
         var result = CreateSuccess(new PackageStateResult(PackageName, true, true)) with
         {
-            Transport = AndroidCommandTransportKind.Activity
+            Transport = AndroidCommandTransportKind.DirectLocal
         };
 
         var interpreted = PackageStateResultInterpreter.Interpret(result, PackageName, expectedHidden: true);
@@ -83,7 +83,7 @@ public sealed class PackageStateResultInterpreterTests
         return AndroidCommandResultEnvelope.Success(
             Guid.NewGuid(),
             AndroidCommandKind.QueryPackageState,
-            AndroidCommandTransportKind.SilentWorkProfile,
+            AndroidCommandTransportKind.Activity,
             JsonSerializer.Serialize(state),
             "Package state queried",
             TimeSpan.Zero,

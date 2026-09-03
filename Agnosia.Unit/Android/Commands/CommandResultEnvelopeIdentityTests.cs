@@ -12,7 +12,7 @@ public sealed class CommandResultEnvelopeIdentityTests
     {
         var validation = CommandResultEnvelopeIdentity.Validate(
             CreateRequest(),
-            CreateResponse(CorrelationId, AndroidCommandKind.WorkAppFrozen));
+            CreateResponse(CorrelationId, AndroidCommandKind.QueryLogs));
 
         Assert.True(validation.Succeeded);
         Assert.Null(validation.ErrorCode);
@@ -23,7 +23,7 @@ public sealed class CommandResultEnvelopeIdentityTests
     {
         var validation = CommandResultEnvelopeIdentity.Validate(
             CreateRequest(),
-            CreateResponse(Guid.Parse("6efb654c-7552-4d60-87d3-d1c5d4fa74da"), AndroidCommandKind.WorkAppFrozen));
+            CreateResponse(Guid.Parse("6efb654c-7552-4d60-87d3-d1c5d4fa74da"), AndroidCommandKind.QueryLogs));
 
         Assert.False(validation.Succeeded);
         Assert.Equal("command_result_correlation_mismatch", validation.ErrorCode);
@@ -44,9 +44,9 @@ public sealed class CommandResultEnvelopeIdentityTests
     {
         return new AndroidCommandEnvelope(
             CorrelationId,
-            AndroidCommandKind.WorkAppFrozen,
-            AndroidCommandTargetProfile.Personal,
-            AndroidCommandInteractivity.Silent,
+            AndroidCommandKind.QueryLogs,
+            AndroidCommandTargetProfile.Work,
+            AndroidCommandInteractivity.NonInteractive,
             AndroidCommandPriority.Mutation,
             TimeSpan.FromSeconds(30),
             "{}");
@@ -57,7 +57,7 @@ public sealed class CommandResultEnvelopeIdentityTests
         return AndroidCommandResultEnvelope.Success(
             correlationId,
             kind,
-            AndroidCommandTransportKind.SilentParentProfile,
+            AndroidCommandTransportKind.Activity,
             null,
             "handled",
             TimeSpan.Zero,

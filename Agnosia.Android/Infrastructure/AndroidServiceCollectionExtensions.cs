@@ -17,7 +17,6 @@ internal static class AndroidServiceCollectionExtensions
         services.AddSingleton<AndroidCommandCenter>();
         services.AddSingleton<AndroidCommandHandlerExecutor>();
         services.AddSingleton<IAndroidCommandHandler, ProfilePingCommandHandler>();
-        services.AddSingleton<IAndroidCommandHandler, RecoverAuthenticationCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, QueryAppIconCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, QueryAppIconsCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, QueryAppsCommandHandler>();
@@ -25,13 +24,9 @@ internal static class AndroidServiceCollectionExtensions
         services.AddSingleton<IAndroidCommandHandler, QueryLogsCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, QueryPermissionsCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, QueryPackageStateCommandHandler>();
-        services.AddSingleton<IAndroidCommandHandler, WorkAppFrozenCommandHandler>();
 #if AGNOSIA_ANDROID
         services.AddSingleton<AndroidCommandExecutionContextFactory>();
         services.AddSingleton<IAndroidCommandTransport, DirectLocalCommandTransport>();
-        services.AddSingleton<IAndroidCommandTransport, SilentServiceCommandTransport>();
-        services.AddSingleton<IAndroidCommandTransport, SilentWorkProfileCommandTransport>();
-        services.AddSingleton<IAndroidCommandTransport, SilentParentProfileCommandTransport>();
         services.AddSingleton<IAndroidCommandTransport, ActivityCommandTransport>();
 
         services.AddSingleton<LocalStorageManager>();
@@ -72,8 +67,6 @@ internal static class AndroidServiceCollectionExtensions
         services.AddSingleton<IPlatformBridge>(provider => provider.GetRequiredService<AndroidPlatformBridge>());
 #else
         services.AddSingleton<IAndroidCommandTransport, DirectLocalCommandTransport>();
-        services.AddSingleton<IAndroidCommandTransport, SilentWorkProfileCommandTransport>();
-        services.AddSingleton<IAndroidCommandTransport, SilentParentProfileCommandTransport>();
 #endif
 
         return services;

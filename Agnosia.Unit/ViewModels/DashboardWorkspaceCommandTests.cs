@@ -67,7 +67,6 @@ public sealed class DashboardWorkspaceCommandTests
 
     public static TheoryData<PermissionKind> ResumePermissionKinds =>
     [
-        PermissionKind.CrossProfileInteraction,
         PermissionKind.Notifications,
         PermissionKind.UsageStats,
         PermissionKind.PackageInstall,
@@ -517,7 +516,6 @@ public sealed class DashboardWorkspaceCommandTests
         Assert.Equal(
             [
                 PermissionKind.WorkProfile,
-                PermissionKind.CrossProfileInteraction,
                 PermissionKind.UsageStats,
                 PermissionKind.Notifications,
                 PermissionKind.PackageInstall
@@ -532,7 +530,7 @@ public sealed class DashboardWorkspaceCommandTests
         Assert.DoesNotContain(viewModel.OnboardingPermissionItems, item => item.Kind == PermissionKind.VpnControl);
         Assert.DoesNotContain(viewModel.OnboardingPermissionItems, item => item.Kind == PermissionKind.Overlay);
         Assert.True(viewModel.AreOnboardingPermissionsGranted);
-        Assert.Equal("GrantedCount|5|5", viewModel.OnboardingPermissionSummary);
+        Assert.Equal("GrantedCount|4|4", viewModel.OnboardingPermissionSummary);
     }
 
     private static AppItemViewModel CreatePersonalApp(DashboardWorkspaceViewModel owner)

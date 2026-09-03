@@ -41,27 +41,19 @@ internal sealed record HiddenAppPendingHideState(
     int FailedAttempts,
     long NextAttemptAtUnixTimeMilliseconds);
 
-internal sealed record HiddenAppPendingParentNotificationState(
-    HiddenAppSessionState Session,
-    string Reason,
-    int FailedAttempts,
-    long NextAttemptAtUnixTimeMilliseconds);
-
 internal sealed record HiddenAppSessionStoreState(
     HiddenAppSessionState? ActiveSession,
     HiddenAppPendingHideState[] PendingHides,
-    HiddenAppPendingParentNotificationState[] PendingParentNotifications,
     int Version = HiddenAppSessionStoreState.CurrentVersion)
 {
     public const int CurrentVersion = 2;
     public const string SessionReplacedReason = "session_replaced";
     public const string ScreenLockPersistedReason = "screen_lock_persisted_session";
 
-    public static HiddenAppSessionStoreState Empty { get; } = new(null, [], []);
+    public static HiddenAppSessionStoreState Empty { get; } = new(null, []);
 
     public bool IsEmpty => ActiveSession is null
-                           && PendingHides.Length == 0
-                           && PendingParentNotifications.Length == 0;
+                           && PendingHides.Length == 0;
 
     public HiddenAppSessionStoreState StartOrReplace(HiddenAppSessionState session, DateTimeOffset now)
     {
@@ -130,79 +122,23 @@ internal sealed record HiddenAppSessionStoreState(
         return this with { PendingHides = pendingHides };
     }
 
-    public HiddenAppSessionStoreState ConfirmHidden(string sessionId, DateTimeOffset now)
+    public HiddenAppSessionStoreState ConfirmHidden(string sessionId, DateTimeOffset _)
     {
         var index = Array.FindIndex(
             PendingHides,
             pending => string.Equals(pending.Session.SessionId, sessionId, StringComparison.Ordinal));
         if (index < 0) return this;
 
-        var completed = PendingHides[index];
         var pendingHides = PendingHides
             .Where((_, pendingIndex) => pendingIndex != index)
             .ToArray();
-        if (string.Equals(completed.Reason, SessionReplacedReason, StringComparison.Ordinal)
-            || string.IsNullOrWhiteSpace(completed.Session.ParentCallbackLaunchId))
-        {
-            return this with { PendingHides = pendingHides };
-        }
-
-        return this with
-        {
-            PendingHides = pendingHides,
-            PendingParentNotifications = AddPendingParentNotification(
-                PendingParentNotifications,
-                completed.Session,
-                completed.Reason,
-                now)
-        };
-    }
-
-    public HiddenAppSessionStoreState RecordParentNotificationFailure(string sessionId, DateTimeOffset now)
-    {
-        var index = Array.FindIndex(
-            PendingParentNotifications,
-            pending => string.Equals(pending.Session.SessionId, sessionId, StringComparison.Ordinal));
-        if (index < 0) return this;
-
-        var failedAttempts = PendingParentNotifications[index].FailedAttempts + 1;
-        var updated = PendingParentNotifications[index] with
-        {
-            FailedAttempts = failedAttempts,
-            NextAttemptAtUnixTimeMilliseconds = now
-                .Add(HiddenAppHideRetryPolicy.GetDelay(failedAttempts))
-                .ToUnixTimeMilliseconds()
-        };
-        var notifications = PendingParentNotifications.ToArray();
-        notifications[index] = updated;
-        return this with { PendingParentNotifications = notifications };
-    }
-
-    public HiddenAppSessionStoreState ConfirmParentNotification(string sessionId)
-    {
-        var notifications = PendingParentNotifications
-            .Where(pending => !string.Equals(
-                pending.Session.SessionId,
-                sessionId,
-                StringComparison.Ordinal))
-            .ToArray();
-        return notifications.Length == PendingParentNotifications.Length
-            ? this
-            : this with { PendingParentNotifications = notifications };
+        return this with { PendingHides = pendingHides };
     }
 
     public HiddenAppPendingHideState[] GetDuePendingHides(DateTimeOffset now)
     {
         var nowUnixTimeMilliseconds = now.ToUnixTimeMilliseconds();
         return PendingHides
-            .Where(pending => pending.NextAttemptAtUnixTimeMilliseconds <= nowUnixTimeMilliseconds)
-            .ToArray();
-    }
-
-    public HiddenAppPendingParentNotificationState[] GetDueParentNotifications(DateTimeOffset now)
-    {
-        var nowUnixTimeMilliseconds = now.ToUnixTimeMilliseconds();
-        return PendingParentNotifications
             .Where(pending => pending.NextAttemptAtUnixTimeMilliseconds <= nowUnixTimeMilliseconds)
             .ToArray();
     }
@@ -232,30 +168,6 @@ internal sealed record HiddenAppSessionStoreState(
         ];
     }
 
-    private static HiddenAppPendingParentNotificationState[] AddPendingParentNotification(
-        HiddenAppPendingParentNotificationState[] notifications,
-        HiddenAppSessionState session,
-        string reason,
-        DateTimeOffset now)
-    {
-        if (notifications.Any(pending => string.Equals(
-                pending.Session.SessionId,
-                session.SessionId,
-                StringComparison.Ordinal)))
-        {
-            return notifications;
-        }
-
-        return
-        [
-            ..notifications,
-            new HiddenAppPendingParentNotificationState(
-                session,
-                reason,
-                0,
-                now.ToUnixTimeMilliseconds())
-        ];
-    }
 }
 
 internal static class HiddenAppHideRetryPolicy

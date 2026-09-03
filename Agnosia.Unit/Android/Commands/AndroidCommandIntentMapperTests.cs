@@ -6,13 +6,6 @@ namespace Agnosia.Unit.Android.Commands;
 
 public sealed class AndroidCommandIntentMapperTests
 {
-    private static readonly HashSet<AndroidCommandKind> BinderOnlyKinds =
-    [
-        AndroidCommandKind.RecoverAuthentication,
-        AndroidCommandKind.QueryPackageState,
-        AndroidCommandKind.WorkAppFrozen
-    ];
-
     public static TheoryData<string, string> RequiredActionMappings => new()
     {
         { nameof(AndroidCommandKind.ProfilePing), AgnosiaActions.ProfilePing },
@@ -24,7 +17,8 @@ public sealed class AndroidCommandIntentMapperTests
         { nameof(AndroidCommandKind.QueryPermissions), AgnosiaActions.QueryPermissions },
         { nameof(AndroidCommandKind.QueryUsageStatsAccess), AgnosiaActions.QueryUsageStatsAccess },
         { nameof(AndroidCommandKind.QueryPackageInstallAccess), AgnosiaActions.QueryPackageInstallAccess },
-        { nameof(AndroidCommandKind.QueryAllFilesAccess), AgnosiaActions.QueryAllFilesAccess }
+        { nameof(AndroidCommandKind.QueryAllFilesAccess), AgnosiaActions.QueryAllFilesAccess },
+        { nameof(AndroidCommandKind.QueryPackageState), "agnosia.action.QUERY_PACKAGE_STATE" }
     };
 
     [Theory]
@@ -49,8 +43,7 @@ public sealed class AndroidCommandIntentMapperTests
     {
         var targetProfileActions = AgnosiaActions.TargetProfileActivityActions.ToHashSet(StringComparer.Ordinal);
 
-        foreach (var kind in Enum.GetValues<AndroidCommandKind>()
-                     .Where(kind => !BinderOnlyKinds.Contains(kind)))
+        foreach (var kind in Enum.GetValues<AndroidCommandKind>())
         {
             var action = AndroidCommandIntentMapper.ToAction(kind);
 
@@ -58,23 +51,10 @@ public sealed class AndroidCommandIntentMapperTests
         }
     }
 
-    [Theory]
-    [InlineData(nameof(AndroidCommandKind.RecoverAuthentication))]
-    [InlineData(nameof(AndroidCommandKind.QueryPackageState))]
-    [InlineData(nameof(AndroidCommandKind.WorkAppFrozen))]
-    public void ToAction_RejectsBinderOnlyCommands(string kindName)
-    {
-        var kind = Enum.Parse<AndroidCommandKind>(kindName);
-
-        Assert.Throws<ArgumentOutOfRangeException>(
-            () => AndroidCommandIntentMapper.ToAction(kind));
-    }
-
     [Fact]
     public void TryFromAction_RoundTripsEveryActivityCommandKind()
     {
-        foreach (var kind in Enum.GetValues<AndroidCommandKind>()
-                     .Where(kind => !BinderOnlyKinds.Contains(kind)))
+        foreach (var kind in Enum.GetValues<AndroidCommandKind>())
         {
             var action = AndroidCommandIntentMapper.ToAction(kind);
 

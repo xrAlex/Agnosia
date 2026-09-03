@@ -2,13 +2,6 @@ namespace Agnosia.Android.Platform;
 
 public static class AndroidPackageAccessPolicy
 {
-    private const string AgnosiaPackageName = "com.agnosia.app";
-
-    private static readonly string[] RequiredCrossProfilePackages =
-    [
-        AgnosiaPackageName
-    ];
-
     private static readonly AndroidPackageAccessRule[] Rules =
     [
         new("ru.sberbankmobile", true)
@@ -24,9 +17,6 @@ public static class AndroidPackageAccessPolicy
         var merged = new HashSet<string>(
             packageNames?.Where(packageName => !string.IsNullOrWhiteSpace(packageName)) ?? [],
             StringComparer.Ordinal);
-
-        foreach (var packageName in RequiredCrossProfilePackages)
-            merged.Add(packageName);
 
         foreach (var rule in Rules)
             if (rule.AccessControlDisabled)

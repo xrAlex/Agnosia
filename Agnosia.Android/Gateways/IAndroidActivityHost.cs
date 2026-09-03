@@ -1,6 +1,5 @@
 using Agnosia.Models;
 using Android.Content;
-using Android.OS;
 
 namespace Agnosia.Android.Gateways;
 
@@ -15,11 +14,6 @@ public interface IAndroidActivityHost
     Type WorkAppFrozenReceiverType { get; }
 
     Task<AndroidActivityResult> StartForResultAsync(Intent intent, CancellationToken cancellationToken = default);
-
-    Task<AndroidActivityResult> StartCrossProfileForResultAsync(
-        Intent intent,
-        UserHandle targetUser,
-        CancellationToken cancellationToken = default);
 
     Task<OperationResult> DisconnectPreparedVpnAsync(CancellationToken cancellationToken = default);
 

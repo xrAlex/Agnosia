@@ -20,16 +20,7 @@ public sealed class HiddenAppSessionStoreCodecTests
             "task_removed",
             3,
             1_800_000_004_000);
-        var notificationSession = CreateSession("session-notify", "com.example.notify", 43) with
-        {
-            ParentCallbackLaunchId = "launch-notify"
-        };
-        var expectedNotification = new HiddenAppPendingParentNotificationState(
-            notificationSession,
-            "target_inactive",
-            2,
-            1_800_000_002_000);
-        var expected = new HiddenAppSessionStoreState(active, [expectedPending], [expectedNotification]);
+        var expected = new HiddenAppSessionStoreState(active, [expectedPending]);
 
         var json = HiddenAppSessionStoreCodec.Serialize(expected);
         var parsed = HiddenAppSessionStoreCodec.TryDeserialize(json, out var actual);
@@ -41,13 +32,6 @@ public sealed class HiddenAppSessionStoreCodecTests
         Assert.Equal(expectedPending.Reason, actualPending.Reason);
         Assert.Equal(expectedPending.FailedAttempts, actualPending.FailedAttempts);
         Assert.Equal(expectedPending.NextAttemptAtUnixTimeMilliseconds, actualPending.NextAttemptAtUnixTimeMilliseconds);
-        var actualNotification = Assert.Single(actual.PendingParentNotifications);
-        AssertSessionEqual(expectedNotification.Session, actualNotification.Session);
-        Assert.Equal(expectedNotification.Reason, actualNotification.Reason);
-        Assert.Equal(expectedNotification.FailedAttempts, actualNotification.FailedAttempts);
-        Assert.Equal(
-            expectedNotification.NextAttemptAtUnixTimeMilliseconds,
-            actualNotification.NextAttemptAtUnixTimeMilliseconds);
         Assert.Equal(HiddenAppSessionStoreState.CurrentVersion, actual.Version);
     }
 
@@ -85,11 +69,10 @@ public sealed class HiddenAppSessionStoreCodecTests
         Assert.Equal(first.ActiveSession?.SessionId, second.ActiveSession?.SessionId);
         Assert.False(string.IsNullOrWhiteSpace(first.ActiveSession?.SessionId));
         Assert.Empty(first.PendingHides);
-        Assert.Empty(first.PendingParentNotifications);
     }
 
     [Fact]
-    public void Version_one_store_is_migrated_with_empty_notification_queue()
+    public void Version_one_store_is_migrated()
     {
         const string versionOne = """
                                   {
@@ -104,40 +87,6 @@ public sealed class HiddenAppSessionStoreCodecTests
         Assert.True(parsed);
         Assert.Equal(HiddenAppSessionStoreState.CurrentVersion, state.Version);
         Assert.Empty(state.PendingHides);
-        Assert.Empty(state.PendingParentNotifications);
-    }
-
-    [Fact]
-    public void TryDeserialize_rejects_notification_without_launch_identity()
-    {
-        const string invalid = """
-                               {
-                                 "ActiveSession": null,
-                                 "PendingHides": [],
-                                 "PendingParentNotifications": [
-                                   {
-                                     "Session": {
-                                       "SessionId": "session-a",
-                                       "PackageName": "com.example.a",
-                                       "DisplayName": "Example",
-                                       "TaskId": 42,
-                                       "StartedAtUnixTimeMilliseconds": 1800000000000,
-                                       "LaunchResult": null,
-                                       "ParentCallbackLaunchId": ""
-                                     },
-                                     "Reason": "target_inactive",
-                                     "FailedAttempts": 0,
-                                     "NextAttemptAtUnixTimeMilliseconds": 1800000000000
-                                   }
-                                 ],
-                                 "Version": 2
-                               }
-                               """;
-
-        var parsed = HiddenAppSessionStoreCodec.TryDeserialize(invalid, out var state);
-
-        Assert.False(parsed);
-        Assert.True(state.IsEmpty);
     }
 
     [Theory]

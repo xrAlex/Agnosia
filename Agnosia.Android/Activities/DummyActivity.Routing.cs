@@ -78,6 +78,9 @@ public sealed partial class DummyActivity
                 case AgnosiaActions.QueryAllFilesAccess:
                     RunCommandCenterAction(AndroidCommandKind.QueryPermissions, "Android не смог проверить доступ ко всем файлам.");
                     break;
+                case AgnosiaActions.QueryPackageState:
+                    RunCommandCenterAction(AndroidCommandKind.QueryPackageState, "Android не смог проверить состояние приложения.");
+                    break;
                 case AgnosiaActions.RequestAllFilesAccess:
                     ActionRequestAllFilesAccess();
                     break;
@@ -182,7 +185,7 @@ public sealed partial class DummyActivity
             _commandCorrelationId,
             kind,
             targetProfile,
-            AndroidCommandInteractivity.Silent,
+            AndroidCommandInteractivity.NonInteractive,
             AndroidCommandPriority.Refresh,
             TimeSpan.FromSeconds(30),
             payloadJson);

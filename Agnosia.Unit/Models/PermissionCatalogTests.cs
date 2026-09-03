@@ -34,14 +34,4 @@ public sealed class PermissionCatalogTests
         Assert.Equal("Проверить профиль", setUp.RequestLabel);
     }
 
-    [Fact]
-    public void Create_cross_profile_interaction_snapshot_remains_actionable_when_settings_request_is_blocked()
-    {
-        var snapshot = PermissionCatalog.CreateCrossProfileInteractionSnapshot(
-            isGranted: false,
-            canRequestThroughSettings: false);
-
-        Assert.True(snapshot.CanRequest);
-        Assert.Equal("Проверить доступ", snapshot.RequestLabel);
-    }
 }

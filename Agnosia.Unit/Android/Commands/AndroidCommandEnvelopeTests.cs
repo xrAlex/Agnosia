@@ -37,7 +37,7 @@ public sealed class AndroidCommandEnvelopeTests
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
             AndroidCommandKind.QueryPermissions,
             AndroidCommandTargetProfile.Work,
-            AndroidCommandInteractivity.Silent,
+            AndroidCommandInteractivity.NonInteractive,
             AndroidCommandPriority.Refresh,
             TimeSpan.FromSeconds(7),
             """{"includeDetails":true}""");
@@ -49,7 +49,7 @@ public sealed class AndroidCommandEnvelopeTests
         Assert.Equal(envelope.CorrelationId, roundTrip.CorrelationId);
         Assert.Equal(AndroidCommandKind.QueryPermissions, roundTrip.Kind);
         Assert.Equal(AndroidCommandTargetProfile.Work, roundTrip.TargetProfile);
-        Assert.Equal(AndroidCommandInteractivity.Silent, roundTrip.Interactivity);
+        Assert.Equal(AndroidCommandInteractivity.NonInteractive, roundTrip.Interactivity);
         Assert.Equal(AndroidCommandPriority.Refresh, roundTrip.Priority);
         Assert.Equal(TimeSpan.FromSeconds(7), roundTrip.Timeout);
         Assert.Equal("""{"includeDetails":true}""", roundTrip.PayloadJson);
@@ -61,7 +61,7 @@ public sealed class AndroidCommandEnvelopeTests
         var envelope = AndroidCommandResultEnvelope.Success(
             Guid.Parse("22222222-2222-2222-2222-222222222222"),
             AndroidCommandKind.QueryLogs,
-            AndroidCommandTransportKind.SilentService,
+            AndroidCommandTransportKind.Activity,
             """{"count":2}""",
             "Loaded logs.",
             TimeSpan.FromMilliseconds(42),
@@ -73,7 +73,7 @@ public sealed class AndroidCommandEnvelopeTests
         Assert.NotNull(roundTrip);
         Assert.True(roundTrip.Succeeded);
         Assert.Equal(AndroidCommandKind.QueryLogs, roundTrip.Kind);
-        Assert.Equal(AndroidCommandTransportKind.SilentService, roundTrip.Transport);
+        Assert.Equal(AndroidCommandTransportKind.Activity, roundTrip.Transport);
         Assert.Equal("""{"count":2}""", roundTrip.PayloadJson);
         Assert.Equal("Loaded logs.", roundTrip.Message);
         Assert.Equal("fallback=false", roundTrip.Diagnostics);
