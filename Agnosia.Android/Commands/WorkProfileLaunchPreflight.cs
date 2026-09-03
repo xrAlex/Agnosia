@@ -16,8 +16,8 @@ internal static partial class WorkProfileLaunchPreflight
 
         if (availability.ManagedProfileExists
             && availability.QuietModeEnabled == false
-            && availability.CanInteractAcrossProfiles
-            && availability.CommandTargetResolvable)
+            && (availability.CanInteractAcrossProfiles
+                || availability.CommandTargetResolvable))
             return null;
 
         return launchResult.Fail(

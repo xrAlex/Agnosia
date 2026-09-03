@@ -118,7 +118,7 @@ public sealed class AndroidCommandMigrationContractTests
     }
 
     [Fact]
-    public void Work_activity_commands_use_explicit_cross_profile_apps_transport()
+    public void Work_activity_commands_prefer_explicit_cross_profile_apps_and_fallback_to_authenticated_dpm_forwarder()
     {
         var gatewaySource = ReadAndroidSource("Gateways", "AndroidActivityCommandGateway.cs");
         var hostSource = ReadAndroidSource("Gateways", "IAndroidActivityHost.cs");
@@ -130,7 +130,13 @@ public sealed class AndroidCommandMigrationContractTests
         Assert.Contains("CanInteractAcrossProfiles", startMethod, StringComparison.Ordinal);
         Assert.Contains("intent.SetComponent", startMethod, StringComparison.Ordinal);
         Assert.Contains("StartCrossProfileForResultAsync", startMethod, StringComparison.Ordinal);
-        Assert.DoesNotContain("TransferIntentToProfile", startMethod, StringComparison.Ordinal);
+        Assert.Contains("AgnosiaUtilities.TransferIntentToProfile(activity, intent)", startMethod,
+            StringComparison.Ordinal);
+        Assert.Contains("RunForwardedWorkProfileActivityCommandAsync", startMethod, StringComparison.Ordinal);
+        Assert.InRange(
+            startMethod.IndexOf("PrepareAuthenticatedCommand", StringComparison.Ordinal),
+            0,
+            startMethod.IndexOf("AgnosiaUtilities.TransferIntentToProfile", StringComparison.Ordinal) - 1);
         Assert.Contains("StartCrossProfileForResultAsync", hostSource, StringComparison.Ordinal);
     }
 

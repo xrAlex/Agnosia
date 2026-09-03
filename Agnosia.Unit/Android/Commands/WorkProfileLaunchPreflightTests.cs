@@ -20,14 +20,7 @@ public sealed class WorkProfileLaunchPreflightTests
             true, null, true, true,
             AndroidAppLaunchIssueKind.WorkProfileUnavailable
         },
-        {
-            true, false, false, true,
-            AndroidAppLaunchIssueKind.WorkProfileUnavailable
-        },
-        {
-            true, false, true, false,
-            AndroidAppLaunchIssueKind.WorkProfileUnavailable
-        }
+        { true, false, false, false, AndroidAppLaunchIssueKind.WorkProfileUnavailable }
     };
 
     // Ловит перенос VPN takeover перед проверкой quiet/profile/cross-profile/target.
@@ -56,11 +49,19 @@ public sealed class WorkProfileLaunchPreflightTests
     }
 
     // Ловит fail-open отказ при полностью готовом work-профиле.
-    [Fact]
-    public void Evaluate_allows_ready_work_profile()
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void Evaluate_allows_ready_work_profile_with_either_cross_profile_transport(
+        bool canInteractAcrossProfiles,
+        bool commandTargetResolvable)
     {
         var launch = AndroidAppLaunchResult.CommandReceived("com.example.hidden", "Hidden");
-        var availability = new WorkProfileLaunchAvailability(true, false, true, true);
+        var availability = new WorkProfileLaunchAvailability(
+            true,
+            false,
+            canInteractAcrossProfiles,
+            commandTargetResolvable);
 
         var failure = WorkProfileLaunchPreflight.Evaluate(launch, availability);
 
