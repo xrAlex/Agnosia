@@ -44,6 +44,40 @@ public sealed class AndroidManifestContractTests
         Assert.Empty(intentFilterActionNames.Except(expectedActionNames, StringComparer.Ordinal));
     }
 
+    [Fact]
+    public void Shortcut_proxy_is_retained_until_cross_profile_launch_result_returns()
+    {
+        var source = ReadAndroidSource("Activities\\ProxyActivity.cs");
+        var activityDeclaration = Regex.Match(
+            source,
+            @"\[Activity\((?<body>[\s\S]*?)\)\]\s*\[IntentFilter",
+            RegexOptions.Singleline).Groups["body"].Value;
+
+        Assert.NotEmpty(activityDeclaration);
+        Assert.DoesNotContain("NoHistory = true", activityDeclaration, StringComparison.Ordinal);
+        Assert.Contains("_pendingWorkLaunch?.TrySetResult", source, StringComparison.Ordinal);
+        Assert.Contains("crossProfileApps.StartActivity(proxyIntent, targetUser, this)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Shortcut_proxy_does_not_report_expected_lifecycle_cancellation_as_vpn_failure()
+    {
+        var source = ReadAndroidSource("Activities\\ProxyActivity.cs");
+        var shortcutFlow = Regex.Match(
+            source,
+            @"private async Task PrepareVpnIfNeededAndForwardAsync[\s\S]*?\n    private async Task<WorkLaunchVpnTakeoverResult>",
+            RegexOptions.Singleline).Value;
+
+        Assert.Contains(
+            "catch (System.OperationCanceledException) when (cancellationToken.IsCancellationRequested)",
+            shortcutFlow,
+            StringComparison.Ordinal);
+        Assert.InRange(
+            shortcutFlow.IndexOf("catch (System.OperationCanceledException)", StringComparison.Ordinal),
+            0,
+            shortcutFlow.IndexOf("catch (Exception exception)", StringComparison.Ordinal) - 1);
+    }
+
     // Проверяет manifest requirements для managed profile и device admin сценариев.
     [Fact]
     public void Manifest_declares_managed_profile_device_admin_requirements()

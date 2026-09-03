@@ -17,7 +17,6 @@ namespace Agnosia.Android.Activities;
     Theme = "@style/Agnosia.ProxyTheme",
     Exported = true,
     ExcludeFromRecents = true,
-    NoHistory = true,
     TaskAffinity = "",
     LaunchMode = LaunchMode.SingleTask)]
 [IntentFilter(
@@ -398,6 +397,12 @@ public sealed class ProxyActivity : Activity
                     cancellationToken)
                 .ConfigureAwait(false);
             FinishForwardedLaunch(launchResult);
+        }
+        catch (System.OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            Log.Debug(
+                LogTag,
+                $"Shortcut launch flow canceled because the proxy activity is finishing. package={request.PackageName}.");
         }
         catch (Exception exception)
         {
