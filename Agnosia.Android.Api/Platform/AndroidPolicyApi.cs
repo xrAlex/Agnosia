@@ -66,11 +66,15 @@ public static class AndroidPolicyApi
         {
             var hiddenBefore = TryReadApplicationHidden(manager, admin, packageName, hidden, logTag);
 
-            var hiddenApplied = manager.SetApplicationHidden(admin, packageName, hidden);
+            var hiddenApplied = ApplicationHiddenPolicy.Apply(
+                hidden,
+                () => manager.IsApplicationHidden(admin, packageName),
+                value => manager.SetApplicationHidden(admin, packageName, value),
+                repairUnchangedPolicy: AndroidApiLevel.IsAtLeastUpsideDownCake());
             var currentHidden = manager.IsApplicationHidden(admin, packageName);
             Log.Debug(logTag,
                 $"SetApplicationHidden result. package={packageName}, requestedHidden={hidden}, returned={hiddenApplied}, hiddenBefore={hiddenBefore?.ToString() ?? "<unknown>"}, currentHidden={currentHidden}, adminPackage={admin.PackageName}.");
-            if (!hiddenApplied && currentHidden != hidden)
+            if (currentHidden != hidden)
             {
                 Log.Warn(logTag,
                     $"SetApplicationHidden rejected. package={packageName}, requestedHidden={hidden}, returned={hiddenApplied}, hiddenBefore={hiddenBefore?.ToString() ?? "<unknown>"}, currentHidden={currentHidden}, adminPackage={admin.PackageName}.");

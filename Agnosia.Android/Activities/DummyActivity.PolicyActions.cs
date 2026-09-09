@@ -1,3 +1,4 @@
+using Agnosia.Android.Services;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Activities;
@@ -65,8 +66,10 @@ public sealed partial class DummyActivity
             : "Интернет приложения разблокирован.");
     }
 
-    private void ActionFreezePackage(bool hidden)
+    private async Task ActionFreezePackageAsync(bool hidden, CancellationToken cancellationToken)
     {
+        using var operation = await HiddenAppSessionConcurrency.EnterOperationAsync(cancellationToken)
+            .ConfigureAwait(false);
         var packageName = Intent?.GetStringExtra("package");
         if (!_isProfileOwner || _policyManager is null || string.IsNullOrWhiteSpace(packageName))
         {
@@ -118,11 +121,15 @@ public sealed partial class DummyActivity
 
         var failedPermissions = new List<string>();
         var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
+        using var operationLease = await HiddenAppSessionConcurrency
+            .EnterOperationAsync(cancellationToken)
+            .ConfigureAwait(false);
         if (!TryMakePackageVisibleForPolicyOperation(
                 admin,
                 packageName,
                 "runtime permission revoke",
                 out var restoreHiddenState,
+                out var visibilitySession,
                 out var visibilityError))
         {
             FinishWithError(visibilityError ?? $"Android не смог восстановить {packageName} для отзыва разрешений.");
@@ -130,26 +137,48 @@ public sealed partial class DummyActivity
         }
 
         var attemptedPermissions = 0;
-        foreach (var permission in permissions.Distinct(StringComparer.Ordinal))
+        var hiddenStateRestored = true;
+        string? restoreError = null;
+        try
         {
-            if (string.IsNullOrWhiteSpace(permission)) continue;
+            foreach (var permission in permissions.Distinct(StringComparer.Ordinal))
+            {
+                if (string.IsNullOrWhiteSpace(permission)) continue;
 
-            attemptedPermissions++;
-            var denyResult = await AndroidPolicyApi.TryDenyRuntimePermissionAsync(
-                    _policyManager,
-                    PackageManager,
+                attemptedPermissions++;
+                var denyResult = await AndroidPolicyApi.TryDenyRuntimePermissionAsync(
+                        _policyManager,
+                        PackageManager,
+                        admin,
+                        packageName,
+                        permission,
+                        LogTag,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                if (!denyResult.Succeeded)
+                    failedPermissions.Add(permission);
+            }
+        }
+        finally
+        {
+            if (restoreHiddenState)
+            {
+                hiddenStateRestored = RestoreHiddenStateAfterPolicyOperation(
                     admin,
                     packageName,
-                    permission,
-                    LogTag,
-                    cancellationToken)
-                .ConfigureAwait(false);
-            if (!denyResult.Succeeded)
-                failedPermissions.Add(permission);
+                    "runtime permission revoke",
+                    visibilitySession,
+                    out restoreError);
+            }
         }
 
-        if (restoreHiddenState)
-            RestoreHiddenStateAfterPolicyOperation(admin, packageName, "runtime permission revoke");
+        if (!hiddenStateRestored)
+        {
+            FinishWithError(
+                restoreError
+                ?? $"Разрешения обработаны, но Android не смог снова скрыть {packageName}. Повтор запланирован.");
+            return;
+        }
 
         if (failedPermissions.Count == 0)
         {

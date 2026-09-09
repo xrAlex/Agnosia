@@ -65,6 +65,12 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         SynchronizeStorageWithResolvedState(workProfileState);
 
         var workProfileAvailable = workProfileState == WorkProfileStateKind.Available;
+        if (workProfileAvailable)
+        {
+            var syncResult = await ServiceRegistry.GetRequiredService<SettingsManager>()
+                .RetryPendingAsync(cancellationToken).ConfigureAwait(false);
+            if (!syncResult.Succeeded) statusMessage = syncResult.Message;
+        }
         var hasSetup = workProfileState == WorkProfileStateKind.Available
                        || workProfileState == WorkProfileStateKind.Unavailable;
         var recoveryKind = ResolveWorkProfileRecoveryKind(workProfileState, profileDiagnostics, ownerCheck);

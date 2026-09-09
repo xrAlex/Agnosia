@@ -46,6 +46,33 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
         return AndroidProfileCommandGateway.CanReachWorkProfileAsync(this, cancellationToken);
     }
 
+    public async Task<OperationResult> DispatchWorkLaunchAsync(Intent intent, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var preflight = PreflightWorkLaunch(intent);
+        if (!preflight.Succeeded) return preflight;
+        var activity = CurrentActivity;
+        PrepareAuthenticatedCommand(intent, Guid.NewGuid(), AndroidCommandKind.UnfreezeAndLaunch);
+        AgnosiaUtilities.TransferIntentToProfile(activity, intent);
+        if (activity is MainActivity mainActivity)
+        {
+            var started = await mainActivity.StartWhenResumedAsync(intent, cancellationToken).ConfigureAwait(false);
+            return AndroidActivityResultApi.ToVoidOperationResult(started, "Команда запуска отправлена.");
+        }
+        var completion = new TaskCompletionSource<OperationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        activity.RunOnUiThread(() =>
+        {
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                activity.StartActivity(intent);
+                completion.TrySetResult(OperationResult.Success("Команда запуска отправлена."));
+            }
+            catch (Exception exception) { completion.TrySetException(exception); }
+        });
+        return await completion.Task.ConfigureAwait(false);
+    }
+
     public PendingIntent CreateWorkAppFrozenCallbackPendingIntent(string packageName, string launchId)
     {
         var host = getActivityHost();
@@ -287,8 +314,7 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
         Guid correlationId,
         AndroidCommandKind kind)
     {
-        intent.PutExtra(AndroidCommandContract.ExtraCommandCorrelationId, correlationId.ToString("D"));
-        intent.PutExtra(AndroidCommandContract.ExtraCommandKind, kind.ToString());
+        AndroidCommandIntentMapper.PutOutgoingIdentity(intent, correlationId, kind);
         AuthenticationUtility.SignIntent(intent);
     }
 

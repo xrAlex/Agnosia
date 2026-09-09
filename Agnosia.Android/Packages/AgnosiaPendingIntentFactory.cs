@@ -7,6 +7,18 @@ internal static class AgnosiaPendingIntentFactory
 {
     private const string LogTag = "AgnosiaPendingIntent";
 
+    public static PendingIntent CreateWorkLaunchAcknowledgement(Context context, string packageName, string launchId)
+    {
+        var intent = new Intent(context, typeof(Receivers.WorkLaunchAcknowledgedReceiver));
+        intent.SetAction("agnosia.action.WORK_LAUNCH_ACKNOWLEDGED");
+        intent.SetData(global::Android.Net.Uri.Parse($"agnosia://launch-ack/{Uri.EscapeDataString(launchId)}"));
+        intent.PutExtra(AndroidCommandContract.ExtraCallbackPackage, packageName);
+        intent.PutExtra(AndroidCommandContract.ExtraCallbackLaunchId, launchId);
+        // Only the outcome extras are filled by the work profile. Component and identity are fixed.
+        return PendingIntent.GetBroadcast(context, 0, intent, PendingIntentFlags.OneShot | PendingIntentFlags.Mutable)
+            ?? throw new InvalidOperationException("Android could not create the launch acknowledgement.");
+    }
+
     public static PendingIntent CreateWorkAppFrozenBroadcastPendingIntent(
         Context context,
         Type receiverType,

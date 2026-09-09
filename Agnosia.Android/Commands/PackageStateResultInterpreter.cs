@@ -3,6 +3,13 @@ using Agnosia.Models;
 
 namespace Agnosia.Android.Commands;
 
+internal readonly record struct PackageStateSnapshot(
+    OperationResult Result,
+    bool Installed,
+    bool Hidden,
+    string? LaunchId,
+    bool RecoveryAcknowledged);
+
 internal static class PackageStateResultInterpreter
 {
     public static OperationResult Interpret(
@@ -10,14 +17,31 @@ internal static class PackageStateResultInterpreter
         string expectedPackageName,
         bool expectedHidden)
     {
+        var snapshot = ReadSnapshot(result, expectedPackageName);
+        if (!snapshot.Result.Succeeded) return snapshot.Result;
+
+        if (!snapshot.Installed)
+            return OperationResult.Failure(
+                "Рабочая копия приложения не установлена.");
+
+        return snapshot.Hidden == expectedHidden
+            ? OperationResult.Success("Рабочая копия приложения подтверждена.")
+            : OperationResult.Failure(expectedHidden
+                ? "Рабочая копия приложения установлена, но не скрыта."
+                : "Системная рабочая копия неожиданно скрыта.");
+    }
+
+    public static PackageStateSnapshot ReadSnapshot(
+        AndroidCommandResultEnvelope result,
+        string expectedPackageName)
+    {
         if (!result.Succeeded)
-            return OperationResult.Failure(string.IsNullOrWhiteSpace(result.Message)
+            return Failure(string.IsNullOrWhiteSpace(result.Message)
                 ? "Рабочий профиль не подтвердил состояние приложения."
                 : result.Message);
 
         if (result.Transport != AndroidCommandTransportKind.Activity)
-            return OperationResult.Failure(
-                "Состояние рабочей копии получено по недоверенному каналу.");
+            return Failure("Состояние рабочей копии получено по недоверенному каналу.");
 
         PackageStateResult? state;
         try
@@ -33,17 +57,23 @@ internal static class PackageStateResultInterpreter
 
         if (state is null
             || !string.Equals(state.PackageName, expectedPackageName, StringComparison.Ordinal))
-            return OperationResult.Failure(
-                "Рабочий профиль вернул состояние другого приложения.");
+            return Failure("Рабочий профиль вернул состояние другого приложения.");
 
-        if (!state.Installed)
-            return OperationResult.Failure(
-                "Рабочая копия приложения не установлена.");
+        return new PackageStateSnapshot(
+            OperationResult.Success("Рабочий профиль вернул состояние приложения."),
+            state.Installed,
+            state.Hidden,
+            state.LaunchId,
+            state.RecoveryAcknowledged);
+    }
 
-        return state.Hidden == expectedHidden
-            ? OperationResult.Success("Рабочая копия приложения подтверждена.")
-            : OperationResult.Failure(expectedHidden
-                ? "Рабочая копия приложения установлена, но не скрыта."
-                : "Системная рабочая копия неожиданно скрыта.");
+    private static PackageStateSnapshot Failure(string message)
+    {
+        return new PackageStateSnapshot(
+            OperationResult.Failure(message),
+            false,
+            false,
+            null,
+            false);
     }
 }

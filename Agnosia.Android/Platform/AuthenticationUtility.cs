@@ -104,8 +104,15 @@ public static class AuthenticationUtility
         if (!IsFreshTimestamp(intentTimestamp)) return false;
 
         var signature = intent.GetStringExtra(ExtraSignature);
-        var expectedSignature = SignPayload(key, CreateIntentSignaturePayload(intent, intentTimestamp));
-        return FixedTimeEqualsHex(signature, expectedSignature);
+        try
+        {
+            var expectedSignature = SignPayload(key, CreateIntentSignaturePayload(intent, intentTimestamp));
+            return FixedTimeEqualsHex(signature, expectedSignature);
+        }
+        catch (NotSupportedException)
+        {
+            return false;
+        }
     }
 
     public static void SignWorkAppFrozenCallback(Intent intent, string packageName, string launchId)
@@ -197,52 +204,33 @@ public static class AuthenticationUtility
                && !string.Equals(key, ExtraSignature, StringComparison.Ordinal)
                && !string.Equals(key, ExtraTimestamp, StringComparison.Ordinal)
                && !string.Equals(key, AndroidCommandContract.ExtraFileShuttleCallbackMessenger, StringComparison.Ordinal)
+               && !string.Equals(key, AndroidCommandContract.ExtraLaunchAcknowledgement, StringComparison.Ordinal)
                && !string.Equals(key, AndroidCommandContract.ExtraParentFrozenCallback, StringComparison.Ordinal);
     }
 
     private static string EncodeExtraValue(Bundle extras, string key)
     {
-        var value = extras.Get(key);
-        if (TryEncodeStringArray(extras, key, value, out var encodedStringArray)) return encodedStringArray;
+        return IntentSignatureValueEncoder.Encode(ReadExtraValue(extras, key));
+    }
+
+    private static object? ReadExtraValue(Bundle extras, string key)
+    {
+        object? value = extras.Get(key);
+        if (value is Object javaObject)
+        {
+            if (javaObject.Class.Name == "[Ljava.lang.String;") return extras.GetStringArray(key);
+            if (javaObject.Class.Name == "[B") return extras.GetByteArray(key);
+        }
 
         return value switch
         {
-            null => "null:",
-            String javaStringValue => "string:" + EncodeString(javaStringValue.ToString()),
-            Boolean booleanValue => "bool:" + booleanValue.BooleanValue().ToString(CultureInfo.InvariantCulture),
-            Integer integerValue => "int:" + integerValue.IntValue().ToString(CultureInfo.InvariantCulture),
-            Long longValue => "long:" + longValue.LongValue().ToString(CultureInfo.InvariantCulture),
-            _ => value.GetType().FullName + ":" + EncodeString(value.ToString())
+            String text => text.ToString(),
+            Boolean boolean => boolean.BooleanValue(),
+            Integer number => number.IntValue(),
+            Long number => number.LongValue(),
+            Bundle bundle => (bundle.KeySet() ?? []).ToDictionary(
+                nestedKey => nestedKey, nestedKey => ReadExtraValue(bundle, nestedKey), StringComparer.Ordinal),
+            _ => value
         };
-    }
-
-    private static bool TryEncodeStringArray(Bundle extras, string key, object? value, out string encodedValue)
-    {
-        if (value is string[] stringValues)
-        {
-            encodedValue = EncodeStringArray(stringValues);
-            return true;
-        }
-
-        if (value is Object javaObject
-            && string.Equals(javaObject.Class.Name, "[Ljava.lang.String;", StringComparison.Ordinal)
-            && extras.GetStringArray(key) is { } javaStringValues)
-        {
-            encodedValue = EncodeStringArray(javaStringValues);
-            return true;
-        }
-
-        encodedValue = string.Empty;
-        return false;
-    }
-
-    private static string EncodeStringArray(IEnumerable<string> values)
-    {
-        return "string[]:" + string.Join(",", values.Select(EncodeString));
-    }
-
-    private static string EncodeString(string value)
-    {
-        return Convert.ToBase64String(Encoding.UTF8.GetBytes(value));
     }
 }

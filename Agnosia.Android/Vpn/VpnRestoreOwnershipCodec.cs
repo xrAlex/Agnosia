@@ -22,7 +22,7 @@ internal static class VpnRestoreOwnershipCodec
             using var document = JsonDocument.Parse(raw);
             if (!TryGetProperty(document.RootElement, nameof(VpnRestoreOwnershipState.Version), out var versionElement)
                 || !versionElement.TryGetInt32(out var version)
-                || version != VpnRestoreOwnershipState.CurrentVersion)
+                || version is < 1 or > VpnRestoreOwnershipState.CurrentVersion)
             {
                 return false;
             }
@@ -32,7 +32,7 @@ internal static class VpnRestoreOwnershipCodec
                 VpnRestoreOwnershipJsonContext.Default.VpnRestoreOwnershipState);
             if (parsed is null || !IsValid(parsed)) return false;
 
-            state = parsed;
+            state = parsed with { Version = VpnRestoreOwnershipState.CurrentVersion };
             return true;
         }
         catch (JsonException)
@@ -54,6 +54,9 @@ internal static class VpnRestoreOwnershipCodec
         if (state.ActiveOwner is not null && !IsValid(state.ActiveOwner)) return false;
         if (state.PendingOwner is not null && !IsValid(state.PendingOwner)) return false;
         if (!state.RestoreRequired && state.ActiveOwner is not null) return false;
+        if (state.RestoreReady
+            && (!state.RestoreRequired
+                || state.ActiveOwner is null && !state.AcceptLegacyCallback)) return false;
         if (state.AcceptLegacyCallback && (!state.RestoreRequired || state.ActiveOwner is not null)) return false;
 
         return true;

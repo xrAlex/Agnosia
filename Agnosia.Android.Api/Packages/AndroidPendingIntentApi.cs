@@ -13,10 +13,16 @@ public static class AndroidPendingIntentApi
         string action,
         string? packageName = null,
         string? operation = null,
-        bool restoreHiddenState = false)
+        bool restoreHiddenState = false,
+        string? operationId = null)
     {
         var intent = new Intent(context, receiverType);
         intent.SetAction(action);
+        if (!string.IsNullOrWhiteSpace(operationId))
+        {
+            intent.PutExtra(AndroidCommandContract.ExtraPackageInstallerOperationId, operationId);
+            intent.SetData(global::Android.Net.Uri.Parse($"agnosia://package-installer/{operationId}"));
+        }
         if (!string.IsNullOrWhiteSpace(packageName))
             intent.PutExtra(AndroidCommandContract.ExtraCallbackPackage, packageName);
 

@@ -29,7 +29,7 @@
                                        Text="{Binding PermissionSummary, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.Permission.'}" />
                         </StackPanel>
 
-                        <Button Grid.Column="1"
+                        <Button AutomationProperties.Name="Закрыть" Grid.Column="1"
                                 Classes="icon-button"
                                 ToolTip.Tip="Закрыть"
                                 Command="{Binding ClosePermissionsCommand}">
@@ -40,7 +40,7 @@
                         <WrapPanel Grid.Row="1"
                                    Grid.ColumnSpan="2"
                                    Orientation="Horizontal">
-                            <Button Classes="compact-action"
+                            <Button AutomationProperties.Name="Обновить" Classes="compact-action"
                                     Margin="0,0,10,0"
                                     Command="{Binding OpenPermissionsCommand}">
                                 <StackPanel Orientation="Horizontal"

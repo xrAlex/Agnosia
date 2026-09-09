@@ -22,9 +22,12 @@ internal sealed record VpnRestoreOwnershipState(
     VpnRestoreOwner? ActiveOwner,
     VpnRestoreOwner? PendingOwner,
     bool AcceptLegacyCallback = false,
-    int Version = VpnRestoreOwnershipState.CurrentVersion)
+    bool RestoreReady = false,
+    int Version = VpnRestoreOwnershipState.CurrentVersion,
+    bool ForceRestore = false,
+    bool PendingLaunchDispatched = false)
 {
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
 
     public static VpnRestoreOwnershipState Empty { get; } = new(false, null, null);
     public static VpnRestoreOwnershipState Legacy { get; } = new(true, null, null, true);
@@ -35,7 +38,7 @@ internal sealed record VpnRestoreOwnershipState(
         if (PendingOwner is not null)
             throw new InvalidOperationException("A VPN restore launch is already pending.");
 
-        return this with { PendingOwner = owner };
+        return this with { PendingOwner = owner, PendingLaunchDispatched = false };
     }
 
     public VpnRestoreOwnershipState RequireRestore()
@@ -54,15 +57,17 @@ internal sealed record VpnRestoreOwnershipState(
             {
                 ActiveOwner = owner,
                 PendingOwner = null,
-                AcceptLegacyCallback = false
+                PendingLaunchDispatched = false,
+                AcceptLegacyCallback = false,
+                RestoreReady = false
             }
-            : this with { PendingOwner = null };
+            : this with { PendingOwner = null, PendingLaunchDispatched = false };
     }
 
     public VpnRestoreOwnershipState Abort(VpnRestoreOwner owner)
     {
         EnsurePendingOwner(owner);
-        return this with { PendingOwner = null };
+        return this with { PendingOwner = null, PendingLaunchDispatched = false };
     }
 
     public bool MatchesCallback(string packageName, string? launchId)
@@ -71,9 +76,17 @@ internal sealed record VpnRestoreOwnershipState(
         if (string.IsNullOrWhiteSpace(launchId))
             return AcceptLegacyCallback && ActiveOwner is null;
 
-        return ActiveOwner is { } active
+        return (PendingOwner ?? ActiveOwner) is { } active
                && string.Equals(active.PackageName, packageName, StringComparison.Ordinal)
                && string.Equals(active.LaunchId, launchId, StringComparison.Ordinal);
+    }
+
+    public VpnRestoreOwnershipState MarkRestoreReady(string packageName, string? launchId)
+    {
+        return MatchesCallback(packageName, launchId)
+            ? this with { ActiveOwner = PendingOwner ?? ActiveOwner, PendingOwner = null,
+                PendingLaunchDispatched = false, RestoreReady = true }
+            : this;
     }
 
     public VpnRestoreOwnershipState ClearAfterRestore()

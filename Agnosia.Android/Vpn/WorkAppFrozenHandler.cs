@@ -14,7 +14,7 @@ internal static class WorkAppFrozenHandler
         string logTag,
         CancellationToken cancellationToken = default)
     {
-        var ownerMatched = false;
+        var restoreSucceeded = false;
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -22,16 +22,16 @@ internal static class WorkAppFrozenHandler
             var completion = await coordinator.CompleteOwnerAsync(
                     packageName,
                     launchId,
-                    () => AndroidVpnAutomationApi.EnableConfiguredVpnAfterWorkFreezeAsync(context, trigger),
+                    () => RestoreOwnedVpnAsync(context, trigger),
                     cancellationToken)
                 .ConfigureAwait(false);
-            ownerMatched = completion.OwnerMatched;
+            restoreSucceeded = completion.OwnerMatched && completion.Result.Succeeded;
             cancellationToken.ThrowIfCancellationRequested();
             return completion.Result;
         }
         finally
         {
-            if (ownerMatched) HideOverlay(context, logTag);
+            if (restoreSucceeded) HideOverlay(context, logTag);
         }
     }
 
@@ -40,18 +40,40 @@ internal static class WorkAppFrozenHandler
         string trigger,
         string logTag)
     {
-        try
-        {
-            return await AndroidVpnAutomationApi.RestoreConfiguredVpnAfterFailedWorkLaunchAsync(context, trigger)
-                .ConfigureAwait(false);
-        }
-        finally
-        {
-            HideOverlay(context, logTag);
-        }
+        var result = await AndroidVpnAutomationApi.RestoreConfiguredVpnAfterFailedWorkLaunchAsync(context, trigger)
+            .ConfigureAwait(false);
+        if (result.Succeeded) HideOverlay(context, logTag);
+        return result;
     }
 
-    private static void HideOverlay(Context context, string logTag)
+    public static async Task<OperationResult> RecoverAfterDeviceRestartAndHideOverlayAsync(
+        Context context,
+        VpnRestoreOwner? expectedOwner,
+        string trigger,
+        string logTag,
+        CancellationToken cancellationToken = default)
+    {
+        var coordinator = ServiceRegistry.GetRequiredService<VpnRestoreOwnershipCoordinator>();
+        var recovery = await coordinator.RecoverAfterDeviceRestartAsync(
+                expectedOwner,
+                () => RestoreOwnedVpnAsync(context, trigger),
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (recovery.Result.Succeeded && recovery.RestoreSucceeded) HideOverlay(context, logTag);
+        return recovery.Result;
+    }
+
+    internal static Task<OperationResult> RestoreOwnedVpnAsync(Context context, string trigger)
+    {
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
+        var force = VpnRestoreOwnershipCodec.TryDeserialize(storage.GetString(StorageKeys.VpnRestoreOwnershipState),
+            out var state) && state.ForceRestore;
+        return force
+            ? AndroidVpnAutomationApi.RestoreConfiguredVpnAfterFailedWorkLaunchAsync(context, trigger)
+            : AndroidVpnAutomationApi.EnableConfiguredVpnAfterWorkFreezeAsync(context, trigger);
+    }
+
+    internal static void HideOverlay(Context context, string logTag)
     {
         try
         {

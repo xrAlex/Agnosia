@@ -15,8 +15,27 @@ internal static class AgnosiaFileShuttleClientBroker
         }
     }
 
-    public static void Preconnect(Context context)
+    public static Task PreconnectAsync(Context context, CancellationToken cancellationToken = default)
     {
-        GetClient(context).Preconnect();
+        return GetClient(context).PreconnectAsync(cancellationToken);
+    }
+
+    public static void Disconnect()
+    {
+        AgnosiaFileShuttleMessengerClient? client;
+        lock (Sync)
+        {
+            client = _client;
+            _client = null;
+        }
+
+        client?.Close();
+    }
+
+    public static void Disconnect(AgnosiaFileShuttleMessengerClient client)
+    {
+        lock (Sync)
+            if (ReferenceEquals(_client, client)) _client = null;
+        client.Close();
     }
 }

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Agnosia.Android.Infrastructure;
 using _Microsoft.Android.Resource.Designer;
 using Android.Content;
 using Android.Content.PM;
@@ -22,12 +23,16 @@ public sealed class AgnosiaFileShuttleService : Service
     private const string NotificationChannelId = "agnosia_file_shuttle";
     private const string NotificationChannelName = "File Shuttle";
     private const string NotificationChannelDescription = "Передача файлов между личным и рабочим профилями.";
+    private const int ListingPageItemLimit = 128;
+    private const int ListingPageJsonByteLimit = 64 * 1024;
     private static readonly TimeSpan IdleStopDelay = TimeSpan.FromSeconds(30);
 
+    private readonly AgnosiaFileShuttleServiceLifetime _lifetime = new();
+    private readonly AgnosiaFileShuttleListingStore _listings = new();
+    private readonly AgnosiaFileShuttleClientRegistry<Messenger> _clients = new();
     private HandlerThread? _handlerThread;
     private Handler? _handler;
     private Messenger? _messenger;
-    private int _idleStopGeneration;
 
     public override void OnCreate()
     {
@@ -44,17 +49,64 @@ public sealed class AgnosiaFileShuttleService : Service
     public override StartCommandResult OnStartCommand(Intent? intent, StartCommandFlags flags, int startId)
     {
         ResetIdleStop();
+        if (AndroidIntentExtras.ReadFileShuttleCallbackMessenger(intent) is { } callback
+            && intent?.GetStringExtra(AgnosiaFileShuttleContract.ExtraConnectionId) is { } connectionId)
+        {
+            var enabled = HasFileAccess();
+            var data = new Bundle();
+            data.PutString(AgnosiaFileShuttleContract.ExtraConnectionId, connectionId);
+            if (enabled)
+            {
+                _clients.Register(connectionId, callback);
+                data.PutParcelable(AgnosiaFileShuttleContract.ExtraServiceMessenger, _messenger);
+            }
+            else
+            {
+                data.PutString(AgnosiaFileShuttleContract.ExtraError,
+                    "File Shuttle выключен или доступ к файлам отозван.");
+            }
+            var message = Message.Obtain(null, AgnosiaFileShuttleContract.MessageConnectResult)!;
+            message.Data = data;
+            try { callback.Send(message); }
+            catch (RemoteException) { _clients.Remove(connectionId); }
+            Log.Debug(LogTag, $"File Shuttle reconnect handled. enabled={enabled}.");
+            if (!enabled) StopSelf();
+        }
         return StartCommandResult.NotSticky;
     }
 
     public override IBinder? OnBind(Intent? intent)
     {
+        if (AndroidIntentExtras.ReadFileShuttleCallbackMessenger(intent) is { } callback
+            && intent?.GetStringExtra(AgnosiaFileShuttleContract.ExtraConnectionId) is { } connectionId)
+            _clients.Register(connectionId, callback);
         ResetIdleStop();
         return _messenger?.Binder;
     }
 
+    public override void OnTimeout(int startId, ForegroundService foregroundServiceType)
+    {
+        Log.Warn(LogTag, $"File Shuttle foreground service timed out. startId={startId}, type={foregroundServiceType}.");
+        StopForeground(StopForegroundFlags.Remove);
+        StopSelf();
+    }
+
     public override void OnDestroy()
     {
+        var clients = _clients.Drain();
+        Log.Debug(LogTag, $"File Shuttle stopping. clients={clients.Length}.");
+        foreach (var client in clients)
+        {
+            try
+            {
+                var message = Message.Obtain(null, AgnosiaFileShuttleContract.MessageDisconnected)!;
+                var data = new Bundle();
+                data.PutParcelable(AgnosiaFileShuttleContract.ExtraServiceMessenger, _messenger);
+                message.Data = data;
+                client.Send(message);
+            }
+            catch (RemoteException) { }
+        }
         _handler?.RemoveCallbacksAndMessages(null);
         _handlerThread?.QuitSafely();
         _messenger?.Dispose();
@@ -66,6 +118,27 @@ public sealed class AgnosiaFileShuttleService : Service
         var intent = new Intent(context, typeof(AgnosiaFileShuttleService));
         context.StartService(intent);
     }
+
+    public static void Stop(Context context)
+    {
+        var intent = new Intent(context, typeof(AgnosiaFileShuttleService));
+        context.StopService(intent);
+    }
+
+    internal static PendingIntent CreateReconnectIntent(Context context, Messenger callback, string? connectionId)
+    {
+        // Immutable capability issued only after the signed, cross-profile handshake.
+        var intent = new Intent(context, typeof(AgnosiaFileShuttleService));
+        intent.SetAction($"agnosia.action.RECONNECT_FILE_SHUTTLE.{connectionId}");
+        intent.PutExtra(AndroidCommandContract.ExtraFileShuttleCallbackMessenger, callback);
+        intent.PutExtra(AgnosiaFileShuttleContract.ExtraConnectionId, connectionId);
+        return PendingIntent.GetForegroundService(context, 0, intent, PendingIntentFlags.Immutable
+            | PendingIntentFlags.UpdateCurrent)!;
+    }
+
+    private bool HasFileAccess() =>
+        ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.CrossProfileFileShuttleEnabled)
+        && AndroidPermissionApi.HasAllFilesAccess(this);
 
     private void StartForegroundServiceNotification()
     {
@@ -91,17 +164,26 @@ public sealed class AgnosiaFileShuttleService : Service
 
     private void ResetIdleStop()
     {
-        var generation = Interlocked.Increment(ref _idleStopGeneration);
+        var generation = _lifetime.RegisterActivity();
         _handler?.PostDelayed(
             () =>
             {
-                if (generation == Volatile.Read(ref _idleStopGeneration)) StopSelf();
+                if (_lifetime.RequestIdleStop(generation)) StopSelf();
             },
             (long)IdleStopDelay.TotalMilliseconds);
     }
 
     private void HandleRequest(Message message)
     {
+        var connectionId = message.Data?.GetString(AgnosiaFileShuttleContract.ExtraConnectionId);
+        if (message.What == AgnosiaFileShuttleContract.MessageUnregisterClient)
+        {
+            if (connectionId is not null) _clients.Remove(connectionId);
+            return;
+        }
+        if (message.ReplyTo is { } callback && connectionId is not null)
+            _clients.Register(connectionId, callback);
+        _lifetime.BeginOperation();
         ResetIdleStop();
 
         var response = Message.Obtain(null, message.What)
@@ -113,6 +195,7 @@ public sealed class AgnosiaFileShuttleService : Service
         ParcelFileDescriptor? responseDescriptor = null;
         try
         {
+            if (!HasFileAccess()) throw new UnauthorizedAccessException("File Shuttle access is disabled.");
             responseDescriptor = WriteResponse(message.What, message.Data ?? new Bundle(), responseData);
         }
         catch (Exception exception)
@@ -123,9 +206,14 @@ public sealed class AgnosiaFileShuttleService : Service
 
         response.Data = responseData;
 
+        var sent = false;
         try
         {
-            message.ReplyTo?.Send(response);
+            if (message.ReplyTo is { } reply)
+            {
+                reply.Send(response);
+                sent = true;
+            }
         }
         catch (RemoteException exception)
         {
@@ -133,7 +221,24 @@ public sealed class AgnosiaFileShuttleService : Service
         }
         finally
         {
-            responseDescriptor?.Dispose();
+            try
+            {
+                if (sent && responseDescriptor is not null)
+                    ReleaseTransferredDescriptor(responseDescriptor);
+            }
+            finally
+            {
+                try { responseDescriptor?.Close(); }
+                catch (Java.IO.IOException exception)
+                {
+                    Log.Warn(LogTag, $"Failed to close File Shuttle response descriptor: {exception.Message}");
+                }
+                finally
+                {
+                    responseDescriptor?.Dispose();
+                    if (_lifetime.CompleteOperation()) StopSelf();
+                }
+            }
         }
     }
 
@@ -141,6 +246,15 @@ public sealed class AgnosiaFileShuttleService : Service
     {
         switch (what)
         {
+            case AgnosiaFileShuttleContract.MessageLoadAvailableBytes:
+            {
+                var root = ResolveFile(AgnosiaFileShuttleContract.DummyRoot, requireExists: true)
+                    ?? throw new System.IO.FileNotFoundException("File Shuttle storage is unavailable.");
+                using var stats = new StatFs(root.AbsolutePath);
+                response.PutLong(AgnosiaFileShuttleContract.ExtraAvailableBytes, stats.AvailableBytes);
+                return null;
+            }
+
             case AgnosiaFileShuttleContract.MessageLoadFileMeta:
                 response.PutString(
                     AgnosiaFileShuttleContract.ExtraFileInfoJson,
@@ -150,12 +264,24 @@ public sealed class AgnosiaFileShuttleService : Service
                 return null;
 
             case AgnosiaFileShuttleContract.MessageLoadFiles:
+            {
+                var path = request.GetString(AgnosiaFileShuttleContract.ExtraPath)
+                    ?? throw new InvalidOperationException("Directory path is missing.");
+                var page = _listings.ReadPage(
+                    path,
+                    request.GetString(AgnosiaFileShuttleContract.ExtraPageToken),
+                    request.GetInt(AgnosiaFileShuttleContract.ExtraPageOffset, 0),
+                    ListingPageItemLimit,
+                    ListingPageJsonByteLimit,
+                    () => LoadFiles(path));
                 response.PutString(
                     AgnosiaFileShuttleContract.ExtraFileListJson,
-                        JsonSerializer.Serialize(
-                            LoadFiles(request.GetString(AgnosiaFileShuttleContract.ExtraPath)),
-                            AgnosiaFileShuttleJsonContext.Default.AgnosiaFileShuttleDocumentInfoArray));
+                    page.Json);
+                response.PutInt(AgnosiaFileShuttleContract.ExtraNextPageOffset, page.NextOffset);
+                response.PutBoolean(AgnosiaFileShuttleContract.ExtraHasMore, page.HasMore);
+                response.PutString(AgnosiaFileShuttleContract.ExtraPageToken, page.PageToken);
                 return null;
+            }
 
             case AgnosiaFileShuttleContract.MessageOpenFile:
             {
@@ -209,10 +335,12 @@ public sealed class AgnosiaFileShuttleService : Service
     private IReadOnlyList<AgnosiaFileShuttleDocumentInfo> LoadFiles(string? path)
     {
         var directory = ResolveFile(path, requireExists: true);
-        if (directory is null || !directory.IsDirectory) return [];
+        if (directory is null || !directory.IsDirectory)
+            throw new System.IO.FileNotFoundException("File Shuttle directory is unavailable.");
 
         var children = directory.ListFiles();
-        if (children is null) return [];
+        if (children is null)
+            throw new System.IO.IOException("Android could not read the File Shuttle directory.");
 
         var result = new List<AgnosiaFileShuttleDocumentInfo>(children.Length);
         foreach (var child in children)
@@ -237,7 +365,7 @@ public sealed class AgnosiaFileShuttleService : Service
         var file = ResolveFile(path, requireExists: true);
         if (file is null || file.IsDirectory) return null;
 
-        return ParcelFileDescriptor.Open(file, ParcelFileDescriptor.ParseMode(mode));
+        return OpenTrackedDescriptor(file, ParcelFileDescriptor.ParseMode(mode));
     }
 
     private ParcelFileDescriptor? OpenThumbnail(string? path)
@@ -247,8 +375,44 @@ public sealed class AgnosiaFileShuttleService : Service
 
         var mimeType = GetMimeType(file);
         return mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
-            ? ParcelFileDescriptor.Open(file, ParcelFileMode.ReadOnly)
+            ? OpenTrackedDescriptor(file, ParcelFileMode.ReadOnly)
             : null;
+    }
+
+    private ParcelFileDescriptor OpenTrackedDescriptor(File file, ParcelFileMode mode)
+    {
+        var handler = _handler
+                      ?? throw new InvalidOperationException("File Shuttle handler is unavailable.");
+        _lifetime.BeginOperation();
+        try
+        {
+            return ParcelFileDescriptor.Open(
+                file,
+                mode,
+                handler,
+                new FileTransferCloseListener(this))
+                ?? throw new System.IO.IOException("Android did not open the file descriptor.");
+        }
+        catch
+        {
+            CompleteTrackedOperation();
+            throw;
+        }
+    }
+
+    private void CompleteTrackedOperation()
+    {
+        if (_lifetime.CompleteOperation()) StopSelf();
+    }
+
+    private static void ReleaseTransferredDescriptor(ParcelFileDescriptor descriptor)
+    {
+        // Messenger copies Bundle parcelables without ReturnValue. A normal Close here would
+        // notify OnCloseListener before the client finishes. ReturnValue releases our copy
+        // silently; recycling the temporary parcel leaves only the actual remote copy alive.
+        using var parcel = Parcel.Obtain();
+        try { descriptor.WriteToParcel(parcel, ParcelableWriteFlags.ReturnValue); }
+        finally { parcel.Recycle(); }
     }
 
     private string? CreateFile(string? parentPath, string? mimeType, string? displayName)
@@ -269,10 +433,14 @@ public sealed class AgnosiaFileShuttleService : Service
     private string? DeleteDocumentFile(string? path)
     {
         var file = ResolveFile(path, requireExists: true);
-        if (file is null || IsExternalStorageRoot(file)) return null;
+        if (file is null || IsExternalStorageRoot(file))
+            throw new System.IO.FileNotFoundException("File Shuttle document cannot be deleted.");
 
         var parent = file.ParentFile?.CanonicalPath;
-        return DeleteRecursively(file) ? parent : null;
+        if (string.IsNullOrWhiteSpace(parent) || !DeleteRecursively(file))
+            throw new System.IO.IOException("File Shuttle could not delete the complete document tree.");
+
+        return parent;
     }
 
     private bool IsChildOf(string? parentPath, string? childPath)
@@ -455,6 +623,19 @@ public sealed class AgnosiaFileShuttleService : Service
         public override void HandleMessage(Message msg)
         {
             service.HandleRequest(msg);
+        }
+    }
+
+    private sealed class FileTransferCloseListener(AgnosiaFileShuttleService service) :
+        Java.Lang.Object,
+        ParcelFileDescriptor.IOnCloseListener
+    {
+        public void OnClose(Java.IO.IOException? exception)
+        {
+            if (exception is not null)
+                Log.Warn(LogTag, $"File Shuttle descriptor closed with an error: {exception.Message}");
+
+            service.CompleteTrackedOperation();
         }
     }
 }

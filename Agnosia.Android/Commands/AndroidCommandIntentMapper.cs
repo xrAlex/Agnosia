@@ -95,6 +95,15 @@ internal static class AndroidCommandIntentMapper
     }
 
 #if AGNOSIA_ANDROID
+    public static void PutOutgoingIdentity(Intent intent, Guid? correlationId = null, AndroidCommandKind? kind = null)
+    {
+        var identity = ResolveOutgoingIdentity(intent.Action,
+            correlationId?.ToString("D") ?? intent.GetStringExtra(AndroidCommandContract.ExtraCommandCorrelationId),
+            kind?.ToString() ?? intent.GetStringExtra(AndroidCommandContract.ExtraCommandKind));
+        intent.PutExtra(AndroidCommandContract.ExtraCommandCorrelationId, identity.CorrelationId.ToString("D"));
+        intent.PutExtra(AndroidCommandContract.ExtraCommandKind, identity.Kind.ToString());
+    }
+
     public static Intent ToIntent(AndroidCommandEnvelope envelope)
     {
         var intent = new Intent(ToAction(envelope.Kind));
@@ -298,6 +307,19 @@ internal static class AndroidCommandIntentMapper
         return false;
     }
 #endif
+
+    public static (Guid CorrelationId, AndroidCommandKind Kind) ResolveOutgoingIdentity(
+        string? action, string? correlationId, string? declaredKind)
+    {
+        if (!TryFromAction(action, out var kind))
+            throw new InvalidOperationException("Unknown outgoing Agnosia command action.");
+        if (declaredKind is not null && (!Enum.TryParse<AndroidCommandKind>(declaredKind, out var parsedKind) || parsedKind != kind))
+            throw new InvalidOperationException("Outgoing command kind does not match its action.");
+        var id = correlationId is null ? Guid.NewGuid()
+            : Guid.TryParse(correlationId, out var parsedId) && parsedId != Guid.Empty ? parsedId
+            : throw new InvalidOperationException("Outgoing command correlation ID is invalid.");
+        return (id, kind);
+    }
 
     private static string SerializeObject<T>(T value)
     {

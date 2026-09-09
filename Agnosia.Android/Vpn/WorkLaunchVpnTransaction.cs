@@ -47,6 +47,10 @@ internal static class WorkLaunchVpnTransaction
 
             return await RollBackFailureAsync(launchResult, rollback).ConfigureAwait(false);
         }
+        catch (Commands.WorkLaunchUnconfirmedException)
+        {
+            throw;
+        }
         catch
         {
             if (rollbackRequired || rollbackRequiredOnException())

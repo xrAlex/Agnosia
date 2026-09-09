@@ -38,7 +38,7 @@
                        Classes="page-caption"
                        Text="{Binding Description}" />
 
-            <Button Grid.Row="2"
+            <Button AutomationProperties.Name="{Binding RequestLabel}" Grid.Row="2"
                     Grid.ColumnSpan="2" Grid.Column="0"
                     Classes="compact-action"
                     HorizontalAlignment="Left"

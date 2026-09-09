@@ -7,6 +7,7 @@ namespace Agnosia.Android.Logging;
 public static class AndroidAppLogArchive
 {
     private const int MaxEntries = 100;
+    private const int MaxMessageLength = 4096;
     private static readonly Lock Sync = new();
     private static readonly TimeSpan FlushDelay = TimeSpan.FromSeconds(1);
     private static readonly List<AppLogEntry> PendingEntries = [];
@@ -36,8 +37,18 @@ public static class AndroidAppLogArchive
         AgnosiaRuntime.Initialize(context);
         lock (Sync)
         {
-            FlushPendingLocked(GetApplicationContext(context));
-            return LoadCore();
+            try
+            {
+                FlushPendingLocked(GetApplicationContext(context));
+                return LoadCore(GetApplicationContext(context));
+            }
+            catch (Exception exception) when (IsArchiveIoFailure(exception))
+            {
+                global::Android.Util.Log.Warn(
+                    nameof(AndroidAppLogArchive),
+                    $"Log archive read failed: {exception.Message}");
+                return PendingEntries.ToArray();
+            }
         }
     }
 
@@ -48,6 +59,16 @@ public static class AndroidAppLogArchive
         {
             PendingEntries.Clear();
             ServiceRegistry.GetRequiredService<LocalStorageManager>().Remove(StorageKeys.LogEntries);
+            try
+            {
+                File.Delete(GetArchivePath(GetApplicationContext(context)));
+            }
+            catch (Exception exception) when (IsArchiveIoFailure(exception))
+            {
+                global::Android.Util.Log.Warn(
+                    nameof(AndroidAppLogArchive),
+                    $"Log archive clear failed: {exception.Message}");
+            }
         }
     }
 
@@ -93,14 +114,14 @@ public static class AndroidAppLogArchive
             ResolveProfile(context),
             level,
             tag,
-            message);
+            message.Length <= MaxMessageLength ? message : message[..MaxMessageLength]);
     }
 
     private static void FlushPendingLocked(Context? context)
     {
         if (context is not null) AgnosiaRuntime.Initialize(context);
 
-        if (PendingEntries.Count == 0) return;
+        if (PendingEntries.Count == 0 || context is null) return;
 
         if (!ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.LoggingEnabled, true))
         {
@@ -108,16 +129,18 @@ public static class AndroidAppLogArchive
             return;
         }
 
-        var entries = LoadCore();
+        var entries = LoadCore(context);
         entries.AddRange(PendingEntries);
-        PendingEntries.Clear();
         Trim(entries);
-        SaveCore(entries);
+        SaveCore(context, entries);
+        PendingEntries.Clear();
     }
 
-    private static List<AppLogEntry> LoadCore()
+    private static List<AppLogEntry> LoadCore(Context context)
     {
-        var raw = ServiceRegistry.GetRequiredService<LocalStorageManager>().GetString(StorageKeys.LogEntries);
+        var path = GetArchivePath(context);
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
+        var raw = File.Exists(path) ? File.ReadAllText(path) : storage.GetString(StorageKeys.LogEntries);
         if (string.IsNullOrWhiteSpace(raw))
             return [];
 
@@ -125,20 +148,36 @@ public static class AndroidAppLogArchive
         {
             var entries = JsonSerializer.Deserialize(raw, AndroidApiJsonContext.Default.ListAppLogEntry) ?? [];
             Trim(entries);
+            if (!File.Exists(path))
+            {
+                SaveCore(context, entries);
+                storage.Remove(StorageKeys.LogEntries);
+            }
             return entries;
         }
         catch (JsonException)
         {
             ServiceRegistry.GetRequiredService<LocalStorageManager>().Remove(StorageKeys.LogEntries);
+            File.Delete(path);
             return [];
         }
     }
 
-    private static void SaveCore(List<AppLogEntry> entries)
+    private static void SaveCore(Context context, List<AppLogEntry> entries)
     {
-        ServiceRegistry.GetRequiredService<LocalStorageManager>().SetString(
-            StorageKeys.LogEntries,
-            JsonSerializer.Serialize(entries, AndroidApiJsonContext.Default.ListAppLogEntry));
+        var path = GetArchivePath(context);
+        var temporary = path + ".tmp";
+        File.WriteAllText(temporary, JsonSerializer.Serialize(entries, AndroidApiJsonContext.Default.ListAppLogEntry));
+        File.Move(temporary, path, true);
+    }
+
+    private static string GetArchivePath(Context context) => Path.Combine(
+        context.FilesDir?.AbsolutePath ?? throw new IOException("Android files directory is unavailable."),
+        "agnosia-log.json");
+
+    private static bool IsArchiveIoFailure(Exception exception)
+    {
+        return exception is IOException or UnauthorizedAccessException;
     }
 
     private static void Trim(List<AppLogEntry> entries)

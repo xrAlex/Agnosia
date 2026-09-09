@@ -187,23 +187,10 @@ internal sealed class AndroidPermissionCoordinator(
                 profileDiagnostics,
                 hasSetup,
                 AndroidPermissionApi.HasNotificationPermission(activity),
-                IsVpnControlGranted(activity),
+                AndroidPermissionApi.HasVpnControlPermission(activity),
                 AndroidPermissionApi.HasAllFilesAccess(activity),
                 AndroidPermissionApi.HasOverlayPermission(activity));
         }, cancellationToken);
-    }
-
-    private static bool IsVpnControlGranted(Activity activity)
-    {
-        try
-        {
-            return VpnService.Prepare(activity) is null;
-        }
-        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
-        {
-            Log.Warn("AgnosiaPermissions", $"Failed to read VPN permission state: {exception}");
-            return false;
-        }
     }
 
     public OperationResult OpenAppDetailsSettings()

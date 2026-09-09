@@ -26,7 +26,7 @@
                         HorizontalAlignment="Stretch">
                     <Grid ColumnDefinitions="*,*"
                           ColumnSpacing="10">
-                        <Button Classes="segment-chip profile-segment"
+                        <Button AutomationProperties.Name="Личный" Classes="segment-chip profile-segment"
                                 Classes.selected="{Binding IsPersonalProfileSelected}"
                                 HorizontalAlignment="Stretch"
                                 Command="{Binding SelectPersonalCommand}"
@@ -42,7 +42,7 @@
                             </Grid>
                         </Button>
 
-                        <Button Grid.Column="1"
+                        <Button AutomationProperties.Name="Рабочий" Grid.Column="1"
                                 Classes="segment-chip profile-segment"
                                 Classes.selected="{Binding IsWorkProfileSelected}"
                                 HorizontalAlignment="Stretch"

@@ -83,8 +83,6 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
             {
                 await Task.Delay(100).ConfigureAwait(false);
 
-                RunOnUiThread(ApplyPreferredDisplayMode);
-
                 if (!AgnosiaUtilities.IsProfileOwner(this)) return;
 
                 RunOnUiThread(BootstrapWorkProfileAndFinish);
@@ -123,24 +121,19 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
     {
         base.OnResume();
         _isResumed = true;
+        UiAnimationState.SetActive(true);
         Current = this;
         ServiceRegistry.GetRequiredService<AndroidPlatformBridge>().AttachActivity(this);
         ServiceRegistry.NotifyPrimaryActivityResumed();
-        ApplyPreferredDisplayMode();
         DrainPendingActivityStarts();
+        _ = RecoverVpnOnResumeAsync();
     }
 
     protected override void OnPause()
     {
         _isResumed = false;
+        UiAnimationState.SetActive(false);
         base.OnPause();
-    }
-
-    public override void OnWindowFocusChanged(bool hasFocus)
-    {
-        base.OnWindowFocusChanged(hasFocus);
-
-        if (hasFocus) ApplyPreferredDisplayMode();
     }
 
     public override bool DispatchTouchEvent(MotionEvent? ev)
@@ -158,26 +151,6 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         }
 
         base.OnDestroy();
-    }
-
-    private void ApplyPreferredDisplayMode()
-    {
-        if (Window is null) return;
-
-        if (OperatingSystem.IsAndroidVersionAtLeast(35)) Window.FrameRatePowerSavingsBalanced = false;
-
-        var display = Display;
-        var attributes = Window.Attributes;
-        if (attributes is null) return;
-
-        var preferredMode = GetHighestRefreshMode(display);
-        if (preferredMode is not null)
-        {
-            attributes.PreferredDisplayModeId = preferredMode.ModeId;
-            attributes.PreferredRefreshRate = preferredMode.RefreshRate;
-        }
-
-        Window.Attributes = attributes;
     }
 
     private void PublishTouchEvent(MotionEvent? ev)
@@ -210,14 +183,6 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
                 WatcherPointerTracker.Release(rootPosition);
                 break;
         }
-    }
-
-    private static Display.Mode? GetHighestRefreshMode(Display display)
-    {
-        return (display.GetSupportedModes() ?? [])
-            .OrderByDescending(mode => mode.RefreshRate)
-            .ThenByDescending(mode => (long)mode.PhysicalWidth * mode.PhysicalHeight)
-            .FirstOrDefault();
     }
 
     private static void ApplyStartupMitigations()

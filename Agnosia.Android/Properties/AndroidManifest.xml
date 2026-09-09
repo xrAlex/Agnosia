@@ -26,6 +26,7 @@
             <action android:name="android.intent.action.MAIN"/>
         </intent>
         <package android:name="com.follow.clash"/>
+        <package android:name="com.follow.clashx"/>
         <package android:name="com.github.metacubex.clash.meta"/>
         <package android:name="com.happproxy"/>
         <package android:name="io.acionyx.tunguska"/>

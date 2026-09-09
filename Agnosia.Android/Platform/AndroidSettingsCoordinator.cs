@@ -6,8 +6,6 @@ namespace Agnosia.Android.Platform;
 
 internal sealed class AndroidSettingsCoordinator(Func<Activity> getInitializedActivity)
 {
-    private const string LogTag = "AgnosiaPlatformBridge";
-
     public Task<bool> LoadOnboardingCompletedAsync(CancellationToken cancellationToken = default)
     {
         _ = getInitializedActivity();
@@ -29,30 +27,34 @@ internal sealed class AndroidSettingsCoordinator(Func<Activity> getInitializedAc
         return AndroidSettingsStore.SaveAsync(activity, settings, cancellationToken);
     }
 
-    public Task<OperationResult> OpenDocumentsUiAsync(CancellationToken cancellationToken = default)
+    public async Task<OperationResult> OpenDocumentsUiAsync(CancellationToken cancellationToken = default)
     {
-        if (cancellationToken.IsCancellationRequested) return Task.FromCanceled<OperationResult>(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var activity = getInitializedActivity();
         try
         {
-            AgnosiaFileShuttleClientBroker.Preconnect(activity);
+            await AgnosiaFileShuttleClientBroker.PreconnectAsync(activity, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
-            return Task.FromResult(OperationResult.Failure(exception.Message));
+            return OperationResult.Failure(exception.Message);
         }
 
         var intent = new Intent(Intent.ActionView);
         intent.SetDataAndType(null, "vnd.android.document/root");
+        if (activity is not MainActivity mainActivity)
+            return OperationResult.Failure("Android не смог определить активный экран Agnosia.");
 
-        return Task.FromResult(AndroidIntentApi.TryStartActivity(
-            activity,
-            intent,
-            LogTag,
-            "Android не смог открыть системный файловый интерфейс.",
-            out var error)
+        var result = await mainActivity.StartWhenResumedAsync(intent, cancellationToken)
+            .ConfigureAwait(false);
+        var error = AndroidActivityResultApi.ExtractError(result);
+        return string.IsNullOrWhiteSpace(error)
             ? OperationResult.Success("Открываем системный файловый интерфейс.")
-            : OperationResult.Failure(error ?? "Android не смог открыть системный файловый интерфейс."));
+            : OperationResult.Failure(error);
     }
 }

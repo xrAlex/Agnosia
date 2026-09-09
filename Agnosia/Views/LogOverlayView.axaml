@@ -39,7 +39,7 @@
             <WrapPanel Grid.Row="1"
                        Orientation="Horizontal"
                        VerticalAlignment="Center">
-                <Button Classes="compact-action"
+                <Button AutomationProperties.Name="Копировать" Classes="compact-action"
                         Margin="0,0,10,0"
                         Click="OnCopyLogsClick">
                     <StackPanel Orientation="Horizontal"
@@ -51,7 +51,7 @@
                     </StackPanel>
                 </Button>
 
-                <Button Classes="compact-action"
+                <Button AutomationProperties.Name="Очистить" Classes="compact-action"
                         Margin="0,0,10,0"
                         Command="{Binding ClearLogsCommand}">
                     <StackPanel Orientation="Horizontal"
@@ -63,7 +63,7 @@
                     </StackPanel>
                 </Button>
 
-                <Button Classes="icon-button"
+                <Button AutomationProperties.Name="Закрыть" Classes="icon-button"
                         ToolTip.Tip="Закрыть"
                         Command="{Binding CloseLogsCommand}">
                     <PathIcon Classes="action-icon"

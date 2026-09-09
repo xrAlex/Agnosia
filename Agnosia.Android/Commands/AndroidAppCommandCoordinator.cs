@@ -264,11 +264,13 @@ internal sealed class AndroidAppCommandCoordinator(
 
         if (app.IsSystem)
         {
-            var intent = CreateWorkLaunchIntent(app, null);
+            var launchId = Guid.NewGuid().ToString("N");
+            var intent = CreateWorkLaunchIntent(app, launchId);
             var preflight = commandRunner.PreflightWorkLaunch(intent);
             return !preflight.Succeeded
                 ? preflight
-                : await commandRunner.RunVoidOperationAsync(intent, true, cancellationToken, "Открываем приложение.")
+                : await AndroidWorkLaunchAcknowledgement.SendAndWaitAsync(activity, intent, app.PackageName, launchId,
+                    token => commandRunner.DispatchWorkLaunchAsync(intent, token), cancellationToken)
                     .ConfigureAwait(false);
         }
 
@@ -278,13 +280,17 @@ internal sealed class AndroidAppCommandCoordinator(
                 {
                     var intent = CreateWorkLaunchIntent(app, scope.LaunchId);
                     return WorkLaunchVpnTransaction.ExecuteAsync(
-                        _ => Task.FromResult(commandRunner.PreflightWorkLaunch(intent)),
+                        _ => Task.FromResult(commandRunner.PreflightWorkLaunch(intent) is { Succeeded: false } failure
+                            ? failure : AndroidVpnAutomationApi.CheckRestoreBeforeTakeover(activity)),
                         takeoverToken => EnsurePersonalVpnDisabledBeforeWorkLaunchAsync(scope, takeoverToken),
-                        launchToken => commandRunner.RunVoidOperationAsync(
-                            intent,
-                            true,
-                            launchToken,
-                            "Открываем приложение."),
+                        launchToken =>
+                        {
+                            scope.MarkLaunchDispatched();
+                            return AndroidWorkLaunchAcknowledgement.SendAndWaitAsync(activity, intent,
+                                app.PackageName, scope.LaunchId,
+                                sendToken => commandRunner.DispatchWorkLaunchAsync(intent, sendToken),
+                                launchToken);
+                        },
                         scope.RollbackAsync,
                         () => scope.AcquiredRestoreObligation,
                         token);
@@ -460,10 +466,15 @@ internal sealed class AndroidAppCommandCoordinator(
                 : error);
         }
 
-        var preHideSucceeded = prepareResult.Data.GetBooleanExtra(
-            AndroidCommandContract.ResultPreHideSucceeded,
-            true);
+        var preHideSucceeded = prepareResult.Data.HasExtra(AndroidCommandContract.ResultPreHideSucceeded)
+                               && prepareResult.Data.GetBooleanExtra(
+                                   AndroidCommandContract.ResultPreHideSucceeded,
+                                   false);
         var preHideError = prepareResult.Data.GetStringExtra(AndroidCommandContract.ResultError);
+        if (!preHideSucceeded)
+            return ShortcutPreparationResult.Failure(string.IsNullOrWhiteSpace(preHideError)
+                ? $"Android не подтвердил скрытие {packageName} перед созданием ярлыка."
+                : preHideError);
 
         var createIntent = new Intent(AgnosiaActions.CreateHiddenShortcut);
         foreach (var extraName in HiddenShortcutPayloadExtras)
@@ -486,8 +497,7 @@ internal sealed class AndroidAppCommandCoordinator(
             true,
             createResult.Data?.GetBooleanExtra(AndroidCommandContract.ResultHideImmediately, false) == true,
             createResult.Data?.GetStringExtra(AndroidCommandContract.ResultMessage)
-            ?? "Подготовка ярлыка завершена.",
-            preHideSucceeded ? null : preHideError);
+            ?? "Подготовка ярлыка завершена.");
     }
 
     private static Intent CreatePackageIntent(string action, AppSnapshot app)

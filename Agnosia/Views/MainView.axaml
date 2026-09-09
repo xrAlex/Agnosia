@@ -64,7 +64,7 @@
                     VerticalAlignment="Center">
                 <Grid RowDefinitions="Auto,Auto"
                       RowSpacing="14">
-                    <Button Classes="icon-button"
+                    <Button AutomationProperties.Name="Закрыть" Classes="icon-button"
                             HorizontalAlignment="Right"
                             ToolTip.Tip="Закрыть"
                             Command="{Binding DismissWorkProfileRecoveryCommand}">
@@ -91,7 +91,7 @@
                                        Text="{Binding WorkProfileRecoveryMessage}" />
                         </Grid>
 
-                        <Button Classes="primary"
+                        <Button AutomationProperties.Name="Открыть настройки профиля" Classes="primary"
                                 MinHeight="58"
                                 HorizontalAlignment="Stretch"
                                 IsVisible="{Binding !IsWorkProfileRecoveryOnboardingRestart}"
@@ -102,7 +102,7 @@
                                        Text="Открыть настройки профиля" />
                         </Button>
 
-                        <Button Classes="primary"
+                        <Button AutomationProperties.Name="OK" Classes="primary"
                                 MinHeight="58"
                                 HorizontalAlignment="Stretch"
                                 IsVisible="{Binding IsWorkProfileRecoveryOnboardingRestart}"

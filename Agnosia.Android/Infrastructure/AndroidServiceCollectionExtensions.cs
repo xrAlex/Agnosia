@@ -33,12 +33,40 @@ internal static class AndroidServiceCollectionExtensions
         services.AddSingleton(provider =>
         {
             var storage = provider.GetRequiredService<LocalStorageManager>();
+            var profileAdapter = new VpnRestoreProfileAdapter(
+                () => Activities.VpnRestoreRecoveryActivity.CurrentHost
+                    ?? provider.GetRequiredService<IAndroidActivityHostAccessor>().GetRequiredHost());
             return new VpnRestoreOwnershipCoordinator(
                 () => storage.GetString(StorageKeys.VpnRestoreOwnershipState),
-                raw => storage.SetString(StorageKeys.VpnRestoreOwnershipState, raw),
-                () => storage.Remove(StorageKeys.VpnRestoreOwnershipState),
+                raw =>
+                {
+                    VpnRestoreOwnershipCodec.TryDeserialize(storage.GetString(StorageKeys.VpnRestoreOwnershipState), out var previous);
+                    storage.SetStringDurably(StorageKeys.VpnRestoreOwnershipState, raw);
+                    if (VpnRestoreOwnershipCodec.TryDeserialize(raw, out var committed)
+                        && previous.PendingLaunchDispatched && previous.PendingOwner is { } pending
+                        && !committed.PendingLaunchDispatched && !committed.RestoreReady)
+                        VpnRestoreRetryScheduler.Cancel(global::Android.App.Application.Context, pending.PackageName, pending.LaunchId);
+                    if (VpnRestoreOwnershipCodec.TryDeserialize(raw, out var state)
+                        && state.RestoreRequired
+                        && (state.RestoreReady || state.PendingLaunchDispatched)
+                        && (state.PendingOwner ?? state.ActiveOwner) is { } owner)
+                        if (!VpnRestoreRetryScheduler.Schedule(global::Android.App.Application.Context,
+                                typeof(Activities.VpnRestoreRecoveryActivity), owner.PackageName, owner.LaunchId,
+                                attempt: state.RestoreReady ? 0 : 1))
+                            throw new IOException("Android could not schedule VPN restoration.");
+                },
+                () =>
+                {
+                    VpnRestoreOwnershipCodec.TryDeserialize(storage.GetString(StorageKeys.VpnRestoreOwnershipState), out var previous);
+                    storage.RemoveDurably(StorageKeys.VpnRestoreOwnershipState);
+                    var owner = previous.ActiveOwner ?? previous.PendingOwner;
+                    if (owner is not null)
+                        VpnRestoreRetryScheduler.Cancel(global::Android.App.Application.Context, owner.PackageName, owner.LaunchId);
+                },
                 () => storage.GetBoolean(StorageKeys.HaveActiveVpnSession),
-                () => storage.Remove(StorageKeys.HaveActiveVpnSession));
+                () => storage.RemoveDurably(StorageKeys.HaveActiveVpnSession),
+                queryPackageState: profileAdapter.QueryAsync,
+                confirmRecovery: profileAdapter.ConfirmRecoveryAsync);
         });
         services.AddSingleton<SettingsManager>();
         services.AddSingleton<IAndroidActivityHostAccessor, AndroidActivityHostAccessor>();

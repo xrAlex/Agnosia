@@ -107,7 +107,7 @@ internal static class HiddenAppShortcutManager
         return requested
             ? ShortcutFreezePreparationResult.Deferred(metadata.IsSystem
                 ? "Подтвердите добавление ярлыка на главный экран."
-                : "Подтвердите добавление ярлыка на главный экран. После подтверждения приложение будет скрыто.")
+                : "Приложение скрыто. Подтвердите добавление ярлыка на главный экран.")
             : ShortcutFreezePreparationResult.Failure("Лаунчер отклонил запрос на создание ярлыка.");
     }
 
@@ -214,73 +214,13 @@ internal static class HiddenAppShortcutManager
     {
         try
         {
-            if (AgnosiaUtilities.IsProfileOwner(context))
-            {
-                Log.Info(LogTag, $"Shortcut pin callback for {packageName} is being handled in the work profile.");
-                FreezeLocally(context, packageName);
-                Toast.MakeText(
-                    context,
-                    IsStoredSystemShortcut(context, packageName) ? "Ярлык создан." : "Ярлык создан, приложение скрыто.",
-                    ToastLength.Short)?.Show();
-                return;
-            }
-
-            Log.Info(LogTag, $"Shortcut pin callback for {packageName} is being forwarded to the work profile.");
-            ForwardFreezeToManagedProfile(context, packageName);
-            Toast.MakeText(
-                    context,
-                    IsStoredSystemShortcut(context, packageName)
-                        ? "Ярлык создан."
-                        : "Ярлык создан, приложение скрывается в рабочем профиле.",
-                    ToastLength.Short)
-                ?.Show();
+            Log.Info(LogTag, $"Shortcut pin confirmed for pre-hidden package {packageName}.");
+            Toast.MakeText(context, "Ярлык создан.", ToastLength.Short)?.Show();
         }
         catch (Exception exception)
         {
-            Log.Error(LogTag, $"Failed to complete shortcut pinning for {packageName}: {exception}");
-            Toast.MakeText(context, $"Ярлык создан, но {packageName} не удалось скрыть.", ToastLength.Long)?.Show();
+            Log.Error(LogTag, $"Failed to process shortcut pin confirmation for {packageName}: {exception}");
         }
-    }
-
-    private static void FreezeLocally(Context context, string packageName)
-    {
-        if (IsStoredSystemShortcut(context, packageName))
-        {
-            Log.Info(LogTag, $"Skipping shortcut freeze for system work-profile app {packageName}.");
-            return;
-        }
-
-        if (AndroidSystemApi.GetDevicePolicyManager(context) is not { } manager)
-            throw new InvalidOperationException("Android did not provide DevicePolicyManager.");
-
-        var admin = AgnosiaUtilities.GetAdminComponent(context, typeof(AgnosiaDeviceAdminReceiver));
-        AndroidPolicyApi.TrySetApplicationHidden(
-            manager,
-            admin,
-            packageName,
-            true,
-            LogTag,
-            out var error);
-        if (error is not null) throw new InvalidOperationException(error);
-    }
-
-    private static void ForwardFreezeToManagedProfile(Context context, string packageName)
-    {
-        if (IsStoredSystemShortcut(context, packageName))
-        {
-            Log.Info(LogTag, $"Skipping forwarded shortcut freeze for system app {packageName}.");
-            return;
-        }
-
-        _ = Task.Run(() =>
-        {
-            var result = AndroidProfileCommandGateway.FreezePackageInWorkProfile(
-                context,
-                packageName,
-                "Приложение скрыто.");
-            if (!result.Succeeded)
-                Log.Warn(LogTag, $"Android не смог скрыть {packageName} в рабочем профиле: {result.Message}");
-        });
     }
 
     private static HiddenAppShortcutMetadata? ReadMetadata(string packageName)

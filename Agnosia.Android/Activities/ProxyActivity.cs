@@ -27,10 +27,8 @@ public sealed class ProxyActivity : Activity
 {
     private const string LogTag = "AgnosiaProxyActivity";
     private const int PrepareVpnRequestCode = 7100;
-    private const int WorkLaunchRequestCode = 7101;
     private const int LaunchResolveAttempts = 12;
     private const int LaunchResolveDelayMilliseconds = 120;
-    private static readonly TimeSpan WorkLaunchTimeout = TimeSpan.FromSeconds(30);
 
     private bool _launchStarted;
     private HiddenAppLaunchRequest? _request;
@@ -38,7 +36,6 @@ public sealed class ProxyActivity : Activity
     private AndroidAppLaunchResult? _launchResult;
     private CancellationTokenSource _flowCts = new();
     private TaskCompletionSource<Result>? _pendingVpnPreparation;
-    private TaskCompletionSource<AndroidActivityResult>? _pendingWorkLaunch;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -81,7 +78,6 @@ public sealed class ProxyActivity : Activity
             return;
         }
 
-        _pendingWorkLaunch?.TrySetResult(new AndroidActivityResult(resultCode, data));
     }
 
     private void TryStartProxyFlow()
@@ -123,6 +119,8 @@ public sealed class ProxyActivity : Activity
         CancellationToken cancellationToken)
     {
         TemporaryPackageVisibilityTransaction? visibilityTransaction = null;
+        HiddenAppSessionState? reservedSession = null;
+        IDisposable? operationLease = null;
         try
         {
             if (!AgnosiaUtilities.IsProfileOwner(this))
@@ -149,6 +147,10 @@ public sealed class ProxyActivity : Activity
                 LaunchVisibleSystemPackage(request);
                 return;
             }
+
+            operationLease = await HiddenAppSessionConcurrency
+                .EnterOperationAsync(cancellationToken)
+                .ConfigureAwait(false);
 
             var launchResult = GetLaunchResult(request);
             var preflight = HiddenAppLaunchPreflight.RequireUsageAccess(
@@ -177,6 +179,14 @@ public sealed class ProxyActivity : Activity
                 return;
             }
 
+            reservedSession = HiddenAppSessionMonitorService.ReserveLaunchSession(
+                this,
+                request.PackageName,
+                request.DisplayName,
+                TaskId,
+                launchResult,
+                AndroidIntentExtras.ReadParentFrozenCallback(Intent),
+                AndroidIntentExtras.ReadParentCallbackLaunchId(Intent));
             visibilityTransaction = new TemporaryPackageVisibilityTransaction(wasHidden);
             if (wasHidden)
             {
@@ -188,6 +198,8 @@ public sealed class ProxyActivity : Activity
                         LogTag,
                         out var error))
                 {
+                    HiddenAppSessionMonitorService.CancelReservedLaunch(reservedSession.SessionId);
+                    reservedSession = null;
                     FinishWithLaunchResult(
                         launchResult.Fail(
                             AndroidAppLaunchStage.CommandReceived,
@@ -214,7 +226,8 @@ public sealed class ProxyActivity : Activity
                     request,
                     "package_blocked",
                     failedResult,
-                    visibilityTransaction);
+                    visibilityTransaction,
+                    reservedSession);
                 FinishWithLaunchResult(
                     failedResult,
                     true);
@@ -231,7 +244,8 @@ public sealed class ProxyActivity : Activity
                     request,
                     "package_manager_missing",
                     failedResult,
-                    visibilityTransaction);
+                    visibilityTransaction,
+                    reservedSession);
                 FinishWithLaunchResult(
                     failedResult,
                     true);
@@ -262,7 +276,8 @@ public sealed class ProxyActivity : Activity
                     request,
                     "launch_intent_missing",
                     failedResult,
-                    visibilityTransaction);
+                    visibilityTransaction,
+                    reservedSession);
                 FinishWithLaunchResult(
                     failedResult,
                     true);
@@ -278,10 +293,12 @@ public sealed class ProxyActivity : Activity
                 $"Resolved launch intent for {request.PackageName}. component={launchIntent.Component?.FlattenToShortString() ?? "<none>"}, flags={launchIntent.Flags}.");
 
             var resultToStart = launchResult;
+            var launchCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             RunOnUiThread(() =>
             {
                 try
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     StartActivity(launchIntent);
                     var startedResult = resultToStart.WithStage(AndroidAppLaunchStage.StartActivityAttempted);
                     _launchResult = startedResult;
@@ -289,14 +306,8 @@ public sealed class ProxyActivity : Activity
                         LogTag,
                         $"StartActivity returned for {request.PackageName}. component={launchIntent.Component?.FlattenToShortString() ?? "<none>"}, flags={launchIntent.Flags}, proxyTaskId={TaskId}.");
                     Log.Debug(LogTag, $"Starting hidden-session monitor for {request.PackageName}, taskId={TaskId}.");
-                    if (!HiddenAppSessionMonitorService.StartMonitoring(
-                            this,
-                            request.PackageName,
-                            request.DisplayName,
-                            TaskId,
-                            startedResult,
-                            AndroidIntentExtras.ReadParentFrozenCallback(Intent),
-                            AndroidIntentExtras.ReadParentCallbackLaunchId(Intent)))
+                    var sessionToStart = reservedSession! with { LaunchResult = startedResult };
+                    if (!HiddenAppSessionMonitorService.StartMonitoring(this, sessionToStart))
                         throw new InvalidOperationException(
                             $"Android did not accept the hidden-session monitor for {request.PackageName}.");
                     visibilityTransaction.Commit();
@@ -313,7 +324,8 @@ public sealed class ProxyActivity : Activity
                         request,
                         "activity_not_found",
                         failedResult,
-                        visibilityTransaction);
+                        visibilityTransaction,
+                        reservedSession);
                     FinishWithLaunchResult(failedResult, true);
                 }
                 catch (Exception exception)
@@ -327,10 +339,16 @@ public sealed class ProxyActivity : Activity
                         request,
                         "launch_failed",
                         failedResult,
-                        visibilityTransaction);
+                        visibilityTransaction,
+                        reservedSession);
                     FinishWithLaunchResult(failedResult, true);
                 }
+                finally
+                {
+                    launchCompletion.TrySetResult();
+                }
             });
+            await launchCompletion.Task.ConfigureAwait(false);
         }
         catch (Exception exception)
         {
@@ -344,10 +362,15 @@ public sealed class ProxyActivity : Activity
                 request,
                 "proxy_flow_failed",
                 failedResult,
-                visibilityTransaction);
+                visibilityTransaction,
+                reservedSession);
             FinishWithLaunchResult(
                 failedResult,
                 true);
+        }
+        finally
+        {
+            operationLease?.Dispose();
         }
     }
 
@@ -370,7 +393,7 @@ public sealed class ProxyActivity : Activity
                 var systemLaunchResult = await ForwardLaunchToManagedProfileAsync(
                         request,
                         isSystem: true,
-                        launchId: null,
+                        launchId: Guid.NewGuid().ToString("N"),
                         cancellationToken)
                     .ConfigureAwait(false);
                 FinishForwardedLaunch(systemLaunchResult);
@@ -382,12 +405,13 @@ public sealed class ProxyActivity : Activity
             var launchResult = await vpnRestoreOwnershipCoordinator.ExecuteLaunchAsync(
                     request.PackageName,
                     (scope, token) => WorkLaunchVpnTransaction.ExecuteAsync(
-                        _ => Task.FromResult(OperationResult.Success(string.Empty)),
+                        _ => Task.FromResult(AndroidVpnAutomationApi.CheckRestoreBeforeTakeover(this)),
                         takeoverToken => PrepareShortcutVpnTakeoverAsync(scope, takeoverToken),
-                        launchToken => ForwardLaunchToManagedProfileAfterPreflightAsync(
-                            request,
-                            scope.LaunchId,
-                            launchToken),
+                        launchToken =>
+                        {
+                            scope.MarkLaunchDispatched();
+                            return ForwardLaunchToManagedProfileAfterPreflightAsync(request, scope.LaunchId, launchToken);
+                        },
                         scope.RollbackAsync,
                         () => scope.AcquiredRestoreObligation,
                         token),
@@ -573,8 +597,7 @@ public sealed class ProxyActivity : Activity
         string? launchId,
         CancellationToken cancellationToken)
     {
-        if (_pendingWorkLaunch is not null)
-            return OperationResult.Failure("Запуск другого рабочего приложения уже ожидает подтверждения.");
+        launchId ??= Guid.NewGuid().ToString("N");
 
         var proxyIntent = HiddenAppShortcutManager.CreateInternalLaunchIntent(
             request.PackageName,
@@ -595,43 +618,25 @@ public sealed class ProxyActivity : Activity
                     launchId));
             proxyIntent.PutExtra(AndroidCommandContract.ExtraCallbackLaunchId, launchId);
         }
+        proxyIntent.PutExtra(AndroidCommandContract.ExtraCallbackLaunchId, launchId);
         AgnosiaUtilities.TransferIntentToProfile(this, proxyIntent);
 
-        var completionSource = new TaskCompletionSource<AndroidActivityResult>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        _pendingWorkLaunch = completionSource;
-        RunOnUiThread(() =>
-        {
-            try
+        return await AndroidWorkLaunchAcknowledgement.SendAndWaitAsync(this, proxyIntent,
+            request.PackageName, launchId, _ =>
             {
-                Log.Debug(
-                    LogTag,
-                    $"Starting DPM-forwarded shortcut work launch for result. package={request.PackageName}.");
-                StartActivityForResult(proxyIntent, WorkLaunchRequestCode);
-            }
-            catch (Exception exception)
-            {
-                Log.Warn(LogTag, $"Failed to start shortcut work launch: {exception}");
-                completionSource.TrySetException(exception);
-            }
-        });
-
-        try
-        {
-            var activityResult = await completionSource.Task
-                .WaitAsync(WorkLaunchTimeout, cancellationToken)
-                .ConfigureAwait(false);
-            return AndroidActivityResultApi.ToVoidOperationResult(activityResult, "Открываем приложение.");
-        }
-        catch (TimeoutException)
-        {
-            return OperationResult.Failure("Рабочий профиль не подтвердил запуск приложения вовремя.");
-        }
-        finally
-        {
-            if (ReferenceEquals(_pendingWorkLaunch, completionSource))
-                _pendingWorkLaunch = null;
-        }
+                var sent = new TaskCompletionSource<OperationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+                RunOnUiThread(() =>
+                {
+                    try
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        StartActivity(proxyIntent);
+                        sent.TrySetResult(OperationResult.Success("Команда запуска отправлена."));
+                    }
+                    catch (Exception exception) { sent.TrySetException(exception); }
+                });
+                return sent.Task;
+            }, cancellationToken).ConfigureAwait(false);
     }
 
     private void FinishForwardedLaunch(OperationResult result)
@@ -649,9 +654,7 @@ public sealed class ProxyActivity : Activity
     {
         _flowCts.Cancel();
         _pendingVpnPreparation?.TrySetCanceled(_flowCts.Token);
-        _pendingWorkLaunch?.TrySetCanceled(_flowCts.Token);
         _pendingVpnPreparation = null;
-        _pendingWorkLaunch = null;
         _flowCts.Dispose();
         _flowCts = new CancellationTokenSource();
     }
@@ -678,42 +681,57 @@ public sealed class ProxyActivity : Activity
         HiddenAppLaunchRequest request,
         string reason,
         AndroidAppLaunchResult launchResult,
-        TemporaryPackageVisibilityTransaction? visibilityTransaction)
+        TemporaryPackageVisibilityTransaction? visibilityTransaction,
+        HiddenAppSessionState? reservedSession)
     {
-        if (visibilityTransaction?.RollbackRequired != true) return launchResult;
+        if (visibilityTransaction?.RollbackRequired != true)
+        {
+            if (reservedSession is not null)
+                HiddenAppSessionMonitorService.CancelReservedLaunch(reservedSession.SessionId);
+            return launchResult;
+        }
 
+        var hiddenConfirmed = false;
         try
         {
-            if (!AgnosiaUtilities.IsProfileOwner(this)
-                || AndroidSystemApi.GetDevicePolicyManager(this) is not { } policyManager)
-                return launchResult;
-
-            if (IsSystemWorkProfileRequest(request))
-                return launchResult;
-
-            var admin = AgnosiaUtilities.GetAdminComponent(this, typeof(AgnosiaDeviceAdminReceiver));
-            if (AndroidPolicyApi.TrySetApplicationHidden(
-                    policyManager,
-                    admin,
-                    request.PackageName,
-                    true,
-                    LogTag,
-                    out _))
+            if (AgnosiaUtilities.IsProfileOwner(this)
+                && AndroidSystemApi.GetDevicePolicyManager(this) is { } policyManager
+                && !IsSystemWorkProfileRequest(request))
             {
-                Log.Info(LogTag, $"App {request.PackageName} hidden again directly. reason={reason}");
-                visibilityTransaction.Commit();
-                launchResult = launchResult.WithStage(
-                    AndroidAppLaunchStage.PackageRehidden,
-                    $"proxy_fallback:{reason}");
-                launchResult.Log(LogTag);
-                Log.Debug(
-                    LogTag,
-                    $"Personal launch transaction will roll back VPN after fallback re-hide for {request.PackageName}.");
+                var admin = AgnosiaUtilities.GetAdminComponent(this, typeof(AgnosiaDeviceAdminReceiver));
+                if (AndroidPolicyApi.TrySetApplicationHidden(
+                        policyManager,
+                        admin,
+                        request.PackageName,
+                        true,
+                        LogTag,
+                        out _))
+                {
+                    Log.Info(LogTag, $"App {request.PackageName} hidden again directly. reason={reason}");
+                    visibilityTransaction.Commit();
+                    hiddenConfirmed = true;
+                    launchResult = launchResult.WithStage(
+                        AndroidAppLaunchStage.PackageRehidden,
+                        $"proxy_fallback:{reason}");
+                    launchResult.Log(LogTag);
+                    Log.Debug(
+                        LogTag,
+                        $"Personal launch transaction will roll back VPN after fallback re-hide for {request.PackageName}.");
+                }
             }
         }
         catch (Exception exception)
         {
             Log.Warn(LogTag, $"Fallback re-hide for {request.PackageName} failed: {exception}");
+        }
+
+        if (reservedSession is not null)
+        {
+            HiddenAppSessionMonitorService.CompleteReservedLaunch(
+                this,
+                reservedSession.SessionId,
+                reason,
+                hiddenConfirmed);
         }
 
         return launchResult;
@@ -807,6 +825,8 @@ public sealed class ProxyActivity : Activity
 
         void FinishCore()
         {
+            if (AgnosiaUtilities.IsProfileOwner(this))
+                AndroidWorkLaunchAcknowledgement.SendResult(this, Intent, result.ToOperationResult());
             if (showToast || !result.Succeeded) Toast.MakeText(this, result.Message, ToastLength.Long)?.Show();
 
             SetResult(result.Succeeded ? Result.Ok : Result.Canceled, result.ToIntent());

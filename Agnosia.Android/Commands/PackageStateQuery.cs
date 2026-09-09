@@ -1,3 +1,5 @@
 namespace Agnosia.Android.Commands;
 
-internal sealed record PackageStateQuery(string PackageName);
+internal sealed record PackageStateQuery(
+    string PackageName,
+    string? ConfirmedRecoveryLaunchId = null);

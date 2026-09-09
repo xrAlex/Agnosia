@@ -85,10 +85,20 @@ internal sealed partial class AndroidModuleCoordinator(
         }
 
         var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
-        storage.SetBoolean(StorageKeys.CrossProfileFileShuttleEnabled, enabled);
+        var settingsManager = ServiceRegistry.GetRequiredService<SettingsManager>();
+        await PersistSynchronizedModuleSettingsAsync(
+            settingsManager,
+            storage,
+            new Dictionary<string, bool>
+            {
+                [StorageKeys.CrossProfileFileShuttleEnabled] = enabled
+            },
+            StorageKeys.CrossProfileFileShuttleEnabled,
+            enabled,
+            cancellationToken).ConfigureAwait(false);
         AgnosiaUtilities.ApplyCrossProfileFileShuttleComponentState(activity);
 
-        var syncResult = await TrySyncFileShuttleSettingAsync(activity, enabled, cancellationToken)
+        var syncResult = await TrySyncFileShuttleSettingAsync(settingsManager, cancellationToken)
             .ConfigureAwait(false);
         if (!syncResult.Succeeded) return syncResult;
 
@@ -150,15 +160,23 @@ internal sealed partial class AndroidModuleCoordinator(
         }
 
         var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
-        storage.SetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch, enabled);
-        storage.SetBoolean(StorageKeys.EnableVpnAfterWorkFreeze, enabled);
+        var settingsManager = ServiceRegistry.GetRequiredService<SettingsManager>();
+        await PersistSynchronizedModuleSettingsAsync(
+            settingsManager,
+            storage,
+            new Dictionary<string, bool>
+            {
+                [StorageKeys.DisableVpnBeforeWorkLaunch] = enabled,
+                [StorageKeys.EnableVpnAfterWorkFreeze] = enabled
+            },
+            StorageKeys.DisableVpnBeforeWorkLaunch,
+            enabled,
+            cancellationToken).ConfigureAwait(false);
         if (!enabled)
             await vpnRestoreOwnershipCoordinator.ClearAsync(cancellationToken).ConfigureAwait(false);
 
         var syncResult = await TrySyncBooleanSettingAsync(
-                activity,
-                StorageKeys.DisableVpnBeforeWorkLaunch,
-                enabled,
+                settingsManager,
                 "VPN Guard",
                 cancellationToken)
             .ConfigureAwait(false);
@@ -254,12 +272,20 @@ internal sealed partial class AndroidModuleCoordinator(
         AgnosiaRuntime.Initialize(activity);
 
         var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
-        storage.SetBoolean(StorageKeys.RiskEngineEnabled, enabled);
+        var settingsManager = ServiceRegistry.GetRequiredService<SettingsManager>();
+        await PersistSynchronizedModuleSettingsAsync(
+            settingsManager,
+            storage,
+            new Dictionary<string, bool>
+            {
+                [StorageKeys.RiskEngineEnabled] = enabled
+            },
+            StorageKeys.RiskEngineEnabled,
+            enabled,
+            cancellationToken).ConfigureAwait(false);
 
         var syncResult = await TrySyncBooleanSettingAsync(
-                activity,
-                StorageKeys.RiskEngineEnabled,
-                enabled,
+                settingsManager,
                 "Risk Engine",
                 cancellationToken)
             .ConfigureAwait(false);
@@ -292,21 +318,12 @@ internal sealed partial class AndroidModuleCoordinator(
     }
 
     private static async Task<OperationResult> TrySyncFileShuttleSettingAsync(
-        Context context,
-        bool enabled,
+        SettingsManager settingsManager,
         CancellationToken cancellationToken)
     {
-        if (!AgnosiaUtilities.HasWorkProfileTarget(context))
-            return enabled
-                ? OperationResult.Failure("Рабочий профиль недоступен для синхронизации File Shuttle.")
-                : OperationResult.Success("Рабочий профиль недоступен, локальный File Shuttle выключен.");
-
         try
         {
-            var result = await ServiceRegistry.GetRequiredService<SettingsManager>().SyncBooleanSettingAsync(
-                    StorageKeys.CrossProfileFileShuttleEnabled,
-                    enabled,
-                    cancellationToken)
+            var result = await settingsManager.RetryPendingAsync(cancellationToken)
                 .ConfigureAwait(false);
             if (result.Succeeded) return OperationResult.Success(string.Empty);
 
@@ -314,6 +331,10 @@ internal sealed partial class AndroidModuleCoordinator(
                 string.IsNullOrWhiteSpace(result.Message)
                     ? "Не удалось синхронизировать File Shuttle с рабочим профилем."
                     : result.Message);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
@@ -323,20 +344,13 @@ internal sealed partial class AndroidModuleCoordinator(
     }
 
     private static async Task<OperationResult> TrySyncBooleanSettingAsync(
-        Context context,
-        string key,
-        bool enabled,
+        SettingsManager settingsManager,
         string moduleName,
         CancellationToken cancellationToken)
     {
-        if (!AgnosiaUtilities.HasWorkProfileTarget(context))
-            return enabled
-                ? OperationResult.Failure($"Рабочий профиль недоступен для синхронизации {moduleName}.")
-                : OperationResult.Success($"Рабочий профиль недоступен, локальный {moduleName} выключен.");
-
         try
         {
-            var result = await ServiceRegistry.GetRequiredService<SettingsManager>().SyncBooleanSettingAsync(key, enabled, cancellationToken)
+            var result = await settingsManager.RetryPendingAsync(cancellationToken)
                 .ConfigureAwait(false);
             if (result.Succeeded) return OperationResult.Success(string.Empty);
 
@@ -345,10 +359,30 @@ internal sealed partial class AndroidModuleCoordinator(
                     ? $"Не удалось синхронизировать {moduleName} с рабочим профилем."
                     : result.Message);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception exception)
         {
             Log.Warn(LogTag, $"Failed to sync {moduleName} setting: {exception.Message}");
             return OperationResult.Failure($"Не удалось синхронизировать {moduleName} с рабочим профилем.");
         }
+    }
+
+    private static Task PersistSynchronizedModuleSettingsAsync(
+        SettingsManager settingsManager,
+        LocalStorageManager storage,
+        IReadOnlyDictionary<string, bool> values,
+        string synchronizedName,
+        bool synchronizedValue,
+        CancellationToken cancellationToken)
+    {
+        return Task.Run(() => settingsManager.PersistSnapshot(() => storage.SetValues(
+            values,
+            new Dictionary<string, string>
+            {
+                [PendingBooleanSettingsSync.Key(synchronizedName)] = synchronizedValue ? "true" : "false"
+            })), cancellationToken);
     }
 }

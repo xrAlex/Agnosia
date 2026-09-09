@@ -24,7 +24,8 @@ public partial class MainActivity
 
     private Task<AndroidActivityResult> StartForResultAsync(
         Intent intent,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool completeOnStart = false)
     {
         var completionSource = new TaskCompletionSource<AndroidActivityResult>(
             TaskCreationOptions.RunContinuationsAsynchronously);
@@ -62,17 +63,25 @@ public partial class MainActivity
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
 
-        StartActivityForResultOnUiThread(intent, requestCode, completionSource);
+        StartActivityForResultOnUiThread(intent, requestCode, completionSource, completeOnStart);
 
         return completionSource.Task;
+    }
+
+    internal Task<AndroidActivityResult> StartWhenResumedAsync(
+        Intent intent,
+        CancellationToken cancellationToken = default)
+    {
+        return StartForResultAsync(intent, cancellationToken, completeOnStart: true);
     }
 
     private void StartActivityForResultOnUiThread(
         Intent intent,
         int requestCode,
-        TaskCompletionSource<AndroidActivityResult> completionSource)
+        TaskCompletionSource<AndroidActivityResult> completionSource,
+        bool completeOnStart)
     {
-        var request = new ActivityStartRequest(intent, requestCode, completionSource);
+        var request = new ActivityStartRequest(intent, requestCode, completionSource, completeOnStart);
 
         if (Looper.MainLooper?.IsCurrentThread == true)
         {
@@ -148,8 +157,20 @@ public partial class MainActivity
         {
             Log.Debug(
                 LogTag,
-                $"Starting activity for result. requestCode={request.RequestCode}, action={request.Intent.Action ?? "<none>"}.");
-            StartActivityForResult(request.Intent, request.RequestCode);
+                $"Starting activity request. requestCode={request.RequestCode}, action={request.Intent.Action ?? "<none>"}, completeOnStart={request.CompleteOnStart}.");
+            if (request.CompleteOnStart)
+            {
+                StartActivity(request.Intent);
+                lock (RequestSync)
+                {
+                    PendingResults.Remove(request.RequestCode);
+                }
+                request.CompletionSource.TrySetResult(new AndroidActivityResult(Result.Ok, null));
+            }
+            else
+            {
+                StartActivityForResult(request.Intent, request.RequestCode);
+            }
         }
         catch (Exception exception)
         {
@@ -229,6 +250,7 @@ public partial class MainActivity
     private sealed record ActivityStartRequest(
         Intent Intent,
         int RequestCode,
-        TaskCompletionSource<AndroidActivityResult> CompletionSource);
+        TaskCompletionSource<AndroidActivityResult> CompletionSource,
+        bool CompleteOnStart);
 
 }

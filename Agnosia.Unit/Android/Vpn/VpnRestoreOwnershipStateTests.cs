@@ -53,6 +53,22 @@ public sealed class VpnRestoreOwnershipStateTests
     }
 
     [Fact]
+    public void Confirmed_callback_marks_only_the_matching_owner_ready_for_restore()
+    {
+        var current = VpnRestoreOwnershipState.Empty
+            .Begin(OwnerA)
+            .RequireRestore()
+            .Commit(OwnerA);
+
+        var ignored = current.MarkRestoreReady(OwnerB.PackageName, OwnerB.LaunchId);
+        var ready = current.MarkRestoreReady(OwnerA.PackageName, OwnerA.LaunchId);
+
+        Assert.Equal(current, ignored);
+        Assert.True(ready.RestoreReady);
+        Assert.Equal(OwnerA, ready.ActiveOwner);
+    }
+
+    [Fact]
     public void Begin_rejects_a_second_simultaneous_pending_owner()
     {
         var state = VpnRestoreOwnershipState.Empty.Begin(OwnerA);

@@ -5,48 +5,34 @@ namespace Agnosia.Android.Activities;
 internal static class PackageInstallerCallbackCoordinator
 {
     private static readonly Lock Sync = new();
-    private static DummyActivity? _activeActivity;
-    private static Intent? _pendingCallback;
+    private static readonly Dictionary<string, DummyActivity> Operations = new(StringComparer.Ordinal);
 
-    public static void RegisterActive(DummyActivity activity)
+    public static void Register(string operationId, DummyActivity activity)
     {
         lock (Sync)
         {
-            _activeActivity = activity;
+            Operations.Add(operationId, activity);
         }
     }
 
-    public static void UnregisterActive(DummyActivity activity)
+    public static void Unregister(string? operationId, DummyActivity activity)
     {
+        if (operationId is null) return;
         lock (Sync)
         {
-            if (ReferenceEquals(_activeActivity, activity)) _activeActivity = null;
-        }
-    }
-
-    public static Intent? TakePendingCallback()
-    {
-        lock (Sync)
-        {
-            if (_pendingCallback is null) return null;
-
-            var pendingCallback = new Intent(_pendingCallback);
-            _pendingCallback = null;
-            return pendingCallback;
+            if (Operations.TryGetValue(operationId, out var owner) && ReferenceEquals(owner, activity))
+                Operations.Remove(operationId);
         }
     }
 
     public static void Dispatch(Intent intent)
     {
+        var operationId = intent.GetStringExtra(AndroidCommandContract.ExtraPackageInstallerOperationId);
+        if (operationId is null) return;
         DummyActivity? activity;
         lock (Sync)
         {
-            activity = _activeActivity;
-            if (activity is null)
-            {
-                _pendingCallback = new Intent(intent);
-                return;
-            }
+            if (!Operations.TryGetValue(operationId, out activity)) return;
         }
 
         activity.RunOnUiThread(() => activity.HandlePackageInstallerCallback(new Intent(intent)));

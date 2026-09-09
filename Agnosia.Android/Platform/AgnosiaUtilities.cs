@@ -1,4 +1,5 @@
 using Agnosia.Android.Api.Internal;
+using Agnosia.Android.Files;
 using Android.App.Admin;
 using Android.Content;
 using Android.Content.PM;
@@ -28,6 +29,8 @@ public static class AgnosiaUtilities
     public static void TransferIntentToProfile(Context context, Intent intent)
     {
         TransferIntentToProfileUnsigned(context, intent);
+        if (AndroidCommandIntentMapper.TryFromAction(intent.Action, out _))
+            AndroidCommandIntentMapper.PutOutgoingIdentity(intent);
         AuthenticationUtility.SignIntent(intent);
     }
 
@@ -199,6 +202,11 @@ public static class AgnosiaUtilities
             context.PackageName,
             AndroidCommandContract.FileShuttleDocumentsProviderComponent);
         var enabled = ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.CrossProfileFileShuttleEnabled);
+        if (!enabled)
+        {
+            AgnosiaFileShuttleClientBroker.Disconnect();
+            AgnosiaFileShuttleService.Stop(context);
+        }
         var state = enabled
             ? ComponentEnabledState.Enabled
             : ComponentEnabledState.Disabled;

@@ -48,6 +48,11 @@ public sealed partial class DummyActivity
         if (_finishRequested || _destroyCancellation.IsCancellationRequested) return;
 
         _finishRequested = true;
+        ReleasePackageInstallerCallback();
+        if (AgnosiaUtilities.IsProfileOwner(this)
+            && Intent?.Action == AgnosiaActions.UnfreezeAndLaunch
+            && AndroidAppLaunchResult.TryRead(data, out var launchResult))
+            AndroidWorkLaunchAcknowledgement.SendResult(this, Intent, launchResult.ToOperationResult());
         if (_hasAuthenticatedCommand)
         {
             data ??= new Intent();
@@ -91,6 +96,12 @@ public sealed partial class DummyActivity
 
     internal void HandlePackageInstallerCallback(Intent? intent)
     {
+        if (_finishRequested || _packageInstallerOperationId is null
+            || !string.Equals(_packageInstallerOperationId,
+                intent?.GetStringExtra(AndroidCommandContract.ExtraPackageInstallerOperationId),
+                StringComparison.Ordinal))
+            return;
+
         RunAction(
             cancellationToken => HandlePackageInstallerCallbackAsync(intent, cancellationToken),
             "Android не смог обработать результат установки пакета.");
@@ -159,9 +170,4 @@ public sealed partial class DummyActivity
             : $"Android отклонил установку пакета: {statusMessage}");
     }
 
-    private void DeliverPendingPackageInstallerCallback()
-    {
-        if (PackageInstallerCallbackCoordinator.TakePendingCallback() is { } pendingCallback)
-            HandlePackageInstallerCallback(pendingCallback);
-    }
 }

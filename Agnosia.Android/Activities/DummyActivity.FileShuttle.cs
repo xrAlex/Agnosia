@@ -13,7 +13,9 @@ public sealed partial class DummyActivity
 
     private void ActionStartFileShuttle()
     {
+        FileShuttleServiceConnection? connection = null;
         var callback = AndroidIntentExtras.ReadFileShuttleCallbackMessenger(Intent);
+        var connectionId = Intent?.GetStringExtra(AgnosiaFileShuttleContract.ExtraConnectionId);
         if (callback is null)
         {
             Finish();
@@ -22,21 +24,21 @@ public sealed partial class DummyActivity
 
         if (!IsFileShuttleActionForCurrentProfile())
         {
-            SendFileShuttleConnectResult(callback, null, "File Shuttle запущен не в том профиле.");
+            SendFileShuttleConnectResult(callback, connectionId, null, "File Shuttle запущен не в том профиле.");
             Finish();
             return;
         }
 
         if (!ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.CrossProfileFileShuttleEnabled))
         {
-            SendFileShuttleConnectResult(callback, null, "File Shuttle выключен в Agnosia.");
+            SendFileShuttleConnectResult(callback, connectionId, null, "File Shuttle выключен в Agnosia.");
             Finish();
             return;
         }
 
         if (!AndroidPermissionApi.HasAllFilesAccess(this))
         {
-            SendFileShuttleConnectResult(callback, null, "Agnosia не получила доступ ко всем файлам в этом профиле.");
+            SendFileShuttleConnectResult(callback, connectionId, null, "Agnosia не получила доступ ко всем файлам в этом профиле.");
             Finish();
             return;
         }
@@ -44,20 +46,23 @@ public sealed partial class DummyActivity
         try
         {
             AgnosiaFileShuttleService.EnsureStarted(this);
-            var connection = new FileShuttleServiceConnection(this, ApplicationContext ?? this, callback);
+            connection = new FileShuttleServiceConnection(this, ApplicationContext ?? this, callback, connectionId);
             AddFileShuttleConnection(connection);
 
             var intent = new Intent(this, typeof(AgnosiaFileShuttleService));
+            intent.PutExtra(AndroidCommandContract.ExtraFileShuttleCallbackMessenger, callback);
+            intent.PutExtra(AgnosiaFileShuttleContract.ExtraConnectionId, connectionId);
             if ((ApplicationContext ?? this).BindService(intent, connection, Bind.AutoCreate)) return;
 
             RemoveFileShuttleConnection(connection);
-            SendFileShuttleConnectResult(callback, null, "Android не смог привязаться к File Shuttle service.");
+            SendFileShuttleConnectResult(callback, connectionId, null, "Android не смог привязаться к File Shuttle service.");
             Finish();
         }
         catch (Exception exception)
         {
+            if (connection is not null) RemoveFileShuttleConnection(connection);
             Log.Warn(LogTag, $"Failed to start File Shuttle service: {exception}");
-            SendFileShuttleConnectResult(callback, null, "Android не смог запустить File Shuttle.");
+            SendFileShuttleConnectResult(callback, connectionId, null, "Android не смог запустить File Shuttle.");
             Finish();
         }
     }
@@ -88,19 +93,6 @@ public sealed partial class DummyActivity
         }
     }
 
-    private static void RetainFileShuttleConnection(FileShuttleServiceConnection connection)
-    {
-        FileShuttleServiceConnection[] staleConnections;
-        lock (FileShuttleConnectionSync)
-        {
-            staleConnections = FileShuttleConnections
-                .Where(candidate => !ReferenceEquals(candidate, connection))
-                .ToArray();
-        }
-
-        foreach (var staleConnection in staleConnections) staleConnection.Disconnect();
-    }
-
     private void CloseFileShuttleConnections()
     {
         FileShuttleServiceConnection[] connections;
@@ -116,8 +108,10 @@ public sealed partial class DummyActivity
 
     private static void SendFileShuttleConnectResult(
         Messenger callback,
+        string? connectionId,
         Messenger? serviceMessenger,
-        string? error)
+        string? error,
+        PendingIntent? reconnectIntent = null)
     {
         try
         {
@@ -125,8 +119,11 @@ public sealed partial class DummyActivity
                           ?? throw new InvalidOperationException(
                               "Android did not create a File Shuttle connect message.");
             var data = new Bundle();
+            data.PutString(AgnosiaFileShuttleContract.ExtraConnectionId, connectionId);
             if (serviceMessenger is not null)
                 data.PutParcelable(AgnosiaFileShuttleContract.ExtraServiceMessenger, serviceMessenger);
+            if (reconnectIntent is not null)
+                data.PutParcelable(AgnosiaFileShuttleContract.ExtraReconnectIntent, reconnectIntent);
             if (!string.IsNullOrWhiteSpace(error))
                 data.PutString(AgnosiaFileShuttleContract.ExtraError, error);
             message.Data = data;
@@ -141,7 +138,8 @@ public sealed partial class DummyActivity
     private sealed class FileShuttleServiceConnection(
         DummyActivity activity,
         Context bindingContext,
-        Messenger callback) : Java.Lang.Object, IServiceConnection
+        Messenger callback,
+        string? connectionId) : Java.Lang.Object, IServiceConnection
     {
         private DummyActivity? _activity = activity;
 
@@ -158,17 +156,13 @@ public sealed partial class DummyActivity
                 var serviceMessenger = service is null ? null : new Messenger(service);
                 SendFileShuttleConnectResult(
                     callback,
+                    connectionId,
                     serviceMessenger,
-                    serviceMessenger is null ? "File Shuttle service не вернул Binder." : null);
-                if (serviceMessenger is not null)
-                {
-                    _activity = null;
-                    RetainFileShuttleConnection(this);
-                }
-                else
-                {
-                    Disconnect();
-                }
+                    serviceMessenger is null ? "File Shuttle service не вернул Binder." : null,
+                    serviceMessenger is null ? null : AgnosiaFileShuttleService.CreateReconnectIntent(
+                        bindingContext, callback, connectionId));
+                _activity = null;
+                Disconnect();
             }
             finally
             {

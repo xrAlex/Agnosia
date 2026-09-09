@@ -37,7 +37,7 @@
                             <TextBlock Classes="page-caption"
                                        Text="Выдача разрешений для корректной работы приложения" />
                         </StackPanel>
-                        <Button Grid.Column="2"
+                        <Button AutomationProperties.Name="Открыть разрешения" Grid.Column="2"
                                 Classes="icon-button"
                                 ToolTip.Tip="Открыть разрешения"
                                 VerticalAlignment="Center"
@@ -72,20 +72,20 @@
                               Grid.ColumnSpan="2" Grid.Column="0"
                               ColumnDefinitions="*,*,*"
                               ColumnSpacing="10">
-                            <Button Classes="segment-chip"
+                            <Button AutomationProperties.Name="Красная" Classes="segment-chip"
                                     Classes.selected="{Binding IsAgnosiaThemeSelected}"
                                     Command="{Binding SelectAgnosiaThemeCommand}">
                                 <TextBlock Classes="button-label"
                                            Text="Красная" />
                             </Button>
-                            <Button Grid.Column="1"
+                            <Button AutomationProperties.Name="Темная" Grid.Column="1"
                                     Classes="segment-chip"
                                     Classes.selected="{Binding IsDarkThemeSelected}"
                                     Command="{Binding SelectDarkThemeCommand}">
                                 <TextBlock Classes="button-label"
                                            Text="Темная" />
                             </Button>
-                            <Button Grid.Column="2"
+                            <Button AutomationProperties.Name="Светлая" Grid.Column="2"
                                     Classes="segment-chip"
                                     Classes.selected="{Binding IsLightThemeSelected}"
                                     Command="{Binding SelectLightThemeCommand}">

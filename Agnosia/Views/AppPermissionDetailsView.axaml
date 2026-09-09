@@ -10,7 +10,7 @@
     <StackPanel Spacing="8">
         <Border Classes="divider" />
 
-        <ToggleButton Classes="app-dialog-section-toggle"
+        <ToggleButton AutomationProperties.Name="Разрешения приложения" Classes="app-dialog-section-toggle"
                       IsChecked="{Binding IsPermissionDetailsExpanded}">
             <Grid ColumnDefinitions="*,Auto"
                   ColumnSpacing="8">
@@ -72,7 +72,7 @@
                            Text="Runtime permissions" />
                 <TextBlock Classes="app-dialog-permission-risk-list"
                            Text="{Binding RuntimePermissionsText}" />
-                <Button Classes="compact-action"
+                <Button AutomationProperties.Name="Отозвать runtime-разрешения" Classes="compact-action"
                         Margin="0,6,0,0"
                         HorizontalAlignment="Left"
                         IsVisible="{Binding CanRevokeRuntimePermissions}"

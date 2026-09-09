@@ -63,7 +63,7 @@
                                             </WrapPanel>
                                         </StackPanel>
 
-                                        <Button Grid.Column="2"
+                                        <Button AutomationProperties.Name="{Binding LaunchLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}" Grid.Column="2"
                                                 Classes="icon-button app-dialog-close"
                                                 ToolTip.Tip="{Binding LaunchLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}"
                                                 Command="{Binding LaunchCommand}"
@@ -73,7 +73,7 @@
                                                       Data="{StaticResource IconLaunchGeometry}" />
                                         </Button>
 
-                                        <Button Grid.Column="3"
+                                        <Button AutomationProperties.Name="Закрыть" Grid.Column="3"
                                                 Classes="icon-button app-dialog-close"
                                                 ToolTip.Tip="Закрыть"
                                                 Command="{Binding CloseControlsCommand}">
@@ -85,7 +85,7 @@
                                     <Border Classes="divider" />
 
                                     <StackPanel Spacing="8">
-                                        <Button Classes="compact-action app-dialog-action"
+                                        <Button AutomationProperties.Name="{Binding CloneLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}" Classes="compact-action app-dialog-action"
                                                 Command="{Binding CloneCommand}"
                                                 IsEnabled="{Binding CanClone}">
                                             <Grid ColumnDefinitions="Auto,*"
@@ -98,7 +98,7 @@
                                             </Grid>
                                         </Button>
 
-                                        <Button Classes="compact-action app-dialog-action"
+                                        <Button AutomationProperties.Name="{Binding MoveToWorkLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}" Classes="compact-action app-dialog-action"
                                                 Command="{Binding MoveToWorkCommand}"
                                                 IsVisible="{Binding CanMoveToWork}"
                                                 IsEnabled="{Binding CanMoveToWork}">
@@ -112,7 +112,7 @@
                                             </Grid>
                                         </Button>
 
-                                        <Button Classes="compact-action app-dialog-action"
+                                        <Button AutomationProperties.Name="{Binding CreateShortcutLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}" Classes="compact-action app-dialog-action"
                                                 Command="{Binding CreateShortcutCommand}"
                                                 IsVisible="{Binding IsAgnosiaManaged}">
                                             <Grid ColumnDefinitions="Auto,*"
@@ -125,7 +125,7 @@
                                             </Grid>
                                         </Button>
 
-                                        <Button Classes="compact-action app-dialog-action"
+                                        <Button AutomationProperties.Name="{Binding ForceFreezeLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}" Classes="compact-action app-dialog-action"
                                                 Command="{Binding ForceFreezeCommand}"
                                                 IsVisible="{Binding IsAgnosiaManaged}"
                                                 IsEnabled="{Binding CanFreeze}">
@@ -139,7 +139,7 @@
                                             </Grid>
                                         </Button>
 
-                                        <Button Classes="compact-action app-dialog-action"
+                                        <Button AutomationProperties.Name="{Binding UninstallLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}" Classes="compact-action app-dialog-action"
                                                 Command="{Binding UninstallCommand}"
                                                 IsEnabled="{Binding CanUninstall}">
                                             <Grid ColumnDefinitions="Auto,*"

@@ -11,6 +11,7 @@ internal sealed partial record HiddenAppSessionState(
     AndroidAppLaunchResult? LaunchResult = null)
 {
     public string? ParentCallbackLaunchId { get; init; }
+    public HiddenAppSessionState? PreviousSession { get; init; }
 
     public static HiddenAppSessionState Create(
         string packageName,
@@ -41,23 +42,40 @@ internal sealed record HiddenAppPendingHideState(
     int FailedAttempts,
     long NextAttemptAtUnixTimeMilliseconds);
 
+internal sealed record HiddenAppPendingParentNotificationState(
+    HiddenAppSessionState Session,
+    string Reason,
+    int FailedAttempts,
+    long NextAttemptAtUnixTimeMilliseconds);
+
 internal sealed record HiddenAppSessionStoreState(
     HiddenAppSessionState? ActiveSession,
     HiddenAppPendingHideState[] PendingHides,
+    HiddenAppPendingParentNotificationState[] PendingParentNotifications,
     int Version = HiddenAppSessionStoreState.CurrentVersion)
 {
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
     public const string SessionReplacedReason = "session_replaced";
     public const string ScreenLockPersistedReason = "screen_lock_persisted_session";
+    public const string TemporaryPolicyVisibilityReason = "temporary_policy_visibility";
 
-    public static HiddenAppSessionStoreState Empty { get; } = new(null, []);
+    public static HiddenAppSessionStoreState Empty { get; } = new(null, [], []);
 
     public bool IsEmpty => ActiveSession is null
-                           && PendingHides.Length == 0;
+                           && PendingHides.Length == 0
+                           && PendingParentNotifications.Length == 0;
+
+    public bool RequiresPackageMonitoring => ActiveSession is not null || PendingHides.Length > 0;
 
     public HiddenAppSessionStoreState StartOrReplace(HiddenAppSessionState session, DateTimeOffset now)
     {
         var pendingHides = PendingHides
+            .Where(pending => !string.Equals(
+                pending.Session.PackageName,
+                session.PackageName,
+                StringComparison.Ordinal))
+            .ToArray();
+        var pendingParentNotifications = PendingParentNotifications
             .Where(pending => !string.Equals(
                 pending.Session.PackageName,
                 session.PackageName,
@@ -73,7 +91,33 @@ internal sealed record HiddenAppSessionStoreState(
         return this with
         {
             ActiveSession = session,
-            PendingHides = pendingHides
+            PendingHides = pendingHides,
+            PendingParentNotifications = pendingParentNotifications
+        };
+    }
+
+    public HiddenAppSessionStoreState ReservePendingHide(
+        HiddenAppSessionState session,
+        string reason,
+        DateTimeOffset now)
+    {
+        return this with { PendingHides = AddPending(PendingHides, session, reason, now) };
+    }
+
+    public HiddenAppSessionStoreState CancelActive(string sessionId)
+    {
+        return ActiveSession is { } active
+               && string.Equals(active.SessionId, sessionId, StringComparison.Ordinal)
+            ? RestorePreviousSession(active.PreviousSession)
+            : this;
+    }
+
+    public HiddenAppSessionStoreState RestorePreviousSession(HiddenAppSessionState? previous)
+    {
+        return this with
+        {
+            ActiveSession = previous,
+            PendingHides = PendingHides.Where(item => item.Session.SessionId != previous?.SessionId).ToArray()
         };
     }
 
@@ -122,23 +166,101 @@ internal sealed record HiddenAppSessionStoreState(
         return this with { PendingHides = pendingHides };
     }
 
-    public HiddenAppSessionStoreState ConfirmHidden(string sessionId, DateTimeOffset _)
+    public HiddenAppSessionStoreState ConfirmHidden(string sessionId, DateTimeOffset now)
     {
         var index = Array.FindIndex(
             PendingHides,
             pending => string.Equals(pending.Session.SessionId, sessionId, StringComparison.Ordinal));
         if (index < 0) return this;
 
+        var completed = PendingHides[index];
         var pendingHides = PendingHides
             .Where((_, pendingIndex) => pendingIndex != index)
             .ToArray();
-        return this with { PendingHides = pendingHides };
+        if (string.Equals(completed.Reason, SessionReplacedReason, StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(completed.Session.ParentCallbackLaunchId))
+        {
+            return this with { PendingHides = pendingHides };
+        }
+
+        return this with
+        {
+            PendingHides = pendingHides,
+            PendingParentNotifications = AddPendingParentNotification(
+                PendingParentNotifications,
+                completed.Session,
+                completed.Reason,
+                now)
+        };
+    }
+
+    public HiddenAppSessionStoreState RecordParentNotificationFailure(string sessionId, DateTimeOffset now)
+    {
+        var index = Array.FindIndex(
+            PendingParentNotifications,
+            pending => string.Equals(pending.Session.SessionId, sessionId, StringComparison.Ordinal));
+        if (index < 0) return this;
+
+        var failedAttempts = PendingParentNotifications[index].FailedAttempts + 1;
+        var updated = PendingParentNotifications[index] with
+        {
+            FailedAttempts = failedAttempts,
+            NextAttemptAtUnixTimeMilliseconds = now
+                .Add(HiddenAppHideRetryPolicy.GetDelay(failedAttempts))
+                .ToUnixTimeMilliseconds()
+        };
+        var notifications = PendingParentNotifications.ToArray();
+        notifications[index] = updated;
+        return this with { PendingParentNotifications = notifications };
+    }
+
+    public HiddenAppSessionStoreState ConfirmParentNotification(string packageName, string launchId)
+    {
+        var notifications = PendingParentNotifications
+            .Where(pending => !(
+                string.Equals(pending.Session.PackageName, packageName, StringComparison.Ordinal)
+                && string.Equals(pending.Session.ParentCallbackLaunchId, launchId, StringComparison.Ordinal)))
+            .ToArray();
+        return notifications.Length == PendingParentNotifications.Length
+            ? this
+            : this with { PendingParentNotifications = notifications };
+    }
+
+    public string? GetPersistedLaunchId(string packageName)
+    {
+        if (ActiveSession is { } active
+            && string.Equals(active.PackageName, packageName, StringComparison.Ordinal)
+            && !string.IsNullOrWhiteSpace(active.ParentCallbackLaunchId))
+        {
+            return active.ParentCallbackLaunchId;
+        }
+
+        return PendingHides
+                   .Where(pending => !string.Equals(
+                       pending.Reason,
+                       SessionReplacedReason,
+                       StringComparison.Ordinal))
+                   .Select(pending => pending.Session)
+                   .Concat(PendingParentNotifications.Select(pending => pending.Session))
+                   .Where(session => string.Equals(session.PackageName, packageName, StringComparison.Ordinal)
+                                     && !string.IsNullOrWhiteSpace(session.ParentCallbackLaunchId))
+                   .OrderByDescending(session => session.StartedAtUnixTimeMilliseconds)
+                   .Select(session => session.ParentCallbackLaunchId)
+                   .FirstOrDefault();
     }
 
     public HiddenAppPendingHideState[] GetDuePendingHides(DateTimeOffset now)
     {
         var nowUnixTimeMilliseconds = now.ToUnixTimeMilliseconds();
         return PendingHides
+            .Where(pending => pending.NextAttemptAtUnixTimeMilliseconds <= nowUnixTimeMilliseconds)
+            .ToArray();
+    }
+
+    public HiddenAppPendingParentNotificationState[] GetDueParentNotifications(DateTimeOffset now)
+    {
+        var nowUnixTimeMilliseconds = now.ToUnixTimeMilliseconds();
+        return PendingParentNotifications
             .Where(pending => pending.NextAttemptAtUnixTimeMilliseconds <= nowUnixTimeMilliseconds)
             .ToArray();
     }
@@ -168,6 +290,31 @@ internal sealed record HiddenAppSessionStoreState(
         ];
     }
 
+    private static HiddenAppPendingParentNotificationState[] AddPendingParentNotification(
+        HiddenAppPendingParentNotificationState[] notifications,
+        HiddenAppSessionState session,
+        string reason,
+        DateTimeOffset now)
+    {
+        if (notifications.Any(pending => string.Equals(
+                pending.Session.SessionId,
+                session.SessionId,
+                StringComparison.Ordinal)))
+        {
+            return notifications;
+        }
+
+        return
+        [
+            ..notifications,
+            new HiddenAppPendingParentNotificationState(
+                session,
+                reason,
+                0,
+                now.ToUnixTimeMilliseconds())
+        ];
+    }
+
 }
 
 internal static class HiddenAppHideRetryPolicy
@@ -186,5 +333,56 @@ internal static class HiddenAppHideRetryPolicy
     {
         var index = Math.Clamp(failedAttempts - 1, 0, Delays.Length - 1);
         return Delays[index];
+    }
+}
+
+internal static class HiddenAppSessionConcurrency
+{
+    private static readonly SemaphoreSlim OperationGate = new(1, 1);
+
+    public static async ValueTask<IDisposable> EnterOperationAsync(CancellationToken cancellationToken = default)
+    {
+        await OperationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        return new OperationLease(OperationGate);
+    }
+
+    public static IDisposable EnterOperation()
+    {
+        OperationGate.Wait();
+        return new OperationLease(OperationGate);
+    }
+
+    public static bool TryEnterOperation(out IDisposable? lease)
+    {
+        if (!OperationGate.Wait(0))
+        {
+            lease = null;
+            return false;
+        }
+
+        lease = new OperationLease(OperationGate);
+        return true;
+    }
+
+    public static Task QueueMonitor(
+        CancellationToken cancellationToken,
+        Func<CancellationToken, Task> monitor,
+        Func<Func<Task>, Task>? queue = null)
+    {
+        ArgumentNullException.ThrowIfNull(monitor);
+        var capturedToken = cancellationToken;
+        return queue is null
+            ? Task.Run(() => monitor(capturedToken))
+            : queue(() => monitor(capturedToken));
+    }
+
+    private sealed class OperationLease(SemaphoreSlim gate) : IDisposable
+    {
+        private SemaphoreSlim? _gate = gate;
+
+        public void Dispose()
+        {
+            Interlocked.Exchange(ref _gate, null)?.Release();
+        }
     }
 }

@@ -1,6 +1,7 @@
 #if AGNOSIA_ANDROID
 using System.Diagnostics;
 using System.Text.Json;
+using Agnosia.Android.Services;
 using Android.Content.PM;
 #endif
 
@@ -11,7 +12,17 @@ internal sealed class QueryPackageStateCommandHandler : IAndroidCommandHandler
     public AndroidCommandKind Kind => AndroidCommandKind.QueryPackageState;
 
 #if AGNOSIA_ANDROID
-    public Task<AndroidCommandResultEnvelope> ExecuteAsync(
+    public async Task<AndroidCommandResultEnvelope> ExecuteAsync(
+        AndroidCommandEnvelope envelope,
+        AndroidCommandExecutionContext context,
+        CancellationToken cancellationToken)
+    {
+        using var operation = await HiddenAppSessionConcurrency.EnterOperationAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return await ExecuteCoreAsync(envelope, context, cancellationToken).ConfigureAwait(false);
+    }
+
+    private Task<AndroidCommandResultEnvelope> ExecuteCoreAsync(
         AndroidCommandEnvelope envelope,
         AndroidCommandExecutionContext context,
         CancellationToken cancellationToken)
@@ -68,10 +79,17 @@ internal sealed class QueryPackageStateCommandHandler : IAndroidCommandHandler
                             && (app.Flags & ApplicationInfoFlags.Installed) != 0;
             var hidden = installed
                          && context.PolicyManager.IsApplicationHidden(context.Admin, query.PackageName);
+            var launchId = HiddenAppSessionMonitorService.GetPersistedLaunchId(query.PackageName);
+            var recoveryAcknowledged = !string.IsNullOrWhiteSpace(query.ConfirmedRecoveryLaunchId)
+                                       && HiddenAppSessionMonitorService.ConfirmParentNotification(
+                                           query.PackageName,
+                                           query.ConfirmedRecoveryLaunchId);
             var payloadJson = JsonSerializer.Serialize(new PackageStateResult(
                 query.PackageName,
                 installed,
-                hidden));
+                hidden,
+                launchId,
+                recoveryAcknowledged));
 
             stopwatch.Stop();
             return Task.FromResult(AndroidCommandResultEnvelope.Success(
@@ -89,6 +107,8 @@ internal sealed class QueryPackageStateCommandHandler : IAndroidCommandHandler
             var payloadJson = JsonSerializer.Serialize(new PackageStateResult(
                 query.PackageName,
                 false,
+                false,
+                HiddenAppSessionMonitorService.GetPersistedLaunchId(query.PackageName),
                 false));
             return Task.FromResult(AndroidCommandResultEnvelope.Success(
                 envelope.CorrelationId,

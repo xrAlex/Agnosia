@@ -28,20 +28,27 @@ public sealed partial class DummyActivity
         var name = intent?.GetStringExtra("name");
         if (string.IsNullOrWhiteSpace(name))
         {
-            Finish();
+            FinishWithError("Не указано имя настройки.");
             return;
         }
 
         if (intent?.HasExtra("boolean") == true)
         {
             var booleanValue = intent.GetBooleanExtra("boolean", false);
-            ServiceRegistry.GetRequiredService<LocalStorageManager>().SetBoolean(name, booleanValue);
+            ServiceRegistry.GetRequiredService<LocalStorageManager>().SetValues(
+                new Dictionary<string, bool> { [name] = booleanValue },
+                new Dictionary<string, string>());
             if (string.Equals(name, StorageKeys.LoggingEnabled, StringComparison.Ordinal) && !booleanValue)
                 AndroidAppLogArchive.Clear(this);
         }
         else if (intent?.HasExtra("int") == true)
         {
             ServiceRegistry.GetRequiredService<LocalStorageManager>().SetInt(name, intent.GetIntExtra("int", int.MinValue));
+        }
+        else
+        {
+            FinishWithError("Не указано значение настройки.");
+            return;
         }
 
         if (_isProfileOwner)

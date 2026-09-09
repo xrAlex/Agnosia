@@ -83,6 +83,7 @@ public sealed class PlexusBackground : Control
         AttachedToVisualTree += (_, _) =>
         {
             _isAttached = true;
+            Agnosia.Infrastructure.UiAnimationState.Changed += UpdateTimerState;
             _lastFrameUtc = DateTime.UtcNow;
             EnsureNodes(_nodes.Count == 0);
             UpdateTimerState();
@@ -91,6 +92,7 @@ public sealed class PlexusBackground : Control
         DetachedFromVisualTree += (_, _) =>
         {
             _isAttached = false;
+            Agnosia.Infrastructure.UiAnimationState.Changed -= UpdateTimerState;
             _animationTimer.Stop();
         };
     }
@@ -302,7 +304,8 @@ public sealed class PlexusBackground : Control
 
     private bool CanAnimate()
     {
-        return _isAttached && IsVisible && Bounds.Width > 1 && Bounds.Height > 1;
+        return _isAttached && IsVisible && Agnosia.Infrastructure.UiAnimationState.IsActive
+            && Bounds.Width > 1 && Bounds.Height > 1;
     }
 
     private void EnsureRenderBrushes(

@@ -3,7 +3,6 @@ using Agnosia.Android.Commands.Handlers;
 using Agnosia.Models;
 using Android.Content;
 using Android.Content.PM;
-using Android.OS;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Gateways;
@@ -441,36 +440,21 @@ public static class AndroidProfileCommandGateway
             blocked ? "Интернет приложения заблокирован." : "Интернет приложения разблокирован.");
     }
 
-    public static Task<OperationResult> SynchronizeBooleanToWorkProfileAsync(
+    public static async Task<OperationResult> SynchronizeBooleanToWorkProfileAsync(
         Context context,
         string name,
         bool value,
         CancellationToken cancellationToken = default)
     {
-        if (cancellationToken.IsCancellationRequested) return Task.FromCanceled<OperationResult>(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var intent = new Intent(AgnosiaActions.SynchronizePreference);
         intent.PutExtra(AndroidCommandContract.ExtraPreferenceName, name);
         intent.PutExtra(AndroidCommandContract.ExtraPreferenceBoolean, value);
-        return Task.FromResult(StartOtherProfileActivity(
-            context,
-            intent,
-            "OK",
-            $"Android не смог синхронизировать настройку {name} с рабочим профилем."));
-    }
-
-    public static OperationResult FreezePackageInWorkProfile(
-        Context context,
-        string packageName,
-        string successMessage)
-    {
-        var intent = new Intent(AgnosiaActions.FreezePackage);
-        intent.PutExtra(AndroidCommandContract.ExtraPackage, packageName);
-        return StartOtherProfileActivity(
-            context,
-            intent,
-            successMessage,
-            $"Android не смог скрыть {packageName} в рабочем профиле.");
+        AgnosiaRuntime.Initialize(context);
+        return await ServiceRegistry.GetRequiredService<AndroidActivityCommandGateway>()
+            .RunVoidOperationAsync(intent, true, cancellationToken, "Настройка применена в рабочем профиле.")
+            .ConfigureAwait(false);
     }
 
     private static async Task<bool> QueryWorkPermissionBooleanAsync(
@@ -686,56 +670,6 @@ public static class AndroidProfileCommandGateway
         intent.PutExtra(AndroidCommandContract.ExtraPackage, packageName);
         intent.PutExtra(AndroidCommandContract.ExtraIsSystem, true);
         return intent;
-    }
-
-    private static OperationResult StartOtherProfileActivity(
-        Context context,
-        Intent intent,
-        string successMessage,
-        string errorMessage)
-    {
-        try
-        {
-            AgnosiaRuntime.Initialize(context);
-            intent.AddFlags(ActivityFlags.NewTask);
-            intent.AddCategory(Intent.CategoryDefault);
-            AgnosiaUtilities.TransferIntentToProfile(context, intent);
-            Log.Debug(
-                LogTag,
-                $"Starting other-profile activity. action={intent.Action ?? "<none>"}, component={intent.Component?.PackageName ?? "<none>"}/{intent.Component?.ClassName ?? "<none>"}.");
-            StartActivityOnMainThread(context, intent);
-            return OperationResult.Success(successMessage);
-        }
-        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
-        {
-            Log.Warn(LogTag, $"{errorMessage} Details: {exception}");
-            return OperationResult.Failure(errorMessage);
-        }
-    }
-
-    private static void StartActivityOnMainThread(Context context, Intent intent)
-    {
-        if (Looper.MainLooper?.IsCurrentThread == true)
-        {
-            context.StartActivity(intent);
-            return;
-        }
-
-        var mainLooper = Looper.MainLooper
-                         ?? throw new InvalidOperationException("Android main looper is unavailable.");
-        new Handler(mainLooper).Post(() =>
-        {
-            try
-            {
-                context.StartActivity(intent);
-            }
-            catch (Exception exception)
-            {
-                Log.Warn(
-                    LogTag,
-                    $"Failed to start other-profile activity on main thread. action={intent.Action ?? "<none>"}; error={exception.Message}");
-            }
-        });
     }
 
     private static WorkProfileOwnerCheckResult InterpretProfilePingResult(AndroidActivityResult result)

@@ -13,16 +13,19 @@ internal static class AndroidIntentExtras
     }
 
     public static PendingIntent? ReadParentFrozenCallback(Intent? intent)
+        => ReadPendingIntent(intent, AndroidCommandContract.ExtraParentFrozenCallback);
+
+    public static PendingIntent? ReadPendingIntent(Intent? intent, string key)
     {
         if (intent is null) return null;
 
         if (OperatingSystem.IsAndroidVersionAtLeast(33))
             return intent.GetParcelableExtra(
-                AndroidCommandContract.ExtraParentFrozenCallback,
+                key,
                 Class.FromType(typeof(PendingIntent))) as PendingIntent;
 
 #pragma warning disable CA1422
-        return intent.GetParcelableExtra(AndroidCommandContract.ExtraParentFrozenCallback) as PendingIntent;
+        return intent.GetParcelableExtra(key) as PendingIntent;
 #pragma warning restore CA1422
     }
 

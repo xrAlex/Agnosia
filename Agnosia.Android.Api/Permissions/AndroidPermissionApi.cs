@@ -14,6 +14,29 @@ public static class AndroidPermissionApi
     private const string LogTag = "AgnosiaPermissions";
     private const int NotificationPermissionRequestCode = 0x57C32;
 
+    public static bool HasVpnControlPermission(Context context)
+    {
+        try
+        {
+            // AOSP's VPN consent app-op. Prepare() can revoke an active external VPN,
+            // so passive UI reads must never use it, even as a fallback.
+            const string activateVpnOperation = "android:activate_vpn";
+            if (context.ApplicationInfo is not { } appInfo
+                || context.PackageName is not { } packageName
+                || AndroidSystemApi.GetAppOpsManager(context) is not { } appOps) return false;
+
+            var mode = OperatingSystem.IsAndroidVersionAtLeast(36)
+                ? appOps.CheckOpNoThrow(activateVpnOperation, appInfo.Uid, packageName)
+                : appOps.UnsafeCheckOpNoThrow(activateVpnOperation, appInfo.Uid, packageName);
+            return mode == AppOpsManagerMode.Allowed;
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn(LogTag, $"Failed to read VPN consent: {exception}");
+            return false;
+        }
+    }
+
     public static bool HasNotificationPermission(Activity activity)
     {
         try

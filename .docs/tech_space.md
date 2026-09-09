@@ -115,7 +115,9 @@ UI собран вокруг одного рабочего пространст�
 | `LogOverlayView` | Журнал событий и строка диагностики устройства. | Просмотр и очистка через настройки логирования. |
 | Work profile recovery overlay | Ошибка или потеря рабочего профиля. | Открыть настройки профиля или начать онбординг заново. |
 
-Нижняя навигация переключает только секции `Overview`, `Apps` и `Settings`. Overlay-окна накладываются поверх текущей секции и не создают отдельную Android-навигацию.
+Нижняя навигация переключает секции `Overview`, `Apps`, `Modules` и `Settings`. Overlay-окна накладываются поверх текущей секции и не создают отдельную Android-навигацию.
+
+Системная «Назад» обрабатывается через `TopLevel.BackRequested` в `MainView`: `TryHandleBack()` закрывает только верхнее доступное overlay в порядке recovery → карточка приложения → модуль → разрешения → журнал. Онбординг не закрывается этим обработчиком; без overlay событие передаётся платформе. Подписка снимается при отсоединении view. Кнопки с составным содержимым имеют явное `AutomationProperties.Name`, включая локализованные подписи действий.
 
 ## Рабочий профиль
 
@@ -173,6 +175,12 @@ Android разделяет личный и рабочий профили, поэ
 `DummyActivity` строит `AndroidCommandExecutionContext` из собственного контекста Activity/профиля и вызывает общий обработчик команд через `AndroidCommandHandlerExecutor`. Так бизнес-логика остаётся в одном источнике, а зависимость от `MainActivity` в рабочем профиле не появляется. Activity использует отдельную non-dimmed translucent theme, чтобы неизбежный переход не затемнял экран во время коротких read-команд.
 
 Каждый результат команды фиксирует запрошенный профиль, фактический профиль выполнения, транспорт, цепочку fallback и источник контекста. Несовпадение запрошенного и фактического профиля считается ошибкой команды.
+
+HMAC сериализует иконки по байтам (Base64), вложенные Bundle — рекурсивно с сортировкой ключей. `Parcelable.ToString()` не используется для подписи данных: его представление меняется при передаче между процессами. Неизвестный тип подписанного extra отклоняется.
+
+Callback PackageInstaller связан с отдельным operation ID в extras и data URI explicit PendingIntent. Владельцем остаётся Activity установки/удаления, в том числе пока поверх неё открыт системный диалог; query-Activity не может получить чужой результат. Для установки окончателен статус PackageInstaller, а не результат экрана подтверждения. Для удаления Android может вернуть Activity `Canceled` даже после успеха, а при настоящей отмене не прислать broadcast: после закрытия подтверждения сверяется флаг `Installed`, включая записи удалённых пакетов. Отсутствующий пакет подтверждает успех; оставшийся пакет приводит к восстановлению прежнего скрытого состояния и сообщению об отменённом/отклонённом удалении. Обычные изменения конфигурации обрабатываются без пересоздания этой прозрачной Activity.
+
+На Android 14+ при расхождении запрошенного hidden с фактическим состоянием выполняется одна попытка повторного применения политики: сначала устанавливается наблюдаемое состояние, затем требуемое. Это обходит сохранённую, но фактически не применённую policy: повтор одинакового значения в policy engine может ничего не менять. Успех по-прежнему требует `IsApplicationHidden == requested`; подтверждённо скрытое приложение ради повтора не раскрывается. Этим адаптером пользуются ручные команды и монитор автозаморозки. Основание: [DevicePolicyEngine Android 15](https://github.com/aosp-mirror/platform_frameworks_base/blob/android-15.0.0_r1/services/devicepolicy/java/com/android/server/devicepolicy/DevicePolicyEngine.java) и [системный обработчик результата удаления](https://github.com/aosp-mirror/platform_frameworks_base/blob/android-15.0.0_r1/packages/PackageInstaller/src/com/android/packageinstaller/UninstallUninstalling.java).
 
 ```text
 Android command
@@ -268,9 +276,11 @@ Provider в профиле A
 DocumentsUI получает SAF rows или ParcelFileDescriptor
 ```
 
-IPC построен без `.aidl`: используются `Android.OS.Messenger`, `Message`, `Bundle` и `ParcelFileDescriptor`. Метаданные файлов передаются JSON-строками через source-generated `AgnosiaFileShuttleJsonContext`; файловые потоки и thumbnails передаются descriptor-ами в response bundle. Ошибки возвращаются строкой `ExtraError`, provider логирует их и отдаёт пустой cursor или `FileNotFoundException` там, где этого ожидает SAF.
+IPC построен без `.aidl`: используются `Android.OS.Messenger`, `Message`, `Bundle` и `ParcelFileDescriptor`. Метаданные файлов передаются JSON-страницами через source-generated `AgnosiaFileShuttleJsonContext`: до 128 записей и 64 КиБ UTF-8 на страницу. Token фиксирует один снимок каталога, поэтому изменения папки между запросами не сдвигают страницы. Число снимков ограничено четырьмя, объём каждого — 2 млн символов с учётом служебной оценки; превышение возвращает ошибку. Ошибки чтения каталога и удаления доходят до SAF как `FileNotFoundException`, включая недоступный bridge и частичное удаление.
 
-Запуск cross-profile bridge идёт через `PendingIntent`, а не прямой `Context.StartActivity(...)`. Это важно для Android 14/15/16 background activity launch rules: `AndroidPendingIntentApi.CreateBackgroundActivityStartPendingIntent(...)` задаёт creator-side `SetPendingIntentCreatorBackgroundActivityStartMode(...)`, а `PendingIntent.Send(...)` получает sender-side `SetPendingIntentBackgroundActivityStartMode(...)`. Перед открытием Files из Agnosia bridge preconnect выполняется из видимой `MainActivity`, после чего `DocumentsProvider` переиспользует общий client. Если Files открыт вручную, provider всё ещё пробует best-effort подключение, но Android может вернуть `BAL_BLOCK`, provider дождётся timeout и покажет пустой root.
+Binding нужен только для получения service Messenger и сразу освобождается. Сервис завершается после 30 секунд простоя, учитывая открытые файловые дескрипторы, и уведомляет клиентов об отключении; broker освобождает свой поток. Выключение модуля закрывает broker и останавливает сервис. `OnTimeout` снимает foreground-состояние и останавливает сервис. После передачи дескриптора локальная копия освобождается с семантикой `PARCELABLE_WRITE_RETURN_VALUE`, чтобы не сообщать о завершении клиентской передачи раньше её закрытия.
+
+Запуск cross-profile bridge идёт через `PendingIntent`: `AndroidPendingIntentApi.CreateBackgroundActivityStartPendingIntent(...)` задаёт creator-side `SetPendingIntentCreatorBackgroundActivityStartMode(...)`, а `PendingIntent.Send(...)` получает sender-side `SetPendingIntentBackgroundActivityStartMode(...)`. Перед открытием Files из Agnosia bridge подключается асинхронно из видимой `MainActivity`, с отменой и тайм-аутом; системный экран открывается в UI-потоке. `DocumentsProvider` использует подготовленный client. Если Files открыт вручную без соединения, чтение каталога сообщает об ошибке; подключение следует повторить через Agnosia.
 
 Границы безопасности:
 
@@ -300,7 +310,7 @@ IPC построен без `.aidl`: используются `Android.OS.Messen
 
 ## Локальное хранение
 
-Постоянное состояние хранится в `SharedPreferences` с именем `agnosia.preferences` и режимом `FileCreationMode.Private`. Хранилище инициализируется через `LocalStorageManager` в каждом профиле отдельно.
+Настройки и состояние операций хранятся в `SharedPreferences` с именем `agnosia.preferences` и режимом `FileCreationMode.Private`. Хранилище инициализируется через `LocalStorageManager` в каждом профиле отдельно. Журнал хранится отдельно в приватном файле `agnosia-log.json`: до 100 записей, сообщения ограничены 4096 символами, запись выполняется через временный файл и атомарную замену. Старый `log_entries` переносится при чтении.
 
 | Группа данных | Ключи / примеры | Для чего нужны |
 | --- | --- | --- |
@@ -311,9 +321,9 @@ IPC построен без `.aidl`: используются `Android.OS.Messen
 | VPN-настройки | `disable_vpn_before_work_launch`, `enable_vpn_after_work_freeze`, `vpn_after_work_freeze_client`, `tunguska_automation_token`, `have_active_vpn_session` | Автоматизация отключения и повторного запуска VPN. |
 | Lockdown | `lockdown_enabled`, `lockdown_blocked_packages` | Always-on lockdown VPN и список рабочих пакетов без интернета. |
 | Скрытые приложения | `hidden_shortcut_metadata:*`, `hidden_app_active_session` | Метаданные ярлыков и versioned snapshot active-сессии, pending-hide и pending parent notification после перезапуска сервиса. |
-| Журнал | `log_entries` | Последние 100 событий платформы. |
+| Повтор синхронизации | `pending.setting.*` | Значения настроек, для которых рабочий профиль ещё не подтвердил применение. |
 
-Часть настроек синхронизируется в рабочий профиль через `AgnosiaActions.SynchronizePreference`, чтобы сервисы рабочего профиля видели те же флаги, что и UI в личном профиле. Сейчас синхронизируются `logging_enabled` и `disable_vpn_before_work_launch`: рабочий профиль должен знать, писать ли локальные события и нужно ли учитывать VPN-сценарий при запуске через ярлык. При выключении логирования журнал очищается в обоих профилях, если рабочий профиль доступен.
+Настройки журнала, VPN перед запуском, File Shuttle и Risk Engine синхронизируются в рабочий профиль через `AgnosiaActions.SynchronizePreference` с подписанным подтверждением результата. Снимок настроек и pending-значения сохраняются одной транзакцией editor вне UI-потока. Неудачная отправка оставляет pending; повторное сохранение и обновление dashboard при доступном профиле повторяют синхронизацию, включая выключенные значения. Запоздалый ack не удаляет более новое значение. UI сообщает, когда локальное сохранение выполнено, а рабочий профиль ещё не подтвердил применение. При выключении логирования рабочий журнал очищается после доставки команды.
 
 ## Управление приложениями
 
@@ -398,7 +408,7 @@ ProxyActivity
 
 Так Agnosia может открыть приложение, которое было скрыто через device policy, и затем вернуть его в скрытое состояние. До подтверждённого `StartActivity` и запуска monitor unhide считается незавершённой транзакцией: missing launcher, suspended state, отсутствие PackageManager или исключение немедленно возвращают исходное hidden-состояние. Для пакетов без front-door Activity кнопка Launch не показывается.
 
-Метаданные ярлыка хранятся в `SharedPreferences` под ключом `hidden_shortcut_metadata:{package}`. В них лежат shortcut id, package name, target activity, label, base64-иконка и случайный token. При запуске pinned shortcut `ProxyActivity` проверяет token, поэтому произвольный intent с тем же action не должен открыть скрытое приложение. Если ярлык уже закреплён, Agnosia обновляет его через `ShortcutManager.updateShortcuts()` и сразу скрывает пакет; если создаётся новый ярлык, launcher запрашивает подтверждение пользователя, а `ShortcutPinReceiver` завершает скрытие после callback-а.
+Метаданные ярлыка хранятся в `SharedPreferences` под ключом `hidden_shortcut_metadata:{package}`. В них лежат shortcut id, package name, target activity, label, base64-иконка и случайный token. При запуске pinned shortcut `ProxyActivity` проверяет token, поэтому произвольный intent с тем же action не должен открыть скрытое приложение. Перед созданием или обновлением ярлыка рабочий профиль обязан подтвердить скрытие пакета. Только после этого Agnosia обновляет закреплённый ярлык через `ShortcutManager.updateShortcuts()` или просит launcher подтвердить новый; `ShortcutPinReceiver` лишь сообщает об успешном закреплении и больше не запускает фоновую межпрофильную команду.
 
 ## Автоматическая заморозка
 
@@ -421,6 +431,10 @@ InactiveCandidate
         ▼
 Completed → setApplicationHidden(..., true)
 ```
+
+Свежий STOPPED/DESTROYED целевой Activity с timestamp не раньше начала текущей сессии может перевести WaitingForTargetForeground прямо в InactiveCandidate, даже если RESUMED пропущен. HiddenAppUsageObservationReducer учитывает порядок timestamp, повторную доставку, остановку старой Activity и системные переходы; отсутствие событий или разрешения не создаёт доказательство сворачивания. Подтверждение попытки StartActivity не выставляет фиктивный foreground.
+
+В Debug-сборке первые две минуты ожидания foreground контрольный запрос от начала сессии минус две секунды выполняется не чаще раза в пять секунд. Он логирует user/session/launch ID, границы запросов и до 32 последних событий целевого пакета с признаком присутствия в обычном запросе. Контрольный запрос не меняет cursor и результат наблюдения. Потеря событий из-за cursor пока не подтверждена; изменение окна запросов не выдаётся за доказанное исправление.
 
 Сервис не прячет приложение по одному слабому признаку. Он использует только доступные приложению документированные сигналы:
 
@@ -448,7 +462,9 @@ Completed → setApplicationHidden(..., true)
 
 При блокировке экрана `WorkProfileLockFreezeService` и `LockFreezeCleanupJobService` переводят сохранённую active-сессию в ту же pending-hide очередь и пытаются скрыть все записи. Safety net явно запускает foreground retry service для любой оставшейся hide-записи.
 
-После успешной заморозки рабочий профиль вызывает immutable `PendingIntent`, созданный личным профилем для конкретных package и `launchId`. `WorkAppFrozenReceiver` проверяет HMAC, восстанавливает VPN только для актуального владельца launch identity и скрывает overlay. Activity/BAL-переход для callback не нужен. Если work process перезапущен и утратил неперсистентный token, callback нельзя восстановить без новой сессии.
+До unhide рабочий профиль сохраняет reservation с идентификатором сессии и передаёт исходный immutable callback в системный alarm. Android удерживает вложенный `PendingIntent` после завершения процесса. После подтверждённого скрытия запись переходит в outbox; успешный `Send()` её не удаляет. Личный receiver проверяет HMAC, сохраняет `RestoreReady` и планирует повтор восстановления; только затем возвращает подтверждение через ordered callback `IOnFinished`. После такого подтверждения рабочий outbox удаляется. Alarm повторяется до подтверждения либо замены сессии; ошибки и завершение процесса до подтверждения сохраняют повтор. Во время активной рабочей сессии alarm проверяет состояние через receiver, без открытия Activity.
+
+Запуск, повторное скрытие, проверка состояния пакета и временная видимость при отзыве разрешений используют общий async gate. Snapshot сохраняется через `Commit` до unhide; изменения после ожиданий применяются к актуальной записи по session ID. Reservation сохраняет предыдущую сессию для возврата при неудаче запуска. Screen-lock receiver не блокирует UI на занятом gate: он сохраняет pending-hide и передаёт выполнение сервису. Отзыв разрешений выполняет cleanup в `finally`, без отменённого токена; отказ скрытия оставляет durable retry и возвращает ошибку вместо успеха.
 
 ## VPN-сценарии
 
@@ -459,10 +475,12 @@ VPN-логика решает две отдельные задачи:
 
 ### Временное отключение VPN
 
+Пассивное чтение разрешений использует `AndroidPermissionApi.HasVpnControlPermission`: AppOps `android:activate_vpn` для собственного UID и пакета, без сохранённого флага. На API 31–35 вызывается `UnsafeCheckOpNoThrow`, на API 36+ — `CheckOpNoThrow`; подтверждённым считается только `Allowed`, недоступная проверка возвращает false. `VpnService.Prepare` разрешён только в явном запросе управления VPN и сценариях запуска/отключения: вызов при refresh может отозвать активный VPN другого приложения. Основания: [VpnService.prepare](https://developer.android.com/reference/android/net/VpnService#prepare(android.content.Context)), [AppOpsManager](https://developer.android.com/reference/android/app/AppOpsManager), [операция VPN в AOSP Android 15](https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-15.0.0_r1/core/java/android/app/AppOpsManager.java).
+
 `TransientVpnDisconnectService` - короткоживущий `VpnService`. Если Android уже выдал Agnosia право управлять VPN, сервис создаёт минимальный VPN-интерфейс и сразу закрывает его. Android переключает активный VPN на Agnosia, прежний VPN-клиент теряет активное соединение, после закрытия интерфейса VPN остаётся выключенным.
 
 ```text
-Проверить work profile / quiet mode / cross-profile target
+Проверить work profile / quiet mode / cross-profile target / VPN restore handler
    │
    ├─ preflight failure → не трогать VPN, вернуть ошибку
    │
@@ -482,29 +500,36 @@ VPN-логика решает две отдельные задачи:
              ▼ 350 ms
            закрыть interface
              ▼ 120 ms
-           запуск с ожиданием work Activity-result
+           запуск с ожиданием отдельного acknowledgement
              │
-             ├─ session confirmed → commit до WorkAppFrozen
-             └─ failure/cancel/timeout → немедленно вернуть VPN
+             ├─ попытка подтверждена → commit до WorkAppFrozen
+             ├─ доказанный отказ → rollback собственного VPN-обязательства
+             └─ timeout/cancel после отправки → сверить launchId и hidden, сохранить owner до подтверждения
 ```
 
 Обязательство вернуть VPN хранится как versioned durable ownership-запись с `launchId` и package name. Координатор сериализует UI launch, pinned shortcut и callback одним process-wide async gate. Обязательство записывается до `VpnService.prepare()`, потому что уже выдача права другому VPN-приложению может деактивировать прежнее соединение. Прежний `have_active_vpn_session=true` при первом чтении мигрирует в новый формат.
 
 При повторном hidden-launch, пока VPN уже отключён Agnosia, новая сессия наследует restore obligation без повторного takeover. После подтверждённого запуска она заменяет прежнего owner; при failure/cancellation/exception прежний owner сохраняется и VPN не восстанавливается поверх ещё активной hidden-сессии.
 
-Отключение VPN встроено в два пути запуска: команду `LaunchAsync` из UI и запуск через pinned shortcut. Оба до takeover проверяют существование managed profile, quiet mode и доступность explicit DPM target Agnosia. Если Android требует подтверждение `VpnService.prepare()`, пользователь видит системный экран. Если после transient VPN активный VPN всё ещё обнаруживается, запуск рабочего приложения прерывается, потому что сторонний клиент мог сразу подключиться обратно.
+Отключение VPN встроено в два пути запуска: команду `LaunchAsync` из UI и запуск через pinned shortcut. Оба до takeover проверяют существование managed profile, quiet mode и доступность explicit DPM target Agnosia. Если предстоит отключить активный VPN, дополнительно проверяются доступность Activity/receiver выбранного VPN-клиента, exported/enabled и требуемое разрешение; для Tunguska нужен automation token. Если Android требует подтверждение `VpnService.prepare()`, пользователь видит системный экран. Если после transient VPN активный VPN всё ещё обнаруживается, запуск рабочего приложения прерывается, потому что сторонний клиент мог сразу подключиться обратно.
 
-UI-путь получает подписанный `AndroidAppLaunchResult` через существующий command gateway. Shortcut-путь переносит explicit intent для work `ProxyActivity` системным DPM intent-forwarder и ждёт Activity-result до 30 секунд. Только успешный результат после принятого Android запроса на запуск hidden-session monitor завершает launch transaction. Любой downstream failure, cancellation, timeout или exception вызывает `RollbackFailedWorkLaunchAsync`: выбранный VPN-клиент запускается независимо от обычной настройки enable-after-freeze, а overlay скрывается.
+UI и shortcut регистрируют ожидание до отправки команды. Отдельный explicit одноразовый mutable PendingIntent адресован закрытому WorkLaunchAcknowledgedReceiver личной копии; package и launchId зафиксированы создателем, рабочая копия добавляет результат попытки StartActivity. Callback создаётся также для системного приложения и при выключенном VPN Guard. Он не зависит от OnActivityResult; последний остаётся для системных UI и query-команд. Parcelable callback исключён из HMAC по тому же правилу, что callback заморозки; launchId подписывается. Основание выбора flags: [Android PendingIntent](https://developer.android.com/reference/android/app/PendingIntent).
+
+WorkLaunchUnconfirmedException отличает потерю acknowledgement/отмену после отправки от подтверждённого отказа отправки. PendingLaunchDispatched сохраняется до отправки; coordinator сверяет пакет и launchId, а при недоступной сверке сохраняет pending owner. Один hidden=false или hidden=true без соответствующей идентичности не подтверждает отправленный запуск. Alarm повторяет сверку через существующий scheduler; подтверждённый commit отменяет pending alarm. RecoveryActivity использует прозрачную тему и собственный host для query после перезапуска личного процесса. Callback завершения соответствующего pending owner может сразу сохранить RestoreReady. Неудача восстановления сохраняет owner и следующий повтор; overlay скрывается только после успешного восстановления.
 
 ### Восстановление VPN
 
-Когда рабочее приложение снова скрыто, рабочий профиль отправляет созданный личным профилем immutable `PendingIntent` с подписанными package и `launchId`. `WorkAppFrozenReceiver` проверяет подпись, а `WorkAppFrozenHandler` вызывает `AndroidVpnAutomationApi.EnableConfiguredVpnAfterWorkFreezeAsync()` и скрывает overlay только если callback совпал с текущим owner. Callback заменённой сессии идемпотентно игнорируется. Ownership очищается только после успешного restore либо если другой VPN уже активен. Отдельной service-очереди и межпрофильного retry больше нет: потерянный после перезапуска рабочего процесса token автоматически восстановить нельзя.
+`WorkAppFrozenReceiver` подтверждает сохранённое принятие callback, а системный alarm запускает `VpnRestoreRecoveryActivity` для автоматизации VPN из активной Activity. Следующая попытка планируется до обращения к VPN-клиенту, поэтому прерывание процесса не теряет обязательство. Неудача сохраняет owner и overlay; успех очищает owner и отменяет alarm. Повторный callback уже завершённого или заменённого owner подтверждается без повторной автоматизации. Ошибка доставки work-ack после успешного восстановления не вызывает повторный toggle VPN.
+
+`PendingOwner` восстанавливается перед следующим запуском и при возврате в главный экран: подписанный `QueryPackageState` возвращает installed/hidden и durable launch ID под тем же gate, что unhide/start/hide. Видимая подтверждённая сессия сохраняет ownership, скрытая завершает восстановление, незапущенная транзакция отменяется. После перезагрузки устройства alarm восстанавливается из personal snapshot; запоздалый boot-retry проверяет исходного owner и не затрагивает новый запуск. При недоступном рабочем профиле состояние сохраняется до следующей проверки. Force-stop и ограничения alarm на конкретной прошивке требуют испытаний на устройстве; MainActivity выполняет дополнительную сверку после открытия приложения.
+
+Задержки alarm являются запросом к системе, а не гарантией времени доставки. Отправка команды клиенту ещё не завершает восстановление: до 10 секунд проверяется наличие внешнего VPN с интервалом 500 мс. Собственные сети Agnosia и одиночная видимая сеть при включённом Lockdown не подтверждают восстановление. Если VPN не обнаружен, obligation и штатные повторы сохраняются; наблюдение транспорта не проверяет доступность интернета через туннель. Механизм ordered acknowledgement основан на передаче `IOnFinished` при отправке broadcast PendingIntent ([реализация AOSP](https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/master/services/core/java/com/android/server/am/PendingIntentRecord.java)).
 
 Поддерживаемые клиенты автоматизации:
 
 | Клиент | Механизм запуска |
 | --- | --- |
-| FlClash | Activity command. |
+| FlClash / FlClashX | Согласованные package/Activity/action: com.follow.clash / com.follow.clash.TempActivity / com.follow.clash.action.START; затем com.follow.clashx / com.follow.clashx.TempActivity / com.follow.clashx.action.START. При обоих доступных обработчиках приоритет у FlClash. |
 | Clash Meta for Android | Explicit Activity command. |
 | Happ | Toggle broadcast. |
 | Tunguska | Activity command с automation token. |
@@ -519,7 +544,7 @@ UI-путь получает подписанный `AndroidAppLaunchResult` ч�
 
 `OverlayVpnService` умеет рисовать небольшой полупрозрачный квадрат 24 dp в правом верхнем углу экрана. Он задуман как технический индикатор VPN-сценария и работает только при выданном доступе `SYSTEM_ALERT_WINDOW`.
 
-Сервис не принимает ввод, не забирает фокус и показывается после успешного временного отключения VPN перед запуском рабочего приложения. Обработчик `WorkAppFrozen` всегда пытается скрыть overlay через bind к сервису после попытки вернуть VPN-клиент. Overlay остаётся вспомогательной возможностью: отсутствие видимого квадрата не блокирует отключение VPN, запуск рабочего приложения, заморозку или восстановление VPN.
+Сервис не принимает ввод, не забирает фокус и показывается после успешного временного отключения VPN перед запуском рабочего приложения. Overlay скрывается после успешного восстановления для текущего owner; при ошибке остаётся до повтора. Отсутствие overlay-доступа не блокирует остальные действия.
 
 В этом сценарии `WorkAppFrozen` означает callback, прошедший проверку current owner: устаревший callback не скрывает overlay.
 
@@ -654,7 +679,7 @@ Android-проект собирается как APK с `ApplicationId` `com.agn
 | Скрытие после установки не прошло сразу | Повторные попытки скрытия выполняются ограниченное время. |
 | Usage Access отсутствует до запуска | Запуск user work-пакета отклоняется до unhide; приложение остаётся скрытым. |
 | Usage Access потерян во время сессии | Приложение не скрывается по неподтверждённому таймауту; durable active-сессия сохраняется до screen-lock safety net или явной заморозки. |
-| Сервис был перезапущен | Versioned durable snapshot восстанавливает active-сессию и pending-hide; retry продолжается до подтверждённого hidden-state, но потерянный callback `PendingIntent` восстановить нельзя. |
+| Сервис был перезапущен | Snapshot восстанавливает active/reservation, pending-hide и outbox. Системный alarm удерживает callback между перезапусками процесса; личный профиль повторяет восстановление из durable owner. |
 | Логирование повреждено или отключено | Повреждённый JSON журнала очищается, при отключении логирования записи удаляются. |
 | Версия Agnosia в рабочем профиле устарела | Личный профиль пытается переустановить актуальный APK в рабочий профиль и повторить owner-check. |
 | Activity-команда стартует, пока `MainActivity` не resumed | Запрос ставится в очередь, а устаревшие фоновые icon-запросы могут быть отменены. |

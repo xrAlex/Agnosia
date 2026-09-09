@@ -60,4 +60,18 @@ public sealed class VpnRestoreOwnershipCodecTests
         Assert.Null(actual.ActiveOwner);
         Assert.Null(actual.PendingOwner);
     }
+
+    [Fact]
+    public void TryDeserialize_upgrades_version_one_owner_as_not_ready_for_restore()
+    {
+        const string json = """
+                            {"RestoreRequired":true,"ActiveOwner":{"LaunchId":"launch-a","PackageName":"com.example.a"},"PendingOwner":null,"AcceptLegacyCallback":false,"Version":1}
+                            """;
+
+        var parsed = VpnRestoreOwnershipCodec.TryDeserialize(json, out var actual);
+
+        Assert.True(parsed);
+        Assert.False(actual.RestoreReady);
+        Assert.Equal(VpnRestoreOwnershipState.CurrentVersion, actual.Version);
+    }
 }

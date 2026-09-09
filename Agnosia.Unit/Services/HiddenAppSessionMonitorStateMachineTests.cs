@@ -44,22 +44,33 @@ public sealed class HiddenAppSessionMonitorStateMachineTests
         Assert.Equal(TimeSpan.FromSeconds(10), completed.InactiveFor);
     }
 
-    // Проверяет, что приложение не скрывается, пока target ни разу не был увиден foreground.
     [Fact]
-    public void MoveNext_does_not_complete_from_inactivity_until_target_was_seen()
+    public void MoveNext_completes_from_confirmed_current_session_stop_without_resume()
     {
         var stateMachine = CreateStateMachine();
         var inactiveSince = StartedAt.AddSeconds(1);
 
+        var pending = stateMachine.MoveNext(inactiveSince, true,
+            ConfirmedInactive(inactiveSince, sawTargetForeground: false));
+        Assert.Equal(HiddenAppSessionMonitorPhase.InactiveCandidate, pending.Phase);
         var transition = stateMachine.MoveNext(
-            inactiveSince.AddSeconds(30),
+            inactiveSince.AddSeconds(10),
             true,
             ConfirmedInactive(inactiveSince, sawTargetForeground: false));
 
-        Assert.Equal(HiddenAppSessionTransitionAction.KeepAlive, transition.Action);
-        Assert.Equal(HiddenAppSessionMonitorPhase.WaitingForTargetForeground, transition.Phase);
-        Assert.Equal("waiting_for_target_foreground", transition.DecisionReason);
-        Assert.Null(transition.CompletionReason);
+        Assert.Equal(HiddenAppSessionTransitionAction.Complete, transition.Action);
+        Assert.False(transition.TargetForegroundFirstSeen);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(null)]
+    public void MoveNext_rejects_inactivity_without_current_session_timestamp(int? seconds)
+    {
+        var observation = new SessionObservation(false, null, true,
+            seconds is { } value ? StartedAt.AddSeconds(value) : null, false, false);
+        var result = CreateStateMachine().MoveNext(StartedAt.AddMinutes(1), true, observation);
+        Assert.Equal(HiddenAppSessionTransitionAction.KeepAlive, result.Action);
     }
 
     // Проверяет сброс таймера авто-скрытия при возврате пользователя в target-приложение.

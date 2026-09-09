@@ -8,7 +8,7 @@
         <Grid HorizontalAlignment="Stretch"
               ColumnDefinitions="*,*,*,*"
               ColumnSpacing="8">
-            <Button Grid.Column="0"
+            <Button AutomationProperties.Name="Обзор" Grid.Column="0"
                     Classes="nav"
                     HorizontalAlignment="Stretch"
                     Classes.active="{Binding IsOverviewSectionSelected}"
@@ -26,7 +26,7 @@
                 </StackPanel>
             </Button>
 
-            <Button Grid.Column="1"
+            <Button AutomationProperties.Name="Приложения" Grid.Column="1"
                     Classes="nav"
                     HorizontalAlignment="Stretch"
                     Classes.active="{Binding IsAppsSectionSelected}"
@@ -45,7 +45,7 @@
                 </StackPanel>
             </Button>
 
-            <Button Grid.Column="2"
+            <Button AutomationProperties.Name="Модули" Grid.Column="2"
                     Classes="nav"
                     HorizontalAlignment="Stretch"
                     Classes.active="{Binding IsModulesSectionSelected}"
@@ -64,7 +64,7 @@
                 </StackPanel>
             </Button>
 
-            <Button Grid.Column="3"
+            <Button AutomationProperties.Name="Настройки" Grid.Column="3"
                     Classes="nav"
                     HorizontalAlignment="Stretch"
                     Classes.active="{Binding IsSettingsSectionSelected}"

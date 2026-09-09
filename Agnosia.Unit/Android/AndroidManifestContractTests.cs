@@ -12,6 +12,30 @@ public sealed class AndroidManifestContractTests
     private static readonly XNamespace Android = "http://schemas.android.com/apk/res/android";
 
     [Fact]
+    public void Package_confirmation_activity_result_cannot_finish_installer_operation()
+    {
+        var source = ReadAndroidSource("Activities\\DummyActivity.PackageActions.cs");
+        var handler = source[source.IndexOf("private void HandlePackageInstallerUserActionResult", StringComparison.Ordinal)..
+            source.IndexOf("private void CompletePackageRemovalAfterConfirmation", StringComparison.Ordinal)];
+        Assert.DoesNotContain("FinishWithError", handler, StringComparison.Ordinal);
+        Assert.DoesNotContain("RestoreHiddenState", handler, StringComparison.Ordinal);
+        Assert.Contains("AndroidCommandKind.UninstallPackage", handler, StringComparison.Ordinal);
+        Assert.Contains("ApplicationInfoFlags.Installed", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Installer_callback_owner_survives_confirmation_activity_pause()
+    {
+        var source = ReadAndroidSource("Activities\\DummyActivity.cs");
+        var pause = Regex.Match(source, @"protected override void OnPause\(\)[\s\S]*?\n    }").Value;
+        Assert.DoesNotContain("PackageInstallerCallbackCoordinator.Unregister", pause, StringComparison.Ordinal);
+        Assert.Contains("ConfigChanges.Orientation | ConfigChanges.ScreenSize", source, StringComparison.Ordinal);
+        var coordinator = ReadAndroidSource("Activities\\PackageInstallerCallbackCoordinator.cs");
+        Assert.DoesNotContain("_activeActivity", coordinator, StringComparison.Ordinal);
+        Assert.Contains("ExtraPackageInstallerOperationId", coordinator, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Authentication_recovery_is_not_exposed_as_a_cross_profile_activity_action()
     {
         const string legacyRecoveryAction = "agnosia.action.RECOVER_AUTHENTICATION";
@@ -55,9 +79,18 @@ public sealed class AndroidManifestContractTests
 
         Assert.NotEmpty(activityDeclaration);
         Assert.DoesNotContain("NoHistory = true", activityDeclaration, StringComparison.Ordinal);
-        Assert.Contains("_pendingWorkLaunch?.TrySetResult", source, StringComparison.Ordinal);
         Assert.Contains("AgnosiaUtilities.TransferIntentToProfile(this, proxyIntent)", source, StringComparison.Ordinal);
         Assert.DoesNotContain("CrossProfileApps", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Launch_acknowledgement_receiver_is_private_and_flclashx_is_visible()
+    {
+        var source = ReadAndroidSource("Receivers\\WorkLaunchAcknowledgedReceiver.cs");
+        Assert.Contains("Exported = false", source, StringComparison.Ordinal);
+        var manifest = XDocument.Parse(ReadAndroidSource("Properties\\AndroidManifest.xml"));
+        Assert.Contains(manifest.Root!.Element("queries")!.Elements("package"),
+            element => (string?)element.Attribute(Android + "name") == "com.follow.clashx");
     }
 
     [Fact]
@@ -77,6 +110,34 @@ public sealed class AndroidManifestContractTests
             shortcutFlow.IndexOf("catch (System.OperationCanceledException)", StringComparison.Ordinal),
             0,
             shortcutFlow.IndexOf("catch (Exception exception)", StringComparison.Ordinal) - 1);
+    }
+
+    [Fact]
+    public void Pinned_shortcut_requires_pre_hide_ack_and_callback_does_not_start_a_profile_command()
+    {
+        var coordinatorSource = ReadAndroidSource("Commands\\AndroidAppCommandCoordinator.cs");
+        var preparation = Regex.Match(
+            coordinatorSource,
+            @"private async Task<ShortcutPreparationResult> PreparePinnedShortcutInParentAsync[\s\S]*?\n    private static Intent CreatePackageIntent",
+            RegexOptions.Singleline).Value;
+        var preHideGuard = Regex.Match(
+            preparation,
+            @"var preHideSucceeded[\s\S]*?if \(!preHideSucceeded\)[\s\S]*?return ShortcutPreparationResult\.Failure").Value;
+        var createShortcutIndex = preparation.IndexOf(
+            "new Intent(AgnosiaActions.CreateHiddenShortcut)",
+            StringComparison.Ordinal);
+
+        Assert.NotEmpty(preHideGuard);
+        Assert.InRange(preparation.IndexOf(preHideGuard, StringComparison.Ordinal), 0, createShortcutIndex - 1);
+
+        var shortcutManagerSource = ReadAndroidSource("Shortcuts\\HiddenAppShortcutManager.cs");
+        var confirmation = Regex.Match(
+            shortcutManagerSource,
+            @"public static void HandlePinnedShortcutConfirmation[\s\S]*?\n    private static HiddenAppShortcutMetadata\? ReadMetadata",
+            RegexOptions.Singleline).Value;
+
+        Assert.DoesNotContain("AndroidProfileCommandGateway", confirmation, StringComparison.Ordinal);
+        Assert.DoesNotContain("Task.Run", confirmation, StringComparison.Ordinal);
     }
 
     // Проверяет manifest requirements для managed profile и device admin сценариев.
@@ -221,24 +282,27 @@ public sealed class AndroidManifestContractTests
         var pendingIntentSource = File.ReadAllText(
             RepositoryPaths.Get("Agnosia.Android.Api", "Packages", "AndroidPendingIntentApi.cs"));
         var preconnectIndex = settingsSource.IndexOf(
-            "AgnosiaFileShuttleClientBroker.Preconnect(activity)",
+            "await AgnosiaFileShuttleClientBroker.PreconnectAsync(activity, cancellationToken)",
             StringComparison.Ordinal);
-        var startDocumentsIndex = settingsSource.IndexOf("AndroidIntentApi.TryStartActivity", StringComparison.Ordinal);
+        var startDocumentsIndex = settingsSource.IndexOf(
+            "StartWhenResumedAsync",
+            StringComparison.Ordinal);
 
         Assert.Contains("CreateBackgroundActivityStartPendingIntent", clientSource, StringComparison.Ordinal);
         Assert.Contains("CreateSenderBackgroundActivityStartOptions", clientSource, StringComparison.Ordinal);
-        Assert.Contains("public void Preconnect()", clientSource, StringComparison.Ordinal);
+        Assert.Contains("public async Task PreconnectAsync", clientSource, StringComparison.Ordinal);
         Assert.Contains("GetClient(Context context)", brokerSource, StringComparison.Ordinal);
         Assert.Contains("_client ??= new AgnosiaFileShuttleMessengerClient(context)", brokerSource, StringComparison.Ordinal);
         Assert.Contains("AgnosiaFileShuttleClientBroker.GetClient(Context)", providerSource, StringComparison.Ordinal);
         Assert.Contains("ProviderRequestTimeout", providerSource, StringComparison.Ordinal);
-        Assert.Contains("if (!client.IsConnected)", providerSource, StringComparison.Ordinal);
+        Assert.Contains("if (!client.IsConnected && !client.CanReconnect)", providerSource, StringComparison.Ordinal);
         Assert.Contains("requireConnected: true", providerSource, StringComparison.Ordinal);
         Assert.Contains("manual Files launches are best-effort", providerSource, StringComparison.Ordinal);
         Assert.InRange(preconnectIndex, 0, startDocumentsIndex - 1);
         Assert.DoesNotContain("_context.StartActivity(intent)", clientSource, StringComparison.Ordinal);
         Assert.DoesNotContain("Preconnect(", providerSource, StringComparison.Ordinal);
         Assert.DoesNotContain("StartConnect(", providerSource, StringComparison.Ordinal);
+        Assert.Contains("StartWhenResumedAsync", settingsSource, StringComparison.Ordinal);
         Assert.Contains("PendingIntent.GetActivity", pendingIntentSource, StringComparison.Ordinal);
         Assert.Contains("SetPendingIntentBackgroundActivityStartMode", pendingIntentSource, StringComparison.Ordinal);
         Assert.Contains(
@@ -307,7 +371,7 @@ public sealed class AndroidManifestContractTests
     }
 
     [Fact]
-    public void Vpn_permission_snapshot_checks_prepare_without_persisted_flag()
+    public void Vpn_permission_snapshot_reads_consent_without_preparing_vpn_or_persisted_flag()
     {
         var source = File.ReadAllText(
             RepositoryPaths.Get("Agnosia.Android", "Permissions", "AndroidPermissionCoordinator.cs"));
@@ -327,9 +391,15 @@ public sealed class AndroidManifestContractTests
         Assert.Contains("ReadPermissionLocalStateAsync", loadPermissions, StringComparison.Ordinal);
         Assert.Contains("PermissionKind.VpnControl", loadPermissions, StringComparison.Ordinal);
         Assert.Contains("vpnControlGranted", loadPermissions, StringComparison.Ordinal);
-        Assert.Contains("VpnService.Prepare(activity)", localStateReader, StringComparison.Ordinal);
+        Assert.Contains("AndroidPermissionApi.HasVpnControlPermission(activity)", localStateReader, StringComparison.Ordinal);
+        Assert.DoesNotContain("VpnService.Prepare(", localStateReader, StringComparison.Ordinal);
+        Assert.DoesNotContain("VpnService.Prepare(", loadPermissions, StringComparison.Ordinal);
         Assert.DoesNotContain("VpnControlPrepared", source, StringComparison.Ordinal);
         Assert.Contains("VpnService.Prepare(activity)", requestVpnControl, StringComparison.Ordinal);
+
+        var permissionApi = File.ReadAllText(
+            RepositoryPaths.Get("Agnosia.Android.Api", "Permissions", "AndroidPermissionApi.cs"));
+        Assert.DoesNotContain("VpnService.Prepare(", permissionApi, StringComparison.Ordinal);
     }
 
     [Fact]

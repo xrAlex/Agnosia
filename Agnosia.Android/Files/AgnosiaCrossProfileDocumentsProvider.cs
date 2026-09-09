@@ -29,7 +29,8 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
         DocumentsContract.Root.ColumnDocumentId,
         DocumentsContract.Root.ColumnIcon,
         DocumentsContract.Root.ColumnTitle,
-        DocumentsContract.Root.ColumnFlags
+        DocumentsContract.Root.ColumnFlags,
+        DocumentsContract.Root.ColumnAvailableBytes
     ];
 
     private static readonly string[] DefaultDocumentProjection =
@@ -64,6 +65,20 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
             (int)(DocumentRootFlags.SupportsCreate
                   | DocumentRootFlags.LocalOnly
                   | DocumentRootFlags.SupportsIsChild));
+        if (cursor.GetColumnIndex(DocumentsContract.Root.ColumnAvailableBytes) >= 0)
+        {
+            try
+            {
+                if (TryGetReadyClient(out var client)
+                    && client.LoadAvailableBytes(ProviderRequestTimeout) is { } availableBytes)
+                    row.Add(DocumentsContract.Root.ColumnAvailableBytes, availableBytes);
+            }
+            catch (Exception exception)
+            {
+                // Unknown space stays null; a metadata failure must not hide the root.
+                Log.Warn(LogTag, $"Failed to read File Shuttle available space: {exception.Message}");
+            }
+        }
         return cursor;
     }
 
@@ -95,7 +110,8 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
     public override ICursor QueryChildDocuments(string? parentDocumentId, string[]? projection, string? sortOrder)
     {
         var cursor = new MatrixCursor(projection ?? DefaultDocumentProjection);
-        if (string.IsNullOrWhiteSpace(parentDocumentId)) return cursor;
+        if (string.IsNullOrWhiteSpace(parentDocumentId))
+            throw new Java.IO.FileNotFoundException("File Shuttle directory id is missing.");
 
         try
         {
@@ -103,13 +119,16 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
                 Context?.ContentResolver,
                 DocumentsContract.BuildDocumentUri(AgnosiaFileShuttleContract.Authority, parentDocumentId));
 
-            if (TryGetReadyClient(out var client))
-                foreach (var info in client.LoadFiles(parentDocumentId, ProviderRequestTimeout, requireConnected: true))
-                    IncludeFile(cursor, info);
+            if (!TryGetReadyClient(out var client))
+                throw new InvalidOperationException("File Shuttle bridge is unavailable.");
+
+            foreach (var info in client.LoadFiles(parentDocumentId, ProviderRequestTimeout, requireConnected: true))
+                IncludeFile(cursor, info);
         }
         catch (Exception exception)
         {
             Log.Warn(LogTag, $"Failed to query File Shuttle children for {parentDocumentId}: {exception.Message}");
+            throw new Java.IO.FileNotFoundException("File Shuttle could not read this directory.");
         }
 
         return cursor;
@@ -188,18 +207,21 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
 
     public override void DeleteDocument(string? documentId)
     {
-        if (string.IsNullOrWhiteSpace(documentId)) return;
+        if (string.IsNullOrWhiteSpace(documentId))
+            throw new Java.IO.FileNotFoundException("File Shuttle document id is missing.");
 
         try
         {
-            if (!TryGetReadyClient(out var client)) return;
+            if (!TryGetReadyClient(out var client))
+                throw new InvalidOperationException("File Shuttle bridge is unavailable.");
 
             var parentId = client.DeleteFile(documentId, ProviderRequestTimeout, requireConnected: true);
-            if (!string.IsNullOrWhiteSpace(parentId)) NotifyDocumentChanged(parentId);
+            NotifyDocumentChanged(parentId);
         }
         catch (Exception exception)
         {
             Log.Warn(LogTag, $"Failed to delete File Shuttle document {documentId}: {exception.Message}");
+            throw new Java.IO.FileNotFoundException("File Shuttle could not delete this document completely.");
         }
     }
 
@@ -239,7 +261,7 @@ public sealed class AgnosiaCrossProfileDocumentsProvider : DocumentsProvider
         if (IsProviderReady())
         {
             client = GetClient();
-            if (!client.IsConnected)
+            if (!client.IsConnected && !client.CanReconnect)
             {
                 Log.Warn(LogTag, "File Shuttle provider has no preconnected bridge; manual Files launches are best-effort on Android 14+ because background activity starts can be blocked.");
                 client = null!;

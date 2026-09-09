@@ -13,7 +13,7 @@
                     MinWidth="0"
                     Spacing="2"
                     VerticalAlignment="Center">
-            <Button Classes="app-title-button"
+            <Button AutomationProperties.Name="Открыть журнал" Classes="app-title-button"
                     HorizontalAlignment="Left"
                     Command="{Binding OpenLogsCommand}">
                 <TextBlock VerticalAlignment="Center"
@@ -26,7 +26,7 @@
                        Text="{Binding StatusMessage, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.Dashboard.Status.'}" />
         </StackPanel>
 
-        <Button Grid.Column="2"
+        <Button AutomationProperties.Name="Обновить" Grid.Column="2"
                 Classes="icon-button"
                 VerticalAlignment="Center"
                 ToolTip.Tip="Обновить"

@@ -59,7 +59,7 @@
                                         </WrapPanel>
                                     </StackPanel>
 
-                                    <Button Grid.Column="2"
+                                    <Button AutomationProperties.Name="Закрыть" Grid.Column="2"
                                             Classes="icon-button"
                                             ToolTip.Tip="Закрыть"
                                             Command="{Binding CloseCommand}">
@@ -126,7 +126,7 @@
                                                 </ItemsControl.ItemsPanel>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="vm:VpnAutomationClientOptionViewModel">
-                                                        <Button MinWidth="100"
+                                                        <Button AutomationProperties.Name="{Binding DisplayName}" MinWidth="100"
                                                                 Margin="5"
                                                                 Classes="segment-chip"
                                                                 Classes.selected="{Binding IsSelected}"
@@ -197,7 +197,7 @@
                                                                            Classes="page-caption"
                                                                            Text="{Binding Description}" />
 
-                                                                <Button Grid.Row="2"
+                                                                <Button AutomationProperties.Name="{Binding ActionLabel}" Grid.Row="2"
                                                                         Grid.ColumnSpan="2"
                                                                         Classes="compact-action"
                                                                         HorizontalAlignment="Left"
@@ -217,7 +217,7 @@
 
                                 <WrapPanel Grid.Row="3"
                                            Orientation="Horizontal">
-                                    <Button Classes="primary"
+                                    <Button AutomationProperties.Name="Открыть Files" Classes="primary"
                                             Margin="0,0,10,0"
                                             IsVisible="{Binding IsFileShuttle}"
                                             IsEnabled="{Binding CanOpenDocumentsUi}"

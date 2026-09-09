@@ -6,7 +6,7 @@ public static class AgnosiaModuleCatalog
         AgnosiaModuleKind.FileShuttle,
         "File Shuttle",
         "Передача файлов между личным и рабочим профилем.",
-        "File Shuttle показывает хранилище второго профиля в системном приложении Files, благодаря этому можно безопасно передавать файлы в рабочий профиль из основногои назад.");
+        "File Shuttle показывает хранилище второго профиля в системном приложении Files, благодаря этому можно безопасно передавать файлы в рабочий профиль из основного и назад.");
 
     public static AgnosiaModuleMetadata VpnGuard { get; } = new(
         AgnosiaModuleKind.VpnGuard,
@@ -18,7 +18,7 @@ public static class AgnosiaModuleCatalog
         AgnosiaModuleKind.Lockdown,
         "Lockdown",
         "Блокировка интернета выбранным приложениям рабочего профиля.",
-        "Lockdown позволяет заблокировать доступ к интернету приложениям в рабочем профиле, используя always ON VPN (у вас будет гореть значок VPN пока акутивен модуль), не влияет на основной профиль.");
+        "Lockdown позволяет заблокировать доступ к интернету приложениям в рабочем профиле, используя always ON VPN (у вас будет гореть значок VPN пока активен модуль), не влияет на основной профиль.");
 
     public static AgnosiaModuleMetadata RiskEngine { get; } = new(
         AgnosiaModuleKind.RiskEngine,

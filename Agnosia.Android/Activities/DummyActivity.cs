@@ -1,5 +1,6 @@
 using Agnosia.Android.Infrastructure;
 using Agnosia.Android.Receivers;
+using Agnosia.Android.Services;
 using Android.App.Admin;
 using Android.Content;
 using Android.Content.PM;
@@ -14,6 +15,10 @@ namespace Agnosia.Android.Activities;
     Exported = true,
     Permission = "com.agnosia.app.permission.CROSS_PROFILE_COMMAND",
     ExcludeFromRecents = true,
+    ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize
+        | ConfigChanges.SmallestScreenSize | ConfigChanges.ScreenLayout | ConfigChanges.KeyboardHidden
+        | ConfigChanges.UiMode | ConfigChanges.Density | ConfigChanges.FontScale
+        | ConfigChanges.Locale | ConfigChanges.LayoutDirection,
     LaunchMode = LaunchMode.SingleTop)]
 [IntentFilter(
 [
@@ -67,6 +72,8 @@ public sealed partial class DummyActivity : Activity
     private Guid _commandCorrelationId;
     private AndroidCommandKind _commandKind;
     private AndroidAppLaunchResult? _pendingProxyLaunchResult;
+    private string? _packageInstallerOperationId;
+    private PendingIntent? _packageInstallerCallback;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -85,25 +92,11 @@ public sealed partial class DummyActivity : Activity
         HandleAction();
     }
 
-    protected override void OnResume()
-    {
-        base.OnResume();
-
-        PackageInstallerCallbackCoordinator.RegisterActive(this);
-        DeliverPendingPackageInstallerCallback();
-    }
-
-    protected override void OnPause()
-    {
-        PackageInstallerCallbackCoordinator.UnregisterActive(this);
-        base.OnPause();
-    }
-
     protected override void OnDestroy()
     {
         _destroyCancellation.Cancel();
         CloseFileShuttleConnections();
-        PackageInstallerCallbackCoordinator.UnregisterActive(this);
+        ReleasePackageInstallerCallback();
         _destroyCancellation.Dispose();
         base.OnDestroy();
     }
@@ -114,13 +107,13 @@ public sealed partial class DummyActivity : Activity
         if (intent is null)
             return;
 
-        Intent = intent;
         if (string.Equals(intent.Action, AgnosiaActions.PackageInstallerCallback, StringComparison.Ordinal))
         {
             HandlePackageInstallerCallback(intent);
             return;
         }
 
+        Intent = intent;
         HandleAction();
     }
 
@@ -176,12 +169,16 @@ public sealed partial class DummyActivity : Activity
                            || AndroidWorkProfilePackageClassifier.IsSystemPackage(PackageManager, packageName);
             Log.Debug(LogTag, $"Starting hidden shortcut preparation for {packageName}.");
             var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
+            using var operationLease = await HiddenAppSessionConcurrency
+                .EnterOperationAsync(cancellationToken)
+                .ConfigureAwait(false);
 
             if (!TryMakePackageVisibleForPolicyOperation(
                     admin,
                     packageName,
                     "hidden shortcut preparation",
                     out var restoreHiddenState,
+                    out var visibilitySession,
                     out var visibilityError))
             {
                 FinishWithError(visibilityError ?? $"Android не смог восстановить {packageName} для подготовки ярлыка.");
@@ -234,6 +231,9 @@ public sealed partial class DummyActivity : Activity
                 if (preHideSucceeded)
                 {
                     restoreHiddenState = false;
+                    if (visibilitySession is not null)
+                        HiddenAppSessionMonitorService.CompleteTemporaryVisibility(
+                            this, visibilitySession.SessionId, hiddenConfirmed: true);
                     Log.Info(LogTag, isSystem
                         ? $"System app {packageName} shortcut prepared without freezing."
                         : $"Installed hidden app {packageName} was frozen before shortcut creation.");
@@ -256,7 +256,12 @@ public sealed partial class DummyActivity : Activity
             finally
             {
                 if (restoreHiddenState)
-                    RestoreHiddenStateAfterPolicyOperation(admin, packageName, "incomplete hidden shortcut preparation");
+                    RestoreHiddenStateAfterPolicyOperation(
+                        admin,
+                        packageName,
+                        "incomplete hidden shortcut preparation",
+                        visibilitySession,
+                        out _);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -275,9 +280,11 @@ public sealed partial class DummyActivity : Activity
         string packageName,
         string operation,
         out bool restoreHiddenState,
+        out HiddenAppSessionState? visibilitySession,
         out string? error)
     {
         restoreHiddenState = false;
+        visibilitySession = null;
         error = null;
 
         if (_policyManager is null)
@@ -302,25 +309,56 @@ public sealed partial class DummyActivity : Activity
 
         Log.Info(LogTag,
             $"Package {packageName} is hidden before {operation}; temporarily unhiding it.");
+        visibilitySession = HiddenAppSessionMonitorService.ReserveTemporaryVisibility(this, packageName, packageName);
         if (AndroidPolicyApi.TrySetApplicationHidden(_policyManager, admin, packageName, false, LogTag, out error))
         {
             restoreHiddenState = true;
             return true;
         }
 
+        HiddenAppSessionMonitorService.CompleteTemporaryVisibility(
+            this,
+            visibilitySession.SessionId,
+            hiddenConfirmed: false);
+        visibilitySession = null;
         error ??= $"Android не смог восстановить {packageName} для операции {operation}.";
         return false;
     }
 
-    private void RestoreHiddenStateAfterPolicyOperation(ComponentName admin, string packageName, string operation)
+    private bool RestoreHiddenStateAfterPolicyOperation(
+        ComponentName admin,
+        string packageName,
+        string operation,
+        HiddenAppSessionState? visibilitySession,
+        out string? error)
     {
-        if (_policyManager is null) return;
+        error = null;
+        var hiddenConfirmed = false;
 
         Log.Info(LogTag,
             $"Restoring hidden state after {operation}. package={packageName}.");
-        if (!AndroidPolicyApi.TrySetApplicationHidden(_policyManager, admin, packageName, true, LogTag, out var error))
+        if (_policyManager is not null)
+        {
+            hiddenConfirmed = AndroidPolicyApi.TrySetApplicationHidden(
+                _policyManager,
+                admin,
+                packageName,
+                true,
+                LogTag,
+                out error);
+        }
+
+        if (visibilitySession is not null)
+            HiddenAppSessionMonitorService.CompleteTemporaryVisibility(
+                this,
+                visibilitySession.SessionId,
+                hiddenConfirmed);
+
+        if (!hiddenConfirmed)
             Log.Warn(LogTag,
                 $"Failed to restore hidden state after {operation}. package={packageName}, error={error ?? "<none>"}.");
+
+        return hiddenConfirmed;
     }
 
     private async Task<bool> WaitForPackageAvailableAsync(
@@ -489,6 +527,8 @@ public sealed partial class DummyActivity : Activity
             }
 
             var proxyIntent = HiddenAppShortcutManager.CreateInternalLaunchIntent(packageName, label: displayName);
+            if (AndroidIntentExtras.ReadPendingIntent(Intent, AndroidCommandContract.ExtraLaunchAcknowledgement) is { } acknowledgement)
+                proxyIntent.PutExtra(AndroidCommandContract.ExtraLaunchAcknowledgement, acknowledgement);
             if (AndroidIntentExtras.ReadParentFrozenCallback(Intent) is { } parentFrozenCallback)
                 proxyIntent.PutExtra(AndroidCommandContract.ExtraParentFrozenCallback, parentFrozenCallback);
             if (AndroidIntentExtras.ReadParentCallbackLaunchId(Intent) is { } parentCallbackLaunchId)

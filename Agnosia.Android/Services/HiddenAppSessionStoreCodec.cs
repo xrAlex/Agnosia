@@ -25,7 +25,7 @@ internal static class HiddenAppSessionStoreCodec
                     return false;
                 }
 
-                if (version == 1)
+                if (version is 1 or 2)
                 {
                     var versionOne = JsonSerializer.Deserialize(
                         raw,
@@ -39,7 +39,8 @@ internal static class HiddenAppSessionStoreCodec
 
                     state = new HiddenAppSessionStoreState(
                         versionOne.ActiveSession,
-                        versionOne.PendingHides);
+                        versionOne.PendingHides,
+                        []);
                     return true;
                 }
 
@@ -73,6 +74,7 @@ internal static class HiddenAppSessionStoreCodec
                     legacy.TaskId,
                     legacy.StartedAtUnixTimeMilliseconds,
                     legacy.LaunchResult),
+                [],
                 []);
             return true;
         }
@@ -89,15 +91,19 @@ internal static class HiddenAppSessionStoreCodec
     private static bool IsValid(HiddenAppSessionStoreState state)
     {
         return state.PendingHides is not null
+               && state.PendingParentNotifications is not null
                && (state.ActiveSession is null || IsValid(state.ActiveSession))
-               && state.PendingHides.All(pending => pending is not null && IsValid(pending.Session));
+               && state.PendingHides.All(pending => pending is not null && IsValid(pending.Session))
+               && state.PendingParentNotifications.All(pending => pending is not null && IsValid(pending.Session));
     }
 
     private static bool IsValid(HiddenAppSessionState session)
     {
         return !string.IsNullOrWhiteSpace(session.SessionId)
                && !string.IsNullOrWhiteSpace(session.PackageName)
-               && session.TaskId >= 0;
+               && session.TaskId >= 0
+               && (session.PreviousSession is null || session.PreviousSession.PreviousSession is null
+                   && IsValid(session.PreviousSession));
     }
 
     private static bool TryGetProperty(JsonElement element, string propertyName, out JsonElement value)

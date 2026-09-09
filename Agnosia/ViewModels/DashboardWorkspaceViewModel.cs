@@ -756,6 +756,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
         try
         {
+            StatusMessage = "Подключаем File Shuttle…";
             var result = await _settingsService.OpenDocumentsUiAsync();
             StatusIsError = !result.Succeeded;
             StatusMessage = string.IsNullOrWhiteSpace(result.Message)
@@ -781,6 +782,20 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     [RelayCommand]
     private void CloseAppControlWindow() => CloseAppControl();
+
+    public bool TryHandleBack()
+    {
+        // Follow the overlay stacking order in MainView, closing only the top layer.
+        if (IsWorkProfileRecoveryVisible) DismissWorkProfileRecovery();
+        else if (IsOnboardingVisible) return false;
+        else if (IsAppControlWindowOpen) CloseAppControl();
+        else if (IsModuleDetailsOpen) CloseModuleDetailsCore();
+        else if (IsPermissionsWindowOpen) ClosePermissions();
+        else if (IsLogWindowOpen) CloseLogs();
+        else return false;
+
+        return true;
+    }
 
     internal void OpenModuleDetails(AgnosiaModuleViewModel module)
     {

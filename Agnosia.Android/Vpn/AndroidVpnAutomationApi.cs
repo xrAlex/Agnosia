@@ -84,7 +84,47 @@ public static class AndroidVpnAutomationApi
         return RestoreConfiguredVpnAsync(context, trigger, requireEnableAfterFreeze: false);
     }
 
-    private static Task<OperationResult> RestoreConfiguredVpnAsync(
+    public static OperationResult CheckRestoreBeforeTakeover(Context context)
+    {
+        var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
+        if (!storage.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch) || !AndroidVpnApi.IsVpnActive(context))
+            return OperationResult.Success(string.Empty);
+        var definition = ResolveInstalledPackage(context, ResolveClient(AndroidSettingsStore.LoadVpnAfterWorkFreezeClient(storage)));
+        if (!CanStartClient(context, definition))
+            return OperationResult.Failure($"VPN-клиент {definition.DisplayName} ({definition.PackageName}) недоступен для восстановления. Проверьте выбранный клиент в настройках VPN Guard.");
+        if (definition.Kind == VpnAutomationClientKind.Tunguska
+            && string.IsNullOrWhiteSpace(storage.GetString(StorageKeys.TunguskaAutomationToken)))
+            return OperationResult.Failure("Для восстановления Tunguska требуется токен автоматизации.");
+        return OperationResult.Success(string.Empty);
+    }
+
+    private static bool CanStartClient(Context context, VpnClientDefinition definition)
+    {
+        try
+        {
+            if (context.PackageManager is not { } manager || !IsPackageInstalled(manager, definition.PackageName)) return false;
+            if (definition.ReceiverClassName is { } receiver)
+            {
+                var intent = new Intent(definition.ToggleAction ?? definition.StartAction);
+                intent.SetComponent(new ComponentName(definition.PackageName, receiver));
+                return manager.QueryBroadcastReceivers(intent, 0)?.Any(result =>
+                    result.ActivityInfo is { Enabled: true, Exported: true } info
+                    && info.ApplicationInfo?.Enabled == true
+                    && (string.IsNullOrWhiteSpace(info.Permission)
+                        || context.CheckSelfPermission(info.Permission) == Permission.Granted)) == true;
+            }
+            var activity = manager.ResolveActivity(CreateStartActivityIntent(definition, definition.RequireExplicitActivity), 0)?.ActivityInfo;
+            return activity is { Enabled: true, Exported: true } && activity.ApplicationInfo?.Enabled == true
+                && (string.IsNullOrWhiteSpace(activity.Permission) || context.CheckSelfPermission(activity.Permission) == Permission.Granted);
+        }
+        catch (Exception exception)
+        {
+            Log.Warn(LogTag, $"VPN restore preflight failed: {exception.Message}");
+            return false;
+        }
+    }
+
+    private static async Task<OperationResult> RestoreConfiguredVpnAsync(
         Context context,
         string trigger,
         bool requireEnableAfterFreeze)
@@ -94,13 +134,13 @@ public static class AndroidVpnAutomationApi
         if (requireEnableAfterFreeze && !storage.GetBoolean(StorageKeys.EnableVpnAfterWorkFreeze))
         {
             Log.Debug(LogTag, $"Enable-after-freeze is disabled. trigger={trigger}.");
-            return Task.FromResult(OperationResult.Success(string.Empty));
+            return OperationResult.Success(string.Empty);
         }
 
         if (AndroidVpnApi.IsVpnActive(context) && !ShouldIgnoreSingleVisibleLockdownVpn(context, trigger))
         {
             Log.Debug(LogTag, $"VPN is already active; skipping enable-after-freeze command. trigger={trigger}.");
-            return Task.FromResult(OperationResult.Success(string.Empty));
+            return OperationResult.Success(string.Empty);
         }
 
         var definition = ResolveInstalledPackage(context, ResolveClient(AndroidSettingsStore.LoadVpnAfterWorkFreezeClient(storage)));
@@ -109,19 +149,31 @@ public static class AndroidVpnAutomationApi
 
         try
         {
-            return Task.FromResult(StartClient(context, definition, storage));
+            var sent = StartClient(context, definition, storage);
+            if (!sent.Succeeded) return sent;
+            var timer = System.Diagnostics.Stopwatch.StartNew();
+            while (timer.Elapsed < TimeSpan.FromSeconds(10))
+            {
+                if (AndroidVpnApi.IsVpnActive(context) && !ShouldIgnoreSingleVisibleLockdownVpn(context, trigger))
+                {
+                    Log.Info(LogTag, $"External VPN detected after restore command. client={definition.DisplayName}, trigger={trigger}.");
+                    return OperationResult.Success("VPN обнаружен после команды восстановления.");
+                }
+                await Task.Delay(500).ConfigureAwait(false);
+            }
+            return OperationResult.Failure($"Команда отправлена в {definition.DisplayName}, но VPN пока не обнаружен. Agnosia повторит проверку восстановления.");
         }
         catch (ActivityNotFoundException)
         {
             var message = $"VPN-клиент {definition.DisplayName} не найден или не принимает команду запуска.";
             Log.Warn(LogTag, $"{message} package={definition.PackageName}.");
-            return Task.FromResult(OperationResult.Failure(message));
+            return OperationResult.Failure(message);
         }
         catch (Exception exception)
         {
             var message = $"Не удалось отправить команду запуска VPN для {definition.DisplayName}.";
             Log.Warn(LogTag, $"{message} error={exception.Message}");
-            return Task.FromResult(OperationResult.Failure(message));
+            return OperationResult.Failure(message);
         }
     }
 
@@ -295,6 +347,19 @@ public static class AndroidVpnAutomationApi
 
     private static VpnClientDefinition ResolveInstalledPackage(Context context, VpnClientDefinition definition)
     {
+        if (definition.Kind == VpnAutomationClientKind.FlClash)
+        {
+            var endpoint = FlClashEndpoint.Select(candidate => CanStartClient(context, definition with
+            {
+                PackageName = candidate.PackageName, ActivityClassName = candidate.ActivityClassName,
+                StartAction = candidate.StartAction
+            }));
+            return endpoint is null ? definition : definition with
+            {
+                PackageName = endpoint.PackageName, ActivityClassName = endpoint.ActivityClassName,
+                StartAction = endpoint.StartAction, DisplayName = endpoint.PackageName == "com.follow.clashx" ? "FlClashX" : "FlClash"
+            };
+        }
         if (definition.PackageNames.Length <= 1) return definition;
 
         foreach (var packageName in definition.PackageNames)

@@ -354,7 +354,7 @@
                                Text="{Binding OnboardingPermissionSummary, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.Permission.'}" />
                 </Border>
 
-                <Button Classes="primary"
+                <Button AutomationProperties.Name="Далее" Classes="primary"
                         Grid.Column="2"
                         Width="172"
                         Height="44"
@@ -367,7 +367,7 @@
                                Text="Далее" />
                 </Button>
 
-                <Button Classes="primary"
+                <Button AutomationProperties.Name="Открыть настройки" Classes="primary"
                         Grid.Column="2"
                         Width="172"
                         Height="44"
@@ -381,7 +381,7 @@
                                Text="Открыть настройки" />
                 </Button>
 
-                <Button Classes="primary"
+                <Button AutomationProperties.Name="Далее" Classes="primary"
                         Grid.Column="2"
                         Width="116"
                         Height="44"
@@ -394,7 +394,7 @@
                                Text="Далее" />
                 </Button>
 
-                <Button Classes="primary"
+                <Button AutomationProperties.Name="Открыть приложения" Classes="primary"
                         Grid.Column="2"
                         Width="116"
                         Height="44"

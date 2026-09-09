@@ -74,7 +74,8 @@ internal sealed class HiddenAppSessionMonitorStateMachine
                 targetForegroundFirstSeen,
                 "target_foreground");
 
-        if (_hasSeenTarget && observation.ConfirmedInactive)
+        if (observation.ConfirmedInactive
+            && observation.InactiveSince is { } confirmedAt && confirmedAt >= _startedAt && confirmedAt <= now)
         {
             _inactiveSince ??= observation.InactiveSince ?? now;
             _phase = HiddenAppSessionMonitorPhase.InactiveCandidate;
@@ -100,6 +101,7 @@ internal sealed class HiddenAppSessionMonitorStateMachine
 
         if (!_hasSeenTarget)
         {
+            ResetInactiveCandidate();
             _phase = HiddenAppSessionMonitorPhase.WaitingForTargetForeground;
             var shouldRaiseLaunchWarning = !_launchObservationWarningRaised
                                            && now - _startedAt >= _initialLaunchGracePeriod;

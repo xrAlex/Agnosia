@@ -6,6 +6,20 @@ namespace Agnosia.Unit.Android.Vpn;
 
 public sealed class WorkLaunchVpnTransactionTests
 {
+    [Fact]
+    public async Task Unknown_launch_result_preserves_restore_obligation_for_reconciliation()
+    {
+        var restores = 0;
+        await Assert.ThrowsAsync<Agnosia.Android.Commands.WorkLaunchUnconfirmedException>(() =>
+            WorkLaunchVpnTransaction.ExecuteAsync(
+                _ => Task.FromResult(OperationResult.Success("ready")),
+                _ => Task.FromResult(WorkLaunchVpnTakeoverResult.Acquired(OperationResult.Success("disabled"))),
+                _ => throw new Agnosia.Android.Commands.WorkLaunchUnconfirmedException("launch", "target"),
+                () => { restores++; return Task.FromResult(OperationResult.Success("restored")); },
+                () => true, CancellationToken.None));
+        Assert.Equal(0, restores);
+    }
+
     // Ловит takeover VPN до work-profile preflight.
     [Fact]
     public async Task ExecuteAsync_stops_before_takeover_when_preflight_fails()

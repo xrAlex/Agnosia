@@ -20,6 +20,29 @@ public sealed class LocalStorageManager
         editor?.Remove(key)?.Apply();
     }
 
+    public void RemoveDurably(string key)
+    {
+        using var editor = _preferences.Edit();
+        if (editor?.Remove(key)?.Commit() != true)
+            throw new IOException("Failed to durably remove stored value.");
+    }
+
+    public void SetValues(IReadOnlyDictionary<string, bool> booleans, IReadOnlyDictionary<string, string> strings)
+    {
+        using var editor = _preferences.Edit()
+            ?? throw new InvalidOperationException("Failed to edit preferences.");
+        foreach (var (key, value) in booleans) editor.PutBoolean(key, value);
+        foreach (var (key, value) in strings) editor.PutString(key, value);
+        if (!editor.Commit()) throw new IOException("Failed to persist settings.");
+    }
+
+    public void SetStringDurably(string key, string value)
+    {
+        using var editor = _preferences.Edit();
+        if (editor?.PutString(key, value)?.Commit() != true)
+            throw new IOException("Failed to persist pending setting.");
+    }
+
     public bool GetBoolean(string key, bool fallback = false)
     {
         return _preferences.GetBoolean(key, fallback);

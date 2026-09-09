@@ -28,7 +28,7 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:AgnosiaModuleViewModel">
-                            <Button Classes="app-card-button"
+                            <Button AutomationProperties.Name="{Binding Title}" Classes="app-card-button"
                                     Command="{Binding OpenCommand}">
                                 <Border Classes="surface-card compact list-card">
                                     <Grid ColumnDefinitions="Auto,*,Auto"

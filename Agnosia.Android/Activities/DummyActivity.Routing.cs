@@ -98,10 +98,10 @@ public sealed partial class DummyActivity
                     ActionCreateHiddenShortcut();
                     break;
                 case AgnosiaActions.FreezePackage:
-                    ActionFreezePackage(true);
+                    RunAction(token => ActionFreezePackageAsync(true, token), "Android не смог скрыть приложение.");
                     break;
                 case AgnosiaActions.UnfreezePackage:
-                    ActionFreezePackage(false);
+                    RunAction(token => ActionFreezePackageAsync(false, token), "Android не смог восстановить приложение.");
                     break;
                 case AgnosiaActions.RevokeRuntimePermissions:
                     RunAction(ActionRevokeRuntimePermissionsAsync,

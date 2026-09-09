@@ -38,6 +38,12 @@
     <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
         <Compile Remove="**\*.cs"/>
         <Compile Include="Activities\HiddenAppLaunchPreflight.cs"/>
+        <Compile Include="Storage\PendingBooleanSettingsSync.cs"/>
+        <Compile Include="Files\AgnosiaFileShuttleContract.cs"/>
+        <Compile Include="Files\AgnosiaFileShuttleClientRegistry.cs"/>
+        <Compile Include="Files\AgnosiaFileShuttlePayloadPager.cs"/>
+        <Compile Include="Files\AgnosiaFileShuttleListingStore.cs"/>
+        <Compile Include="Files\AgnosiaFileShuttleServiceLifetime.cs"/>
         <Compile Include="Activities\TemporaryPackageVisibilityTransaction.cs"/>
         <Compile Include="Permissions\AppPermissionRiskCatalog.cs"/>
         <Compile Include="Permissions\AppPermissionRiskCatalog.AnalysisContext.cs"/>
@@ -64,6 +70,8 @@
         <Compile Include="Commands\ActivityCommandResultIdentity.cs"/>
         <Compile Include="Commands\CommandResultEnvelopeIdentity.cs"/>
         <Compile Include="Commands\WorkProfileLaunchPreflight.cs"/>
+        <Compile Include="Commands\WorkLaunchAcknowledgement.cs"/>
+        <Compile Include="Vpn\FlClashEndpoint.cs"/>
         <Compile Include="Commands\PackageStateQuery.cs"/>
         <Compile Include="Commands\PackageStateResult.cs"/>
         <Compile Include="Commands\PackageStateResultInterpreter.cs"/>
@@ -83,9 +91,11 @@
         <Compile Include="InternalsVisibleTo.cs"/>
         <Compile Include="Platform\AuthenticationKeyMaterial.cs"/>
         <Compile Include="Platform\WorkAppFrozenCallbackPayload.cs"/>
+        <Compile Include="Platform\IntentSignatureValueEncoder.cs"/>
         <Compile Include="Platform\AndroidPackageAccessPolicy.cs"/>
         <Compile Include="Packages\PackageLaunchability.cs"/>
         <Compile Include="Services\HiddenAppUsageEventPolicy.cs"/>
+        <Compile Include="Services\HiddenAppUsageObservationReducer.cs"/>
         <Compile Include="Services\HiddenAppSessionStoreCodec.cs"/>
         <Compile Include="Services\HiddenAppSessionStoreJsonContext.cs"/>
         <Compile Include="Services\HiddenAppSessionStoreState.cs"/>

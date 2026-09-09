@@ -9,6 +9,25 @@ public sealed class PackageStateResultInterpreterTests
     private const string PackageName = "com.example.notes";
 
     [Fact]
+    public void ReadSnapshot_ReturnsPersistedLaunchIdentityAndRecoveryAcknowledgement()
+    {
+        var result = CreateSuccess(new PackageStateResult(
+            PackageName,
+            true,
+            true,
+            "launch-a",
+            true));
+
+        var snapshot = PackageStateResultInterpreter.ReadSnapshot(result, PackageName);
+
+        Assert.True(snapshot.Result.Succeeded);
+        Assert.True(snapshot.Installed);
+        Assert.True(snapshot.Hidden);
+        Assert.Equal("launch-a", snapshot.LaunchId);
+        Assert.True(snapshot.RecoveryAcknowledged);
+    }
+
+    [Fact]
     public void Interpret_AcceptsInstalledPackageWithExpectedHiddenState()
     {
         var result = CreateSuccess(new PackageStateResult(PackageName, true, true));

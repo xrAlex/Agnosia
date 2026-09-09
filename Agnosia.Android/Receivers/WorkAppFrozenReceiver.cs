@@ -37,27 +37,31 @@ public sealed class WorkAppFrozenReceiver : BroadcastReceiver
         var packageName = intent.GetStringExtra(AndroidCommandContract.ExtraCallbackPackage)!;
         var launchId = intent.GetStringExtra(AndroidCommandContract.ExtraCallbackLaunchId);
         var trigger = intent.GetStringExtra(AndroidProfileCommandGateway.ExtraTrigger) ?? "work_app_frozen_broadcast";
+        var ordered = IsOrderedBroadcast;
         _ = Task.Run(async () =>
         {
             try
             {
                 Log.Info(LogTag, $"Work-app frozen broadcast received in parent profile. trigger={trigger}");
 
-                var result = await WorkAppFrozenHandler.RestoreParentVpnAndHideOverlayAsync(
-                    appContext,
-                    packageName,
-                    launchId,
-                    trigger,
-                    LogTag).ConfigureAwait(false);
-                if (result.Succeeded)
+                AgnosiaRuntime.Initialize(appContext);
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(7));
+                var completion = await ServiceRegistry.GetRequiredService<VpnRestoreOwnershipCoordinator>()
+                    .AcceptCompletionAsync(packageName, launchId, timeout.Token).ConfigureAwait(false);
+                if (completion.Result.Succeeded)
                 {
+                    if (completion.OwnerMatched && !VpnRestoreRetryScheduler.Schedule(
+                            appContext, typeof(Activities.VpnRestoreRecoveryActivity), packageName, launchId))
+                        return;
+                    if (ordered && pendingResult is not null)
+                        pendingResult.ResultCode = (Result)WorkVpnRecoveryAlarm.DurableAcknowledgement;
                     Log.Info(LogTag,
-                        $"Work-app frozen broadcast handled successfully. trigger={trigger}, message={result.Message}");
+                        $"Work-app frozen broadcast accepted durably. trigger={trigger}");
                     return;
                 }
 
                 Log.Warn(LogTag,
-                    $"Work-app frozen broadcast handling failed. trigger={trigger}, message={result.Message}");
+                    $"Work-app frozen broadcast handling failed. trigger={trigger}, message={completion.Result.Message}");
             }
             catch (Exception exception)
             {
