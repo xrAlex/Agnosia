@@ -153,6 +153,9 @@ public sealed partial class HiddenAppSessionMonitorService : Service
         Log.Debug(LogTag, $"OnStartCommand action={intent?.Action ?? "<null>"} startId={startId}.");
         try
         {
+            // A queued FGS start can arrive after the reserved hide has completed.
+            // Promote even an empty session before any validation or early stop.
+            StartForegroundServiceNotification(_storeState);
             var action = intent?.Action;
             if (string.Equals(action, ActionStart, StringComparison.Ordinal))
             {

@@ -299,6 +299,9 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(LaunchLabel));
         }
 
+        if (previous.IsIsolationEnabled != snapshot.IsIsolationEnabled)
+            OnPropertyChanged(nameof(IsAgnosiaManaged));
+
         if (previous.InteractionAllowed != snapshot.InteractionAllowed)
         {
             OnPropertyChanged(nameof(InteractionAllowed));

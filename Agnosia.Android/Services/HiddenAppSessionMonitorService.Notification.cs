@@ -9,12 +9,14 @@ public sealed partial class HiddenAppSessionMonitorService
     {
         var pending = state.PendingHides.FirstOrDefault();
         var session = pending?.Session ?? state.ActiveSession;
-        if (session is null) return;
-
-        var title = pending is not null
+        var title = session is null
+            ? "Проверка изоляции приложений"
+            : pending is not null
             ? $"Не удалось скрыть: {session.DisplayName}"
             : $"Открыто: {session.DisplayName}";
-        var message = pending is not null
+        var message = session is null
+            ? "Agnosia завершает обработку сессии."
+            : pending is not null
             ? "Agnosia продолжает попытки восстановить изоляцию приложения."
             : $"Приложение снова скроется через {UserBackgroundHideDelay.TotalSeconds:0} секунд после сворачивания или закрытия.";
         var notification = AndroidNotificationApi.BuildNotification(

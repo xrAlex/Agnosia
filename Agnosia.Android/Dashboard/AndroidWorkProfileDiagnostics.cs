@@ -30,9 +30,8 @@ internal static class AndroidWorkProfileDiagnosticsReader
             managedProfile,
             storedManagedProfileSerial,
             notes);
-        var managedProfileExists = managedProfile is not null
-                                   || userProfiles.Any(profile => !IsSameUser(userManager, currentUser, profile, notes));
         var commandTargetResolvable = TryHasWorkProfileTarget(context, notes);
+        var managedProfileExists = managedProfile is not null || commandTargetResolvable;
         var quietModeEnabled = managedProfile is null
             ? null
             : TryReadQuietMode(userManager, managedProfile, notes);
@@ -98,10 +97,14 @@ internal static class AndroidWorkProfileDiagnosticsReader
     {
         if (storedManagedProfileSerial >= 0
             && TryGetUserForSerial(userManager, storedManagedProfileSerial, notes) is { } storedUser
+            && userProfiles.Any(profile => IsSameUser(userManager, profile, storedUser, notes))
             && !IsSameUser(userManager, currentUser, storedUser, notes))
             return storedUser;
 
-        return userProfiles.FirstOrDefault(profile => !IsSameUser(userManager, currentUser, profile, notes));
+        // Only provisioning supplies a trusted managed-profile identity. Other
+        // associated users can be Private Space or profiles owned by another DPC.
+        notes.Add("managedUser=unavailable:noProvisionedIdentity");
+        return null;
     }
 
     private static UserHandle? TryGetUserForSerial(

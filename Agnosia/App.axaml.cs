@@ -35,6 +35,7 @@ public class App : Application
         AppThemeManager.Apply(startupState.InitialTheme);
         var workspaceViewModel = ServiceRegistry.GetRequiredService<DashboardWorkspaceViewModel>();
         ServiceRegistry.PrimaryActivityResumed += workspaceViewModel.HandlePrimaryActivityResumed;
+        ServiceRegistry.WorkAppFrozen += workspaceViewModel.HandleWorkAppFrozen;
 
         switch (ApplicationLifetime)
         {

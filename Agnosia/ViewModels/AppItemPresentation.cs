@@ -56,7 +56,7 @@ internal static class AppItemPresentation
 
     public static bool IsAgnosiaManaged(AppSnapshot snapshot)
     {
-        return ShouldShowWorkControls(snapshot.Profile) && snapshot.IsHidden;
+        return ShouldShowWorkControls(snapshot.Profile) && (snapshot.IsIsolationEnabled || snapshot.IsHidden);
     }
 
     public static bool CanClone(AppSnapshot snapshot)

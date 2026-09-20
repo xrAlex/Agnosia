@@ -36,7 +36,11 @@ public sealed class WorkVpnRecoveryReceiver : BroadcastReceiver
                 using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(7));
                 using var operation = await HiddenAppSessionConcurrency.EnterOperationAsync(timeout.Token);
                 if (!HiddenAppSessionMonitorService.IsKnownLaunch(package, launchId)) return;
-                if (!IsPackageHiddenOrMissing(appContext, package)) return;
+                // A durable completion proves this launch was already hidden.
+                // The user can have disabled isolation since then; still deliver
+                // its acknowledgement, unless a newer launch replaced the outbox.
+                if (!HiddenAppSessionMonitorService.HasCompletedLaunch(package, launchId)
+                    && !IsPackageHiddenOrMissing(appContext, package)) return;
                 HiddenAppSessionMonitorService.PrepareParentNotification(package, launchId);
                 WorkVpnRecoveryAlarm.Send(appContext, package, launchId, callback);
             }

@@ -14,8 +14,12 @@
     </Design.DataContext>
 
     <Border Background="{StaticResource AppOverlayScrimBrush}">
-        <Grid Margin="12">
+        <Grid x:Name="DialogHost" Margin="12">
             <ContentControl Content="{Binding SelectedApp}"
+                            Height="{Binding #DialogHost.Bounds.Height}"
+                            MaxHeight="640"
+                            HorizontalContentAlignment="Stretch"
+                            VerticalContentAlignment="Stretch"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
                 <ContentControl.DataTemplates>
@@ -168,7 +172,7 @@
                                             </StackPanel>
                                             <ToggleSwitch Grid.Column="1"
                                                           VerticalAlignment="Center"
-                                                          IsChecked="{Binding IsHidden, Mode=OneWay}"
+                                                          IsChecked="{Binding IsAgnosiaManaged, Mode=OneWay}"
                                                           IsEnabled="{Binding CanFreeze}"
                                                           Command="{Binding ToggleFrozenCommand}" />
                                         </Grid>

@@ -1,4 +1,5 @@
 using Agnosia.Models;
+using Agnosia.Android.Services;
 using Android.App.Admin;
 using Android.Content;
 using Android.Content.PM;
@@ -39,6 +40,7 @@ public static class AndroidAppInventoryApi
             .LoadBlockedPackages()
             .ToHashSet(StringComparer.Ordinal);
         var specialAccess = isRiskEngineEnabled ? ReadSpecialAccessSnapshot(context) : SpecialAccessSnapshot.Empty;
+        var packagesAwaitingHide = HiddenAppSessionMonitorService.GetPackagesAwaitingHide();
         foreach (var app in apps)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -53,6 +55,7 @@ public static class AndroidAppInventoryApi
                     showAll,
                     specialAccess,
                     internetBlockedPackages,
+                    packagesAwaitingHide,
                     isRiskEngineEnabled,
                     options) is { } model)
                 models.Add(model);
@@ -133,6 +136,7 @@ public static class AndroidAppInventoryApi
         bool showAll,
         SpecialAccessSnapshot specialAccess,
         HashSet<string> internetBlockedPackages,
+        HashSet<string> packagesAwaitingHide,
         bool isRiskEngineEnabled,
         AppInventoryQueryOptions options)
     {
@@ -161,7 +165,8 @@ public static class AndroidAppInventoryApi
                 isInternetBlocked: false,
                 permissionRiskAvailable: true,
                 loadIcon: false,
-                includeApkPaths: options.IncludeSystemApkPaths);
+                includeApkPaths: options.IncludeSystemApkPaths,
+                isIsolationEnabled: false);
         }
 
         PackageIdentity packageIdentity;
@@ -193,7 +198,8 @@ public static class AndroidAppInventoryApi
             internetBlockedPackages.Contains(packageName),
             isRiskEngineEnabled,
             loadIcon: options.IncludeInlineIcons,
-            includeApkPaths: true);
+            includeApkPaths: true,
+            isIsolationEnabled: isHidden || packagesAwaitingHide.Contains(packageName));
     }
 
     private static AppServiceModel CreateModel(
@@ -209,7 +215,8 @@ public static class AndroidAppInventoryApi
         bool isInternetBlocked,
         bool permissionRiskAvailable,
         bool loadIcon,
-        bool includeApkPaths)
+        bool includeApkPaths,
+        bool isIsolationEnabled)
     {
         return new AppServiceModel
         {
@@ -219,6 +226,7 @@ public static class AndroidAppInventoryApi
             SplitApks = includeApkPaths ? app.SplitSourceDirs?.ToArray() ?? [] : [],
             IsSystem = isSystem,
             IsHidden = isHidden,
+            IsIsolationEnabled = isIsolationEnabled,
             CanLaunch = PackageLaunchability.CanLaunch(
                 isInstalled || isHidden,
                 new AndroidPackageLaunchQuery(packageManager, packageName)),

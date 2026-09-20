@@ -70,6 +70,26 @@ internal static class WorkVpnRecoveryAlarm
         }
     }
 
+    public static void RequestImmediateDelivery(Context context, string packageName, string launchId)
+    {
+        // Retrieve the existing alarm token, whose extras retain the parent
+        // callback across process death. Keep its scheduled retry until acked.
+        var intent = new Intent(context, typeof(WorkVpnRecoveryReceiver));
+        intent.SetAction(Action);
+        intent.SetData(global::Android.Net.Uri.Parse(
+            $"agnosia://work-vpn-recovery/{Uri.EscapeDataString(packageName)}/{Uri.EscapeDataString(launchId)}"));
+        try
+        {
+            using var pending = PendingIntent.GetBroadcast(context, GetStableRequestCode(packageName, launchId),
+                intent, PendingIntentFlags.NoCreate | PendingIntentFlags.Immutable);
+            pending?.Send();
+        }
+        catch (Exception exception)
+        {
+            Log.Warn("AgnosiaWorkVpnRecovery", $"Immediate completion delivery deferred to alarm: {exception.Message}");
+        }
+    }
+
     public static void Send(Context context, string packageName, string launchId, PendingIntent callback)
     {
         callback.Send(context, Result.Canceled, null,

@@ -63,6 +63,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private bool _initialized;
     private bool _isApplyingSnapshot;
     private bool _isOperationInProgress;
+    private bool _workAppRefreshPending;
     private bool _isPreparingOnboardingPermissions;
     private PermissionKind? _pendingResumePermissionKind;
     private bool _inventoryLoadInProgress;
@@ -605,6 +606,28 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         _ = RefreshDashboardAfterResumeAsync();
     }
 
+    public void HandleWorkAppFrozen(string packageName)
+    {
+        _ = InvokeOnUiThreadActionAsync(() =>
+        {
+            // Re-read authoritative state: a delayed callback can belong to a
+            // previous launch, and freezing does not require VPN ownership.
+            if (_initialized && _appItemCache.ContainsKey(new AppItemKey(ProfileKind.Work, packageName)))
+            {
+                _workAppRefreshPending = true;
+                TryStartPendingWorkAppRefresh();
+            }
+        });
+    }
+
+    private void TryStartPendingWorkAppRefresh()
+    {
+        if (!_workAppRefreshPending || IsBusy || _isOperationInProgress || IsDashboardRefreshing) return;
+
+        _workAppRefreshPending = false;
+        _ = RefreshDashboardAsync(false);
+    }
+
     private async Task RefreshDashboardAfterResumeAsync()
     {
         if (!_initialized || IsBusy || _isOperationInProgress) return;
@@ -698,6 +721,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             await InvokeOnUiThreadActionAsync(() =>
             {
                 IsDashboardRefreshing = false;
+                TryStartPendingWorkAppRefresh();
                 _settingsSaveCoordinator.TryStartQueued();
             }, DispatcherPriority.Background).ConfigureAwait(false);
         }
@@ -1046,13 +1070,13 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     internal Task ToggleFrozenAsync(AppItemViewModel app)
     {
-        var hidden = !app.IsHidden;
+        var hidden = !app.IsAgnosiaManaged;
         return RunAppOperationAsync(
             app,
             snapshot => _appCommandService.SetFrozenAsync(snapshot, hidden),
-            app.IsHidden ? "Restored" : "Hidden",
+            app.IsAgnosiaManaged ? "Restored" : "Hidden",
             refreshOnSuccess: false,
-            updateLocalSnapshot: snapshot => snapshot with { IsHidden = hidden });
+            updateLocalSnapshot: snapshot => snapshot with { IsHidden = hidden, IsIsolationEnabled = hidden });
     }
 
     internal Task ForceFreezeAsync(AppItemViewModel app)
@@ -1062,7 +1086,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             snapshot => _appCommandService.ForceFreezeAsync(snapshot),
             "ForceHidden",
             refreshOnSuccess: false,
-            updateLocalSnapshot: snapshot => snapshot with { IsHidden = true });
+            updateLocalSnapshot: snapshot => snapshot with { IsHidden = true, IsIsolationEnabled = true });
     }
 
     internal Task CreateShortcutAsync(AppItemViewModel app)
@@ -1540,6 +1564,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
         _busyScopeCount--;
         if (_busyScopeCount == 0) IsBusy = false;
+        TryStartPendingWorkAppRefresh();
     }
 
     private static async ValueTask InvokeOnAvaloniaUiThreadAsync(
@@ -1568,6 +1593,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(CanStartProvisioning));
         NotifyOperationStatusChanged();
         StartProvisioningCommand.NotifyCanExecuteChanged();
+        TryStartPendingWorkAppRefresh();
     }
 
     private void NotifyOperationStatusChanged()

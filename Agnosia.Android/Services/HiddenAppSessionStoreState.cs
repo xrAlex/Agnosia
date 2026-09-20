@@ -67,6 +67,33 @@ internal sealed record HiddenAppSessionStoreState(
 
     public bool RequiresPackageMonitoring => ActiveSession is not null || PendingHides.Length > 0;
 
+    public bool HasCompletedLaunch(string packageName, string launchId)
+    {
+        return PendingParentNotifications.Any(pending => pending.Session.PackageName == packageName
+            && pending.Session.ParentCallbackLaunchId == launchId);
+    }
+
+    public HashSet<string> GetPackagesAwaitingHide()
+    {
+        return new[] { ActiveSession, ActiveSession?.PreviousSession }
+            .Concat(PendingHides.Select(pending => pending.Session))
+            .OfType<HiddenAppSessionState>()
+            .Select(session => session.PackageName)
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
+    public HiddenAppSessionStoreState CompletePackage(string packageName, string reason, DateTimeOffset now)
+    {
+        var state = this;
+        if (state.ActiveSession is { } active && active.PackageName == packageName)
+            state = state.BeginCompletion(active.SessionId, reason, now);
+
+        foreach (var pending in state.PendingHides.Where(item => item.Session.PackageName == packageName).ToArray())
+            state = state.ConfirmHidden(pending.Session.SessionId, now);
+
+        return state;
+    }
+
     public HiddenAppSessionStoreState StartOrReplace(HiddenAppSessionState session, DateTimeOffset now)
     {
         var pendingHides = PendingHides

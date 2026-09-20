@@ -8,6 +8,8 @@ public static class ServiceRegistry
 
     public static event Action? PrimaryActivityResumed;
 
+    public static event Action<string>? WorkAppFrozen;
+
     public static IServiceProvider Services => _services;
 
     public static void ConfigureServices(IServiceProvider services)
@@ -24,6 +26,11 @@ public static class ServiceRegistry
     public static void NotifyPrimaryActivityResumed()
     {
         PrimaryActivityResumed?.Invoke();
+    }
+
+    public static void NotifyWorkAppFrozen(string packageName)
+    {
+        WorkAppFrozen?.Invoke(packageName);
     }
 
     private static IServiceProvider CreateDefaultServices()

@@ -273,9 +273,8 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
 
     private static bool IsProbablyDeletedManagedProfile(WorkProfileDiagnostics profileDiagnostics)
     {
-        return profileDiagnostics.ManagedProfileExists
-               && profileDiagnostics.QuietModeEnabled == true
-               && profileDiagnostics.UserRunning == false
+        return !profileDiagnostics.ManagedProfileExists
+               && profileDiagnostics.ManagedProfileUserSerial is not null
                && !profileDiagnostics.CommandTargetResolvable;
     }
 
@@ -405,7 +404,8 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
                 app.ManifestPermissions,
                 app.RuntimePermissions,
                 app.PermissionRiskAvailable,
-                app.IsInternetBlocked);
+                app.IsInternetBlocked,
+                app.IsIsolationEnabled);
         }
 
         return mappedApps;

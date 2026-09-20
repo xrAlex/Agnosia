@@ -50,6 +50,8 @@ public sealed class WorkAppFrozenReceiver : BroadcastReceiver
                     .AcceptCompletionAsync(packageName, launchId, timeout.Token).ConfigureAwait(false);
                 if (completion.Result.Succeeded)
                 {
+                    AndroidQueryCache.Shared.ClearAppInventoryQueries();
+                    ServiceRegistry.NotifyWorkAppFrozen(packageName);
                     if (completion.OwnerMatched && !VpnRestoreRetryScheduler.Schedule(
                             appContext, typeof(Activities.VpnRestoreRecoveryActivity), packageName, launchId))
                         return;

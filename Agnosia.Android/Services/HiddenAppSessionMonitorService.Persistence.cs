@@ -8,6 +8,36 @@ public sealed partial class HiddenAppSessionMonitorService
 {
     private static readonly Lock PersistedStateSync = new();
 
+    internal static HashSet<string> GetPackagesAwaitingHide()
+    {
+        TryLoadPersistedState(out var state);
+        return state.GetPackagesAwaitingHide();
+    }
+
+    internal static bool HasCompletedLaunch(string packageName, string launchId)
+    {
+        TryLoadPersistedState(out var state);
+        return state.HasCompletedLaunch(packageName, launchId);
+    }
+
+    // Called under the package operation gate, after Android confirms hiding.
+    internal static void CompletePackage(Context context, string packageName)
+    {
+        var changed = false;
+        var completed = UpdatePersistedState(state =>
+        {
+            var updated = state.CompletePackage(packageName, "manual_freeze", DateTimeOffset.UtcNow);
+            changed = !ReferenceEquals(updated, state);
+            return updated;
+        });
+        if (!changed) return;
+
+        EnsurePendingHideRetryRunning(context);
+        foreach (var pending in completed.PendingParentNotifications.Where(item => item.Session.PackageName == packageName))
+            if (pending.Session.ParentCallbackLaunchId is { Length: > 0 } launchId)
+                WorkVpnRecoveryAlarm.RequestImmediateDelivery(context, packageName, launchId);
+    }
+
     public static bool HasPersistedSessionForScreenLock()
     {
         return TryLoadPersistedState(out var state) && !state.IsEmpty;
@@ -221,6 +251,7 @@ public sealed partial class HiddenAppSessionMonitorService
 
     private static void PersistStateCore(HiddenAppSessionStoreState state)
     {
+        AndroidQueryCache.Shared.ClearAppInventoryQueries();
         if (state.IsEmpty)
         {
             ServiceRegistry.GetRequiredService<LocalStorageManager>().RemoveDurably(StorageKeys.HiddenAppActiveSession);

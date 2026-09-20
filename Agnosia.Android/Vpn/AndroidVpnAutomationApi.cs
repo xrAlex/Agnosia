@@ -91,7 +91,9 @@ public static class AndroidVpnAutomationApi
             return OperationResult.Success(string.Empty);
         var definition = ResolveInstalledPackage(context, ResolveClient(AndroidSettingsStore.LoadVpnAfterWorkFreezeClient(storage)));
         if (!CanStartClient(context, definition))
-            return OperationResult.Failure($"VPN-клиент {definition.DisplayName} ({definition.PackageName}) недоступен для восстановления. Проверьте выбранный клиент в настройках VPN Guard.");
+            return OperationResult.Failure(IsPackageInstalled(context.PackageManager, definition.PackageName)
+                ? $"Установленный VPN-клиент {definition.DisplayName} ({definition.PackageName}) не предоставляет Agnosia доступную команду восстановления. Эта сборка клиента не поддерживает автоматизацию VPN Guard."
+                : $"VPN-клиент {definition.DisplayName} ({definition.PackageName}) не установлен. Проверьте выбранный клиент в настройках VPN Guard.");
         if (definition.Kind == VpnAutomationClientKind.Tunguska
             && string.IsNullOrWhiteSpace(storage.GetString(StorageKeys.TunguskaAutomationToken)))
             return OperationResult.Failure("Для восстановления Tunguska требуется токен автоматизации.");
@@ -353,7 +355,7 @@ public static class AndroidVpnAutomationApi
             {
                 PackageName = candidate.PackageName, ActivityClassName = candidate.ActivityClassName,
                 StartAction = candidate.StartAction
-            }));
+            }), packageName => IsPackageInstalled(context.PackageManager, packageName));
             return endpoint is null ? definition : definition with
             {
                 PackageName = endpoint.PackageName, ActivityClassName = endpoint.ActivityClassName,

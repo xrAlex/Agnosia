@@ -87,6 +87,20 @@ public sealed partial class DummyActivity
         }
 
         var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
+        // End a temporarily visible session before releasing its isolation;
+        // otherwise the monitor would hide it again after an explicit unfreeze.
+        if (!hidden && HiddenAppSessionMonitorService.GetPackagesAwaitingHide().Contains(packageName))
+        {
+            if (!AndroidPolicyApi.TrySetApplicationHidden(_policyManager, admin, packageName, true, LogTag,
+                    out var freezeError))
+            {
+                FinishWithError(freezeError ?? $"Android не смог завершить сессию {packageName}.");
+                return;
+            }
+
+            HiddenAppSessionMonitorService.CompletePackage(this, packageName);
+        }
+
         if (!AndroidPolicyApi.TrySetApplicationHidden(_policyManager, admin, packageName, hidden, LogTag,
                 out var error))
         {
@@ -96,6 +110,8 @@ public sealed partial class DummyActivity
             return;
         }
 
+        if (hidden) HiddenAppSessionMonitorService.CompletePackage(this, packageName);
+        ClearAppInventoryQueryCache();
         FinishWithSuccessMessage(hidden
             ? "Приложение скрыто."
             : "Приложение снова доступно в рабочем профиле.");

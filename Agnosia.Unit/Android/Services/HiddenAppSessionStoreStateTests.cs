@@ -9,6 +9,51 @@ public sealed class HiddenAppSessionStoreStateTests
     private static readonly DateTimeOffset Now = DateTimeOffset.FromUnixTimeSeconds(1_800_000_000);
 
     [Fact]
+    public void Manual_freeze_completes_active_session_and_preserves_parent_notification()
+    {
+        var active = CreateSession("active", "com.example.active") with { ParentCallbackLaunchId = "launch" };
+        var state = HiddenAppSessionStoreState.Empty.StartOrReplace(active, Now);
+
+        var completed = state.CompletePackage(active.PackageName, "manual_freeze", Now);
+
+        Assert.Null(completed.ActiveSession);
+        Assert.Empty(completed.PendingHides);
+        Assert.Empty(completed.GetPackagesAwaitingHide());
+        Assert.True(completed.HasCompletedLaunch(active.PackageName, "launch"));
+        Assert.False(completed.HasCompletedLaunch(active.PackageName, "other-launch"));
+        Assert.Equal("launch", Assert.Single(completed.PendingParentNotifications).Session.ParentCallbackLaunchId);
+    }
+
+    [Fact]
+    public void New_launch_replaces_completed_notification_for_same_package()
+    {
+        var active = CreateSession("active", "com.example.active") with { ParentCallbackLaunchId = "old-launch" };
+        var state = HiddenAppSessionStoreState.Empty.StartOrReplace(active, Now)
+            .CompletePackage(active.PackageName, "manual_freeze", Now);
+
+        var resumed = state.StartOrReplace(active with { SessionId = "new", ParentCallbackLaunchId = "new-launch" }, Now);
+
+        Assert.False(resumed.HasCompletedLaunch(active.PackageName, "old-launch"));
+        Assert.False(resumed.HasCompletedLaunch(active.PackageName, "new-launch"));
+        Assert.Empty(resumed.PendingParentNotifications);
+    }
+
+    [Fact]
+    public void Isolation_tracks_active_and_pending_packages_but_not_completed_notifications()
+    {
+        var first = CreateSession("first", "com.example.first");
+        var second = CreateSession("second", "com.example.second") with { ParentCallbackLaunchId = "launch" };
+        var state = HiddenAppSessionStoreState.Empty.StartOrReplace(first, Now).StartOrReplace(second, Now);
+
+        Assert.True(state.GetPackagesAwaitingHide().SetEquals(["com.example.first", "com.example.second"]));
+
+        var completed = state.CompletePackage(second.PackageName, "manual_freeze", Now);
+
+        Assert.Equal("com.example.first", Assert.Single(completed.GetPackagesAwaitingHide()));
+        Assert.Single(completed.PendingParentNotifications);
+    }
+
+    [Fact]
     public void BeginCompletion_moves_active_session_to_pending()
     {
         var active = CreateSession("session-a", "com.example.a");

@@ -128,7 +128,7 @@
         <Setter Property="MaxHeight" Value="640" />
         <Setter Property="Padding" Value="14" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
-        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Stretch" />
     </Style>
     <Style Selector="Border.module-dialog">
         <Setter Property="MinWidth" Value="320" />

@@ -18,6 +18,8 @@ public sealed class AppServiceModel
 
     public bool IsHidden { get; init; }
 
+    public bool IsIsolationEnabled { get; init; }
+
     public bool CanLaunch { get; init; }
 
     public bool IsInstalled { get; init; }

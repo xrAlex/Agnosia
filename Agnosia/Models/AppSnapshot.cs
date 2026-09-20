@@ -22,4 +22,5 @@ public sealed record AppSnapshot(
     IReadOnlyList<string>? ManifestPermissions = null,
     IReadOnlyList<string>? RuntimePermissions = null,
     bool PermissionRiskAvailable = true,
-    bool IsInternetBlocked = false);
+    bool IsInternetBlocked = false,
+    bool IsIsolationEnabled = false);

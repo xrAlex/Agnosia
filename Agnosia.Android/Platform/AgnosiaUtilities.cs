@@ -84,9 +84,7 @@ public static class AgnosiaUtilities
 
     public static bool HasAssociatedProfile(Context context)
     {
-        var userManager = AndroidSystemApi.GetUserManager(context);
-        var currentUser = global::Android.OS.Process.MyUserHandle();
-        return userManager?.UserProfiles?.Any(profile => !profile.Equals(currentUser)) == true;
+        return Dashboard.AndroidWorkProfileDiagnosticsReader.Read(context).ManagedProfileExists;
     }
 
     public static void MarkWorkProfileReady()
