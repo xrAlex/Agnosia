@@ -15,8 +15,8 @@
     </Design.DataContext>
 
     <Grid Background="{StaticResource AppBackgroundBrush}"
-          RowDefinitions="*,Auto">
-        <Grid Grid.RowSpan="2"
+          RowDefinitions="*,Auto,Auto">
+        <Grid Grid.RowSpan="3"
               IsHitTestVisible="False"
               ClipToBounds="True">
             <controls:PlexusBackground LineBrush="{StaticResource AppPlexusLineBrush}"
@@ -335,7 +335,14 @@
             </StackPanel>
         </ScrollViewer>
 
-        <Border Grid.Row="1"
+        <TextBlock Grid.Row="1"
+                   Margin="18,8"
+                   Classes="header-status error"
+                   TextWrapping="Wrap"
+                   IsVisible="{Binding StatusIsError}"
+                   Text="{Binding StatusMessage, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.Dashboard.Status.'}" />
+
+        <Border Grid.Row="2"
                 Background="{StaticResource AppChromeBrush}"
                 BorderBrush="{StaticResource AppBorderSoftBrush}"
                 BorderThickness="0,1,0,0"

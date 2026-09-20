@@ -8,6 +8,76 @@ namespace Agnosia.Unit.ViewModels;
 
 public sealed class DashboardWorkspaceRecoveryTests
 {
+    [Fact]
+    public async Task Finish_onboarding_shares_permission_read_with_in_progress_dashboard_refresh()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            OnboardingCompleted = false,
+            Permissions = TestSnapshots.RequiredOnboardingPermissions(granted: true)
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+        await viewModel.EnsureInitializedAsync();
+        viewModel.OnboardingStep = OnboardingStep.Final;
+        var initialLoadCount = services.PermissionLoadCount;
+        var readStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var permissions = new TaskCompletionSource<IReadOnlyList<PermissionSnapshot>>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        services.LoadPermissionsHandler = _ =>
+        {
+            readStarted.TrySetResult();
+            return permissions.Task;
+        };
+
+        var refresh = viewModel.RefreshCommand.ExecuteAsync(null);
+        await readStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var finish = viewModel.FinishOnboardingCommand.ExecuteAsync(null);
+        permissions.SetResult(services.Permissions);
+        await Task.WhenAll(refresh, finish).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.Equal(initialLoadCount + 1, services.PermissionLoadCount);
+        Assert.Equal(1, services.CompleteOnboardingCallCount);
+        Assert.False(viewModel.IsOnboardingVisible);
+        Assert.True(viewModel.IsAppsSectionSelected);
+    }
+
+    [Fact]
+    public async Task Finish_onboarding_shows_progress_and_blocks_resume_refresh_during_permission_read()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            OnboardingCompleted = false,
+            Permissions = TestSnapshots.RequiredOnboardingPermissions(granted: true)
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+        await viewModel.EnsureInitializedAsync();
+        viewModel.OnboardingStep = OnboardingStep.Final;
+        var initialProfileLoadCount = services.DashboardProfileLoadCount;
+        var permissions = new TaskCompletionSource<IReadOnlyList<PermissionSnapshot>>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        services.LoadPermissionsHandler = _ => permissions.Task;
+
+        var finish = viewModel.FinishOnboardingCommand.ExecuteAsync(null);
+        try
+        {
+            Assert.True(viewModel.IsOperationActive);
+            viewModel.HandlePrimaryActivityResumed();
+            Assert.Equal(initialProfileLoadCount, services.DashboardProfileLoadCount);
+        }
+        finally
+        {
+            permissions.SetResult(services.Permissions);
+            await finish.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+
+        Assert.False(viewModel.IsOperationActive);
+        Assert.Equal(initialProfileLoadCount + 1, services.DashboardProfileLoadCount);
+        Assert.Equal(1, services.CompleteOnboardingCallCount);
+        Assert.False(viewModel.IsOnboardingVisible);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

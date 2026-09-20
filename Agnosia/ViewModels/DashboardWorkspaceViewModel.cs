@@ -62,6 +62,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private DashboardSnapshot? _lastProfileSnapshot;
     private Task? _iconBatchProcessor;
     private Task<bool>? _permissionReloadTask;
+    private Task<IReadOnlyList<PermissionSnapshot>>? _permissionLoadTask;
     private bool _initialized;
     private bool _isApplyingSnapshot;
     private bool _isOperationInProgress;
@@ -905,24 +906,37 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [RelayCommand]
     private async Task FinishOnboardingAsync()
     {
-        if (!await ReloadPermissionsAsync()) return;
-        if (!AreOnboardingPermissionsGranted)
+        BeginBusy();
+        try
         {
-            StatusIsError = true;
-            StatusMessage = "PermissionRequestFailed";
-            StartOnboardingMonitorIfNeeded();
-            return;
-        }
+            if (!await ReloadPermissionsAsync()) return;
+            if (!AreOnboardingPermissionsGranted)
+            {
+                StatusIsError = true;
+                StatusMessage = "PermissionRequestFailed";
+                OnboardingStep = OnboardingStep.Permissions;
+                return;
+            }
 
-        if (OnboardingStep != OnboardingStep.Final)
+            if (OnboardingStep != OnboardingStep.Final)
+            {
+                StatusIsError = false;
+                OnboardingStep = OnboardingStep.Final;
+                return;
+            }
+
+            await CompleteOnboardingAsync();
+            if (OnboardingCompleted && CanOpenAppsSection) SelectedSection = DashboardSection.Apps;
+        }
+        catch (Exception exception)
         {
-            StatusIsError = false;
-            OnboardingStep = OnboardingStep.Final;
-            return;
+            await ReportErrorOnUiThreadAsync(exception, "UpdateState");
         }
-
-        await CompleteOnboardingAsync();
-        if (OnboardingCompleted && CanOpenAppsSection) SelectedSection = DashboardSection.Apps;
+        finally
+        {
+            EndBusy();
+            _settingsSaveCoordinator.TryStartQueued();
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanStartProvisioning))]
@@ -985,7 +999,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         if (result.Succeeded)
         {
             OnboardingCompleted = true;
-            await RefreshAsync();
+            await RefreshDashboardAsync(true);
         }
     }
 
@@ -1564,7 +1578,15 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private Task<IReadOnlyList<PermissionSnapshot>> LoadPermissionsOnWorkerAsync()
     {
-        return Task.Run(() => _permissionService.LoadPermissionsAsync());
+        lock (_permissionReloadSync)
+        {
+            // Dashboard refresh and onboarding must share the platform query:
+            // Android cancels the previous QueryPermissions when another starts.
+            if (_permissionLoadTask is { IsCompleted: false }) return _permissionLoadTask;
+
+            _permissionLoadTask = Task.Run(() => _permissionService.LoadPermissionsAsync());
+            return _permissionLoadTask;
+        }
     }
 
     private Task<IReadOnlyList<AppLogEntry>> LoadRecentLogsOnWorkerAsync()
