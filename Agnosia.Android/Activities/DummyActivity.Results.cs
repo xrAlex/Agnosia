@@ -63,6 +63,7 @@ public sealed partial class DummyActivity
             data.PutExtra(AndroidCommandContract.ExtraCommandKind, _commandKind.ToString());
             data.PutExtra(AndroidCommandContract.ResultCommandResultCode, (int)resultCode);
             TrySignResult(data);
+            Receivers.ActivityCommandResultReceiver.Send(this, Intent, resultCode, data);
         }
 
         Log.Debug(
@@ -154,7 +155,7 @@ public sealed partial class DummyActivity
             if (string.Equals(operation, AndroidCommandContract.PackageInstallerOperationInstall,
                     StringComparison.Ordinal)
                 && !string.IsNullOrWhiteSpace(callbackPackage)
-                && !await WaitForPackageAvailableAsync(callbackPackage, cancellationToken).ConfigureAwait(false))
+                && !await WaitForPackageAvailableAsync(callbackPackage, cancellationToken, includeHidden: true).ConfigureAwait(false))
             {
                 FinishWithError($"Android установил {callbackPackage}, но пакет еще не доступен в рабочем профиле.");
                 return;

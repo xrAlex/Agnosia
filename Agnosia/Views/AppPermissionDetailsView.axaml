@@ -60,7 +60,7 @@
                         IsVisible="{Binding HasManifestPermissions}">
                 <TextBlock Classes="app-dialog-setting-caption"
                            FontWeight="SemiBold"
-                           Text="Manifest permissions" />
+                           Text="Заявленные разрешения" />
                 <TextBlock Classes="app-dialog-permission-risk-list"
                            Text="{Binding ManifestPermissionsText}" />
             </StackPanel>
@@ -69,7 +69,7 @@
                         IsVisible="{Binding HasRuntimePermissions}">
                 <TextBlock Classes="app-dialog-setting-caption"
                            FontWeight="SemiBold"
-                           Text="Runtime permissions" />
+                           Text="Запрашиваемые разрешения" />
                 <TextBlock Classes="app-dialog-permission-risk-list"
                            Text="{Binding RuntimePermissionsText}" />
                 <Button AutomationProperties.Name="Отозвать runtime-разрешения" Classes="compact-action"

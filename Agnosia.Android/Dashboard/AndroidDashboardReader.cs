@@ -35,6 +35,9 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
                 cancellationToken)
             .ConfigureAwait(false);
         var statusMessage = string.Empty;
+        if (ownerCheck.Kind == WorkProfileOwnerCheckKind.Unreachable)
+            throw new InvalidOperationException("Рабочий профиль временно не ответил на запрос состояния.");
+
         if (hadConfiguredWorkProfile && ShouldUpdateWorkProfileApp(localVersionCode, ownerCheck))
         {
             Log.Info(

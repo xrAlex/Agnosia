@@ -192,6 +192,15 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
             {
                 PrepareAuthenticatedCommand(intent, correlationId, kind);
                 AgnosiaUtilities.TransferIntentToProfile(activity, intent);
+                if (kind is AndroidCommandKind.RequestUsageStatsAccess
+                    or AndroidCommandKind.RequestPackageInstallAccess
+                    or AndroidCommandKind.RequestAllFilesAccess)
+                {
+                    var permissionResult = await Receivers.ActivityCommandResultReceiver.RunAsync(
+                        host, intent, correlationId, kind, cancellationToken).ConfigureAwait(false);
+                    return ValidateAuthenticatedResult(permissionResult, correlationId, kind);
+                }
+
                 var result = await RunForwardedWorkProfileActivityCommandAsync(
                         host,
                         intent,
@@ -204,6 +213,13 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
 
             intent.SetComponent(new ComponentName(activity, Class.FromType(host.CommandActivityType)));
             PrepareAuthenticatedCommand(intent, correlationId, kind);
+            if (kind == AndroidCommandKind.CreateHiddenShortcut)
+            {
+                var shortcutResult = await Receivers.ActivityCommandResultReceiver.RunAsync(
+                    host, intent, correlationId, kind, cancellationToken).ConfigureAwait(false);
+                return ValidateAuthenticatedResult(shortcutResult, correlationId, kind);
+            }
+
             var localResult = await RunLocalActivityCommandAsync(host, intent, cancellationToken)
                 .ConfigureAwait(false);
             return ValidateAuthenticatedResult(localResult, correlationId, kind);

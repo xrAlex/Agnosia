@@ -7,7 +7,7 @@
             HorizontalAlignment="Stretch">
         <Grid HorizontalAlignment="Stretch"
               ColumnDefinitions="*,*,*,*"
-              ColumnSpacing="8">
+              ColumnSpacing="2">
             <Button AutomationProperties.Name="Обзор" Grid.Column="0"
                     Classes="nav"
                     HorizontalAlignment="Stretch"
@@ -21,7 +21,8 @@
                     <TextBlock Classes="nav-label"
                                HorizontalAlignment="Center"
                                FontSize="10"
-                               TextWrapping="NoWrap"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"
                                Text="Обзор" />
                 </StackPanel>
             </Button>
@@ -40,7 +41,8 @@
                     <TextBlock Classes="nav-label"
                                HorizontalAlignment="Center"
                                FontSize="10"
-                               TextWrapping="NoWrap"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"
                                Text="Приложения" />
                 </StackPanel>
             </Button>
@@ -59,7 +61,8 @@
                     <TextBlock Classes="nav-label"
                                HorizontalAlignment="Center"
                                FontSize="10"
-                               TextWrapping="NoWrap"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"
                                Text="Модули" />
                 </StackPanel>
             </Button>
@@ -78,7 +81,8 @@
                     <TextBlock Classes="nav-label"
                                HorizontalAlignment="Center"
                                FontSize="10"
-                               TextWrapping="NoWrap"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"
                                Text="Настройки" />
                 </StackPanel>
             </Button>

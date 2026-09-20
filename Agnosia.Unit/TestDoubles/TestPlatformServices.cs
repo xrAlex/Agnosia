@@ -110,6 +110,7 @@ public sealed class TestPlatformServices :
     public int OpenDocumentsUiRequests { get; private set; }
     public Func<CancellationToken, Task<OperationResult>>? OpenDocumentsUiHandler { get; set; }
     public int ModuleLoadCount { get; private set; }
+    public Func<CancellationToken, Task<IReadOnlyList<AgnosiaModuleSnapshot>>>? LoadModulesHandler { get; set; }
     public List<(AgnosiaModuleKind Module, bool Enabled)> SetModuleEnabledRequests { get; } = [];
     public Func<AgnosiaModuleKind, bool, CancellationToken, Task<OperationResult>>? SetModuleEnabledHandler { get; set; }
 
@@ -340,7 +341,7 @@ public sealed class TestPlatformServices :
     {
         ModuleLoadCount++;
 
-        return Task.FromResult(Modules);
+        return LoadModulesHandler?.Invoke(cancellationToken) ?? Task.FromResult(Modules);
     }
 
     public Task<IReadOnlyList<AgnosiaModuleSnapshot>> LoadModulesAsync(
@@ -349,7 +350,7 @@ public sealed class TestPlatformServices :
     {
         ModuleLoadCount++;
 
-        return Task.FromResult(Modules);
+        return LoadModulesHandler?.Invoke(cancellationToken) ?? Task.FromResult(Modules);
     }
 
     public Task<OperationResult> SetModuleEnabledAsync(

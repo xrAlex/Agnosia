@@ -29,6 +29,7 @@ public static class AndroidCommandContract
     public const string ExtraQueryPageToken = "query_page_token";
     public const string ExtraCommandCorrelationId = "agnosia.command.correlation_id";
     public const string ExtraCommandKind = "agnosia.command.kind";
+    public const string ExtraCommandResultCallback = "agnosia.command.result_callback";
     public const string ResultCommandResultCode = "agnosia.command.result_code";
     public const string ResultAppsJson = "apps_json";
     public const string ResultNextQueryOffset = "next_query_offset";

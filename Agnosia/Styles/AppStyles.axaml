@@ -339,9 +339,8 @@
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="8" />
-        <Setter Property="Padding" Value="10,7" />
-        <Setter Property="MinHeight" Value="50" />
-        <Setter Property="Height" Value="58" />
+        <Setter Property="Padding" Value="2,7" />
+        <Setter Property="MinHeight" Value="58" />
         <Setter Property="Transitions">
             <Transitions />
         </Setter>
@@ -480,6 +479,8 @@
         <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
     <Style Selector="ToggleSwitch">
+        <Setter Property="OffContent" Value="Выкл." />
+        <Setter Property="OnContent" Value="Вкл." />
         <Setter Property="Foreground" Value="{StaticResource AppTextPrimaryBrush}" />
         <Setter Property="automation:AutomationProperties.AccessibilityView" Value="Raw" />
     </Style>

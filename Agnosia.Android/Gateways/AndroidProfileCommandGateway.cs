@@ -251,13 +251,13 @@ public static class AndroidProfileCommandGateway
         if (!commandResult.Succeeded)
         {
             Log.Warn(LogTag, $"Failed to query work permissions through command center. diagnostics={commandResult.Diagnostics}");
-            return WorkProfilePermissionQueryResult.Empty;
+            throw new InvalidOperationException("Не удалось прочитать разрешения рабочего профиля.");
         }
 
         if (!TryReadPayloadBoolean(commandResult.PayloadJson, AndroidCommandContract.ResultUsageStatsAccess, out var usageStatsAccess)
             || !TryReadPayloadBoolean(commandResult.PayloadJson, AndroidCommandContract.ResultPackageInstallAccess, out var packageInstallAccess)
             || !TryReadPayloadBoolean(commandResult.PayloadJson, AndroidCommandContract.ResultAllFilesAccess, out var allFilesAccess))
-            return WorkProfilePermissionQueryResult.Empty;
+            throw new InvalidOperationException("Рабочий профиль вернул неполное состояние разрешений.");
 
         var permissions = new WorkProfilePermissionQueryResult(
             usageStatsAccess,

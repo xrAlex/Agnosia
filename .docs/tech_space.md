@@ -345,6 +345,12 @@ Binding нужен только для получения service Messenger и �
 
 ## Каталог приложений
 
+После успешного callback установки проверка `installed` включает `MatchUninstalledPackages` вместе с `MatchDisabledComponents`: это позволяет увидеть уже скрытую рабочую копию при обновлении. Обязательная проверка `ApplicationInfoFlags.Installed` исключает удалённые пакеты с сохранёнными данными. Временное снятие изоляции для этой проверки не требуется; ожидание видимости для операций, которым нужен доступ к компонентам пакета, остаётся прежним.
+
+Dashboard применяет профиль, разрешения и модули только после успешной загрузки всего снимка. Временный сбой связи с рабочим профилем не превращается в снимок отсутствующих разрешений; сохраняются последние достоверные данные, показывается локализованная ошибка и разрешается повторная загрузка при resume. Неуспешное или отменённое чтение разрешений останавливает завершение onboarding, даже если старый снимок показывал все разрешения.
+
+Запросы рабочих настроек разрешений и личная команда `CreateHiddenShortcut` доставляют подписанный ответ через explicit одноразовый mutable `PendingIntent` закрытого `ActivityCommandResultReceiver`. Это подтверждение открытия системного UI, а актуальные разрешения читаются после resume. Ответ проверяется по HMAC, сроку подписи, correlation ID, виду команды и подписанному result code. Parcelable callback исключён из HMAC; идентичность и результат команды подписаны. Callback устраняет зависимость от задержанной доставки `OnActivityResult`, пока пользователь находится в Settings или launcher; окно проверки подписи 30 секунд не увеличивается. Основание: [Android PendingIntent](https://developer.android.com/reference/android/app/PendingIntent), [Activity result lifecycle](https://developer.android.com/reference/android/app/Activity#onActivityResult(int,int,android.content.Intent)).
+
 Каталог строится из двух независимых запросов: личный профиль читается локально, рабочий профиль опрашивается через `AndroidCommandCenter` и подписанный `DummyActivity`. App list, одиночные и batch-иконки, logs, permissions и cross-profile packages выполняются общими command handlers. Оба результата приводятся к `AppSnapshot`, чтобы UI не зависел от Android-типов.
 
 ```text

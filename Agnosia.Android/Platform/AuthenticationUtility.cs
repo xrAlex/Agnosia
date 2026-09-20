@@ -204,6 +204,7 @@ public static class AuthenticationUtility
                && !string.Equals(key, ExtraSignature, StringComparison.Ordinal)
                && !string.Equals(key, ExtraTimestamp, StringComparison.Ordinal)
                && !string.Equals(key, AndroidCommandContract.ExtraFileShuttleCallbackMessenger, StringComparison.Ordinal)
+               && !string.Equals(key, AndroidCommandContract.ExtraCommandResultCallback, StringComparison.Ordinal)
                && !string.Equals(key, AndroidCommandContract.ExtraLaunchAcknowledgement, StringComparison.Ordinal)
                && !string.Equals(key, AndroidCommandContract.ExtraParentFrozenCallback, StringComparison.Ordinal);
     }

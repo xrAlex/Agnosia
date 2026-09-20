@@ -15,8 +15,17 @@ public class LocalizationConverter : IValueConverter
         var parts = key.Split('|');
         var resourceKey = prefix + parts[0];
 
-        if (Application.Current?.Resources.TryGetResource(resourceKey, null, out var resourceValue) != true || resourceValue is not string localizedFormat) 
-            return key;
+        if (Application.Current?.Resources.TryGetResource(resourceKey, null, out var resourceValue) != true
+            || resourceValue is not string)
+        {
+            if (prefix != "String.Dashboard.Status."
+                || Application.Current?.Resources.TryGetResource(
+                    "String.Dashboard.Error." + parts[0], null, out resourceValue) != true
+                || resourceValue is not string)
+                return key;
+        }
+
+        var localizedFormat = (string)resourceValue;
         return parts.Length > 1 ? string.Format(localizedFormat, parts.Skip(1).Cast<object>().ToArray()) : localizedFormat;
     }
 

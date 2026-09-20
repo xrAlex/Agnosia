@@ -16,10 +16,16 @@ internal sealed class AndroidPermissionCoordinator(
 
         var (profileDiagnostics, hasSetup, notificationPermissionGranted, vpnControlGranted, personalAllFilesGranted, overlayPermissionGranted) = await ReadPermissionLocalStateAsync(activity, cancellationToken).ConfigureAwait(false);
         var hasWorkProfileTarget = profileDiagnostics.CommandTargetResolvable;
+        var ownerCheck = hasWorkProfileTarget && profileDiagnostics.QuietModeEnabled != true
+            ? await AndroidProfileCommandGateway.CheckWorkProfileOwnerAsync(commandRunner, cancellationToken)
+                .ConfigureAwait(false)
+            : null;
+        if (ownerCheck?.Kind == WorkProfileOwnerCheckKind.Unreachable)
+            throw new InvalidOperationException("Рабочий профиль временно не ответил на запрос разрешений.");
+
         var workProfileAvailable = hasWorkProfileTarget
                                    && profileDiagnostics.QuietModeEnabled != true
-                                   && await commandRunner.CanReachWorkProfileAsync(cancellationToken)
-                                       .ConfigureAwait(false);
+                                   && ownerCheck?.Kind == WorkProfileOwnerCheckKind.AppIsProfileOwner;
         var workPermissions = workProfileAvailable
             ? await AndroidProfileCommandGateway.QueryWorkPermissionsAsync(commandRunner, cancellationToken)
                 .ConfigureAwait(false)

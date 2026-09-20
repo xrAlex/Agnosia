@@ -110,7 +110,7 @@ public partial class DashboardWorkspaceViewModel
                     }
                 }
 
-                await EnsurePermissionsLoadedAsync();
+                if (!await EnsurePermissionsLoadedAsync()) return;
                 OnboardingStep = OnboardingStep.Permissions;
                 await CompleteOnboardingIfReadyAsync();
                 return;
@@ -123,7 +123,7 @@ public partial class DashboardWorkspaceViewModel
 
         if (OnboardingStep == OnboardingStep.Permissions)
         {
-            await ReloadPermissionsAsync();
+            if (!await ReloadPermissionsAsync()) return;
             await CompleteOnboardingIfReadyAsync();
         }
     }

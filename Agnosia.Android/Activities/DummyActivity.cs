@@ -363,13 +363,14 @@ public sealed partial class DummyActivity : Activity
 
     private async Task<bool> WaitForPackageAvailableAsync(
         string packageName,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool includeHidden = false)
     {
         var deadline = DateTimeOffset.UtcNow + PackageAvailabilityWaitTimeout;
         var attempt = 1;
         while (true)
         {
-            if (IsPackageAvailable(packageName))
+            if (IsPackageAvailable(packageName, includeHidden))
             {
                 if (attempt > 1)
                     Log.Info(LogTag,
@@ -390,11 +391,13 @@ public sealed partial class DummyActivity : Activity
         }
     }
 
-    private bool IsPackageAvailable(string packageName)
+    private bool IsPackageAvailable(string packageName, bool includeHidden = false)
     {
         try
         {
-            var packageInfo = PackageManager?.GetPackageInfo(packageName, PackageInfoFlags.MatchDisabledComponents);
+            var flags = PackageInfoFlags.MatchDisabledComponents;
+            if (includeHidden) flags |= PackageInfoFlags.MatchUninstalledPackages;
+            var packageInfo = PackageManager?.GetPackageInfo(packageName, flags);
             var applicationInfo = packageInfo?.ApplicationInfo;
             var isInstalled = applicationInfo is not null
                               && (applicationInfo.Flags & ApplicationInfoFlags.Installed) != 0;

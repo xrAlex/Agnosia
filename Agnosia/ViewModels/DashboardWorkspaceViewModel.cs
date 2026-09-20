@@ -40,6 +40,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private readonly DebouncedAsyncAction _searchRefreshDebouncer;
     private readonly DashboardSettingsSaveCoordinator _settingsSaveCoordinator;
     private readonly SerializedBackgroundWorker _dashboardRefreshWorker = new();
+    private bool _dashboardRefreshFailed;
+    private bool _permissionResumePending;
     private readonly SemaphoreSlim _iconLoadGate = new(1, 1);
     private readonly Lock _iconBatchProcessorSync = new();
     private readonly Lock _permissionReloadSync = new();
@@ -59,7 +61,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private AppItemViewModel[] _workApps = [];
     private DashboardSnapshot? _lastProfileSnapshot;
     private Task? _iconBatchProcessor;
-    private Task? _permissionReloadTask;
+    private Task<bool>? _permissionReloadTask;
     private bool _initialized;
     private bool _isApplyingSnapshot;
     private bool _isOperationInProgress;
@@ -596,12 +598,18 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         var pendingResumePermissionKind = _pendingResumePermissionKind;
         if (pendingResumePermissionKind is not null)
         {
+            if (_isOperationInProgress)
+            {
+                _permissionResumePending = true;
+                return;
+            }
+
             handledPermissionResume = true;
             _pendingResumePermissionKind = null;
             _ = RefreshPermissionsAfterResumeAsync(pendingResumePermissionKind.Value);
         }
 
-        if (handledPermissionResume || StatusIsError) return;
+        if (handledPermissionResume || (StatusIsError && !_dashboardRefreshFailed)) return;
 
         _ = RefreshDashboardAfterResumeAsync();
     }
@@ -667,12 +675,6 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         try
         {
             var profileSnapshot = await LoadDashboardProfileOnWorkerAsync().ConfigureAwait(false);
-            await InvokeOnUiThreadActionAsync(() =>
-            {
-                _lastProfileSnapshot = profileSnapshot;
-                ApplyProfileSnapshot(profileSnapshot);
-            }, DispatcherPriority.Background).ConfigureAwait(false);
-
             var permissionSnapshots = profileSnapshot.IsSupported && profileSnapshot.HasSetup && !allowDuringOperation
                 ? await LoadPermissionsOnWorkerAsync().ConfigureAwait(false)
                 : null;
@@ -680,10 +682,13 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
             await InvokeOnUiThreadActionAsync(() =>
             {
+                _lastProfileSnapshot = profileSnapshot;
+                ApplyProfileSnapshot(profileSnapshot);
                 ApplyModuleSnapshots(moduleSnapshots);
                 if (permissionSnapshots is not null) ApplyPermissionSnapshots(permissionSnapshots);
 
                 HasLoadedSnapshot = true;
+                _dashboardRefreshFailed = false;
                 StatusMessage = !string.IsNullOrWhiteSpace(profileSnapshot.StatusMessage)
                     ? profileSnapshot.StatusMessage
                     : IsSupported
@@ -711,6 +716,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
                 HasLoadedSnapshot = true;
                 HasLoadedInventory = true;
                 StatusIsError = true;
+                _dashboardRefreshFailed = true;
                 StatusMessage = ResolveExceptionMessage(ex, "UpdateState");
                 IsInventoryLoading = false;
             }, DispatcherPriority.Background).ConfigureAwait(false);
@@ -866,7 +872,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         SetPreparingOnboardingPermissions(true);
         try
         {
-            await EnsurePermissionsLoadedAsync();
+            if (!await EnsurePermissionsLoadedAsync()) return;
             OnboardingStep = OnboardingStep.Permissions;
         }
         finally
@@ -892,14 +898,14 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             return;
         }
 
-        await EnsurePermissionsLoadedAsync();
+        if (!await EnsurePermissionsLoadedAsync()) return;
         OnboardingStep = OnboardingStep.Permissions;
     }
 
     [RelayCommand]
     private async Task FinishOnboardingAsync()
     {
-        await ReloadPermissionsAsync();
+        if (!await ReloadPermissionsAsync()) return;
         if (!AreOnboardingPermissionsGranted)
         {
             StatusIsError = true;
@@ -1163,7 +1169,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         {
             StatusIsError = true;
             StatusMessage = ResolveExceptionMessage(ex, "ModuleUpdateFailed");
-            await ReloadModulesAsync();
+            _dashboardRefreshFailed = true;
         }
         finally
         {
@@ -1216,7 +1222,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             {
                 if (!result.Succeeded) _pendingResumePermissionKind = null;
 
-                await ReloadPermissionsAsync();
+                if (!await ReloadPermissionsAsync()) return;
                 await ReloadModulesAsync();
                 await CompleteOnboardingIfReadyAsync();
             }
@@ -1227,6 +1233,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         {
             StatusIsError = true;
             StatusMessage = ResolveExceptionMessage(ex, "PermissionRequestFailed");
+            _pendingResumePermissionKind = null;
         }
         finally
         {
@@ -1238,6 +1245,11 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             {
                 EndOperation();
                 _settingsSaveCoordinator.TryStartQueued();
+                if (_permissionResumePending)
+                {
+                    _permissionResumePending = false;
+                    HandlePrimaryActivityResumed();
+                }
             }
         }
     }
@@ -1604,7 +1616,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(OverallStatusCaption));
     }
 
-    private Task ReloadPermissionsAsync()
+    private Task<bool> ReloadPermissionsAsync()
     {
         lock (_permissionReloadSync)
         {
@@ -1615,11 +1627,11 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }
     }
 
-    private Task EnsurePermissionsLoadedAsync()
+    private Task<bool> EnsurePermissionsLoadedAsync()
     {
         return _permissionItems.Count == 0
             ? ReloadPermissionsAsync()
-            : Task.CompletedTask;
+            : Task.FromResult(true);
     }
 
     private async Task ReloadModulesAsync()
@@ -1671,22 +1683,24 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         NotifyOverviewMetricsChanged();
     }
 
-    private async Task ReloadPermissionsCoreAsync()
+    private async Task<bool> ReloadPermissionsCoreAsync()
     {
         IReadOnlyList<PermissionSnapshot> snapshots;
         try
         {
             snapshots = await LoadPermissionsOnWorkerAsync().ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (Exception exception)
         {
-            return;
+            await ReportErrorOnUiThreadAsync(exception, "UpdateState");
+            return false;
         }
 
         await InvokeOnUiThreadActionAsync(
                 () => ApplyPermissionSnapshots(snapshots),
                 DispatcherPriority.Background)
             .ConfigureAwait(false);
+        return true;
     }
 
     private void ApplyPermissionSnapshots(IReadOnlyList<PermissionSnapshot> snapshots)
@@ -1717,7 +1731,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
         try
         {
-            await ReloadPermissionsAsync();
+            if (!await ReloadPermissionsAsync()) return;
             if (ShouldReloadModulesAfterPermissionResume(kind))
                 await ReloadModulesAsync();
 
@@ -1725,6 +1739,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            _dashboardRefreshFailed = true;
             await ReportErrorOnUiThreadAsync(ex, "PermissionRequestFailed");
         }
     }
@@ -1733,6 +1748,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     {
         await InvokeOnUiThreadActionAsync(() =>
         {
+            if (fallbackMessage == "UpdateState") _dashboardRefreshFailed = true;
             StatusIsError = true;
             StatusMessage = ResolveExceptionMessage(exception, fallbackMessage);
         }, DispatcherPriority.Background);
