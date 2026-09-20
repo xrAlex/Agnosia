@@ -71,7 +71,6 @@
         <Compile Include="Commands\CommandResultEnvelopeIdentity.cs"/>
         <Compile Include="Commands\WorkProfileLaunchPreflight.cs"/>
         <Compile Include="Commands\WorkLaunchAcknowledgement.cs"/>
-        <Compile Include="Vpn\FlClashEndpoint.cs"/>
         <Compile Include="Commands\PackageStateQuery.cs"/>
         <Compile Include="Commands\PackageStateResult.cs"/>
         <Compile Include="Commands\PackageStateResultInterpreter.cs"/>

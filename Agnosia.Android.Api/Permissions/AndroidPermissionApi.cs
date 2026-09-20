@@ -138,17 +138,17 @@ public static class AndroidPermissionApi
             activity.StartActivity(intent);
 
             return OperationResult.Success(
-                "Пролистайте вниз и включите разрешение «Поверх других приложений» вручную.");
+                "Открыты настройки Agnosia. Если доступ ограничен, найдите в меню ⋮ пункт «Разрешить доступ к настройкам». Затем вернитесь и повторите выдачу разрешения.");
         }
         catch (ActivityNotFoundException exception)
         {
             Log.Warn(LogTag, $"Settings activity not found: {exception}");
-            return OperationResult.Failure("Android не нашёл страницу настроек приложения.");
+            return OperationResult.Failure("Android не нашёл страницу настроек приложения. Откройте вручную: Настройки → Приложения → Agnosia в нужном профиле → ⋮ → Разрешить доступ к настройкам.");
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
             Log.Warn(LogTag, $"Failed to open app details settings: {exception}");
-            return OperationResult.Failure("Android не смог открыть страницу настроек приложения.");
+            return OperationResult.Failure("Android не смог открыть страницу настроек приложения. Откройте вручную: Настройки → Приложения → Agnosia в нужном профиле → ⋮ → Разрешить доступ к настройкам.");
         }
     }
 

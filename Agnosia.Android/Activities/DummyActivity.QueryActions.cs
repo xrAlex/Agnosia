@@ -270,6 +270,14 @@ public sealed partial class DummyActivity
 
     private void ActionRequestUsageStatsAccess()
     {
+        if (Intent?.GetBooleanExtra(AndroidCommandContract.ExtraOpenAppDetailsSettings, false) == true)
+        {
+            var result = AndroidPermissionApi.OpenAppDetailsSettings(this);
+            if (result.Succeeded) FinishWithSuccessMessage(result.Message);
+            else FinishWithError(result.Message);
+            return;
+        }
+
         if (AndroidUsageStatsAccessApi.HasAccess(this, LogTag))
         {
             FinishWithSuccessMessage("Доступ к истории использования уже включен.");

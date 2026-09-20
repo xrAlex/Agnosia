@@ -16,8 +16,7 @@
     <Border Background="{StaticResource AppOverlayScrimBrush}">
         <Grid x:Name="DialogHost" Margin="12">
             <ContentControl Content="{Binding SelectedApp}"
-                            Height="{Binding #DialogHost.Bounds.Height}"
-                            MaxHeight="640"
+                            MaxHeight="{Binding #DialogHost.Bounds.Height}"
                             HorizontalContentAlignment="Stretch"
                             VerticalContentAlignment="Stretch"
                             HorizontalAlignment="Center"

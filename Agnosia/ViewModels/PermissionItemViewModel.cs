@@ -11,11 +11,14 @@ public sealed partial class PermissionItemViewModel
     {
         _owner = owner;
         Snapshot = snapshot;
+        RestrictedSettingsHelp = new RestrictedPermissionHelpViewModel(owner, snapshot.Kind, snapshot.IsGranted, snapshot.CanRequest);
     }
 
     private PermissionSnapshot Snapshot { get; }
 
     public PermissionKind Kind => Snapshot.Kind;
+
+    public RestrictedPermissionHelpViewModel RestrictedSettingsHelp { get; }
 
     public string Title => Snapshot.Title;
 
@@ -35,6 +38,4 @@ public sealed partial class PermissionItemViewModel
     [RelayCommand(CanExecute = nameof(CanRequest))]
     private Task RequestAsync() => _owner.RequestPermissionAsync(this);
 
-    [RelayCommand]
-    private Task OpenAppDetailsSettingsAsync() => _owner.OpenAppDetailsSettingsAsync();
 }

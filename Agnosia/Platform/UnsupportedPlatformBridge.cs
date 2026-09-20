@@ -89,7 +89,7 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
         return AndroidOnlyFailureTask;
     }
 
-    public Task<OperationResult> OpenAppDetailsSettingsAsync(CancellationToken cancellationToken = default)
+    public Task<OperationResult> OpenAppDetailsSettingsAsync(ProfileKind profile, CancellationToken cancellationToken = default)
     {
         return AndroidOnlyFailureTask;
     }

@@ -94,10 +94,9 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         return _permissionCoordinator.RequestPermissionAsync(permission, cancellationToken);
     }
 
-    public Task<OperationResult> OpenAppDetailsSettingsAsync(CancellationToken cancellationToken = default)
+    public Task<OperationResult> OpenAppDetailsSettingsAsync(ProfileKind profile, CancellationToken cancellationToken = default)
     {
-        var result = _permissionCoordinator.OpenAppDetailsSettings();
-        return Task.FromResult(result);
+        return _permissionCoordinator.OpenAppDetailsSettingsAsync(profile, cancellationToken);
     }
 
     public Task<OperationResult> RevokeRuntimePermissionsAsync(

@@ -9,5 +9,5 @@ public interface IPermissionPlatformService
     Task<OperationResult> RequestPermissionAsync(PermissionKind permission,
         CancellationToken cancellationToken = default);
 
-    Task<OperationResult> OpenAppDetailsSettingsAsync(CancellationToken cancellationToken = default);
+    Task<OperationResult> OpenAppDetailsSettingsAsync(ProfileKind profile, CancellationToken cancellationToken = default);
 }

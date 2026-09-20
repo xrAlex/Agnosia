@@ -8,6 +8,9 @@ public sealed partial class AgnosiaModuleRequirementViewModel(
     DashboardWorkspaceViewModel owner,
     AgnosiaModuleRequirement snapshot) : ObservableObject
 {
+    public RestrictedPermissionHelpViewModel RestrictedSettingsHelp { get; } =
+        new(owner, snapshot.PermissionKind, snapshot.IsSatisfied, !snapshot.IsSatisfied && snapshot.PermissionKind.HasValue);
+
     public string Title => snapshot.Title;
 
     public string Description => snapshot.Description;

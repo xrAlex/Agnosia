@@ -104,6 +104,10 @@ public sealed class TestPlatformServices :
 
     public List<PermissionKind> PermissionRequests { get; } = [];
 
+    public List<ProfileKind> AppDetailsSettingsRequests { get; } = [];
+
+    public Func<ProfileKind, CancellationToken, Task<OperationResult>>? OpenAppDetailsSettingsHandler { get; set; }
+
     public List<AppSettingsSnapshot> SavedSettings { get; } = [];
 
     public Func<AppSettingsSnapshot, CancellationToken, Task<OperationResult>>? SaveSettingsHandler { get; set; }
@@ -180,9 +184,12 @@ public sealed class TestPlatformServices :
             : RequestPermissionHandler(permission, cancellationToken);
     }
 
-    public Task<OperationResult> OpenAppDetailsSettingsAsync(CancellationToken cancellationToken = default)
+    public Task<OperationResult> OpenAppDetailsSettingsAsync(ProfileKind profile, CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(DefaultOperationResult);
+        AppDetailsSettingsRequests.Add(profile);
+        return OpenAppDetailsSettingsHandler is null
+            ? Task.FromResult(DefaultOperationResult)
+            : OpenAppDetailsSettingsHandler(profile, cancellationToken);
     }
 
     public Task<bool> LoadOnboardingCompletedAsync(CancellationToken cancellationToken = default)

@@ -349,19 +349,6 @@ public static class AndroidVpnAutomationApi
 
     private static VpnClientDefinition ResolveInstalledPackage(Context context, VpnClientDefinition definition)
     {
-        if (definition.Kind == VpnAutomationClientKind.FlClash)
-        {
-            var endpoint = FlClashEndpoint.Select(candidate => CanStartClient(context, definition with
-            {
-                PackageName = candidate.PackageName, ActivityClassName = candidate.ActivityClassName,
-                StartAction = candidate.StartAction
-            }), packageName => IsPackageInstalled(context.PackageManager, packageName));
-            return endpoint is null ? definition : definition with
-            {
-                PackageName = endpoint.PackageName, ActivityClassName = endpoint.ActivityClassName,
-                StartAction = endpoint.StartAction, DisplayName = endpoint.PackageName == "com.follow.clashx" ? "FlClashX" : "FlClash"
-            };
-        }
         if (definition.PackageNames.Length <= 1) return definition;
 
         foreach (var packageName in definition.PackageNames)

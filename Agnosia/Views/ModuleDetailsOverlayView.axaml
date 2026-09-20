@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Agnosia.ViewModels"
+             xmlns:views="using:Agnosia.Views"
              mc:Ignorable="d"
              x:Class="Agnosia.Views.ModuleDetailsOverlayView"
              x:DataType="vm:DashboardWorkspaceViewModel"
@@ -171,7 +172,7 @@
                                                     <DataTemplate x:DataType="vm:AgnosiaModuleRequirementViewModel">
                                                         <Border Classes="surface-card compact list-card">
                                                             <Grid ColumnDefinitions="Auto,*"
-                                                                  RowDefinitions="Auto,Auto,Auto"
+                                                                  RowDefinitions="Auto,Auto,Auto,Auto"
                                                                   ColumnSpacing="12"
                                                                   RowSpacing="8">
                                                                 <Border Classes="icon-tile permission-icon"
@@ -206,6 +207,8 @@
                                                                     <TextBlock Classes="button-label"
                                                                                Text="{Binding ActionLabel}" />
                                                                 </Button>
+                                                                <views:RestrictedPermissionHelpView Grid.Row="3" Grid.ColumnSpan="2"
+                                                                                                    DataContext="{Binding RestrictedSettingsHelp}" />
                                                             </Grid>
                                                         </Border>
                                                     </DataTemplate>

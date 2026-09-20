@@ -1254,13 +1254,15 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }
     }
 
-    internal async Task OpenAppDetailsSettingsAsync()
+    internal async Task OpenAppDetailsSettingsAsync(PermissionKind permission, ProfileKind profile)
     {
         if (!TryBeginOperation()) return;
 
         try
         {
-            var result = await _permissionService.OpenAppDetailsSettingsAsync();
+            _pendingResumePermissionKind = permission;
+            var result = await _permissionService.OpenAppDetailsSettingsAsync(profile);
+            if (!result.Succeeded) _pendingResumePermissionKind = null;
             StatusIsError = !result.Succeeded;
             StatusMessage = string.IsNullOrWhiteSpace(result.Message)
                 ? "AppDetailsSettingsOpened"
@@ -1270,6 +1272,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         {
             StatusIsError = true;
             StatusMessage = ResolveExceptionMessage(ex, "AppDetailsSettingsFailed");
+            _pendingResumePermissionKind = null;
         }
         finally
         {
@@ -1281,6 +1284,11 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             {
                 EndOperation();
                 _settingsSaveCoordinator.TryStartQueued();
+                if (_permissionResumePending)
+                {
+                    _permissionResumePending = false;
+                    HandlePrimaryActivityResumed();
+                }
             }
         }
     }

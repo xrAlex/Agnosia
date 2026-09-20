@@ -8,6 +8,7 @@ public static class AndroidCommandContract
     public const string ExtraPackage = "package";
     public const string ExtraPackages = "packages";
     public const string ExtraPermissions = "permissions";
+    public const string ExtraOpenAppDetailsSettings = "open_app_details_settings";
     public const string ExtraIsSystem = "is_system";
     public const string ExtraApk = "apk";
     public const string ExtraSplitApks = "split_apks";

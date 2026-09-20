@@ -67,7 +67,7 @@
                              Margin="1,2,0,0"
                              HorizontalAlignment="Left"
                              VerticalAlignment="Top"
-                             Fill="{StaticResource AppTextPrimaryBrush}"
+                             Fill="White"
                              Opacity="0.92">
                         <Ellipse.RenderTransform>
                             <TranslateTransform />

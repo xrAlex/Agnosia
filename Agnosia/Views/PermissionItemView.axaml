@@ -1,11 +1,12 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Agnosia.ViewModels"
+             xmlns:views="using:Agnosia.Views"
              x:Class="Agnosia.Views.PermissionItemView"
              x:DataType="vm:PermissionItemViewModel">
     <Border Classes="surface-card compact list-card">
         <Grid ColumnDefinitions="Auto,*"
-              RowDefinitions="Auto,Auto,Auto"
+              RowDefinitions="Auto,Auto,Auto,Auto"
               ColumnSpacing="12"
               RowSpacing="10">
             <Border Classes="icon-tile permission-icon"
@@ -47,6 +48,8 @@
                 <TextBlock Classes="button-label"
                            Text="{Binding RequestLabel}" />
             </Button>
+            <views:RestrictedPermissionHelpView Grid.Row="3" Grid.ColumnSpan="2"
+                                                DataContext="{Binding RestrictedSettingsHelp}" />
         </Grid>
     </Border>
 </UserControl>

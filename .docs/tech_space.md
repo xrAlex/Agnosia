@@ -293,6 +293,8 @@ Binding нужен только для получения service Messenger и �
 
 ## Онбординг и разрешения
 
+Для невыданных Usage Stats и Overlay общий `RestrictedPermissionHelpView` раскрывает инструкцию и кнопку сведений о приложении. Он используется в карточках разрешений и требований модуля; `RestrictedPermissionHelpViewModel` выбирает рабочий профиль для Usage Stats и личный для Overlay. `IPermissionPlatformService.OpenAppDetailsSettingsAsync` принимает `ProfileKind`. В рабочем профиле переход использует существующий подписанный action `RequestUsageStatsAccess` с `AndroidCommandContract.ExtraOpenAppDetailsSettings`, поэтому не требует обновления cross-profile intent filters ранее созданного профиля. `DummyActivity` проверяет этот флаг до проверки самого разрешения и открывает `ACTION_APPLICATION_DETAILS_SETTINGS` для своего пакета. Возврат обрабатывается через `_pendingResumePermissionKind`, включая отложенный resume во время выполнения команды; ошибки открытия очищают ожидание и показывают ручной маршрут. Разрешение считается выданным только после повторного чтения его состояния.
+
 Онбординг состоит из создания рабочего профиля и выдачи системных доступов, без которых отдельные функции не могут работать стабильно.
 
 | Разрешение / доступ | Профиль | Зачем нужно |
@@ -535,7 +537,7 @@ WorkLaunchUnconfirmedException отличает потерю acknowledgement/о�
 
 | Клиент | Механизм запуска |
 | --- | --- |
-| FlClash / FlClashX | Согласованные package/Activity/action: com.follow.clash / com.follow.clash.TempActivity / com.follow.clash.action.START; затем com.follow.clashx / com.follow.clashx.TempActivity / com.follow.clashx.action.START. При обоих доступных обработчиках приоритет у FlClash. |
+| FlClash | Package/Activity/action: com.follow.clash / com.follow.clash.TempActivity / com.follow.clash.action.START. |
 | Clash Meta for Android | Explicit Activity command. |
 | Happ | Toggle broadcast. |
 | Tunguska | Activity command с automation token. |

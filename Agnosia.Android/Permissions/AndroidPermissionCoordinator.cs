@@ -199,10 +199,28 @@ internal sealed class AndroidPermissionCoordinator(
         }, cancellationToken);
     }
 
-    public OperationResult OpenAppDetailsSettings()
+    public async Task<OperationResult> OpenAppDetailsSettingsAsync(ProfileKind profile, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var activity = commandRunner.CurrentActivity;
         AgnosiaRuntime.Initialize(activity);
+        if (profile == ProfileKind.Work)
+        {
+            // Use the existing permission route so previously provisioned profiles
+            // do not need new cross-profile intent filters after an app update.
+            var intent = new Intent(AgnosiaActions.RequestUsageStatsAccess);
+            intent.PutExtra(AndroidCommandContract.ExtraOpenAppDetailsSettings, true);
+            var result = await commandRunner.RunVoidOperationAsync(
+                intent, true, cancellationToken,
+                "Открыты настройки Agnosia в рабочем профиле. После изменения вернитесь и повторите выдачу разрешения.")
+                .ConfigureAwait(false);
+            return result.Succeeded ? result : OperationResult.Failure(
+                $"{result.Message} Откройте вручную: Настройки → Приложения → Рабочий профиль → Agnosia → ⋮ → Разрешить доступ к настройкам. Если рабочий профиль выключен, сначала включите его.");
+        }
+
+        if (profile != ProfileKind.Personal)
+            return OperationResult.Failure("Неизвестный профиль приложения.");
+
         return AndroidPermissionApi.OpenAppDetailsSettings(activity);
     }
 

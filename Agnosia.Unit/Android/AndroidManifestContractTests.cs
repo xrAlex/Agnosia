@@ -84,13 +84,10 @@ public sealed class AndroidManifestContractTests
     }
 
     [Fact]
-    public void Launch_acknowledgement_receiver_is_private_and_flclashx_is_visible()
+    public void Launch_acknowledgement_receiver_is_private()
     {
         var source = ReadAndroidSource("Receivers\\WorkLaunchAcknowledgedReceiver.cs");
         Assert.Contains("Exported = false", source, StringComparison.Ordinal);
-        var manifest = XDocument.Parse(ReadAndroidSource("Properties\\AndroidManifest.xml"));
-        Assert.Contains(manifest.Root!.Element("queries")!.Elements("package"),
-            element => (string?)element.Attribute(Android + "name") == "com.follow.clashx");
     }
 
     [Fact]
@@ -381,7 +378,7 @@ public sealed class AndroidManifestContractTests
             RegexOptions.Singleline).Value;
         var localStateReader = Regex.Match(
             source,
-            @"private static Task<PermissionLocalState> ReadPermissionLocalStateAsync[\s\S]*?\n    public OperationResult OpenAppDetailsSettings",
+            @"private static Task<PermissionLocalState> ReadPermissionLocalStateAsync[\s\S]*?\n    public async Task<OperationResult> OpenAppDetailsSettingsAsync",
             RegexOptions.Singleline).Value;
         var requestVpnControl = Regex.Match(
             source,

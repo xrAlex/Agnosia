@@ -1,0 +1,27 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Agnosia.ViewModels"
+             x:Class="Agnosia.Views.RestrictedPermissionHelpView"
+             x:DataType="vm:RestrictedPermissionHelpViewModel"
+             IsVisible="{Binding IsVisible}">
+    <StackPanel Spacing="8">
+        <ToggleButton Classes="app-dialog-section-toggle"
+                      HorizontalAlignment="Left"
+                      AutomationProperties.Name="Не удаётся разрешить?"
+                      IsChecked="{Binding IsExpanded, Mode=TwoWay}">
+            <TextBlock Classes="button-label" Text="Не удаётся разрешить?" />
+        </ToggleButton>
+        <StackPanel Spacing="8" IsVisible="{Binding IsExpanded}">
+            <TextBlock Classes="page-caption"
+                       TextWrapping="Wrap"
+                       Text="Если Android сообщает об ограниченной настройке, откройте сведения об Agnosia и найдите в меню ⋮ пункт «Разрешить доступ к настройкам» или «Разрешить ограниченные настройки». Затем вернитесь и повторите выдачу разрешения. Название и расположение пункта могут отличаться на вашей прошивке." />
+            <TextBlock Classes="page-caption" Text="{Binding ProfileLabel}" />
+            <Button Classes="compact-action"
+                    HorizontalAlignment="Left"
+                    AutomationProperties.Name="Открыть настройки Agnosia"
+                    Command="{Binding OpenSettingsCommand}">
+                <TextBlock Classes="button-label" TextWrapping="Wrap" Text="Открыть настройки Agnosia" />
+            </Button>
+        </StackPanel>
+    </StackPanel>
+</UserControl>
