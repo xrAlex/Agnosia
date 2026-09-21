@@ -115,9 +115,37 @@ public sealed class DashboardWorkspaceCommandTests
         Assert.Single(services.CloneRequests);
         Assert.Empty(services.VerifyWorkCopyRequests);
         Assert.Empty(services.UninstallRequests);
-        Assert.Equal(0, services.DashboardProfileLoadCount);
+        Assert.Equal(1, services.DashboardProfileLoadCount);
         Assert.True(viewModel.StatusIsError);
         Assert.Equal("CloneRejected", viewModel.StatusMessage);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Unconfirmed_install_refreshes_inventory_without_removing_personal_copy(bool move)
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            AppInventory = new DashboardAppInventorySnapshot([], [
+                TestSnapshots.App(ProfileKind.Work, "com.example.notes", "Notes")]),
+            CloneHandler = (_, _) => Task.FromResult(OperationResult.Failure("InstallationResultMissing"))
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+        var app = CreatePersonalApp(viewModel);
+
+        if (move)
+            await app.MoveToWorkCommand.ExecuteAsync(null);
+        else
+            await app.CloneCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, services.DashboardProfileLoadCount);
+        await AsyncAssert.EventuallyAsync(() => viewModel.WorkAppsCount == 1,
+            "The installed work copy must appear even when its completion result was lost.");
+        Assert.True(viewModel.StatusIsError);
+        Assert.Equal("InstallationResultMissing", viewModel.StatusMessage);
+        Assert.Empty(services.UninstallRequests);
     }
 
     // Проверяет, что личная копия сохраняется, пока рабочий профиль независимо не подтвердит clone.

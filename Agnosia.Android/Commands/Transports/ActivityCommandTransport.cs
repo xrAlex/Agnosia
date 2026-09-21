@@ -35,7 +35,8 @@ internal sealed class ActivityCommandTransport(
                 string.IsNullOrWhiteSpace(error)
                     ? "Android activity command was canceled."
                     : error,
-                "activity_result_canceled",
+                result.Data?.GetStringExtra(AndroidCommandContract.ResultCommandErrorCode)
+                ?? "activity_result_canceled",
                 stopwatch.Elapsed,
                 $"result={result.ResultCode}; action={intent.Action ?? "<none>"}");
         }

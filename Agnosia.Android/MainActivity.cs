@@ -212,9 +212,9 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
     Type IAndroidActivityHost.WorkAppFrozenReceiverType => typeof(WorkAppFrozenReceiver);
 
     Task<AndroidActivityResult> IAndroidActivityHost.StartForResultAsync(Intent intent,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, Action? beforeStart)
     {
-        return StartForResultAsync(intent, cancellationToken);
+        return StartForResultAsync(intent, cancellationToken, beforeStart: beforeStart);
     }
 
     Task<OperationResult> IAndroidActivityHost.DisconnectPreparedVpnAsync(CancellationToken cancellationToken)

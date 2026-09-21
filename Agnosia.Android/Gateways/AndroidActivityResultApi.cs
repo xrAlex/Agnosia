@@ -26,7 +26,7 @@ public static class AndroidActivityResultApi
     {
         var data = new Intent();
         data.PutExtra(AndroidCommandContract.ResultError, error);
-        return new AndroidActivityResult(Result.Canceled, data);
+        return new AndroidActivityResult(Result.Canceled, data) { IsLocalFailure = true };
     }
 
     public static OperationResult ToPackageOperationResult(AndroidActivityResult result, string successMessage)

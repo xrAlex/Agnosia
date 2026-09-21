@@ -1,5 +1,6 @@
 using Android.Content;
 using Android.Content.PM;
+using Android.OS;
 using Exception = System.Exception;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
@@ -14,10 +15,14 @@ public sealed partial class DummyActivity
         FinishWithResult(Result.Canceled, result);
     }
 
-    private void FinishWithError(string message)
+    private void FinishWithError(string message) => FinishWithError(message, null);
+
+    private void FinishWithError(string message, string? errorCode)
     {
         var result = new Intent();
         result.PutExtra(AndroidCommandContract.ResultError, message);
+        if (!string.IsNullOrWhiteSpace(errorCode))
+            result.PutExtra(AndroidCommandContract.ResultCommandErrorCode, errorCode);
         FinishWithResult(Result.Canceled, result);
     }
 
@@ -45,6 +50,11 @@ public sealed partial class DummyActivity
 
     private void FinishWithResult(Result resultCode, Intent? data = null)
     {
+        if (Looper.MainLooper?.IsCurrentThread != true)
+        {
+            RunOnUiThread(() => FinishWithResult(resultCode, data));
+            return;
+        }
         if (_finishRequested || _destroyCancellation.IsCancellationRequested) return;
 
         _finishRequested = true;
@@ -66,9 +76,12 @@ public sealed partial class DummyActivity
             Receivers.ActivityCommandResultReceiver.Send(this, Intent, resultCode, data);
         }
 
-        Log.Debug(
-            LogTag,
-            $"Finishing action={Intent?.Action ?? "<none>"} with result={resultCode}, hasData={data is not null}.");
+        var completionMessage =
+            $"Finishing action={Intent?.Action ?? "<none>"}, correlationId={_commandCorrelationId}, result={resultCode}, hasData={data is not null}.";
+        if (_commandKind is AndroidCommandKind.InstallPackage or AndroidCommandKind.UninstallPackage)
+            Log.Info(LogTag, completionMessage);
+        else
+            Log.Debug(LogTag, completionMessage);
         if (data is null)
             SetResult(resultCode);
         else
@@ -118,9 +131,10 @@ public sealed partial class DummyActivity
                               ?? intent?.GetStringExtra(PackageInstaller.ExtraPackageName);
         var operation = intent?.GetStringExtra(AndroidCommandContract.ExtraPackageInstallerOperation);
         var statusMessage = intent?.GetStringExtra(PackageInstaller.ExtraStatusMessage);
+        var sessionId = intent?.GetIntExtra(PackageInstaller.ExtraSessionId, -1);
 
         Log.Info(LogTag,
-            $"PackageInstaller callback status={status}, operation={operation ?? "<unknown>"}, package={callbackPackage ?? "<unknown>"}, statusMessage={statusMessage ?? "<none>"}.");
+            $"PackageInstaller callback status={status}, sessionId={sessionId}, operation={operation ?? "<unknown>"}, package={callbackPackage ?? "<unknown>"}, statusMessage={statusMessage ?? "<none>"}.");
 
         if (status == PackageInstallStatus.PendingUserAction)
         {
@@ -153,11 +167,9 @@ public sealed partial class DummyActivity
         if (status == PackageInstallStatus.Success)
         {
             if (string.Equals(operation, AndroidCommandContract.PackageInstallerOperationInstall,
-                    StringComparison.Ordinal)
-                && !string.IsNullOrWhiteSpace(callbackPackage)
-                && !await WaitForPackageAvailableAsync(callbackPackage, cancellationToken, includeHidden: true).ConfigureAwait(false))
+                    StringComparison.Ordinal))
             {
-                FinishWithError($"Android установил {callbackPackage}, но пакет еще не доступен в рабочем профиле.");
+                await CompleteSuccessfulInstallAsync(callbackPackage, cancellationToken).ConfigureAwait(false);
                 return;
             }
 
@@ -169,6 +181,18 @@ public sealed partial class DummyActivity
         FinishWithError(string.IsNullOrWhiteSpace(statusMessage)
             ? "Android отклонил установку пакета."
             : $"Android отклонил установку пакета: {statusMessage}");
+    }
+
+    private async Task CompleteSuccessfulInstallAsync(string? packageName, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(packageName)
+            || !await WaitForPackageAvailableAsync(packageName, cancellationToken, includeHidden: true).ConfigureAwait(false))
+        {
+            LogInstallPackageState(packageName, "success_but_unavailable");
+            FinishWithError($"Android сообщил об успешной установке {packageName}, но пакет недоступен в рабочем профиле.");
+            return;
+        }
+        FinishWithResult(Result.Ok);
     }
 
 }

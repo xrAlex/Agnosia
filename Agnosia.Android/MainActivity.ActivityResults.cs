@@ -25,7 +25,8 @@ public partial class MainActivity
     private Task<AndroidActivityResult> StartForResultAsync(
         Intent intent,
         CancellationToken cancellationToken = default,
-        bool completeOnStart = false)
+        bool completeOnStart = false,
+        Action? beforeStart = null)
     {
         var completionSource = new TaskCompletionSource<AndroidActivityResult>(
             TaskCreationOptions.RunContinuationsAsynchronously);
@@ -63,25 +64,27 @@ public partial class MainActivity
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
 
-        StartActivityForResultOnUiThread(intent, requestCode, completionSource, completeOnStart);
+        StartActivityForResultOnUiThread(intent, requestCode, completionSource, completeOnStart, beforeStart);
 
         return completionSource.Task;
     }
 
     internal Task<AndroidActivityResult> StartWhenResumedAsync(
         Intent intent,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Action? beforeStart = null)
     {
-        return StartForResultAsync(intent, cancellationToken, completeOnStart: true);
+        return StartForResultAsync(intent, cancellationToken, completeOnStart: true, beforeStart: beforeStart);
     }
 
     private void StartActivityForResultOnUiThread(
         Intent intent,
         int requestCode,
         TaskCompletionSource<AndroidActivityResult> completionSource,
-        bool completeOnStart)
+        bool completeOnStart,
+        Action? beforeStart)
     {
-        var request = new ActivityStartRequest(intent, requestCode, completionSource, completeOnStart);
+        var request = new ActivityStartRequest(intent, requestCode, completionSource, completeOnStart, beforeStart);
 
         if (Looper.MainLooper?.IsCurrentThread == true)
         {
@@ -155,6 +158,9 @@ public partial class MainActivity
 
         try
         {
+            // Only the trusted caller can provide preparation. Do not sign arbitrary
+            // external intents or renew signatures based on intent extras.
+            request.BeforeStart?.Invoke();
             Log.Debug(
                 LogTag,
                 $"Starting activity request. requestCode={request.RequestCode}, action={request.Intent.Action ?? "<none>"}, completeOnStart={request.CompleteOnStart}.");
@@ -251,6 +257,7 @@ public partial class MainActivity
         Intent Intent,
         int RequestCode,
         TaskCompletionSource<AndroidActivityResult> CompletionSource,
-        bool CompleteOnStart);
+        bool CompleteOnStart,
+        Action? BeforeStart);
 
 }

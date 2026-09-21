@@ -39,11 +39,16 @@ internal sealed class AndroidAppCommandCoordinator(
         else
         {
             var intent = CreatePackageIntent(AgnosiaActions.InstallPackage, app);
+            // Reuse a work copy only when its version is at least the personal version.
+            // Explicit installs and self-updates must await their own installer result.
+            intent.PutExtra(AndroidCommandContract.ExtraReuseExistingWorkCopy,
+                app.Profile == ProfileKind.Personal && !app.IsSystem);
 
             if (!app.IsSystem)
             {
                 var sourceDirectory = app.SourceDirectory;
                 var splitApks = app.SplitApks.ToArray();
+                long? sourceVersionCode = null;
                 if (app.Profile == ProfileKind.Personal)
                 {
                     var sourceResolution = await ResolveInstalledPackageSourceAsync(
@@ -51,6 +56,7 @@ internal sealed class AndroidAppCommandCoordinator(
                             app.PackageName,
                             cancellationToken)
                         .ConfigureAwait(false);
+                    sourceVersionCode = sourceResolution.VersionCode;
                     if (sourceResolution.Succeeded)
                     {
                         sourceDirectory = sourceResolution.SourceDirectory;
@@ -65,6 +71,8 @@ internal sealed class AndroidAppCommandCoordinator(
 
                 intent.PutExtra(AndroidCommandContract.ExtraApk, sourceDirectory);
                 intent.PutExtra(AndroidCommandContract.ExtraSplitApks, splitApks);
+                if (sourceVersionCode is { } versionCode)
+                    intent.PutExtra(AndroidCommandContract.ExtraSourceVersionCode, versionCode);
             }
 
             result = await (app.Profile == ProfileKind.Personal
@@ -76,6 +84,8 @@ internal sealed class AndroidAppCommandCoordinator(
         }
 
         if (!result.Succeeded || app.Profile != ProfileKind.Personal) return result;
+
+        AndroidKnownWorkPackages.Remember(app.PackageName);
 
         var freezeResult = await HideClonedWorkAppAsync(
             app with
@@ -116,6 +126,8 @@ internal sealed class AndroidAppCommandCoordinator(
         }
 
         if (!result.Succeeded || app.Profile != ProfileKind.Work) return result;
+
+        AndroidKnownWorkPackages.Forget(app.PackageName);
 
         var shortcutResult = AndroidHiddenShortcutApi.InvalidatePinnedShortcut(
             commandRunner.CurrentActivity,
@@ -516,13 +528,26 @@ internal sealed class AndroidAppCommandCoordinator(
         return Task.Run(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return AndroidPackageApi.TryResolveInstalledPackageSource(
+            var sourceAvailable = AndroidPackageApi.TryResolveInstalledPackageSource(
                 packageManager,
                 packageName,
                 out var sourceDirectory,
-                out var splitApks)
-                ? new PackageSourceResolution(true, sourceDirectory, splitApks)
-                : new PackageSourceResolution(false, null, []);
+                out var splitApks);
+
+            long? versionCode = null;
+            try
+            {
+                versionCode = packageManager?.GetPackageInfo(packageName, PackageInfoFlags.MatchDisabledComponents)
+                    ?.LongVersionCode;
+            }
+            catch (Exception exception) when (exception is PackageManager.NameNotFoundException
+                                              || AndroidRecoverableException.IsMatch(exception))
+            {
+                Log.Warn(ActivityResultLogTag,
+                    $"Could not read personal package version before copying. package={packageName}, error={exception.GetType().Name}.");
+            }
+
+            return new PackageSourceResolution(sourceAvailable, sourceDirectory, splitApks, versionCode);
         }, cancellationToken);
     }
 
@@ -575,5 +600,6 @@ internal sealed class AndroidAppCommandCoordinator(
     private sealed record PackageSourceResolution(
         bool Succeeded,
         string? SourceDirectory,
-        string[] SplitApks);
+        string[] SplitApks,
+        long? VersionCode);
 }

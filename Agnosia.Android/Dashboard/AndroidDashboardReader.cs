@@ -162,6 +162,26 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         return mergedLogs;
     }
 
+    public async Task<OperationResult> ClearRecentLogsAsync(CancellationToken cancellationToken)
+    {
+        var activity = commandRunner.CurrentActivity;
+        AgnosiaRuntime.Initialize(activity);
+        cancellationToken.ThrowIfCancellationRequested();
+        AndroidAppLogArchive.Clear(activity, throwOnFailure: true);
+        var diagnostics = AndroidWorkProfileDiagnosticsReader.Read(activity);
+        if (!diagnostics.ManagedProfileExists) return OperationResult.Success(string.Empty);
+        if (!CanAttemptWorkProfileOwnerCheck(diagnostics))
+            return OperationResult.Failure("Журнал личного профиля очищен. Для очистки рабочего профиля включите его и повторите попытку.");
+
+        var envelope = new AndroidCommandEnvelope(Guid.NewGuid(), AndroidCommandKind.ClearLogs,
+            AndroidCommandTargetProfile.Work, AndroidCommandInteractivity.NonInteractive,
+            AndroidCommandPriority.UserBlocking, TimeSpan.FromSeconds(30), null);
+        var result = await ServiceRegistry.GetRequiredService<AndroidCommandCenter>()
+            .ExecuteAsync(envelope, cancellationToken).ConfigureAwait(false);
+        return result.Succeeded ? OperationResult.Success(string.Empty)
+            : OperationResult.Failure("Журнал личного профиля очищен, но рабочий профиль не подтвердил очистку. Повторите попытку.");
+    }
+
     private static Task<DashboardProfileLocalState> ReadDashboardProfileLocalStateAsync(
         Activity activity,
         CancellationToken cancellationToken)
@@ -217,7 +237,11 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
             showAll,
             cancellationToken).ConfigureAwait(false);
 
-        return payload is null ? AppQueryResult.Empty : new AppQueryResult(payload.Apps, payload.InteractionPackages);
+        if (payload is null)
+            throw new InvalidOperationException(profile == ProfileKind.Work
+                ? "Не удалось получить список приложений рабочего профиля. Повторите обновление."
+                : "Не удалось получить список приложений личного профиля. Повторите обновление.");
+        return new AppQueryResult(payload.Apps, payload.InteractionPackages);
     }
 
     private async Task<WorkProfileOwnerCheckResult> ReadWorkProfileOwnerCheckAsync(

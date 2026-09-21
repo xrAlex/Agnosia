@@ -6,6 +6,9 @@ namespace Agnosia.ViewModels;
 
 public partial class DashboardWorkspaceViewModel
 {
+    private int _logGeneration;
+    private bool _clearingLogs;
+
     [RelayCommand]
     private async Task OpenLogsAsync()
     {
@@ -20,8 +23,29 @@ public partial class DashboardWorkspaceViewModel
     private void CloseLogs() => IsLogWindowOpen = false;
 
     [RelayCommand]
-    private void ClearLogs()
+    private async Task ClearLogsAsync()
     {
+        _clearingLogs = true;
+        ClearDisplayedLogs();
+        try
+        {
+            var result = await Task.Run(() => _platformEventLogReader.ClearRecentLogsAsync());
+            if (!result.Succeeded) StatusMessage = result.Message;
+        }
+        catch (Exception)
+        {
+            StatusMessage = "Не удалось полностью очистить журнал. Повторите попытку, когда рабочий профиль доступен.";
+        }
+        finally
+        {
+            ClearDisplayedLogs();
+            _clearingLogs = false;
+        }
+    }
+
+    private void ClearDisplayedLogs()
+    {
+        _logGeneration++;
         _eventLogService.Clear();
         NotifyLogStateChanged();
     }
@@ -35,15 +59,15 @@ public partial class DashboardWorkspaceViewModel
 
     private async Task ReloadPlatformLogsAsync(bool force = false)
     {
-        var shouldLoad = await InvokeOnUiThreadFuncAsync(
-                () => LoggingEnabled && (force || IsLogWindowOpen),
+        var generation = await InvokeOnUiThreadFuncAsync(
+                () => LoggingEnabled && !_clearingLogs && (force || IsLogWindowOpen) ? _logGeneration : -1,
                 DispatcherPriority.Background)
             .ConfigureAwait(false);
-        if (!shouldLoad) return;
+        if (generation < 0) return;
 
         var logs = await LoadRecentLogsOnWorkerAsync().ConfigureAwait(false);
         await InvokeOnUiThreadActionAsync(
-                () => ImportPlatformLogs(logs),
+                () => { if (!_clearingLogs && generation == _logGeneration) ImportPlatformLogs(logs); },
                 DispatcherPriority.Background)
             .ConfigureAwait(false);
     }

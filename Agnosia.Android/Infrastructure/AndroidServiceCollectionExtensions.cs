@@ -22,6 +22,7 @@ internal static class AndroidServiceCollectionExtensions
         services.AddSingleton<IAndroidCommandHandler, QueryAppsCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, QueryCrossProfilePackagesCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, QueryLogsCommandHandler>();
+        services.AddSingleton<IAndroidCommandHandler, ClearLogsCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, QueryPermissionsCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, QueryPackageStateCommandHandler>();
 #if AGNOSIA_ANDROID

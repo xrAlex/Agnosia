@@ -22,6 +22,16 @@ public sealed class TestPlatformServices :
 
     public IReadOnlyList<AppLogEntry> RecentLogs { get; set; } = [];
 
+    public Func<Task<OperationResult>>? ClearLogsHandler { get; set; }
+    public Func<Task<IReadOnlyList<AppLogEntry>>>? LoadLogsHandler { get; set; }
+
+    public Task<OperationResult> ClearRecentLogsAsync(CancellationToken cancellationToken = default)
+    {
+        if (ClearLogsHandler is not null) return ClearLogsHandler();
+        RecentLogs = [];
+        return Task.FromResult(OperationResult.Success(string.Empty));
+    }
+
     public IReadOnlyList<PermissionSnapshot> Permissions { get; set; } = [];
 
     public IReadOnlyList<AgnosiaModuleSnapshot> Modules { get; set; } =
@@ -155,7 +165,7 @@ public sealed class TestPlatformServices :
 
     public Task<IReadOnlyList<AppLogEntry>> LoadRecentLogsAsync(CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(RecentLogs);
+        return LoadLogsHandler?.Invoke() ?? Task.FromResult(RecentLogs);
     }
 
     public string GetDeviceInfoString()

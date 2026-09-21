@@ -78,6 +78,9 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
         return EmptyLogsTask;
     }
 
+    public Task<OperationResult> ClearRecentLogsAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(OperationResult.Success(string.Empty));
+
     public Task<IReadOnlyList<PermissionSnapshot>> LoadPermissionsAsync(CancellationToken cancellationToken = default)
     {
         return EmptyPermissionsTask;

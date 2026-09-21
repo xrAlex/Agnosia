@@ -21,7 +21,7 @@ public partial class DashboardWorkspaceViewModel
         }
 
         IsLogWindowOpen = false;
-        ClearLogs();
+        ClearDisplayedLogs();
         QueueSettingsSave();
     }
 

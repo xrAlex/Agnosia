@@ -83,6 +83,9 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         return _dashboardReader.LoadRecentLogsAsync(cancellationToken);
     }
 
+    public Task<OperationResult> ClearRecentLogsAsync(CancellationToken cancellationToken = default)
+        => _dashboardReader.ClearRecentLogsAsync(cancellationToken);
+
     public Task<IReadOnlyList<PermissionSnapshot>> LoadPermissionsAsync(CancellationToken cancellationToken = default)
     {
         return _permissionCoordinator.LoadPermissionsAsync(cancellationToken);

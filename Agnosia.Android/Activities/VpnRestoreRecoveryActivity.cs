@@ -33,7 +33,8 @@ public sealed class VpnRestoreRecoveryActivity : Activity, IAndroidActivityHost
     void IAndroidActivityHost.ShowVpnGuardOverlay() => OverlayVpnService.ShowOverlay(this);
     void IAndroidActivityHost.HideVpnGuardOverlay() => OverlayVpnService.HideOverlay(this);
 
-    async Task<AndroidActivityResult> IAndroidActivityHost.StartForResultAsync(Intent intent, CancellationToken token)
+    async Task<AndroidActivityResult> IAndroidActivityHost.StartForResultAsync(Intent intent, CancellationToken token,
+        Action? beforeStart)
     {
         var requestCode = Interlocked.Increment(ref _nextQueryCode);
         var completion = new TaskCompletionSource<AndroidActivityResult>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -47,6 +48,7 @@ public sealed class VpnRestoreRecoveryActivity : Activity, IAndroidActivityHost
                 try
                 {
                     linked.Token.ThrowIfCancellationRequested();
+                    beforeStart?.Invoke();
                     StartActivityForResult(intent, requestCode);
                 }
                 catch (Exception exception) { completion.TrySetException(exception); }

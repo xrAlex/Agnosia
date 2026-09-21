@@ -32,17 +32,17 @@ public sealed class ActivityCommandResultReceiver : BroadcastReceiver
             return;
         }
 
-        Log.Debug(LogTag, $"Accepted command result. correlationId={id}, kind={pending.Kind}, result={resultCode}.");
+        Log.Info(LogTag, $"Accepted command result. correlationId={id}, kind={pending.Kind}, result={resultCode}.");
         pending.Completion.TrySetResult(new AndroidActivityResult((Result)resultCode, new Intent(intent)));
     }
 
     internal static async Task<AndroidActivityResult> RunAsync(
         IAndroidActivityHost host, Intent intent, Guid correlationId, AndroidCommandKind kind,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, TimeSpan? resultTimeout = null)
     {
         var completion = new TaskCompletionSource<AndroidActivityResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        timeout.CancelAfter(resultTimeout ?? TimeSpan.FromSeconds(30));
         using var callbackIntent = new Intent(host.CurrentActivity, typeof(ActivityCommandResultReceiver));
         callbackIntent.SetAction(AgnosiaActions.CommandResult);
         callbackIntent.SetData(global::Android.Net.Uri.Parse($"agnosia://activity-result/{correlationId:D}"));
@@ -54,12 +54,13 @@ public sealed class ActivityCommandResultReceiver : BroadcastReceiver
         try
         {
             intent.PutExtra(AndroidCommandContract.ExtraCommandResultCallback, callback);
-            var activityResult = host.StartForResultAsync(intent, timeout.Token);
-            // Observe task failures. A canceled Activity result alone is not
-            // authoritative: only the authenticated callback completes this command.
-            var first = await Task.WhenAny(activityResult, completion.Task).ConfigureAwait(false);
-            if (first == activityResult) await activityResult.ConfigureAwait(false);
-            return await completion.Task.WaitAsync(timeout.Token).ConfigureAwait(false);
+            var activityResult = host.StartForResultAsync(intent, timeout.Token,
+                () => AuthenticationUtility.SignIntent(intent));
+            // Either channel may be delayed or lost. Only a signed result with
+            // the expected command identity is allowed to complete the operation.
+            return await AuthenticatedActivityResultWaiter.WaitAsync(activityResult, completion.Task,
+                result => result.IsLocalFailure || IsAuthenticatedActivityResult(result, correlationId, kind), timeout.Token)
+                .ConfigureAwait(false);
         }
         finally
         {
@@ -67,6 +68,19 @@ public sealed class ActivityCommandResultReceiver : BroadcastReceiver
             timeout.Cancel();
             callback.Cancel();
         }
+    }
+
+    private static bool IsAuthenticatedActivityResult(
+        AndroidActivityResult result, Guid correlationId, AndroidCommandKind kind)
+    {
+        var data = result.Data;
+        return data?.Action == AgnosiaActions.CommandResult
+               && (result.ResultCode == Result.Ok || result.ResultCode == Result.Canceled)
+               && AuthenticationUtility.CheckIntent(data)
+               && ActivityCommandResultIdentity.Validate(correlationId, kind, (int)result.ResultCode,
+                   data.GetStringExtra(AndroidCommandContract.ExtraCommandCorrelationId),
+                   data.GetStringExtra(AndroidCommandContract.ExtraCommandKind),
+                   data.GetIntExtra(AndroidCommandContract.ResultCommandResultCode, int.MinValue)).Succeeded;
     }
 
     internal static void Send(Context context, Intent? request, Result resultCode, Intent result)

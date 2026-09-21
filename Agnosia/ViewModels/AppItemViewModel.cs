@@ -89,22 +89,26 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
     public string RuntimePermissionsText =>
         _runtimePermissionsText ??= AppPermissionRiskTextFormatter.FormatPermissionBlockList(RuntimePermissions);
 
-    public string PermissionRiskSummaryText => AppPermissionRiskTextFormatter.BuildRiskSummary(PermissionRiskLevel);
+    public string PermissionRiskSummaryText => Snapshot.PermissionRiskAvailable
+        ? AppPermissionRiskTextFormatter.BuildRiskSummary(PermissionRiskLevel)
+        : "Оценка разрешений недоступна";
 
     public IReadOnlyList<string> PermissionRiskReasons => GetPermissionRiskReasons();
 
     public bool HasPermissionRiskReasons => GetPermissionRiskReasons().Length > 0;
 
-    public bool IsPermissionRiskSafe => PermissionRiskLevel == AppPermissionRiskLevel.Safe;
+    public bool IsPermissionRiskSafe => Snapshot.PermissionRiskAvailable && PermissionRiskLevel == AppPermissionRiskLevel.Safe;
 
-    public bool IsPermissionRiskDangerous => PermissionRiskLevel == AppPermissionRiskLevel.Dangerous;
+    public bool IsPermissionRiskDangerous => Snapshot.PermissionRiskAvailable && PermissionRiskLevel == AppPermissionRiskLevel.Dangerous;
 
-    public bool IsPermissionRiskCritical => PermissionRiskLevel == AppPermissionRiskLevel.Critical;
+    public bool IsPermissionRiskCritical => Snapshot.PermissionRiskAvailable && PermissionRiskLevel == AppPermissionRiskLevel.Critical;
 
     public bool ShowPermissionRiskIndicator => AppItemPresentation.ShouldShowPermissionRiskIndicator(Snapshot);
 
     public string PermissionRiskTooltip =>
-        AppItemPresentation.GetPermissionRiskTooltip(PermissionRiskLevel, PermissionRiskSummaryText);
+        Snapshot.PermissionRiskAvailable
+            ? AppItemPresentation.GetPermissionRiskTooltip(PermissionRiskLevel, PermissionRiskSummaryText)
+            : PermissionRiskSummaryText;
 
     public string Monogram => AppItemPresentation.GetMonogram(Snapshot.Label);
 
@@ -330,6 +334,9 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
         if (previous.PermissionRiskAvailable != snapshot.PermissionRiskAvailable)
         {
+            OnPropertyChanged(nameof(IsPermissionRiskSafe));
+            OnPropertyChanged(nameof(IsPermissionRiskDangerous));
+            OnPropertyChanged(nameof(IsPermissionRiskCritical));
             OnPropertyChanged(nameof(ShowPermissionRiskIndicator));
             OnPropertyChanged(nameof(PermissionRiskTooltip));
             OnPropertyChanged(nameof(PermissionRiskSummaryText));

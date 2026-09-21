@@ -28,6 +28,7 @@ namespace Agnosia.Android.Activities;
     AgnosiaActions.QueryAppIcon,
     AgnosiaActions.QueryAppIcons,
     AgnosiaActions.QueryLogs,
+    AgnosiaActions.ClearLogs,
     AgnosiaActions.QueryCrossProfilePackages,
     AgnosiaActions.QueryPermissions,
     AgnosiaActions.QueryUsageStatsAccess,
@@ -94,6 +95,9 @@ public sealed partial class DummyActivity : Activity
 
     protected override void OnDestroy()
     {
+        if (_packageInstallerOperationId is not null)
+            Log.Warn(LogTag,
+                $"Command activity destroyed with pending installer. correlationId={_commandCorrelationId}, operationId={_packageInstallerOperationId}, finishing={IsFinishing}.");
         _destroyCancellation.Cancel();
         CloseFileShuttleConnections();
         ReleasePackageInstallerCallback();

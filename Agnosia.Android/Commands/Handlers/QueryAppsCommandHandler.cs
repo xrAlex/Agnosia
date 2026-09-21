@@ -30,15 +30,25 @@ internal sealed class QueryAppsCommandHandler : IAndroidCommandHandler
             .GetBoolean(StorageKeys.RiskEngineEnabled, true);
         var isProfileOwner = IsProfileOwner(context);
         var admin = isProfileOwner ? context.Admin : null;
-        var inventory = await GetOrCreateCachedAppInventoryQueryAsync(
-                context,
-                request.ShowAll,
-                isRiskEngineEnabled,
-                request.PageToken,
-                packageManager,
-                admin,
-                cancellationToken)
-            .ConfigureAwait(false);
+        AndroidQueryCache.AppInventoryQuery inventory;
+        try
+        {
+            inventory = await GetOrCreateCachedAppInventoryQueryAsync(
+                    context,
+                    request.ShowAll,
+                    isRiskEngineEnabled,
+                    request.PageToken,
+                    packageManager,
+                    admin,
+                    request.KnownPackageNames,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (PackageInventoryUnavailableException exception)
+        {
+            return Failure(envelope, context, stopwatch, exception.Message,
+                AndroidCommandContract.ErrorAppInventoryUnavailable);
+        }
         var response = CreateResponse(request, inventory);
         var payloadJson = JsonSerializer.Serialize(response);
 
@@ -75,6 +85,7 @@ internal sealed class QueryAppsCommandHandler : IAndroidCommandHandler
         string? pageToken,
         PackageManager packageManager,
         ComponentName? admin,
+        string[]? knownPackageNames,
         CancellationToken cancellationToken)
     {
         if (AndroidQueryCache.Shared.TryGetAppInventoryQuery(
@@ -91,7 +102,8 @@ internal sealed class QueryAppsCommandHandler : IAndroidCommandHandler
             admin,
             showAll,
             cancellationToken,
-            AppInventoryQueryOptions.WorkList), cancellationToken).ConfigureAwait(false);
+            AppInventoryQueryOptions.WorkList,
+            knownPackageNames), cancellationToken).ConfigureAwait(false);
 
         var interactionPackages = admin is not null && context.PolicyManager is not null
             ? AndroidPolicyApi.GetCrossProfilePackages(context.PolicyManager, admin)
@@ -170,7 +182,8 @@ internal sealed record QueryAppsRequest(
     [property: JsonPropertyName(AndroidCommandContract.ExtraQueryLimit)]
     int Limit,
     [property: JsonPropertyName(AndroidCommandContract.ExtraQueryMaxJsonBytes)]
-    int MaxJsonBytes)
+    int MaxJsonBytes,
+    string[]? KnownPackageNames = null)
 {
     public static QueryAppsRequest Empty { get; } = new(false, null, 0, 0, 0);
 

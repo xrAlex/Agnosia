@@ -3,6 +3,7 @@ using Android.Content;
 using Android.Content.PM;
 using Android.Provider;
 using AndroidUri = Android.Net.Uri;
+using AndroidProcess = Android.OS.Process;
 using JavaFile = Java.IO.File;
 using JavaFileNotFoundException = Java.IO.FileNotFoundException;
 using JavaIOException = Java.IO.IOException;
@@ -89,7 +90,8 @@ public static class AndroidPackageApi
         string[]? splitApks,
         PendingIntent callbackPendingIntent,
         string logTag,
-        Action<string> onError)
+        Action<string> onError,
+        Action<int>? onSessionCreated = null)
     {
         try
         {
@@ -107,7 +109,7 @@ public static class AndroidPackageApi
                 return true;
             }
 
-            StartSessionInstall(activity, packageName, installParts, callbackPendingIntent, logTag, onError);
+            StartSessionInstall(activity, packageName, installParts, callbackPendingIntent, logTag, onError, onSessionCreated);
             return true;
         }
         catch (PackageManager.NameNotFoundException)
@@ -146,7 +148,8 @@ public static class AndroidPackageApi
         IReadOnlyList<string> installParts,
         PendingIntent callbackPendingIntent,
         string logTag,
-        Action<string> onError)
+        Action<string> onError,
+        Action<int>? onSessionCreated)
     {
         var packageInstaller = activity.PackageManager!.PackageInstaller;
         int sessionId;
@@ -163,6 +166,8 @@ public static class AndroidPackageApi
             return;
         }
 
+        Log.Info(logTag, $"Install session created. sessionId={sessionId}, package={packageName}, user={AndroidProcess.MyUserHandle()}, parts={installParts.Count}.");
+        onSessionCreated?.Invoke(sessionId);
         _ = Task.Run(() =>
         {
             try
@@ -189,6 +194,7 @@ public static class AndroidPackageApi
                 if (writtenParts == 0)
                     throw new InvalidOperationException("Android did not provide any APKs for installation.");
 
+                Log.Info(logTag, $"Committing install session. sessionId={sessionId}, package={packageName}, parts={writtenParts}.");
                 session.Commit(callbackPendingIntent.IntentSender);
             }
             catch (Exception exception)

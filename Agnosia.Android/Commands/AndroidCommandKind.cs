@@ -32,5 +32,6 @@ internal enum AndroidCommandKind
     StartFileShuttleWorkToParent,
     SynchronizePreference,
     FinalizeProvision,
-    PackageInstallerCallback
+    PackageInstallerCallback,
+    ClearLogs
 }

@@ -95,22 +95,31 @@ public static class AuthenticationUtility
     }
 
     public static bool CheckIntent(Intent? intent)
+        => CheckIntent(intent, out _);
+
+    public static bool CheckIntent(Intent? intent, out string failureReason)
     {
+        failureReason = "missing_intent";
         if (intent is null) return false;
 
+        failureReason = "missing_or_invalid_key";
         if (!TryGetValidStoredKey(true, out var key)) return false;
 
         var intentTimestamp = intent.GetLongExtra(ExtraTimestamp, 0);
+        failureReason = $"expired_or_future_timestamp; ageMs={DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - intentTimestamp}";
         if (!IsFreshTimestamp(intentTimestamp)) return false;
 
         var signature = intent.GetStringExtra(ExtraSignature);
         try
         {
             var expectedSignature = SignPayload(key, CreateIntentSignaturePayload(intent, intentTimestamp));
-            return FixedTimeEqualsHex(signature, expectedSignature);
+            var valid = FixedTimeEqualsHex(signature, expectedSignature);
+            failureReason = valid ? string.Empty : "signature_mismatch";
+            return valid;
         }
         catch (NotSupportedException)
         {
+            failureReason = "unsupported_signed_extra";
             return false;
         }
     }

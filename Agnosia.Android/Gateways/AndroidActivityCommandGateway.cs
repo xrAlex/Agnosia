@@ -56,7 +56,8 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
         AgnosiaUtilities.TransferIntentToProfile(activity, intent);
         if (activity is MainActivity mainActivity)
         {
-            var started = await mainActivity.StartWhenResumedAsync(intent, cancellationToken).ConfigureAwait(false);
+            var started = await mainActivity.StartWhenResumedAsync(intent, cancellationToken,
+                () => AuthenticationUtility.SignIntent(intent)).ConfigureAwait(false);
             return AndroidActivityResultApi.ToVoidOperationResult(started, "Команда запуска отправлена.");
         }
         var completion = new TaskCompletionSource<OperationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -65,6 +66,7 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                AuthenticationUtility.SignIntent(intent);
                 activity.StartActivity(intent);
                 completion.TrySetResult(OperationResult.Success("Команда запуска отправлена."));
             }
@@ -205,10 +207,12 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
                         host,
                         intent,
                         isLaunchCommand,
+                        correlationId,
+                        kind,
                         cancellationToken)
                     .ConfigureAwait(false);
 
-                return ValidateAuthenticatedResult(result, correlationId, kind);
+                return result;
             }
 
             intent.SetComponent(new ComponentName(activity, Class.FromType(host.CommandActivityType)));
@@ -258,7 +262,8 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
         Log.Debug(
             ActivityResultLogTag,
             $"Starting local activity command. action={GetActionForLog(intent)}.");
-        var result = await host.StartForResultAsync(intent, cancellationToken).ConfigureAwait(false);
+        var result = await host.StartForResultAsync(intent, cancellationToken,
+            () => AuthenticationUtility.SignIntent(intent)).ConfigureAwait(false);
         Log.Debug(
             ActivityResultLogTag,
             FormatActivityCommandCompleted("Local", intent, result));
@@ -269,6 +274,8 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
         IAndroidActivityHost host,
         Intent intent,
         bool isLaunchCommand,
+        Guid correlationId,
+        AndroidCommandKind kind,
         CancellationToken cancellationToken)
     {
         var profileCommandTimeout = GetProfileCommandTimeout(intent);
@@ -279,11 +286,18 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
             Log.Debug(
                 ActivityResultLogTag,
                 $"Starting DPM-forwarded work-profile activity command. action={GetActionForLog(intent)}, timeoutMs={profileCommandTimeout.TotalMilliseconds:0}.");
-            var result = await host.StartForResultAsync(intent, timeoutCancellation.Token).ConfigureAwait(false);
+            var result = kind == AndroidCommandKind.InstallPackage
+                ? await Receivers.ActivityCommandResultReceiver.RunAsync(
+                    host, intent, correlationId, kind, timeoutCancellation.Token, profileCommandTimeout)
+                    .ConfigureAwait(false)
+                : await host.StartForResultAsync(intent, timeoutCancellation.Token,
+                    () => AuthenticationUtility.SignIntent(intent)).ConfigureAwait(false);
             Log.Debug(
                 ActivityResultLogTag,
                 FormatActivityCommandCompleted("DPM-forwarded work-profile", intent, result));
-            return result;
+            // Validate only remote results. A locally generated timeout below
+            // has no signature and must retain its original diagnostic message.
+            return ValidateAuthenticatedResult(result, correlationId, kind);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -331,7 +345,7 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
         AndroidCommandKind kind)
     {
         AndroidCommandIntentMapper.PutOutgoingIdentity(intent, correlationId, kind);
-        AuthenticationUtility.SignIntent(intent);
+        // The host signs immediately before launching, after any resume queue wait.
     }
 
     private static AndroidActivityResult ValidateAuthenticatedResult(
@@ -339,12 +353,17 @@ internal sealed class AndroidActivityCommandGateway(Func<IAndroidActivityHost> g
         Guid correlationId,
         AndroidCommandKind kind)
     {
+        if (result.IsLocalFailure) return result;
         var data = result.Data;
         if (data is null
             || !string.Equals(data.Action, AgnosiaActions.CommandResult, StringComparison.Ordinal)
             || !AuthenticationUtility.CheckIntent(data))
+        {
+            Log.Warn(ActivityResultLogTag,
+                $"Rejected command result. correlationId={correlationId}, kind={kind}, result={result.ResultCode}, hasData={data is not null}, action={data?.Action ?? "<none>"}.");
             return AndroidActivityResultApi.CreateCanceledResult(
                 "Рабочий профиль не вернул подписанный результат Agnosia.");
+        }
 
         var identity = ActivityCommandResultIdentity.Validate(
             correlationId,

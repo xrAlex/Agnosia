@@ -8,6 +8,28 @@ namespace Agnosia.Unit.ViewModels;
 
 public sealed class AppItemViewModelTests
 {
+    [Theory]
+    [InlineData(AppPermissionRiskLevel.Safe)]
+    [InlineData(AppPermissionRiskLevel.Dangerous)]
+    [InlineData(AppPermissionRiskLevel.Critical)]
+    public void Unavailable_analysis_does_not_claim_a_known_risk_level(AppPermissionRiskLevel level)
+    {
+        var snapshot = TestSnapshots.App(ProfileKind.Work, permissionRiskLevel: level);
+        var app = CreateApp(snapshot);
+        var changed = new List<string?>();
+        app.PropertyChanged += (_, args) => changed.Add(args.PropertyName);
+        app.ApplySnapshot(snapshot with { PermissionRiskAvailable = false });
+
+        Assert.False(app.IsPermissionRiskSafe);
+        Assert.False(app.IsPermissionRiskDangerous);
+        Assert.False(app.IsPermissionRiskCritical);
+        Assert.Equal("Оценка разрешений недоступна", app.PermissionRiskSummaryText);
+        Assert.Equal("Оценка разрешений недоступна", app.PermissionRiskTooltip);
+        Assert.Contains(nameof(AppItemViewModel.IsPermissionRiskSafe), changed);
+        Assert.Contains(nameof(AppItemViewModel.IsPermissionRiskDangerous), changed);
+        Assert.Contains(nameof(AppItemViewModel.IsPermissionRiskCritical), changed);
+    }
+
     // Проверяет доступные действия для обычного личного приложения.
     [Fact]
     public void Personal_non_system_app_exposes_move_and_uninstall_controls()
@@ -226,7 +248,7 @@ public sealed class AppItemViewModelTests
             ProfileKind.Personal,
             permissionRiskAvailable: false));
 
-        Assert.True(app.IsPermissionRiskSafe);
+        Assert.False(app.IsPermissionRiskSafe);
         Assert.False(app.ShowPermissionRiskIndicator);
     }
 

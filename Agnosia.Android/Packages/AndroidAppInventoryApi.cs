@@ -29,11 +29,13 @@ public static class AndroidAppInventoryApi
         ComponentName? admin,
         bool showAll,
         CancellationToken cancellationToken = default,
-        AppInventoryQueryOptions? options = null)
+        AppInventoryQueryOptions? options = null,
+        IReadOnlyList<string>? knownPackageNames = null)
     {
         options ??= AppInventoryQueryOptions.Full;
         var isRiskEngineEnabled = ServiceRegistry.GetRequiredService<LocalStorageManager>().GetBoolean(StorageKeys.RiskEngineEnabled, true);
-        var apps = packageManager.GetInstalledApplications(AndroidSystemApi.GetInstalledApplicationFlags());
+        var apps = QueryApplicationInventory(
+            context, packageManager, policyManager, admin, knownPackageNames, cancellationToken);
         var models = new List<AppServiceModel>(apps.Count);
         var installedPackageNames = new HashSet<string>(StringComparer.Ordinal);
         var internetBlockedPackages = LockdownSettingsStore
@@ -63,7 +65,95 @@ public static class AndroidAppInventoryApi
 
         AndroidAppIconResolver.PruneMemoryIconCache(installedPackageNames);
         models.Sort(static (left, right) => StringComparer.CurrentCultureIgnoreCase.Compare(left.Label, right.Label));
+        Log.Info(LogTag,
+            $"App inventory built. user={Process.MyUserHandle()}, enumerated={apps.Count}, nonSystemEnumerated={apps.Count(app => !AndroidWorkProfilePackageClassifier.IsSystemApp(app))}, listed={models.Count}, hiddenListed={models.Count(app => app.IsHidden)}, showAll={showAll}, riskEngine={isRiskEngineEnabled}.");
         return models;
+    }
+
+    private static IReadOnlyList<ApplicationInfo> QueryApplicationInventory(
+        Context context,
+        PackageManager packageManager,
+        DevicePolicyManager? policyManager,
+        ComponentName? admin,
+        IReadOnlyList<string>? knownPackageNames,
+        CancellationToken cancellationToken)
+    {
+        var flags = AndroidSystemApi.GetInstalledApplicationFlags();
+        return PackageInventoryQuery.Read<ApplicationInfo>(
+            () =>
+            {
+                var apps = packageManager.GetInstalledApplications(flags).ToArray();
+                if (apps.Length > 0) return apps;
+
+                var queryAllGranted = context.CheckSelfPermission(global::Android.Manifest.Permission.QueryAllPackages)
+                                      == Permission.Granted;
+                var selfVisible = context.PackageName is { } packageName
+                                  && TryGetApplicationInfo(packageManager, packageName, flags) is not null;
+                Log.Warn(LogTag,
+                    $"Application inventory unexpectedly empty. user={Process.MyUserHandle()}, uid={Process.MyUid()}, flags={(int)flags}, queryAllGranted={queryAllGranted}, selfVisible={selfVisible}, knownCandidates={knownPackageNames?.Count ?? 0}.");
+                return apps;
+            },
+            cancellationToken,
+            knownPackageNames is { Count: > 0 }
+                ? () => QueryKnownWorkPackages(
+                    context.PackageName, packageManager, policyManager, admin, flags, knownPackageNames,
+                    cancellationToken)
+                : null);
+    }
+
+    private static IReadOnlyList<ApplicationInfo> QueryKnownWorkPackages(
+        string? ownPackageName,
+        PackageManager packageManager,
+        DevicePolicyManager? policyManager,
+        ComponentName? admin,
+        PackageInfoFlags flags,
+        IReadOnlyList<string> knownPackageNames,
+        CancellationToken cancellationToken)
+    {
+        var apps = PackageInventoryQuery.ReadKnownPackages(
+            knownPackageNames,
+            name =>
+        {
+            ApplicationInfo app;
+            try
+            {
+                app = packageManager.GetApplicationInfo(name, flags);
+            }
+            catch (PackageManager.NameNotFoundException)
+            {
+                return null;
+            }
+            catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+            {
+                Log.Warn(LogTag,
+                    $"Known work package lookup failed. package={name}, error={exception.GetType().Name}.");
+                throw new PackageInventoryUnavailableException();
+            }
+
+            if (app is null || !string.Equals(app.PackageName, name, StringComparison.Ordinal)) return null;
+            var installed = (app.Flags & ApplicationInfoFlags.Installed) != 0;
+            if (installed) return app;
+            if (policyManager is null || admin is null) return null;
+            try
+            {
+                return policyManager.IsApplicationHidden(admin, name) ? app : null;
+            }
+            catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+            {
+                Log.Warn(LogTag,
+                    $"Known work package hidden-state lookup failed. package={name}, error={exception.GetType().Name}.");
+                throw new PackageInventoryUnavailableException();
+            }
+        }, cancellationToken);
+
+        // A self-only result is indistinguishable from broken per-name package visibility.
+        // It must not silently replace an existing catalog with an empty user-app list.
+        if (apps.All(app => string.Equals(app.PackageName, ownPackageName, StringComparison.Ordinal)))
+            throw new PackageInventoryUnavailableException();
+
+        Log.Info(LogTag,
+            $"Island-style work inventory lookup completed. user={Process.MyUserHandle()}, candidates={knownPackageNames.Count}, found={apps.Count}, flags={(int)flags}.");
+        return apps;
     }
 
     public static byte[]? LoadAppIconPng(
@@ -169,21 +259,19 @@ public static class AndroidAppInventoryApi
                 isIsolationEnabled: false);
         }
 
-        PackageIdentity packageIdentity;
-        if (isRiskEngineEnabled)
-        {
-            if (!TryGetPackageInventoryDetails(
+        var metadata = PackageInventoryMetadata.Read(isRiskEngineEnabled,
+            () => TryGetPackageInventoryDetails(
                     context,
                     packageManager,
                     packageName,
                     specialAccess,
-                    out packageIdentity,
-                    out permissionRisk)) return null;
-        }
-        else if (!TryGetPackageIdentity(packageManager, packageName, out packageIdentity))
-        {
-            return null;
-        }
+                    out var identity,
+                    out var risk)
+                ? new PackageInventoryMetadata(identity, risk, true) : null,
+            () => TryGetPackageIdentity(packageManager, packageName, out var identity) ? identity : null);
+        if (isRiskEngineEnabled && !metadata.RiskAvailable || metadata.Identity is null)
+            Log.Warn(LogTag,
+                $"Keeping app with incomplete inventory details. package={packageName}, installed={isInstalled}, hidden={isHidden}, identityAvailable={metadata.Identity is not null}, riskAvailable={metadata.RiskAvailable}.");
 
         return CreateModel(
             context,
@@ -193,11 +281,11 @@ public static class AndroidAppInventoryApi
             isSystem,
             isHidden,
             isInstalled,
-            packageIdentity,
-            permissionRisk,
+            metadata.Identity.GetValueOrDefault(),
+            metadata.Risk,
             internetBlockedPackages.Contains(packageName),
-            isRiskEngineEnabled,
-            loadIcon: options.IncludeInlineIcons,
+            metadata.RiskAvailable,
+            loadIcon: options.IncludeInlineIcons && metadata.Identity is not null,
             includeApkPaths: true,
             isIsolationEnabled: isHidden || packagesAwaitingHide.Contains(packageName));
     }
@@ -353,7 +441,7 @@ public static class AndroidAppInventoryApi
                 ?? packageManager.GetPackageInfo(packageName, PackageInfoFlags.Permissions | PackageInfoFlags.Services);
             if (packageInfo is null)
             {
-                Log.Debug(LogTag, $"Package inventory details unavailable. package={packageName}, reason=PackageInfoNull.");
+                Log.Warn(LogTag, $"Package inventory details unavailable. package={packageName}, reason=PackageInfoNull.");
                 identity = default;
                 permissionRisk = AppPermissionRiskAnalysis.Safe;
                 return false;
@@ -386,7 +474,7 @@ public static class AndroidAppInventoryApi
         catch (Exception exception) when (exception is PackageManager.NameNotFoundException
                                           || AndroidRecoverableException.IsMatch(exception))
         {
-            Log.Debug(
+            Log.Warn(
                 LogTag,
                 $"Package inventory details unavailable. package={packageName}, error={exception.GetType().Name}.");
             identity = default;

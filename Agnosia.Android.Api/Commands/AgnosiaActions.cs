@@ -9,6 +9,7 @@ public static class AgnosiaActions
     public const string QueryAppIcon = "agnosia.action.QUERY_APP_ICON";
     public const string QueryAppIcons = "agnosia.action.QUERY_APP_ICONS";
     public const string QueryLogs = "agnosia.action.QUERY_LOGS";
+    public const string ClearLogs = "agnosia.action.CLEAR_LOGS";
     public const string QueryCrossProfilePackages = "agnosia.action.QUERY_CROSS_PROFILE_PACKAGES";
     public const string QueryPermissions = "agnosia.action.QUERY_PERMISSIONS";
     public const string QueryUsageStatsAccess = "agnosia.action.QUERY_USAGE_STATS_ACCESS";
@@ -45,6 +46,7 @@ public static class AgnosiaActions
         QueryAppIcon,
         QueryAppIcons,
         QueryLogs,
+        ClearLogs,
         QueryCrossProfilePackages,
         QueryPermissions,
         QueryUsageStatsAccess,
@@ -84,6 +86,7 @@ public static class AgnosiaActions
         QueryAppIcon,
         QueryAppIcons,
         QueryLogs,
+        ClearLogs,
         QueryCrossProfilePackages,
         QueryPermissions,
         QueryUsageStatsAccess,

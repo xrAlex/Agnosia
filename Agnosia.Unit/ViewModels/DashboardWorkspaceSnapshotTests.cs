@@ -7,6 +7,86 @@ namespace Agnosia.Unit.ViewModels;
 
 public sealed class DashboardWorkspaceSnapshotTests
 {
+    [Fact]
+    public async Task Refresh_reports_updated_only_after_inventory_is_loaded()
+    {
+        var inventory = new TaskCompletionSource<DashboardAppInventorySnapshot>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            LoadAppInventoryHandler = (_, cancellation) => inventory.Task.WaitAsync(cancellation)
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+
+        await viewModel.EnsureInitializedAsync();
+
+        Assert.Equal("LoadingApps", viewModel.StatusMessage);
+        inventory.SetResult(new DashboardAppInventorySnapshot([], [
+            TestSnapshots.App(ProfileKind.Work, "ru.fourpda.client", "4pda")
+        ]));
+        await AsyncAssert.EventuallyAsync(
+            () => viewModel.WorkAppsCount == 1 && viewModel.StatusMessage == "Updated",
+            "Refresh should report success only after the app inventory has been applied.");
+        Assert.False(viewModel.StatusIsError);
+    }
+
+    [Fact]
+    public async Task Failed_inventory_refresh_keeps_apps_and_never_reports_updated()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            AppInventory = new DashboardAppInventorySnapshot([], [
+                TestSnapshots.App(ProfileKind.Work, "ru.fourpda.client", "4pda")
+            ])
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+        await viewModel.EnsureInitializedAsync();
+        await AsyncAssert.EventuallyAsync(() => viewModel.WorkAppsCount == 1,
+            "The initial work inventory should be available.");
+        var inventory = new TaskCompletionSource<DashboardAppInventorySnapshot>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        services.LoadAppInventoryHandler = (_, cancellation) => inventory.Task.WaitAsync(cancellation);
+        var statuses = new List<string>();
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(viewModel.StatusMessage)) statuses.Add(viewModel.StatusMessage);
+        };
+
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        inventory.SetException(new InvalidOperationException("Work inventory unavailable."));
+        await AsyncAssert.EventuallyAsync(() => viewModel.StatusIsError,
+            "The inventory failure should be reported.");
+
+        Assert.Equal("LoadAppsFailed", viewModel.StatusMessage);
+        Assert.Equal(1, viewModel.WorkAppsCount);
+        Assert.DoesNotContain("Updated", statuses);
+    }
+
+    [Fact]
+    public async Task Inventory_completion_preserves_a_newer_operation_status()
+    {
+        var inventory = new TaskCompletionSource<DashboardAppInventorySnapshot>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            LoadAppInventoryHandler = (_, cancellation) => inventory.Task.WaitAsync(cancellation)
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+        await viewModel.EnsureInitializedAsync();
+        viewModel.StatusMessage = "CopyPersonalToWorkFinished";
+
+        inventory.SetResult(new DashboardAppInventorySnapshot([], [
+            TestSnapshots.App(ProfileKind.Work, "ru.fourpda.client", "4pda")
+        ]));
+        await AsyncAssert.EventuallyAsync(() => viewModel.WorkAppsCount == 1,
+            "The inventory should be applied without replacing a newer status.");
+
+        Assert.Equal("CopyPersonalToWorkFinished", viewModel.StatusMessage);
+    }
+
     // Проверяет обновление счетчиков приложений при применении snapshot каталога.
     [Fact]
     public async Task Dashboard_snapshot_updates_app_counts()

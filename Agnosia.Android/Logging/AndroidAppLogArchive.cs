@@ -52,7 +52,7 @@ public static class AndroidAppLogArchive
         }
     }
 
-    public static void Clear(Context context)
+    public static void Clear(Context context, bool throwOnFailure = false)
     {
         AgnosiaRuntime.Initialize(context);
         lock (Sync)
@@ -68,6 +68,7 @@ public static class AndroidAppLogArchive
                 global::Android.Util.Log.Warn(
                     nameof(AndroidAppLogArchive),
                     $"Log archive clear failed: {exception.Message}");
+                if (throwOnFailure) throw;
             }
         }
     }

@@ -160,6 +160,7 @@ public sealed class AndroidManifestContractTests
                 "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
                 "android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED",
                 "android.permission.PACKAGE_USAGE_STATS",
+                "android.permission.QUERY_ALL_PACKAGES",
                 "android.permission.RECEIVE_BOOT_COMPLETED",
                 "android.permission.REQUEST_INSTALL_PACKAGES",
                 "android.permission.REQUEST_DELETE_PACKAGES",

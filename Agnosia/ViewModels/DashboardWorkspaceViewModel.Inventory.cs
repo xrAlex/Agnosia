@@ -81,6 +81,7 @@ public partial class DashboardWorkspaceViewModel
                     : inventory);
                 HasLoadedInventory = true;
                 IsInventoryLoading = false;
+                if (!StatusIsError && StatusMessage == "LoadingApps") StatusMessage = "Updated";
             }, DispatcherPriority.Background);
         }
         catch (OperationCanceledException) when (inventoryCancellation.IsCancellationRequested)

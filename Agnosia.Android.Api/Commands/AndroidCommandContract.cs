@@ -12,6 +12,8 @@ public static class AndroidCommandContract
     public const string ExtraIsSystem = "is_system";
     public const string ExtraApk = "apk";
     public const string ExtraSplitApks = "split_apks";
+    public const string ExtraReuseExistingWorkCopy = "reuse_existing_work_copy";
+    public const string ExtraSourceVersionCode = "source_version_code";
     public const string ExtraShowAll = "show_all";
     public const string ExtraPreferenceName = "name";
     public const string ExtraPreferenceBoolean = "boolean";
@@ -65,4 +67,6 @@ public static class AndroidCommandContract
     public const string PackageInstallerOperationInstall = "install";
     public const string PackageInstallerOperationUninstall = "uninstall";
     public const string ErrorSystemAppUnsupported = "system_app_unsupported";
+    public const string ErrorAppInventoryUnavailable = "app_inventory_unavailable";
+    public const string ResultCommandErrorCode = "command_error_code";
 }

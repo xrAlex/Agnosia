@@ -1,4 +1,5 @@
 using Android.Content;
+using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Activities;
 
@@ -32,7 +33,11 @@ internal static class PackageInstallerCallbackCoordinator
         DummyActivity? activity;
         lock (Sync)
         {
-            if (!Operations.TryGetValue(operationId, out activity)) return;
+            if (!Operations.TryGetValue(operationId, out activity))
+            {
+                Log.Warn("AgnosiaPkgCallback", $"No activity owns installer callback. operationId={operationId}.");
+                return;
+            }
         }
 
         activity.RunOnUiThread(() => activity.HandlePackageInstallerCallback(new Intent(intent)));

@@ -22,11 +22,11 @@ public sealed partial class DummyActivity
         }
 
         Log.Debug(LogTag, $"Handling signed action={action}, isProfileOwner={_isProfileOwner}.");
-        var hasAuthenticatedIntent = AuthenticationUtility.CheckIntent(Intent);
+        var hasAuthenticatedIntent = AuthenticationUtility.CheckIntent(Intent, out var authenticationFailure);
         if (!hasAuthenticatedIntent)
         {
             Log.Warn(LogTag,
-                $"Rejected signed action={action}: authentication check failed. isProfileOwner={_isProfileOwner}.");
+                $"Rejected signed action={action}: authentication check failed. reason={authenticationFailure}; isProfileOwner={_isProfileOwner}.");
             Finish();
             return;
         }
@@ -56,6 +56,9 @@ public sealed partial class DummyActivity
                     break;
                 case AgnosiaActions.QueryLogs:
                     RunCommandCenterAction(AndroidCommandKind.QueryLogs, "Android не смог получить журнал.");
+                    break;
+                case AgnosiaActions.ClearLogs:
+                    RunCommandCenterAction(AndroidCommandKind.ClearLogs, "Android не смог очистить журнал.");
                     break;
                 case AgnosiaActions.QueryCrossProfilePackages:
                     RunCommandCenterAction(AndroidCommandKind.QueryCrossProfilePackages, "Android не смог получить список межпрофильных пакетов.");
@@ -208,7 +211,8 @@ public sealed partial class DummyActivity
                 {
                     FinishWithError(string.IsNullOrWhiteSpace(result.Message)
                         ? fallbackErrorMessage
-                        : result.Message);
+                        : result.Message,
+                        result.ErrorCode);
                     return;
                 }
 

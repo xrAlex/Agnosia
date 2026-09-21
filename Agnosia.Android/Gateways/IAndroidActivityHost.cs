@@ -13,7 +13,8 @@ public interface IAndroidActivityHost
 
     Type WorkAppFrozenReceiverType { get; }
 
-    Task<AndroidActivityResult> StartForResultAsync(Intent intent, CancellationToken cancellationToken = default);
+    Task<AndroidActivityResult> StartForResultAsync(Intent intent, CancellationToken cancellationToken = default,
+        Action? beforeStart = null);
 
     Task<OperationResult> DisconnectPreparedVpnAsync(CancellationToken cancellationToken = default);
 

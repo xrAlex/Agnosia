@@ -16,6 +16,33 @@ internal static class AndroidProfileAppsPager
         bool showAll,
         CancellationToken cancellationToken)
     {
+        var initial = await QueryPagesAsync(commandRunner, showAll, null, cancellationToken)
+            .ConfigureAwait(false);
+        if (initial.Apps is not null
+            || initial.ErrorCode != AndroidCommandContract.ErrorAppInventoryUnavailable)
+            return initial.Apps;
+
+        var activity = commandRunner.CurrentActivity;
+        var appContext = activity.ApplicationContext ?? activity;
+        var candidates = await Task.Run(
+                () => AndroidWorkProfileAppCandidates.Collect(appContext, cancellationToken),
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (candidates.Length == 0) return null;
+
+        Log.Info(LogTag,
+            $"Retrying work apps with Island-style package lookup. candidates={candidates.Length}, showAll={showAll}.");
+        var fallback = await QueryPagesAsync(commandRunner, showAll, candidates, cancellationToken)
+            .ConfigureAwait(false);
+        return fallback.Apps;
+    }
+
+    private static async Task<QueryAttempt> QueryPagesAsync(
+        AndroidActivityCommandGateway commandRunner,
+        bool showAll,
+        string[]? knownPackageNames,
+        CancellationToken cancellationToken)
+    {
         var apps = new List<AppServiceModel>();
         IReadOnlyList<string> interactionPackages = [];
         var pageToken = Guid.NewGuid().ToString("N");
@@ -28,7 +55,8 @@ internal static class AndroidProfileAppsPager
                 pageToken,
                 offset,
                 QueryAppsPageLimit,
-                QueryAppsMaxJsonBytes);
+                QueryAppsMaxJsonBytes,
+                knownPackageNames);
             var envelope = new AndroidCommandEnvelope(
                 Guid.NewGuid(),
                 AndroidCommandKind.QueryApps,
@@ -42,16 +70,17 @@ internal static class AndroidProfileAppsPager
                 .ConfigureAwait(false);
             if (!result.Succeeded)
             {
-                Log.Warn(LogTag, $"Failed to query work apps page {pageIndex} through command center. diagnostics={result.Diagnostics}");
-                return null;
+                Log.Warn(LogTag, $"Failed to query work apps page {pageIndex} through command center. errorCode={result.ErrorCode}, message={result.Message}, diagnostics={result.Diagnostics}");
+                return new QueryAttempt(null, pageIndex == 0 ? result.ErrorCode : null);
             }
 
             var response = DeserializePayload<QueryAppsResponse>(result.PayloadJson, $"work apps page {pageIndex}");
-            if (response is null) return null;
+            if (response is null) return new QueryAttempt(null, null);
 
             var pageApps = AndroidProfileCommandJson.DeserializeAppServiceModelsResult(
                 response.AppsJson,
-                $"work apps page {pageIndex}") ?? [];
+                $"work apps page {pageIndex}");
+            if (pageApps is null) return new QueryAttempt(null, null);
             apps.AddRange(pageApps);
 
             if (offset == 0)
@@ -59,14 +88,19 @@ internal static class AndroidProfileAppsPager
 
             var hasMore = response.HasMore;
             var nextOffset = response.NextOffset;
-            if (!hasMore) return new ProfileAppsQueryResult(apps, interactionPackages);
+            if (!hasMore)
+            {
+                AndroidKnownWorkPackages.RememberAll(apps.Select(static app => app.PackageName));
+                Log.Info(LogTag, $"Work apps query completed. count={apps.Count}, showAll={showAll}, pages={pageIndex + 1}, source={(knownPackageNames is null ? "bulk" : "known-packages")}.");
+                return new QueryAttempt(new ProfileAppsQueryResult(apps, interactionPackages), null);
+            }
 
             if (nextOffset <= offset)
             {
                 Log.Warn(
                     LogTag,
                     $"Work apps paging stopped because next offset did not advance. page={pageIndex}, offset={offset}, nextOffset={nextOffset}, pageCount={pageApps.Count}.");
-                return null;
+                return new QueryAttempt(null, null);
             }
 
             offset = nextOffset;
@@ -75,8 +109,10 @@ internal static class AndroidProfileAppsPager
         Log.Warn(
             LogTag,
             $"Work apps paging stopped after reaching the page limit. pages={QueryAppsMaxPages}, loadedApps={apps.Count}.");
-        return null;
+        return new QueryAttempt(null, null);
     }
+
+    private sealed record QueryAttempt(ProfileAppsQueryResult? Apps, string? ErrorCode);
 
     private static T? DeserializePayload<T>(string? payloadJson, string description)
     {

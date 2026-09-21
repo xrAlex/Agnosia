@@ -693,7 +693,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
                 StatusMessage = !string.IsNullOrWhiteSpace(profileSnapshot.StatusMessage)
                     ? profileSnapshot.StatusMessage
                     : IsSupported
-                        ? "Updated"
+                        ? IsDashboardVisible ? "LoadingApps" : "Updated"
                         : "NotSupported";
                 StatusIsError = WorkProfileRecovery == WorkProfileRecoveryKind.UpdateFailedDeleteWorkProfile;
 
@@ -1010,14 +1010,13 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             snapshot => _appCommandService.CloneAsync(snapshot),
             app.Profile == ProfileKind.Personal
                 ? "CopyPersonalToWorkFinished"
-                : "CopyWorkToPersonalFinished");
+                : "CopyWorkToPersonalFinished",
+            refreshOnFailure: true);
     }
 
     internal async Task MoveToWorkAsync(AppItemViewModel app)
     {
         if (!app.CanMoveToWork || !TryBeginOperation()) return;
-
-        var shouldRefresh = false;
 
         try
         {
@@ -1027,13 +1026,9 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             {
                 StatusIsError = true;
                 StatusMessage = ResolveOperationMessage(cloneResult.Message, "CloneFailed");
-                if (IsStaleInstallSourceMessage(cloneResult.Message))
-                    await RefreshAfterStaleInstallSourceAsync(StatusMessage);
-
                 return;
             }
 
-            shouldRefresh = true;
             var verificationResult = await _appCommandService.VerifyWorkCopyAsync(snapshot);
             if (!verificationResult.Succeeded)
             {
@@ -1055,24 +1050,23 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         }
         finally
         {
-            if (shouldRefresh)
-                try
-                {
-                    var operationStatusIsError = StatusIsError;
-                    var operationStatusMessage = StatusMessage;
-                    await RefreshDashboardAsync(true);
-                    StatusIsError = operationStatusIsError;
-                    StatusMessage = operationStatusMessage;
-                }
-                catch (Exception ex) when (!StatusIsError)
-                {
-                    StatusIsError = true;
-                    StatusMessage = ResolveExceptionMessage(ex, "RefreshAfterOpFailed");
-                }
-                catch (Exception)
-                {
-                    StatusMessage = $"{StatusMessage}|ManualRefreshHint";
-                }
+            try
+            {
+                var operationStatusIsError = StatusIsError;
+                var operationStatusMessage = StatusMessage;
+                await RefreshDashboardAsync(true);
+                StatusIsError = operationStatusIsError;
+                StatusMessage = operationStatusMessage;
+            }
+            catch (Exception ex) when (!StatusIsError)
+            {
+                StatusIsError = true;
+                StatusMessage = ResolveExceptionMessage(ex, "RefreshAfterOpFailed");
+            }
+            catch (Exception)
+            {
+                StatusMessage = $"{StatusMessage}|ManualRefreshHint";
+            }
 
             try
             {
@@ -1428,12 +1422,14 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         Func<AppSnapshot, Task<OperationResult>> operation,
         string successFallback,
         bool refreshOnSuccess = true,
-        Func<AppSnapshot, AppSnapshot>? updateLocalSnapshot = null)
+        Func<AppSnapshot, AppSnapshot>? updateLocalSnapshot = null,
+        bool refreshOnFailure = false)
     {
         return RunOperationAsync(
             () => operation(app.Snapshot),
             successFallback,
             false,
+            refreshOnFailure: refreshOnFailure,
             refreshOnSuccess: refreshOnSuccess,
             applyLocalSuccess: updateLocalSnapshot is null
                 ? null
@@ -1478,9 +1474,20 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             }
             else if (refreshOnFailure)
             {
-                await RefreshDashboardAsync(true);
-                StatusIsError = true;
-                StatusMessage = string.IsNullOrWhiteSpace(result.Message) ? successFallback : result.Message;
+                var failureMessage = StatusMessage;
+                try
+                {
+                    await RefreshDashboardAsync(true);
+                }
+                catch (Exception)
+                {
+                    failureMessage = $"{failureMessage}|ManualRefreshHint";
+                }
+                finally
+                {
+                    StatusIsError = true;
+                    StatusMessage = failureMessage;
+                }
             }
             else if (IsStaleInstallSourceMessage(result.Message))
                 await RefreshAfterStaleInstallSourceAsync(StatusMessage);

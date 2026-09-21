@@ -38,6 +38,11 @@
     <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
         <Compile Remove="**\*.cs"/>
         <Compile Include="Activities\HiddenAppLaunchPreflight.cs"/>
+        <Compile Include="Activities\NewPackageInstallRecovery.cs"/>
+        <Compile Include="Activities\PackageCopyPreflight.cs"/>
+        <Compile Include="Packages\PackageIdentity.cs"/>
+        <Compile Include="Packages\PackageInventoryMetadata.cs"/>
+        <Compile Include="Packages\PackageInventoryQuery.cs"/>
         <Compile Include="Storage\PendingBooleanSettingsSync.cs"/>
         <Compile Include="Files\AgnosiaFileShuttleContract.cs"/>
         <Compile Include="Files\AgnosiaFileShuttleClientRegistry.cs"/>
@@ -68,6 +73,8 @@
         <Compile Include="Commands\AndroidCommandTargetProfile.cs"/>
         <Compile Include="Commands\AndroidCommandTransportKind.cs"/>
         <Compile Include="Commands\ActivityCommandResultIdentity.cs"/>
+        <Compile Include="Commands\AuthenticatedActivityResultWaiter.cs"/>
+        <Compile Include="Activities\PackageInstallSessionCompletion.cs"/>
         <Compile Include="Commands\CommandResultEnvelopeIdentity.cs"/>
         <Compile Include="Commands\WorkProfileLaunchPreflight.cs"/>
         <Compile Include="Commands\WorkLaunchAcknowledgement.cs"/>
@@ -80,6 +87,7 @@
         <Compile Include="Commands\Handlers\QueryAppsCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\QueryCrossProfilePackagesCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\QueryLogsCommandHandler.cs"/>
+        <Compile Include="Commands\Handlers\ClearLogsCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\QueryPermissionsCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\QueryPackageStateCommandHandler.cs"/>
         <Compile Include="Commands\Transports\DirectLocalCommandTransport.cs"/>
