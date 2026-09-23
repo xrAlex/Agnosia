@@ -140,8 +140,15 @@ public static class AgnosiaUtilities
         storage.SetBoolean(StorageKeys.HasSetup, false);
         storage.SetBoolean(StorageKeys.OnboardingCompleted, false);
         storage.Remove(StorageKeys.SetupStartedAtUtc);
+        storage.Remove(StorageKeys.DirectProfileProvisioning);
         ClearManagedProfileTracking(storage);
         AuthenticationUtility.Reset();
+    }
+
+    internal static bool HasPendingDirectProfileSetup()
+    {
+        var value = ServiceRegistry.GetRequiredService<LocalStorageManager>().GetString(StorageKeys.DirectProfileProvisioning);
+        return DirectProfileProvisioningState.BlocksReadiness(value);
     }
 
     private static void ClearManagedProfileTracking(LocalStorageManager storage)

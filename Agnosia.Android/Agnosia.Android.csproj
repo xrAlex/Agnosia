@@ -97,6 +97,10 @@
         <Compile Include="Infrastructure\AndroidServiceCollectionExtensions.cs"/>
         <Compile Include="InternalsVisibleTo.cs"/>
         <Compile Include="Platform\AuthenticationKeyMaterial.cs"/>
+        <Compile Include="Platform\DirectProfileProvisioningCommands.cs"/>
+        <Compile Include="Platform\DirectProfileProvisioningState.cs"/>
+        <Compile Include="Platform\DirectProfileProvisioningWorkflow.cs"/>
+        <Compile Include="Platform\DirectProfileSetupAuthentication.cs"/>
         <Compile Include="Platform\WorkAppFrozenCallbackPayload.cs"/>
         <Compile Include="Platform\IntentSignatureValueEncoder.cs"/>
         <Compile Include="Platform\AndroidPackageAccessPolicy.cs"/>

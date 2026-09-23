@@ -117,6 +117,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsOperationActive))]
     [NotifyCanExecuteChangedFor(nameof(StartProvisioningCommand))]
     [NotifyCanExecuteChangedFor(nameof(StartOfflineProvisioningCommand))]
+    [NotifyCanExecuteChangedFor(nameof(StartDirectProvisioningCommand))]
     private partial bool IsBusy { get; set; }
 
     [ObservableProperty]
@@ -133,6 +134,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
     [NotifyCanExecuteChangedFor(nameof(StartProvisioningCommand))]
     [NotifyCanExecuteChangedFor(nameof(StartOfflineProvisioningCommand))]
+    [NotifyCanExecuteChangedFor(nameof(StartDirectProvisioningCommand))]
     private partial bool IsSupported { get; set; } = true;
 
     [ObservableProperty]
@@ -163,6 +165,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
     [NotifyCanExecuteChangedFor(nameof(StartProvisioningCommand))]
     [NotifyCanExecuteChangedFor(nameof(StartOfflineProvisioningCommand))]
+    [NotifyCanExecuteChangedFor(nameof(StartDirectProvisioningCommand))]
     public partial bool WorkProfileAvailable { get; set; }
 
     [ObservableProperty]
@@ -956,6 +959,17 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     }
 
     [RelayCommand(CanExecute = nameof(CanStartProvisioning))]
+    private async Task StartDirectProvisioningAsync()
+    {
+        await RunOperationAsync(
+            () => _onboardingService.StartDirectProvisioningAsync(),
+            "ProvisioningStarted",
+            true,
+            true);
+        StartOnboardingMonitorIfNeeded();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanStartProvisioning))]
     private async Task StartOfflineProvisioningAsync()
     {
         await RunOperationAsync(
@@ -1648,6 +1662,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         NotifyOperationStatusChanged();
         StartProvisioningCommand.NotifyCanExecuteChanged();
         StartOfflineProvisioningCommand.NotifyCanExecuteChanged();
+        StartDirectProvisioningCommand.NotifyCanExecuteChanged();
         return true;
     }
 
@@ -1660,6 +1675,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         NotifyOperationStatusChanged();
         StartProvisioningCommand.NotifyCanExecuteChanged();
         StartOfflineProvisioningCommand.NotifyCanExecuteChanged();
+        StartDirectProvisioningCommand.NotifyCanExecuteChanged();
         TryStartPendingWorkAppRefresh();
     }
 

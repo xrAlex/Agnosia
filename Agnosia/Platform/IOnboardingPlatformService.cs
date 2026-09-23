@@ -12,5 +12,7 @@ public interface IOnboardingPlatformService
 
     Task<OperationResult> StartOfflineProvisioningAsync(CancellationToken cancellationToken = default);
 
+    Task<OperationResult> StartDirectProvisioningAsync(CancellationToken cancellationToken = default);
+
     Task<OperationResult> OpenWorkProfileSettingsAsync(CancellationToken cancellationToken = default);
 }

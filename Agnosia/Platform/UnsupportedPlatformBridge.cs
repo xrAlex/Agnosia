@@ -112,6 +112,11 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
         return ProvisioningFailureTask;
     }
 
+    public Task<OperationResult> StartDirectProvisioningAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(OperationResult.Failure("Создание рабочего профиля через root доступно только на Android."));
+    }
+
     public Task<OperationResult> StartOfflineProvisioningAsync(CancellationToken cancellationToken = default)
     {
         return ProvisioningFailureTask;

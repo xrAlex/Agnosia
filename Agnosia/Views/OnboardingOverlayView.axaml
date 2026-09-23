@@ -170,6 +170,8 @@
                                        Text="Создайте рабочий профиль Android" />
                             <TextBlock Classes="page-caption"
                                        Text="Agnosia откроет системную настройку Android. Если нет интернета, выберите создание офлайн. Завершите настройку, затем вернитесь в приложение." />
+                            <TextBlock Classes="page-caption"
+                                       Text="На устройстве с root можно создать профиль без системного мастера. Нажмите «Создать через root» и разрешите Agnosia root-доступ при запросе." />
                         </StackPanel>
                     </Border>
 
@@ -346,8 +348,8 @@
                 Background="{StaticResource AppChromeBrush}"
                 BorderBrush="{StaticResource AppBorderSoftBrush}"
                 BorderThickness="0,1,0,0"
-                Height="72">
-            <Grid Margin="18,0"
+                MinHeight="72">
+            <Grid Margin="18,12"
                   HorizontalAlignment="Stretch"
                   VerticalAlignment="Center"
                   ColumnDefinitions="Auto,*,Auto"
@@ -374,13 +376,16 @@
                                Text="Далее" />
                 </Button>
 
-                <StackPanel Grid.Column="2"
-                            Orientation="Horizontal"
-                            Spacing="8"
-                            HorizontalAlignment="Right"
-                            IsVisible="{Binding IsOnboardingWorkProfileStep}">
+                <Grid Grid.Column="0"
+                      Grid.ColumnSpan="3"
+                      ColumnDefinitions="*,*"
+                      RowDefinitions="Auto,Auto"
+                      ColumnSpacing="8"
+                      RowSpacing="8"
+                      IsVisible="{Binding IsOnboardingWorkProfileStep}">
                     <Button AutomationProperties.Name="Создать офлайн"
-                            Width="136"
+                            Grid.Column="0"
+                            HorizontalAlignment="Stretch"
                             Height="44"
                             MinHeight="44"
                             Padding="8,4"
@@ -393,7 +398,8 @@
                                    Text="Создать офлайн" />
                     </Button>
                     <Button AutomationProperties.Name="Создать профиль" Classes="primary"
-                            Width="136"
+                            Grid.Column="1"
+                            HorizontalAlignment="Stretch"
                             Height="44"
                             MinHeight="44"
                             Padding="8,4"
@@ -405,7 +411,21 @@
                                    TextAlignment="Center"
                                    Text="Создать профиль" />
                     </Button>
-                </StackPanel>
+                    <Button AutomationProperties.Name="Создать через root"
+                            Grid.Row="1"
+                            Grid.ColumnSpan="2"
+                            HorizontalAlignment="Stretch"
+                            Height="44"
+                            MinHeight="44"
+                            Padding="8,4"
+                            Command="{Binding StartDirectProvisioningCommand}"
+                            IsEnabled="{Binding CanStartProvisioning}">
+                        <TextBlock Classes="button-label"
+                                   FontSize="13"
+                                   TextAlignment="Center"
+                                   Text="Создать через root" />
+                    </Button>
+                </Grid>
 
                 <Button AutomationProperties.Name="Далее" Classes="primary"
                         Grid.Column="2"

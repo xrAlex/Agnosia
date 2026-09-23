@@ -84,6 +84,10 @@ public sealed class TestPlatformServices :
 
     public int StartOfflineProvisioningCallCount { get; private set; }
 
+    public int StartDirectProvisioningCallCount { get; private set; }
+
+    public Func<Task<OperationResult>>? DirectProvisioningHandler { get; set; }
+
     public int OpenWorkProfileSettingsCallCount { get; private set; }
 
     public List<AppSnapshot> CloneRequests { get; } = [];
@@ -208,6 +212,12 @@ public sealed class TestPlatformServices :
         StartProvisioningCallCount++;
 
         return Task.FromResult(DefaultOperationResult);
+    }
+
+    public Task<OperationResult> StartDirectProvisioningAsync(CancellationToken cancellationToken = default)
+    {
+        StartDirectProvisioningCallCount++;
+        return DirectProvisioningHandler?.Invoke() ?? Task.FromResult(DefaultOperationResult);
     }
 
     public Task<OperationResult> StartOfflineProvisioningAsync(CancellationToken cancellationToken = default)

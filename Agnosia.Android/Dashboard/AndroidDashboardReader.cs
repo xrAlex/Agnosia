@@ -28,6 +28,11 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         if (!isSupported) return DashboardSnapshot.Unsupported;
 
         var settings = appSettingsSnapshot ?? AppSettingsSnapshot.Default;
+        if (AgnosiaUtilities.HasPendingDirectProfileSetup())
+            return new DashboardSnapshot(true, false, AndroidProvisioningCoordinator.IsProvisioningInProgress,
+                false, WorkProfileStateKind.Unavailable, WorkProfileRecoveryKind.DeleteWorkProfile,
+                "directProvisioning=pending; retry root setup to complete policies and authentication",
+                [], [], settings);
         var profileDiagnostics = workProfileDiagnostics
                                  ?? throw new InvalidOperationException("Profile diagnostics were not loaded.");
         var ownerCheck = await ReadWorkProfileOwnerCheckAsync(
@@ -362,6 +367,8 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
 
     private static void SynchronizeStorageWithResolvedState(WorkProfileStateKind workProfileState)
     {
+        // Dashboard polling must not erase the key or journal while root setup is in progress or resumable.
+        if (AndroidProvisioningCoordinator.IsProvisioningInProgress || AgnosiaUtilities.HasPendingDirectProfileSetup()) return;
         switch (workProfileState)
         {
             case WorkProfileStateKind.Available:

@@ -299,6 +299,63 @@ public sealed class DashboardWorkspaceScenarioTests
         Assert.True(viewModel.IsOnboardingVisible);
     }
 
+    [Fact]
+    public async Task StartDirectProvisioningCommand_shows_root_denial_and_reenables_creation()
+    {
+        var services = new TestPlatformServices
+        {
+            OnboardingCompleted = false,
+            DashboardProfile = TestSnapshots.Dashboard(hasSetup: false, workProfileAvailable: false,
+                workProfileState: WorkProfileStateKind.NoWorkProfile),
+            DefaultOperationResult = OperationResult.Failure("Root-доступ не предоставлен.")
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+        await viewModel.EnsureInitializedAsync();
+        viewModel.StartOnboardingCommand.Execute(null);
+
+        await viewModel.StartDirectProvisioningCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, services.StartDirectProvisioningCallCount);
+        Assert.Equal(0, services.StartProvisioningCallCount);
+        Assert.Equal(0, services.StartOfflineProvisioningCallCount);
+        Assert.True(viewModel.StatusIsError);
+        Assert.Equal("Root-доступ не предоставлен.", viewModel.StatusMessage);
+        Assert.True(viewModel.StartDirectProvisioningCommand.CanExecute(null));
+        Assert.True(viewModel.IsOnboardingWorkProfileStep);
+    }
+
+    [Fact]
+    public async Task StartDirectProvisioningCommand_is_disabled_while_busy_and_after_profile_is_ready()
+    {
+        var completion = new TaskCompletionSource<OperationResult>();
+        var services = new TestPlatformServices
+        {
+            OnboardingCompleted = false,
+            DashboardProfile = TestSnapshots.Dashboard(hasSetup: false, workProfileAvailable: false,
+                workProfileState: WorkProfileStateKind.NoWorkProfile),
+            DirectProvisioningHandler = () => completion.Task,
+            Permissions = TestSnapshots.RequiredOnboardingPermissions(granted: false)
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+        await viewModel.EnsureInitializedAsync();
+        viewModel.StartOnboardingCommand.Execute(null);
+        var operation = viewModel.StartDirectProvisioningCommand.ExecuteAsync(null);
+        Assert.False(viewModel.StartDirectProvisioningCommand.CanExecute(null));
+        Assert.False(viewModel.StartProvisioningCommand.CanExecute(null));
+        Assert.False(viewModel.StartOfflineProvisioningCommand.CanExecute(null));
+        services.DashboardProfile = TestSnapshots.Dashboard(hasSetup: true, workProfileAvailable: true,
+            workProfileState: WorkProfileStateKind.Available);
+        completion.SetResult(OperationResult.Success("Рабочий профиль подключен."));
+        await operation;
+
+        Assert.False(viewModel.StatusIsError);
+        Assert.True(viewModel.WorkProfileAvailable);
+        Assert.False(viewModel.StartDirectProvisioningCommand.CanExecute(null));
+        // Drive the same state check as the monitor without relying on the global Avalonia dispatcher in a unit test.
+        await viewModel.CheckOnboardingWorkProfileCommand.ExecuteAsync(null);
+        Assert.True(viewModel.IsOnboardingPermissionsStep);
+    }
+
     // Проверяет, что кнопка создания профиля не блокируется stale recovery-состоянием:
     // Android provisioning сам решает, можно ли создать новый профиль после удаления старого.
     [Fact]

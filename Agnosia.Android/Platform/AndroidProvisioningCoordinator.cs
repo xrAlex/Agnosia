@@ -14,6 +14,9 @@ internal sealed class AndroidProvisioningCoordinator(
     private const string ManagedProfileSettingsAction = "android.settings.MANAGED_PROFILE_SETTINGS";
     private const int ProvisioningWarmupAttempts = 5;
     private const int ProvisioningWarmupDelayMilliseconds = 2000;
+    private static readonly SemaphoreSlim ProvisioningLock = new(1, 1);
+
+    internal static bool IsProvisioningInProgress => ProvisioningLock.CurrentCount == 0;
 
     public Task<OperationResult> StartProvisioningAsync(CancellationToken cancellationToken = default)
     {
@@ -25,11 +28,71 @@ internal sealed class AndroidProvisioningCoordinator(
         return StartProvisioningAsync(true, cancellationToken);
     }
 
+    public async Task<OperationResult> StartDirectProvisioningAsync(CancellationToken cancellationToken = default)
+    {
+        if (!await ProvisioningLock.WaitAsync(0, cancellationToken).ConfigureAwait(false))
+            return OperationResult.Failure("Создание рабочего профиля уже выполняется.");
+        AndroidDirectProfileProvisioningStore? store = null;
+        try
+        {
+            var activity = GetInitializedActivity();
+            var packageName = activity.PackageName;
+            if (string.IsNullOrWhiteSpace(packageName) || AndroidSystemApi.GetUserManager(activity)?.IsManagedProfile != false)
+                return OperationResult.Failure("Создание через root нужно запускать из личного профиля.");
+            store = new AndroidDirectProfileProvisioningStore(ServiceRegistry.GetRequiredService<LocalStorageManager>(),
+                Settings.Global.GetInt(activity.ContentResolver, Settings.Global.BootCount, -1));
+            var admin = AgnosiaUtilities.GetAdminComponent(activity, getActivityHost().AdminReceiverType).FlattenToString()
+                        ?? throw new InvalidOperationException("Missing device admin component.");
+            AndroidQueryCache.Shared.ClearOwnerCheck();
+            var workflow = new DirectProfileProvisioningWorkflow(new AndroidRootCommandRunner(), store,
+                packageName, admin, async (_, token) =>
+                {
+                    AndroidQueryCache.Shared.ClearOwnerCheck();
+                    return await WaitForWorkProfileAvailabilityAsync(token, attempts: 10).ConfigureAwait(false);
+                });
+            var result = await workflow.RunAsync(global::Android.OS.Process.MyUserHandle()?.GetHashCode() ?? -1, cancellationToken)
+                .ConfigureAwait(false);
+            if (result.Succeeded) AgnosiaUtilities.MarkWorkProfileReady();
+            else if (store.DidWrite) AgnosiaUtilities.MarkWorkProfileResetRequired();
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            if (store?.DidWrite == true) AgnosiaUtilities.MarkWorkProfileResetRequired();
+            throw;
+        }
+        finally { ProvisioningLock.Release(); }
+    }
+
     private async Task<OperationResult> StartProvisioningAsync(bool allowOffline, CancellationToken cancellationToken)
+    {
+        if (!await ProvisioningLock.WaitAsync(0, cancellationToken).ConfigureAwait(false))
+            return OperationResult.Failure("Создание рабочего профиля уже выполняется.");
+        try { return await StartSystemProvisioningAsync(allowOffline, cancellationToken).ConfigureAwait(false); }
+        finally { ProvisioningLock.Release(); }
+    }
+
+    private async Task<OperationResult> StartSystemProvisioningAsync(bool allowOffline, CancellationToken cancellationToken)
     {
         var host = getActivityHost();
         var activity = host.CurrentActivity;
         AgnosiaRuntime.Initialize(activity);
+
+        // The system wizard must not clear an uncertain root operation or race its delayed Binder work.
+        var pendingDirect = ServiceRegistry.GetRequiredService<LocalStorageManager>().GetString(StorageKeys.DirectProfileProvisioning);
+        if (pendingDirect is not null)
+        {
+            try
+            {
+                if (DirectProfileProvisioningState.Decode(pendingDirect).RequiresReboot(
+                        Settings.Global.GetInt(activity.ContentResolver, Settings.Global.BootCount, -1)))
+                    return OperationResult.Failure("Результат предыдущей root-команды не подтверждён. Перезагрузите устройство перед созданием профиля.");
+            }
+            catch (FormatException)
+            {
+                return OperationResult.Failure("Не удалось прочитать состояние предыдущей настройки рабочего профиля.");
+            }
+        }
 
         if (AndroidSystemApi.GetDevicePolicyManager(activity) is not { } policyManager)
             return OperationResult.Failure("На этом устройстве недоступны API политики устройства.");
@@ -95,6 +158,7 @@ internal sealed class AndroidProvisioningCoordinator(
 
     private static string PrepareProvisioningAuthentication()
     {
+        ServiceRegistry.GetRequiredService<LocalStorageManager>().RemoveDurably(StorageKeys.DirectProfileProvisioning);
         var authKey = AuthenticationUtility.CreateAndStoreKey();
         AuthenticationUtility.Reset();
         AgnosiaUtilities.MarkWorkProfileSetupStarted();

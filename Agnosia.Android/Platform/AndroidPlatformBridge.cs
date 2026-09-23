@@ -135,6 +135,11 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         return _provisioningCoordinator.StartProvisioningAsync(cancellationToken);
     }
 
+    public Task<OperationResult> StartDirectProvisioningAsync(CancellationToken cancellationToken = default)
+    {
+        return _provisioningCoordinator.StartDirectProvisioningAsync(cancellationToken);
+    }
+
     public Task<OperationResult> StartOfflineProvisioningAsync(CancellationToken cancellationToken = default)
     {
         return _provisioningCoordinator.StartOfflineProvisioningAsync(cancellationToken);
