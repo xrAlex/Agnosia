@@ -86,6 +86,8 @@ public sealed class TestPlatformServices :
 
     public int StartProvisioningCallCount { get; private set; }
 
+    public int StartOfflineProvisioningCallCount { get; private set; }
+
     public int OpenWorkProfileSettingsCallCount { get; private set; }
 
     public List<AppSnapshot> CloneRequests { get; } = [];
@@ -219,6 +221,13 @@ public sealed class TestPlatformServices :
     public Task<OperationResult> StartProvisioningAsync(CancellationToken cancellationToken = default)
     {
         StartProvisioningCallCount++;
+
+        return Task.FromResult(DefaultOperationResult);
+    }
+
+    public Task<OperationResult> StartOfflineProvisioningAsync(CancellationToken cancellationToken = default)
+    {
+        StartOfflineProvisioningCallCount++;
 
         return Task.FromResult(DefaultOperationResult);
     }

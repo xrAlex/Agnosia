@@ -17,10 +17,13 @@ public static class AndroidProvisioningApi
     public static void ConfigureManagedProfileProvisioningIntent(
         Intent intent,
         ComponentName adminComponent,
-        string authKey)
+        string authKey,
+        bool allowOffline)
     {
         intent.PutExtra(DevicePolicyManager.ExtraProvisioningDeviceAdminComponentName, adminComponent);
         intent.PutExtra(DevicePolicyManager.ExtraProvisioningSkipEncryption, true);
+        if (allowOffline && OperatingSystem.IsAndroidVersionAtLeast(33))
+            intent.PutExtra(DevicePolicyManager.ExtraProvisioningAllowOffline, true);
 
         var adminExtras = new PersistableBundle();
         adminExtras.PutString(ProvisioningAuthKeyExtra, authKey);

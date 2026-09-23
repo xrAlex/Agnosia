@@ -169,7 +169,7 @@
                             <TextBlock Classes="section-title"
                                        Text="Создайте рабочий профиль Android" />
                             <TextBlock Classes="page-caption"
-                                       Text="Agnosia откроет системную настройку Android. Завершите её, затем вернитесь в приложение." />
+                                       Text="Agnosia откроет системную настройку Android. Если нет интернета, выберите создание офлайн. Завершите настройку, затем вернитесь в приложение." />
                         </StackPanel>
                     </Border>
 
@@ -374,19 +374,38 @@
                                Text="Далее" />
                 </Button>
 
-                <Button AutomationProperties.Name="Открыть настройки" Classes="primary"
-                        Grid.Column="2"
-                        Width="172"
-                        Height="44"
-                        MinHeight="44"
-                        HorizontalAlignment="Right"
-                        IsVisible="{Binding IsOnboardingWorkProfileStep}"
-                        Command="{Binding StartProvisioningCommand}"
-                        IsEnabled="{Binding CanStartProvisioning}">
-                    <TextBlock Classes="button-label"
-                               TextAlignment="Center"
-                               Text="Открыть настройки" />
-                </Button>
+                <StackPanel Grid.Column="2"
+                            Orientation="Horizontal"
+                            Spacing="8"
+                            HorizontalAlignment="Right"
+                            IsVisible="{Binding IsOnboardingWorkProfileStep}">
+                    <Button AutomationProperties.Name="Создать офлайн"
+                            Width="136"
+                            Height="44"
+                            MinHeight="44"
+                            Padding="8,4"
+                            Command="{Binding StartOfflineProvisioningCommand}"
+                            IsEnabled="{Binding CanStartProvisioning}">
+                        <TextBlock Classes="button-label"
+                                   FontSize="13"
+                                   TextWrapping="NoWrap"
+                                   TextAlignment="Center"
+                                   Text="Создать офлайн" />
+                    </Button>
+                    <Button AutomationProperties.Name="Создать профиль" Classes="primary"
+                            Width="136"
+                            Height="44"
+                            MinHeight="44"
+                            Padding="8,4"
+                            Command="{Binding StartProvisioningCommand}"
+                            IsEnabled="{Binding CanStartProvisioning}">
+                        <TextBlock Classes="button-label"
+                                   FontSize="13"
+                                   TextWrapping="NoWrap"
+                                   TextAlignment="Center"
+                                   Text="Создать профиль" />
+                    </Button>
+                </StackPanel>
 
                 <Button AutomationProperties.Name="Далее" Classes="primary"
                         Grid.Column="2"

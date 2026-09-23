@@ -116,6 +116,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
     [NotifyPropertyChangedFor(nameof(IsOperationActive))]
     [NotifyCanExecuteChangedFor(nameof(StartProvisioningCommand))]
+    [NotifyCanExecuteChangedFor(nameof(StartOfflineProvisioningCommand))]
     private partial bool IsBusy { get; set; }
 
     [ObservableProperty]
@@ -131,6 +132,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(OverallStatusText))]
     [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
     [NotifyCanExecuteChangedFor(nameof(StartProvisioningCommand))]
+    [NotifyCanExecuteChangedFor(nameof(StartOfflineProvisioningCommand))]
     private partial bool IsSupported { get; set; } = true;
 
     [ObservableProperty]
@@ -152,12 +154,15 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(WorkProfileStatusText))]
     [NotifyPropertyChangedFor(nameof(OverviewHeadline))]
+    [NotifyPropertyChangedFor(nameof(CanStartProvisioning))]
     [NotifyPropertyChangedFor(nameof(CanContinueOnboardingFromWorkProfile))]
     [NotifyPropertyChangedFor(nameof(IsOnboardingWorkProfileStep))]
     [NotifyPropertyChangedFor(nameof(IsOnboardingPermissionsStep))]
     [NotifyPropertyChangedFor(nameof(OnboardingStepLabel))]
     [NotifyPropertyChangedFor(nameof(OverallStatusText))]
     [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
+    [NotifyCanExecuteChangedFor(nameof(StartProvisioningCommand))]
+    [NotifyCanExecuteChangedFor(nameof(StartOfflineProvisioningCommand))]
     public partial bool WorkProfileAvailable { get; set; }
 
     [ObservableProperty]
@@ -950,6 +955,17 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         StartOnboardingMonitorIfNeeded();
     }
 
+    [RelayCommand(CanExecute = nameof(CanStartProvisioning))]
+    private async Task StartOfflineProvisioningAsync()
+    {
+        await RunOperationAsync(
+            () => _onboardingService.StartOfflineProvisioningAsync(),
+            "ProvisioningStarted",
+            true,
+            true);
+        StartOnboardingMonitorIfNeeded();
+    }
+
     [RelayCommand]
     private async Task OpenWorkProfileSettingsAsync()
     {
@@ -1631,6 +1647,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(CanStartProvisioning));
         NotifyOperationStatusChanged();
         StartProvisioningCommand.NotifyCanExecuteChanged();
+        StartOfflineProvisioningCommand.NotifyCanExecuteChanged();
         return true;
     }
 
@@ -1642,6 +1659,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(CanStartProvisioning));
         NotifyOperationStatusChanged();
         StartProvisioningCommand.NotifyCanExecuteChanged();
+        StartOfflineProvisioningCommand.NotifyCanExecuteChanged();
         TryStartPendingWorkAppRefresh();
     }
 

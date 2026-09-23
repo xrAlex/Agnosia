@@ -276,6 +276,29 @@ public sealed class DashboardWorkspaceScenarioTests
         Assert.True(viewModel.IsOnboardingVisible);
     }
 
+    [Fact]
+    public async Task StartOfflineProvisioningCommand_requests_offline_profile_creation()
+    {
+        var services = new TestPlatformServices
+        {
+            OnboardingCompleted = true,
+            DashboardProfile = TestSnapshots.Dashboard(
+                hasSetup: false,
+                workProfileAvailable: false,
+                workProfileState: WorkProfileStateKind.NoWorkProfile),
+            DefaultOperationResult = OperationResult.Success("ProvisioningStarted")
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+        await viewModel.EnsureInitializedAsync();
+
+        await viewModel.StartOfflineProvisioningCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, services.StartOfflineProvisioningCallCount);
+        Assert.Equal(0, services.StartProvisioningCallCount);
+        Assert.False(viewModel.StatusIsError);
+        Assert.True(viewModel.IsOnboardingVisible);
+    }
+
     // Проверяет, что кнопка создания профиля не блокируется stale recovery-состоянием:
     // Android provisioning сам решает, можно ли создать новый профиль после удаления старого.
     [Fact]

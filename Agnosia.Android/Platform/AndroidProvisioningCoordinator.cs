@@ -15,7 +15,17 @@ internal sealed class AndroidProvisioningCoordinator(
     private const int ProvisioningWarmupAttempts = 5;
     private const int ProvisioningWarmupDelayMilliseconds = 2000;
 
-    public async Task<OperationResult> StartProvisioningAsync(CancellationToken cancellationToken = default)
+    public Task<OperationResult> StartProvisioningAsync(CancellationToken cancellationToken = default)
+    {
+        return StartProvisioningAsync(false, cancellationToken);
+    }
+
+    public Task<OperationResult> StartOfflineProvisioningAsync(CancellationToken cancellationToken = default)
+    {
+        return StartProvisioningAsync(true, cancellationToken);
+    }
+
+    private async Task<OperationResult> StartProvisioningAsync(bool allowOffline, CancellationToken cancellationToken)
     {
         var host = getActivityHost();
         var activity = host.CurrentActivity;
@@ -27,8 +37,11 @@ internal sealed class AndroidProvisioningCoordinator(
         if (!AndroidProvisioningApi.CanStartManagedProfileProvisioning(policyManager))
             return CreateProvisioningBlockedResult(activity);
 
+        if (allowOffline && !OperatingSystem.IsAndroidVersionAtLeast(33))
+            return OperationResult.Failure("Создание рабочего профиля офлайн доступно на Android 13 и новее.");
+
         var authKey = PrepareProvisioningAuthentication();
-        var intent = CreateManagedProfileProvisioningIntent(activity, host.AdminReceiverType, authKey);
+        var intent = CreateManagedProfileProvisioningIntent(activity, host.AdminReceiverType, authKey, allowOffline);
         var result = await commandRunner.StartExternalActivityForResultAsync(
                 intent,
                 cancellationToken,
@@ -92,13 +105,15 @@ internal sealed class AndroidProvisioningCoordinator(
     private static Intent CreateManagedProfileProvisioningIntent(
         Activity activity,
         Type adminReceiverType,
-        string authKey)
+        string authKey,
+        bool allowOffline)
     {
         var intent = new Intent(DevicePolicyManager.ActionProvisionManagedProfile);
         AndroidProvisioningApi.ConfigureManagedProfileProvisioningIntent(
             intent,
             AgnosiaUtilities.GetAdminComponent(activity, adminReceiverType),
-            authKey);
+            authKey,
+            allowOffline);
         return intent;
     }
 

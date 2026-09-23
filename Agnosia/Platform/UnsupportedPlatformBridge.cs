@@ -112,6 +112,11 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
         return ProvisioningFailureTask;
     }
 
+    public Task<OperationResult> StartOfflineProvisioningAsync(CancellationToken cancellationToken = default)
+    {
+        return ProvisioningFailureTask;
+    }
+
     public Task<OperationResult> OpenWorkProfileSettingsAsync(CancellationToken cancellationToken = default)
     {
         return ProvisioningFailureTask;
