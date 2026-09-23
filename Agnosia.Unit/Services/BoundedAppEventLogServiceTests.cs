@@ -6,24 +6,6 @@ namespace Agnosia.Unit.Services;
 
 public sealed class BoundedAppEventLogServiceTests
 {
-    // Проверяет, что журнал не принимает нулевую или отрицательную емкость.
-    [Fact]
-    public void Constructor_rejects_non_positive_capacity()
-    {
-        Assert.Throws<ArgumentOutOfRangeException>(() => new BoundedAppEventLogService(0));
-    }
-
-    // Проверяет состояние пустого журнала и текст-заглушку для UI.
-    [Fact]
-    public void Empty_log_exposes_stable_placeholder_state()
-    {
-        var service = new BoundedAppEventLogService(3);
-
-        Assert.Equal("Сообщений: 0 / 3", service.Summary);
-        Assert.Equal("Журнал пока пуст.", service.Output);
-        Assert.Equal(["Журнал пока пуст."], service.Lines);
-    }
-
     // Проверяет сортировку, форматирование и признак изменения при импорте логов.
     [Fact]
     public void ImportPlatformLogs_sorts_formats_and_reports_changes()

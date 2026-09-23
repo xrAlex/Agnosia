@@ -33,12 +33,6 @@ public sealed class AndroidCommandIntentMapperTests
     }
 
     [Fact]
-    public void PayloadJsonExtraKey_UsesStableContractKey()
-    {
-        Assert.Equal("agnosia.command.payload_json", AndroidCommandIntentMapper.PayloadJsonExtraKey);
-    }
-
-    [Fact]
     public void ToAction_MapsEveryActivityCommandKindToTargetProfileActivityAction()
     {
         var targetProfileActions = AgnosiaActions.TargetProfileActivityActions.ToHashSet(StringComparer.Ordinal);

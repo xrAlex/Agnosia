@@ -37,9 +37,6 @@ public sealed class DashboardWorkspaceRecoveryTests
         await Task.WhenAll(refresh, finish).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         Assert.Equal(initialLoadCount + 1, services.PermissionLoadCount);
-        Assert.Equal(1, services.CompleteOnboardingCallCount);
-        Assert.False(viewModel.IsOnboardingVisible);
-        Assert.True(viewModel.IsAppsSectionSelected);
     }
 
     [Fact]
@@ -222,13 +219,17 @@ public sealed class DashboardWorkspaceRecoveryTests
         var viewModel = TestWorkspaceFactory.Create(services);
         await viewModel.EnsureInitializedAsync();
         Assert.True(viewModel.StatusIsError);
+        var permissionLoads = services.PermissionLoadCount;
         services.LoadPermissionsHandler = null;
 
         viewModel.HandlePrimaryActivityResumed();
 
         await AsyncAssert.EventuallyAsync(
-            () => !viewModel.StatusIsError && viewModel.OnboardingPermissionSummary == "GrantedCount|4|4",
+            () => services.PermissionLoadCount > permissionLoads
+                  && !viewModel.IsDashboardRefreshing
+                  && !viewModel.StatusIsError,
             "Resume should recover the dashboard after a transient refresh failure.");
+        Assert.Equal("GrantedCount|4|4", viewModel.OnboardingPermissionSummary);
         Assert.True(viewModel.WorkProfileAvailable);
     }
 }

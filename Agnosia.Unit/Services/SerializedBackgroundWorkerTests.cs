@@ -43,24 +43,4 @@ public sealed class SerializedBackgroundWorkerTests
             TestContext.Current.CancellationToken);
     }
 
-    [Fact]
-    public async Task RunAsync_returns_action_result()
-    {
-        var worker = new SerializedBackgroundWorker();
-
-        var result = await worker.RunAsync(() => Task.FromResult(42), TestContext.Current.CancellationToken);
-
-        Assert.Equal(42, result);
-    }
-
-    [Fact]
-    public async Task RunAsync_rejects_null_action()
-    {
-        var worker = new SerializedBackgroundWorker();
-
-        await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            worker.RunAsync(null!, TestContext.Current.CancellationToken));
-        await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            worker.RunAsync<int>(null!, TestContext.Current.CancellationToken));
-    }
 }

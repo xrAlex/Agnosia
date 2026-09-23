@@ -54,8 +54,6 @@ public sealed class TestPlatformServices :
 
     public Func<CancellationToken, Task<IReadOnlyList<PermissionSnapshot>>>? LoadPermissionsHandler { get; set; }
 
-    public Func<CancellationToken, Task<OperationResult>>? CompleteOnboardingHandler { get; set; }
-
     public Func<AppSnapshot, CancellationToken, Task<OperationResult>>? CloneHandler { get; set; }
 
     public Func<AppSnapshot, CancellationToken, Task<OperationResult>>? VerifyWorkCopyHandler { get; set; }
@@ -71,8 +69,6 @@ public sealed class TestPlatformServices :
     public Func<AppSnapshot, CancellationToken, Task<OperationResult>>? LaunchHandler { get; set; }
 
     public Func<AppSnapshot, bool, CancellationToken, Task<OperationResult>>? SetLockdownInternetAccessHandler { get; set; }
-
-    public Func<AppSnapshot, CancellationToken, Task<OperationResult>>? RevokeRuntimePermissionsHandler { get; set; }
 
     public int DashboardProfileLoadCount { get; private set; }
 
@@ -98,17 +94,9 @@ public sealed class TestPlatformServices :
 
     public List<string> AppCommandCalls { get; } = [];
 
-    public List<(AppSnapshot App, bool Hidden)> SetFrozenRequests { get; } = [];
-
-    public List<AppSnapshot> ForceFreezeRequests { get; } = [];
-
     public List<AppSnapshot> CreateShortcutRequests { get; } = [];
 
     public List<AppSnapshot> LaunchRequests { get; } = [];
-
-    public List<AppSnapshot> RevokeRuntimePermissionsRequests { get; } = [];
-
-    public List<(AppSnapshot App, bool Enabled)> SetInteractionAccessRequests { get; } = [];
 
     public List<(AppSnapshot App, bool Blocked)> SetLockdownInternetAccessRequests { get; } = [];
 
@@ -124,7 +112,6 @@ public sealed class TestPlatformServices :
 
     public Func<AppSettingsSnapshot, CancellationToken, Task<OperationResult>>? SaveSettingsHandler { get; set; }
     public int OpenDocumentsUiRequests { get; private set; }
-    public Func<CancellationToken, Task<OperationResult>>? OpenDocumentsUiHandler { get; set; }
     public int ModuleLoadCount { get; private set; }
     public Func<CancellationToken, Task<IReadOnlyList<AgnosiaModuleSnapshot>>>? LoadModulesHandler { get; set; }
     public List<(AgnosiaModuleKind Module, bool Enabled)> SetModuleEnabledRequests { get; } = [];
@@ -213,9 +200,7 @@ public sealed class TestPlatformServices :
     {
         CompleteOnboardingCallCount++;
 
-        return CompleteOnboardingHandler is null
-            ? Task.FromResult(DefaultOperationResult)
-            : CompleteOnboardingHandler(cancellationToken);
+        return Task.FromResult(DefaultOperationResult);
     }
 
     public Task<OperationResult> StartProvisioningAsync(CancellationToken cancellationToken = default)
@@ -276,8 +261,6 @@ public sealed class TestPlatformServices :
         bool hidden,
         CancellationToken cancellationToken = default)
     {
-        SetFrozenRequests.Add((app, hidden));
-
         return SetFrozenHandler is null
             ? Task.FromResult(DefaultOperationResult)
             : SetFrozenHandler(app, hidden, cancellationToken);
@@ -285,8 +268,6 @@ public sealed class TestPlatformServices :
 
     public Task<OperationResult> ForceFreezeAsync(AppSnapshot app, CancellationToken cancellationToken = default)
     {
-        ForceFreezeRequests.Add(app);
-
         return ForceFreezeHandler is null
             ? Task.FromResult(DefaultOperationResult)
             : ForceFreezeHandler(app, cancellationToken);
@@ -315,8 +296,6 @@ public sealed class TestPlatformServices :
         bool enabled,
         CancellationToken cancellationToken = default)
     {
-        SetInteractionAccessRequests.Add((app, enabled));
-
         return Task.FromResult(DefaultOperationResult);
     }
 
@@ -336,11 +315,7 @@ public sealed class TestPlatformServices :
         AppSnapshot app,
         CancellationToken cancellationToken = default)
     {
-        RevokeRuntimePermissionsRequests.Add(app);
-
-        return RevokeRuntimePermissionsHandler is null
-            ? Task.FromResult(DefaultOperationResult)
-            : RevokeRuntimePermissionsHandler(app, cancellationToken);
+        return Task.FromResult(DefaultOperationResult);
     }
 
     public Task<OperationResult> SaveSettingsAsync(
@@ -358,9 +333,7 @@ public sealed class TestPlatformServices :
     {
         OpenDocumentsUiRequests++;
 
-        return OpenDocumentsUiHandler is null
-            ? Task.FromResult(DefaultOperationResult)
-            : OpenDocumentsUiHandler(cancellationToken);
+        return Task.FromResult(DefaultOperationResult);
     }
 
     public Task<IReadOnlyList<AgnosiaModuleSnapshot>> LoadModulesAsync(CancellationToken cancellationToken = default)

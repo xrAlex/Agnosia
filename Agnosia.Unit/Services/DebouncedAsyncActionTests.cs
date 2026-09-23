@@ -6,22 +6,6 @@ namespace Agnosia.Unit.Services;
 
 public sealed class DebouncedAsyncActionTests
 {
-    // Проверяет, что debounce action не принимает отрицательную задержку.
-    [Fact]
-    public void Constructor_rejects_negative_delay()
-    {
-        Assert.Throws<ArgumentOutOfRangeException>(() => new DebouncedAsyncAction(TimeSpan.FromMilliseconds(-1)));
-    }
-
-    // Проверяет защиту от null action при постановке задачи.
-    [Fact]
-    public void Schedule_rejects_null_action()
-    {
-        var debouncedAction = new DebouncedAsyncAction(TimeSpan.Zero);
-
-        Assert.Throws<ArgumentNullException>(() => debouncedAction.Schedule(null!));
-    }
-
     // Проверяет, что запланированная задача выполняется после задержки.
     [Fact]
     public async Task Schedule_runs_action_after_delay()

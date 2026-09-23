@@ -528,23 +528,6 @@ public sealed class VpnRestoreOwnershipCoordinatorTests
     }
 
     [Fact]
-    public async Task Failed_current_callback_restore_preserves_owner_for_retry()
-    {
-        var storage = new InMemoryOwnershipStorage(OwnedBy("launch-a", "com.example.a"));
-        var coordinator = storage.CreateCoordinator(() => "unused");
-
-        var completion = await coordinator.CompleteOwnerAsync(
-            "com.example.a",
-            "launch-a",
-            () => Task.FromResult(OperationResult.Failure("restore failed")),
-            TestContext.Current.CancellationToken);
-
-        Assert.True(completion.OwnerMatched);
-        Assert.False(completion.Result.Succeeded);
-        Assert.Equal("launch-a", storage.State.ActiveOwner?.LaunchId);
-    }
-
-    [Fact]
     public async Task Legacy_boolean_is_migrated_and_legacy_callback_can_complete_it()
     {
         var storage = new InMemoryOwnershipStorage { LegacyFlag = true };

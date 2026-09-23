@@ -89,6 +89,12 @@ public sealed class RestrictedPermissionHelpViewModelTests
         owner.IsPermissionsWindowOpen = true;
         var help = new RestrictedPermissionHelpViewModel(owner, PermissionKind.UsageStats, false, true);
         var loads = services.PermissionLoadCount;
+        var permissionsApplied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        owner.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(owner.OnboardingPermissionSummary))
+                permissionsApplied.TrySetResult();
+        };
 
         var opening = help.OpenSettingsCommand.ExecuteAsync(null);
         owner.HandlePrimaryActivityResumed();
@@ -96,8 +102,8 @@ public sealed class RestrictedPermissionHelpViewModelTests
         completion.SetResult(OperationResult.Success("Settings opened"));
         await opening;
 
-        await AsyncAssert.EventuallyAsync(() => services.PermissionLoadCount == loads + 1,
-            "The pending resume should refresh permissions after the settings command finishes.");
+        await permissionsApplied.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(loads + 1, services.PermissionLoadCount);
         Assert.False(owner.PermissionItems.Single(item => item.Kind == PermissionKind.UsageStats).IsGranted);
     }
 

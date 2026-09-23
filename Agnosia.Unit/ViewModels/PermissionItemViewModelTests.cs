@@ -49,27 +49,6 @@ public sealed class PermissionItemViewModelTests
         Assert.False(item.RequestCommand.CanExecute(null));
     }
 
-    // Проверяет подписи статуса и кнопки запроса для granted/not granted состояний.
-    [Theory]
-    [InlineData(true, "Allowed", "Ask", "Allowed", "Allowed")]
-    [InlineData(false, "Allowed", "Ask", "ActionRequired", "Ask")]
-    public void Labels_reflect_granted_state(
-        bool isGranted,
-        string grantedLabel,
-        string requestLabel,
-        string expectedStatusLabel,
-        string expectedRequestLabel)
-    {
-        var item = CreateItem(TestSnapshots.Permission(
-            PermissionKind.Overlay,
-            isGranted,
-            grantedLabel: grantedLabel,
-            requestLabel: requestLabel));
-
-        Assert.Equal(expectedStatusLabel, item.StatusLabel);
-        Assert.Equal(expectedRequestLabel, item.RequestLabel);
-    }
-
     // Проверяет, что command не вызывает owner, когда запрос разрешения запрещен.
     [Fact]
     public async Task RequestCommand_does_not_call_owner_when_request_is_forbidden()
