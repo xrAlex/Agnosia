@@ -18,6 +18,14 @@ public static class AndroidSettingsContract
             : VpnAutomationClientKind.FlClash;
     }
 
+    public static CommandTransportPreference ParseCommandTransportPreference(string? value)
+    {
+        return Enum.TryParse<CommandTransportPreference>(value, true, out var preference)
+               && Enum.IsDefined(preference)
+            ? preference
+            : CommandTransportPreference.Auto;
+    }
+
     public static string NormalizeTunguskaAutomationToken(string? value)
     {
         return value?.Trim() ?? string.Empty;

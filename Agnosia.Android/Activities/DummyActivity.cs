@@ -22,6 +22,7 @@ namespace Agnosia.Android.Activities;
     LaunchMode = LaunchMode.SingleTop)]
 [IntentFilter(
 [
+    AgnosiaActions.ConnectCommandProvider,
     AgnosiaActions.FinalizeProvision,
     AgnosiaActions.ProfilePing,
     AgnosiaActions.QueryApps,

@@ -68,53 +68,18 @@ public sealed partial class DummyActivity
 
     private async Task ActionFreezePackageAsync(bool hidden, CancellationToken cancellationToken)
     {
-        using var operation = await HiddenAppSessionConcurrency.EnterOperationAsync(cancellationToken)
-            .ConfigureAwait(false);
-        var packageName = Intent?.GetStringExtra("package");
-        if (!_isProfileOwner || _policyManager is null || string.IsNullOrWhiteSpace(packageName))
-        {
-            Log.Warn(LogTag,
-                $"Freeze package command rejected. package={packageName ?? "<none>"}, hidden={hidden}, isProfileOwner={_isProfileOwner}, hasPolicyManager={_policyManager is not null}.");
-            FinishWithResult(Result.Canceled);
-            return;
-        }
-
-        if (hidden && AndroidWorkProfilePackageClassifier.IsSystemPackage(PackageManager, packageName))
-        {
-            Log.Info(LogTag, $"Ignoring freeze command for system work-profile app. package={packageName}.");
-            FinishWithSuccessMessage("Системные приложения рабочего профиля не замораживаются Agnosia.");
-            return;
-        }
-
-        var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
-        // End a temporarily visible session before releasing its isolation;
-        // otherwise the monitor would hide it again after an explicit unfreeze.
-        if (!hidden && HiddenAppSessionMonitorService.GetPackagesAwaitingHide().Contains(packageName))
-        {
-            if (!AndroidPolicyApi.TrySetApplicationHidden(_policyManager, admin, packageName, true, LogTag,
-                    out var freezeError))
-            {
-                FinishWithError(freezeError ?? $"Android не смог завершить сессию {packageName}.");
-                return;
-            }
-
-            HiddenAppSessionMonitorService.CompletePackage(this, packageName);
-        }
-
-        if (!AndroidPolicyApi.TrySetApplicationHidden(_policyManager, admin, packageName, hidden, LogTag,
-                out var error))
-        {
-            FinishWithError(error ?? (hidden
-                ? $"Android не смог скрыть {packageName}."
-                : $"Android не смог восстановить {packageName}."));
-            return;
-        }
-
-        if (hidden) HiddenAppSessionMonitorService.CompletePackage(this, packageName);
-        ClearAppInventoryQueryCache();
-        FinishWithSuccessMessage(hidden
-            ? "Приложение скрыто."
-            : "Приложение снова доступно в рабочем профиле.");
+        var envelope = new AndroidCommandEnvelope(_commandCorrelationId,
+            hidden ? AndroidCommandKind.FreezePackage : AndroidCommandKind.UnfreezePackage,
+            AndroidCommandTargetProfile.Work, AndroidCommandInteractivity.NonInteractive,
+            AndroidCommandPriority.Mutation, TimeSpan.FromSeconds(30),
+            System.Text.Json.JsonSerializer.Serialize(new Commands.Handlers.SetPackageHiddenRequest(
+                Intent?.GetStringExtra(AndroidCommandContract.ExtraPackage) ?? "")));
+        var context = ServiceRegistry.GetRequiredService<AndroidCommandExecutionContextFactory>()
+            .Create(this, this, envelope, AndroidCommandTransportKind.Activity, "dummy-activity");
+        var result = await ServiceRegistry.GetRequiredService<AndroidCommandHandlerExecutor>()
+            .ExecuteAsync(envelope, context, cancellationToken).ConfigureAwait(false);
+        if (result.Succeeded) FinishWithSuccessMessage(result.Message);
+        else FinishWithError(result.Message, result.ErrorCode);
     }
 
     private async Task ActionRevokeRuntimePermissionsAsync(CancellationToken cancellationToken)

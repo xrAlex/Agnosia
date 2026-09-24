@@ -77,4 +77,16 @@ public sealed class AndroidSettingsContractTests
 
         Assert.Equal(expected, result);
     }
+
+    [Theory]
+    [InlineData("Auto", CommandTransportPreference.Auto)]
+    [InlineData("provider", CommandTransportPreference.Provider)]
+    [InlineData("ACTIVITY", CommandTransportPreference.Activity)]
+    [InlineData("unknown", CommandTransportPreference.Auto)]
+    [InlineData(null, CommandTransportPreference.Auto)]
+    public void ParseCommandTransportPreference_uses_auto_for_missing_or_invalid_value(
+        string? savedValue, CommandTransportPreference expected)
+    {
+        Assert.Equal(expected, AndroidSettingsContract.ParseCommandTransportPreference(savedValue));
+    }
 }

@@ -14,7 +14,15 @@ internal static class AndroidServiceCollectionExtensions
     public static IServiceCollection AddAgnosiaAndroid(this IServiceCollection services)
     {
         services.AddSingleton<AndroidCommandScheduler>();
-        services.AddSingleton<AndroidCommandCenter>();
+        services.AddSingleton(provider => new AndroidCommandCenter(
+            provider.GetRequiredService<AndroidCommandScheduler>(),
+            provider.GetServices<IAndroidCommandTransport>(),
+#if AGNOSIA_ANDROID
+            () => ProviderTransportOptions.Enabled && !provider.GetRequiredService<CommandAccessCoordinator>().UseLegacyProfileRoute,
+            () => AndroidSettingsStore.LoadCommandTransportPreference(provider.GetRequiredService<LocalStorageManager>())));
+#else
+            () => ProviderTransportOptions.Enabled));
+#endif
         services.AddSingleton<AndroidCommandHandlerExecutor>();
         services.AddSingleton<IAndroidCommandHandler, ProfilePingCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, QueryAppIconCommandHandler>();
@@ -24,11 +32,19 @@ internal static class AndroidServiceCollectionExtensions
         services.AddSingleton<IAndroidCommandHandler, QueryLogsCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, ClearLogsCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, QueryPermissionsCommandHandler>();
+        services.AddSingleton<IAndroidCommandHandler>(_ => new QueryPermissionsCommandHandler(AndroidCommandKind.QueryUsageStatsAccess));
+        services.AddSingleton<IAndroidCommandHandler>(_ => new QueryPermissionsCommandHandler(AndroidCommandKind.QueryPackageInstallAccess));
+        services.AddSingleton<IAndroidCommandHandler>(_ => new QueryPermissionsCommandHandler(AndroidCommandKind.QueryAllFilesAccess));
+        services.AddSingleton<IAndroidCommandHandler>(_ => new SetPackageHiddenCommandHandler(true));
+        services.AddSingleton<IAndroidCommandHandler>(_ => new SetPackageHiddenCommandHandler(false));
         services.AddSingleton<IAndroidCommandHandler, QueryPackageStateCommandHandler>();
 #if AGNOSIA_ANDROID
         services.AddSingleton<AndroidCommandExecutionContextFactory>();
         services.AddSingleton<IAndroidCommandTransport, DirectLocalCommandTransport>();
         services.AddSingleton<IAndroidCommandTransport, ActivityCommandTransport>();
+        services.AddSingleton<ProviderCommandClient>();
+        services.AddSingleton<CommandAccessCoordinator>();
+        services.AddSingleton<IAndroidCommandTransport, ProviderCommandTransport>();
 
         services.AddSingleton<LocalStorageManager>();
         services.AddSingleton(provider =>

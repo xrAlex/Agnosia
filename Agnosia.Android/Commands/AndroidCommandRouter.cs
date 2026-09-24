@@ -1,20 +1,27 @@
+using Agnosia.Models;
+
 namespace Agnosia.Android.Commands;
 
 internal static class AndroidCommandRouter
 {
-    public static AndroidCommandRoute GetRoute(AndroidCommandEnvelope envelope)
+    public static AndroidCommandRoute GetRoute(AndroidCommandEnvelope envelope, bool providerEnabled = false,
+        CommandTransportPreference preference = CommandTransportPreference.Auto)
     {
-        if (envelope.Interactivity == AndroidCommandInteractivity.Interactive)
+        if (envelope.TargetProfile == AndroidCommandTargetProfile.Personal)
+            return new AndroidCommandRoute([AndroidCommandTransportKind.DirectLocal]);
+
+        if (preference == CommandTransportPreference.Activity)
             return new AndroidCommandRoute([AndroidCommandTransportKind.Activity]);
 
-        return envelope.TargetProfile switch
-        {
-            AndroidCommandTargetProfile.Personal => new AndroidCommandRoute(
-                [AndroidCommandTransportKind.DirectLocal]),
-            AndroidCommandTargetProfile.Work => new AndroidCommandRoute(
-                [AndroidCommandTransportKind.Activity]),
-            _ => new AndroidCommandRoute([AndroidCommandTransportKind.Activity])
-        };
+        if (preference == CommandTransportPreference.Provider)
+            return new AndroidCommandRoute([AndroidCommandTransportKind.Provider]);
+
+        if (providerEnabled && envelope.Interactivity == AndroidCommandInteractivity.NonInteractive
+            && envelope.TargetProfile == AndroidCommandTargetProfile.Work
+            && ProviderCommandPolicy.Supports(envelope.Kind))
+            return new AndroidCommandRoute([AndroidCommandTransportKind.Provider, AndroidCommandTransportKind.Activity]);
+
+        return new AndroidCommandRoute([AndroidCommandTransportKind.Activity]);
     }
 }
 

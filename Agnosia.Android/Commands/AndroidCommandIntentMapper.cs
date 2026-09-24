@@ -17,6 +17,7 @@ internal static class AndroidCommandIntentMapper
     {
         return kind switch
         {
+            AndroidCommandKind.ConnectCommandProvider => AgnosiaActions.ConnectCommandProvider,
             AndroidCommandKind.ProfilePing => AgnosiaActions.ProfilePing,
             AndroidCommandKind.QueryApps => AgnosiaActions.QueryApps,
             AndroidCommandKind.QueryAppIcon => AgnosiaActions.QueryAppIcon,
@@ -57,6 +58,7 @@ internal static class AndroidCommandIntentMapper
     {
         var resolved = action switch
         {
+            AgnosiaActions.ConnectCommandProvider => AndroidCommandKind.ConnectCommandProvider,
             AgnosiaActions.ProfilePing => AndroidCommandKind.ProfilePing,
             AgnosiaActions.QueryApps => AndroidCommandKind.QueryApps,
             AgnosiaActions.QueryAppIcon => AndroidCommandKind.QueryAppIcon,

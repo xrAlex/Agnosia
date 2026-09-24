@@ -7,6 +7,38 @@ namespace Agnosia.Unit.ViewModels;
 
 public sealed class DashboardWorkspaceIconLoadingTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Cancelled_after_dequeue_is_filtered_without_losing_a_live_consumer(bool keepLiveConsumer)
+    {
+        var delays = new ManualDelayScheduler();
+        var services = new TestPlatformServices();
+        var viewModel = TestWorkspaceFactory.Create(services, delays.DelayAsync);
+        var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var gate = (SemaphoreSlim)viewModel.GetType().GetField("_iconLoadGate", flags)!.GetValue(viewModel)!;
+        var channel = viewModel.GetType().GetField("_pendingIconLoads", flags)!.GetValue(viewModel)!;
+        var reader = channel.GetType().GetProperty("Reader")!.GetValue(channel)!;
+        var peek = reader.GetType().GetMethod("TryPeek")!;
+        await gate.WaitAsync(TestContext.Current.CancellationToken);
+        using var cancellation = new CancellationTokenSource();
+        var app = TestSnapshots.App(ProfileKind.Work, "test.cancel", "Cancel");
+        var cancelled = viewModel.LoadAppIconPngAsync(app, cancellation.Token);
+        var live = keepLiveConsumer ? viewModel.LoadAppIconPngAsync(app, TestContext.Current.CancellationToken) : null;
+        delays.CompleteNext();
+        await AsyncAssert.EventuallyAsync(() => !(bool)peek.Invoke(reader, [null])!, "Batch must leave the queue before cancellation.");
+        cancellation.Cancel();
+        gate.Release();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cancelled);
+        var processor = (Task)viewModel.GetType().GetField("_iconBatchProcessor", flags)!.GetValue(viewModel)!;
+        if (live is not null) await live;
+        await AsyncAssert.EventuallyAsync(() => delays.RequestedDelays.Count >= 2, "Batch should finish processing.");
+        delays.CompleteNext();
+        await processor;
+        Assert.Equal(keepLiveConsumer ? 1 : 0, services.AppIconLoadRequests.Count);
+        if (keepLiveConsumer) Assert.Single(Assert.Single(services.AppIconLoadRequests));
+    }
+
     // Проверяет объединение нескольких запросов иконки одного package в один batch load.
     [Fact]
     public async Task LoadAppIconPngAsync_batches_multiple_requests_for_same_package()

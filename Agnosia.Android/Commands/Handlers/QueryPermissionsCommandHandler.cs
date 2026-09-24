@@ -6,9 +6,9 @@ using System.Text.Json.Serialization;
 
 namespace Agnosia.Android.Commands.Handlers;
 
-internal sealed class QueryPermissionsCommandHandler : IAndroidCommandHandler
+internal sealed class QueryPermissionsCommandHandler(AndroidCommandKind kind = AndroidCommandKind.QueryPermissions) : IAndroidCommandHandler
 {
-    public AndroidCommandKind Kind => AndroidCommandKind.QueryPermissions;
+    public AndroidCommandKind Kind => kind;
 
 #if AGNOSIA_ANDROID
     public Task<AndroidCommandResultEnvelope> ExecuteAsync(

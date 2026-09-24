@@ -27,6 +27,8 @@ public partial class DashboardWorkspaceViewModel
 
     partial void OnShowAllAppsChanged(bool value) => QueueSettingsSave();
 
+    partial void OnSelectedCommandTransportChanged(CommandTransportPreference value) => QueueSettingsSave();
+
     partial void OnDisableVpnBeforeWorkLaunchChanged(bool value) => QueueSettingsSave();
 
     partial void OnCrossProfileFileShuttleEnabledChanged(bool value) => QueueSettingsSave();
@@ -57,7 +59,8 @@ public partial class DashboardWorkspaceViewModel
             SelectedTheme,
             EnableVpnAfterWorkFreeze,
             VpnAfterWorkFreezeClient,
-            TunguskaAutomationToken);
+            TunguskaAutomationToken,
+            SelectedCommandTransport);
     }
 
     private void QueueSettingsSave() => _settingsSaveCoordinator.Queue();

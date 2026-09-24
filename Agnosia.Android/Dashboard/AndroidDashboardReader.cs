@@ -27,6 +27,13 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
         var (isSupported, appSettingsSnapshot, hadConfiguredWorkProfile, workProfileDiagnostics, localVersionCode) = await ReadDashboardProfileLocalStateAsync(activity, cancellationToken).ConfigureAwait(false);
         if (!isSupported) return DashboardSnapshot.Unsupported;
 
+        if (ProviderTransportOptions.Enabled && MainActivity.CanPrepareCommandAccess)
+        {
+            var access = ServiceRegistry.GetRequiredService<CommandAccessCoordinator>();
+            access.AllowForegroundRefresh();
+            await access.PrepareInForegroundAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         var settings = appSettingsSnapshot ?? AppSettingsSnapshot.Default;
         if (AgnosiaUtilities.HasPendingDirectProfileSetup())
             return new DashboardSnapshot(true, false, AndroidProvisioningCoordinator.IsProvisioningInProgress,
@@ -54,6 +61,12 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
                     cancellationToken)
                 .ConfigureAwait(false);
             AndroidQueryCache.Shared.ClearOwnerCheck();
+            if (updateResult.Succeeded && ProviderTransportOptions.Enabled)
+            {
+                var access = ServiceRegistry.GetRequiredService<CommandAccessCoordinator>();
+                access.NotifyWorkProfileAppUpdated();
+                await access.PrepareInForegroundAsync(cancellationToken).ConfigureAwait(false);
+            }
             ownerCheck = updateResult.Succeeded
                 ? await ReadWorkProfileOwnerCheckAsync(profileDiagnostics, cancellationToken).ConfigureAwait(false)
                 : ownerCheck with { Kind = WorkProfileOwnerCheckKind.VersionUpdateFailed, DiagnosticReason = $"profileUpdate=failed; message={updateResult.Message}; previous={ownerCheck.DiagnosticReason}" };

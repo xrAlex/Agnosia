@@ -28,12 +28,18 @@ public sealed class PermissionItemViewModelTests
 
         Assert.Equal(permissionLoads, services.PermissionLoadCount);
         Assert.False(item.IsGranted);
+        var permissionApplied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        owner.PropertyChanged += (_, args) =>
+        {
+            // The test dispatcher executes on the worker; inspect the collection on its mutation thread.
+            if (args.PropertyName == nameof(owner.PermissionSummary)
+                && owner.PermissionItems.Any(permission => permission.Kind == kind && permission.IsGranted))
+                permissionApplied.TrySetResult();
+        };
         services.Permissions = [TestSnapshots.GrantedPermission(kind)];
         owner.HandlePrimaryActivityResumed();
 
-        await AsyncAssert.EventuallyAsync(
-            () => owner.PermissionItems.Any(permission => permission.Kind == kind && permission.IsGranted),
-            "Returning from app settings should update the permission.");
+        await permissionApplied.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Equal(permissionLoads + 1, services.PermissionLoadCount);
         Assert.Equal(appLoads, services.AppInventoryLoadCount);
     }

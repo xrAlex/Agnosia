@@ -8,6 +8,43 @@ namespace Agnosia.Unit.ViewModels;
 public sealed class DashboardWorkspaceSnapshotTests
 {
     [Fact]
+    public async Task Command_transport_selection_loads_and_switches_between_manual_and_auto()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(settings: AppSettingsSnapshot.Default with
+            {
+                CommandTransport = CommandTransportPreference.Activity
+            })
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+        await viewModel.EnsureInitializedAsync();
+
+        Assert.True(viewModel.IsActivityTransportSelected);
+        viewModel.SelectProviderTransportCommand.Execute(null);
+        Assert.True(viewModel.IsProviderTransportSelected);
+        viewModel.SelectAutoTransportCommand.Execute(null);
+        Assert.True(viewModel.IsAutoTransportSelected);
+    }
+
+    [Fact]
+    public async Task Concurrent_dashboard_refreshes_share_the_same_generation()
+    {
+        var services = new TestPlatformServices { DashboardProfile = TestSnapshots.Dashboard() };
+        var viewModel = TestWorkspaceFactory.Create(services);
+        await viewModel.EnsureInitializedAsync();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        services.LoadModulesHandler = async _ => { entered.TrySetResult(); await release.Task; return []; };
+        var first = viewModel.RefreshCommand.ExecuteAsync(null);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var duplicate = viewModel.RefreshCommand.ExecuteAsync(null);
+        release.SetResult();
+        await Task.WhenAll(first, duplicate);
+        Assert.Equal(2, services.DashboardProfileLoadCount);
+    }
+
+    [Fact]
     public async Task Refresh_reports_updated_only_after_inventory_is_loaded()
     {
         var inventory = new TaskCompletionSource<DashboardAppInventorySnapshot>(

@@ -97,6 +97,39 @@
                 </Border>
 
                 <TextBlock Classes="group-title"
+                           Text="Транспорт команд" />
+
+                <Border Classes="surface-card compact">
+                    <StackPanel Spacing="12">
+                        <StackPanel Spacing="4">
+                            <TextBlock Classes="section-title compact"
+                                       Text="Команды рабочего профиля" />
+                            <TextBlock Classes="page-caption"
+                                       Text="Авто пробует Provider и при безопасном сбое переходит на Activity. Ручной выбор фиксирует транспорт командного центра." />
+                            <TextBlock Classes="page-caption"
+                                       Text="Интерактивные действия вне командного центра по-прежнему открывают Activity." />
+                        </StackPanel>
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                            <Button AutomationProperties.Name="Авто" Classes="segment-chip"
+                                    Classes.selected="{Binding IsAutoTransportSelected}"
+                                    Command="{Binding SelectAutoTransportCommand}">
+                                <TextBlock Classes="button-label" Text="Авто" />
+                            </Button>
+                            <Button AutomationProperties.Name="Provider" Grid.Column="1" Classes="segment-chip"
+                                    Classes.selected="{Binding IsProviderTransportSelected}"
+                                    Command="{Binding SelectProviderTransportCommand}">
+                                <TextBlock Classes="button-label" Text="Provider" />
+                            </Button>
+                            <Button AutomationProperties.Name="Activity" Grid.Column="2" Classes="segment-chip"
+                                    Classes.selected="{Binding IsActivityTransportSelected}"
+                                    Command="{Binding SelectActivityTransportCommand}">
+                                <TextBlock Classes="button-label" Text="Activity" />
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Classes="group-title"
                            Text="Поведение" />
 
                 <Border Classes="surface-card compact">

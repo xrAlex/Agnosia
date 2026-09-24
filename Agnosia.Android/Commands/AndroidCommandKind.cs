@@ -33,5 +33,6 @@ internal enum AndroidCommandKind
     SynchronizePreference,
     FinalizeProvision,
     PackageInstallerCallback,
-    ClearLogs
+    ClearLogs,
+    ConnectCommandProvider
 }

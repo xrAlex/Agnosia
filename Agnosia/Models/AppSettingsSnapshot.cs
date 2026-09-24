@@ -8,7 +8,8 @@ public sealed record AppSettingsSnapshot(
     AppThemeKind Theme = AppThemeKind.Dark,
     bool EnableVpnAfterWorkFreeze = false,
     VpnAutomationClientKind VpnAfterWorkFreezeClient = VpnAutomationClientKind.FlClash,
-    string TunguskaAutomationToken = "")
+    string TunguskaAutomationToken = "",
+    CommandTransportPreference CommandTransport = CommandTransportPreference.Auto)
 {
     public static AppSettingsSnapshot Default { get; } = new(false, false, false, true);
 }

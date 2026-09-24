@@ -4,6 +4,8 @@ namespace Agnosia.Platform;
 
 public interface IDashboardPlatformService
 {
+    Task PrepareDashboardRefreshAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
     Task<DashboardSnapshot> LoadDashboardProfileAsync(CancellationToken cancellationToken = default);
 
     Task<DashboardAppInventorySnapshot> LoadAppInventoryAsync(

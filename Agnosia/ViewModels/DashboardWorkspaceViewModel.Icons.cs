@@ -60,12 +60,13 @@ public partial class DashboardWorkspaceViewModel
 
     private async Task LoadIconBatchAsync(IReadOnlyList<PendingIconLoad> batch)
     {
-        var snapshots = GetDistinctIconSnapshots(batch);
-
         IReadOnlyDictionary<AppItemKey, byte[]?> icons;
         await _iconLoadGate.WaitAsync().ConfigureAwait(false);
         try
         {
+            // A consumer can cancel while this batch waits for the platform gate.
+            var snapshots = GetDistinctIconSnapshots(batch);
+            if (snapshots.Length == 0) return;
             icons = await _dashboardService.LoadAppIconsAsync(snapshots).ConfigureAwait(false);
         }
         catch (Exception exception)
@@ -92,6 +93,11 @@ public partial class DashboardWorkspaceViewModel
         var seen = new HashSet<AppItemKey>();
         foreach (var t in batch)
         {
+            if (t.IsCompleted)
+            {
+                t.Dispose();
+                continue;
+            }
             var snapshot = t.Snapshot;
             if (seen.Add(AppItemKey.FromSnapshot(snapshot)))
                 snapshots.Add(snapshot);

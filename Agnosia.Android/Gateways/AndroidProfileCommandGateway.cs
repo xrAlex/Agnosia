@@ -348,16 +348,29 @@ public static class AndroidProfileCommandGateway
         return RunWorkPackageOperationAsync(commandRunner, intent, successMessage, cancellationToken);
     }
 
-    internal static Task<OperationResult> SetPackageHiddenInWorkProfileAsync(
+    internal static async Task<OperationResult> SetPackageHiddenInWorkProfileAsync(
         AndroidActivityCommandGateway commandRunner,
         string packageName,
         bool hidden,
         string successMessage,
         CancellationToken cancellationToken)
     {
-        var intent = new Intent(hidden ? AgnosiaActions.FreezePackage : AgnosiaActions.UnfreezePackage);
-        intent.PutExtra(AndroidCommandContract.ExtraPackage, packageName);
-        return RunWorkPackageOperationAsync(commandRunner, intent, successMessage, cancellationToken);
+        var envelope = new AndroidCommandEnvelope(Guid.NewGuid(),
+            hidden ? AndroidCommandKind.FreezePackage : AndroidCommandKind.UnfreezePackage,
+            AndroidCommandTargetProfile.Work, AndroidCommandInteractivity.NonInteractive, AndroidCommandPriority.Mutation,
+            TimeSpan.FromSeconds(30), JsonSerializer.Serialize(new SetPackageHiddenRequest(packageName)));
+        var center = ServiceRegistry.GetRequiredService<AndroidCommandCenter>();
+        var result = await center.ExecuteAsync(envelope, cancellationToken).ConfigureAwait(false);
+        if (result.ErrorCode == "outcome_unknown" && !cancellationToken.IsCancellationRequested)
+        {
+            // Read behind the work-side session gate; never repeat an uncertain mutation.
+            var query = envelope with { CorrelationId = Guid.NewGuid(), Kind = AndroidCommandKind.QueryPackageState,
+                Priority = AndroidCommandPriority.UserBlocking, PayloadJson = JsonSerializer.Serialize(new PackageStateQuery(packageName)) };
+            var state = await center.ExecuteAsync(query, cancellationToken).ConfigureAwait(false);
+            if (PackageStateResultInterpreter.Interpret(state, packageName, hidden).Succeeded)
+                return OperationResult.Success(successMessage);
+        }
+        return result.Succeeded ? OperationResult.Success(successMessage) : OperationResult.Failure(result.Message);
     }
 
     internal static async Task<OperationResult> RevokeRuntimePermissionsInWorkProfileAsync(

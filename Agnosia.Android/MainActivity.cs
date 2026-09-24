@@ -35,10 +35,21 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
     private static int _nextRequestCode = 4100;
     private static bool _startupMitigationsApplied;
     private bool _isResumed;
+    private CommandProfileAvailabilityReceiver? _commandProfileReceiver;
     private bool _pendingDrainScheduled;
     private long _lastPublishedMoveAtMilliseconds;
 
     private static MainActivity? Current { get; set; }
+
+    internal static bool CanPrepareCommandAccess
+    {
+        get
+        {
+            lock (RequestSync)
+                return Current is { _isResumed: true, IsFinishing: false }
+                       && PendingResults.Count == 0 && PendingActivityStarts.Count == 0;
+        }
+    }
 
     static MainActivity()
     {
@@ -73,6 +84,8 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         AndroidStartup.ConfigurePrimaryProfileServices(this);
         ServiceRegistry.GetRequiredService<AndroidPlatformBridge>().AttachActivity(this);
         Current = this;
+        if (ProviderTransportOptions.Enabled)
+            _commandProfileReceiver = CommandProfileAvailabilityReceiver.Register(this);
     }
 
     private void StartBackgroundInitialization()
@@ -124,9 +137,28 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         UiAnimationState.SetActive(true);
         Current = this;
         ServiceRegistry.GetRequiredService<AndroidPlatformBridge>().AttachActivity(this);
+        if (ProviderTransportOptions.Enabled) _ = PrepareCommandAccessAsync();
         ServiceRegistry.NotifyPrimaryActivityResumed();
         DrainPendingActivityStarts();
         _ = RecoverVpnOnResumeAsync();
+    }
+
+    protected override void OnStart()
+    {
+        base.OnStart();
+        if (ProviderTransportOptions.Enabled)
+            ServiceRegistry.GetRequiredService<CommandAccessCoordinator>().NotifyForegroundSession();
+    }
+
+    private async Task PrepareCommandAccessAsync()
+    {
+        try
+        {
+            var access = ServiceRegistry.GetRequiredService<CommandAccessCoordinator>();
+            if (!access.IsConnecting)
+                await access.PrepareInForegroundAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception exception) { Log.Warn(LogTag, $"Provider preparation failed: {exception.GetType().Name}."); }
     }
 
     protected override void OnPause()
@@ -144,6 +176,12 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
 
     protected override void OnDestroy()
     {
+        if (_commandProfileReceiver is not null)
+        {
+            UnregisterReceiver(_commandProfileReceiver);
+            _commandProfileReceiver.Dispose();
+            _commandProfileReceiver = null;
+        }
         if (ReferenceEquals(Current, this))
         {
             Current = null;

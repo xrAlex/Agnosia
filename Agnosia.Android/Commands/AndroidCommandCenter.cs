@@ -1,6 +1,7 @@
 #if AGNOSIA_ANDROID
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 #endif
+using Agnosia.Models;
 
 namespace Agnosia.Android.Commands;
 
@@ -10,19 +11,28 @@ internal sealed class AndroidCommandCenter
 
     private readonly AndroidCommandScheduler _scheduler;
     private readonly IReadOnlyDictionary<AndroidCommandTransportKind, IAndroidCommandTransport> _transports;
+    private readonly Func<bool> _providerEnabled;
+    private readonly Func<CommandTransportPreference> _transportPreference;
 
     public AndroidCommandCenter(
         AndroidCommandScheduler scheduler,
-        IEnumerable<IAndroidCommandTransport> transports)
+        IEnumerable<IAndroidCommandTransport> transports,
+        Func<bool>? providerEnabled = null,
+        Func<CommandTransportPreference>? transportPreference = null)
     {
         _scheduler = scheduler;
         _transports = transports.ToDictionary(transport => transport.Kind);
+        _providerEnabled = providerEnabled ?? (() => false);
+        _transportPreference = transportPreference ?? (() => CommandTransportPreference.Auto);
     }
 
     public async Task<AndroidCommandResultEnvelope> ExecuteAsync(
         AndroidCommandEnvelope envelope,
         CancellationToken cancellationToken)
     {
+        var preference = _transportPreference();
+        var providerEnabled = preference == CommandTransportPreference.Auto && _providerEnabled();
+        var route = AndroidCommandRouter.GetRoute(envelope, providerEnabled, preference);
         using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var timeout = envelope.Timeout > TimeSpan.Zero
             ? envelope.Timeout
@@ -33,14 +43,13 @@ internal sealed class AndroidCommandCenter
         {
             return await _scheduler.RunAsync(
                     envelope,
-                    token => ExecuteWithFallbackAsync(envelope, token),
+                    token => ExecuteWithFallbackAsync(envelope, route, token),
                     timeoutCancellation.Token)
                 .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested
                                                 && timeoutCancellation.IsCancellationRequested)
         {
-            var route = AndroidCommandRouter.GetRoute(envelope);
             var timeoutTransport = route.Transports.FirstOrDefault();
             return AndroidCommandResultEnvelope.Failure(
                 envelope.CorrelationId,
@@ -55,14 +64,15 @@ internal sealed class AndroidCommandCenter
 
     private async Task<AndroidCommandResultEnvelope> ExecuteWithFallbackAsync(
         AndroidCommandEnvelope envelope,
+        AndroidCommandRoute route,
         CancellationToken cancellationToken)
     {
         var diagnostics = new List<string>();
-        var route = AndroidCommandRouter.GetRoute(envelope);
         AndroidCommandResultEnvelope? lastFailure = null;
 
-        foreach (var transportKind in route.Transports)
+        for (var index = 0; index < route.Transports.Count; index++)
         {
+            var transportKind = route.Transports[index];
             if (!_transports.TryGetValue(transportKind, out var transport))
             {
                 diagnostics.Add($"missing={transportKind}");
@@ -70,9 +80,35 @@ internal sealed class AndroidCommandCenter
             }
 
             AndroidCommandResultEnvelope result;
+            using var attemptCancellation = transportKind == AndroidCommandTransportKind.Provider
+                                            && index < route.Transports.Count - 1
+                                            && !ProviderCommandPolicy.IsMutation(envelope.Kind)
+                ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+                : null;
+            if (attemptCancellation is not null)
+            {
+                var totalMilliseconds = envelope.Timeout > TimeSpan.Zero
+                    ? envelope.Timeout.TotalMilliseconds
+                    : TimeSpan.FromSeconds(30).TotalMilliseconds;
+                attemptCancellation.CancelAfter(TimeSpan.FromMilliseconds(
+                    Math.Clamp(totalMilliseconds / 3, 250, 5_000)));
+            }
             try
             {
-                result = await transport.ExecuteAsync(envelope, cancellationToken).ConfigureAwait(false);
+                result = await transport.ExecuteAsync(envelope, attemptCancellation?.Token ?? cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (attemptCancellation?.IsCancellationRequested == true
+                                                    && !cancellationToken.IsCancellationRequested)
+            {
+                result = AndroidCommandResultEnvelope.Failure(
+                    envelope.CorrelationId,
+                    envelope.Kind,
+                    transportKind,
+                    "Provider did not respond in time.",
+                    "provider_timeout",
+                    TimeSpan.Zero,
+                    "provider attempt timed out before Activity fallback");
             }
             catch (OperationCanceledException)
             {
@@ -92,6 +128,14 @@ internal sealed class AndroidCommandCenter
 
             if (result.Succeeded)
                 return Complete(envelope, result, diagnostics);
+
+            if (index == route.Transports.Count - 1
+                || transportKind == AndroidCommandTransportKind.Provider
+                   && !ProviderCommandPolicy.CanFallbackToActivity(envelope.Kind, result.ErrorCode))
+            {
+                diagnostics.Add($"terminalFailure={transportKind}; reason={result.ErrorCode ?? "failed"}");
+                return Complete(envelope, result, diagnostics);
+            }
 
             lastFailure = result;
             diagnostics.Add($"fallbackFrom={transportKind}; reason={result.ErrorCode ?? "failed"}");

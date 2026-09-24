@@ -16,6 +16,7 @@
         <Compile Remove="**\*.cs"/>
         <Compile Include="Commands\AgnosiaActions.cs"/>
         <Compile Include="Commands\AndroidCommandContract.cs"/>
+        <Compile Include="Commands\ProviderCommandProtocol.cs"/>
         <Compile Include="Commands\AndroidAppLaunchResult.cs"/>
         <Compile Include="Platform\AppInventoryPayloadPager.cs"/>
         <Compile Include="Platform\ApplicationHiddenPolicy.cs"/>

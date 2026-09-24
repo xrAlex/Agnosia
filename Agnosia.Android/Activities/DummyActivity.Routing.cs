@@ -42,8 +42,14 @@ public sealed partial class DummyActivity
         {
             switch (action)
             {
+                case AgnosiaActions.ConnectCommandProvider:
+                    ActionConnectCommandProvider();
+                    break;
                 case AgnosiaActions.ProfilePing:
-                    RunCommandCenterAction(AndroidCommandKind.ProfilePing, "Android не смог проверить рабочий профиль.");
+                    if (Intent?.GetBooleanExtra(ProviderCommandProtocol.BootstrapExtra, false) == true)
+                        ActionConnectCommandProvider();
+                    else
+                        RunCommandCenterAction(AndroidCommandKind.ProfilePing, "Android не смог проверить рабочий профиль.");
                     break;
                 case AgnosiaActions.QueryApps:
                     RunCommandCenterAction(AndroidCommandKind.QueryApps, "Android не смог получить список приложений.");

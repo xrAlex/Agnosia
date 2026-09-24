@@ -16,6 +16,10 @@
         <DefineConstants>$(DefineConstants);AGNOSIA_ANDROID</DefineConstants>
     </PropertyGroup>
 
+    <PropertyGroup Condition="'$(AgnosiaCommandProvider)' == 'true'">
+        <DefineConstants>$(DefineConstants);AGNOSIA_COMMAND_PROVIDER</DefineConstants>
+    </PropertyGroup>
+
     <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-android' and '$(AgnosiaAndroidPackageVariant)' == 'universal'">
         <!-- Release universal APK should include 32-bit and 64-bit Android ABIs. -->
         <RuntimeIdentifiers>android-arm;android-arm64;android-x86;android-x64</RuntimeIdentifiers>
@@ -57,6 +61,7 @@
         <Compile Include="Permissions\AppPermissionRiskCatalog.Scoring.cs"/>
         <Compile Include="Permissions\AppPermissionRiskInput.cs"/>
         <Compile Include="Commands\AndroidCommandEnvelope.cs"/>
+        <Compile Include="Commands\Provider\*.cs"/>
         <Compile Include="Commands\AndroidCommandInteractivity.cs"/>
         <Compile Include="Commands\AndroidCommandKind.cs"/>
         <Compile Include="Commands\AndroidCommandPriority.cs"/>
@@ -90,6 +95,7 @@
         <Compile Include="Commands\Handlers\ClearLogsCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\QueryPermissionsCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\QueryPackageStateCommandHandler.cs"/>
+        <Compile Include="Commands\Handlers\SetPackageHiddenCommandHandler.cs"/>
         <Compile Include="Commands\Transports\DirectLocalCommandTransport.cs"/>
         <Compile Include="Gateways\AndroidQueryCache.cs"/>
         <Compile Include="Gateways\WorkProfileOwnerCheckInterpreter.cs"/>

@@ -17,7 +17,8 @@ public static class AndroidSettingsStore
             LoadAppTheme(storage),
             storage.GetBoolean(StorageKeys.EnableVpnAfterWorkFreeze),
             LoadVpnAfterWorkFreezeClient(storage),
-            storage.GetString(StorageKeys.TunguskaAutomationToken) ?? string.Empty);
+            storage.GetString(StorageKeys.TunguskaAutomationToken) ?? string.Empty,
+            LoadCommandTransportPreference(storage));
     }
 
     public static async Task<OperationResult> SaveAsync(
@@ -49,6 +50,7 @@ public static class AndroidSettingsStore
                 [StorageKeys.VpnAfterWorkFreezeClient] = settings.VpnAfterWorkFreezeClient.ToString(),
                 [StorageKeys.TunguskaAutomationToken] = tunguskaToken,
                 [StorageKeys.AppTheme] = settings.Theme.ToString(),
+                [StorageKeys.CommandTransportPreference] = settings.CommandTransport.ToString(),
                 [PendingBooleanSettingsSync.Key(StorageKeys.LoggingEnabled)] = settings.LoggingEnabled ? "true" : "false",
                 [PendingBooleanSettingsSync.Key(StorageKeys.DisableVpnBeforeWorkLaunch)] = settings.DisableVpnBeforeWorkLaunch ? "true" : "false",
                 [PendingBooleanSettingsSync.Key(StorageKeys.CrossProfileFileShuttleEnabled)] = settings.CrossProfileFileShuttleEnabled ? "true" : "false"
@@ -72,5 +74,11 @@ public static class AndroidSettingsStore
     {
         return AndroidSettingsContract.ParseVpnAfterWorkFreezeClient(
             storage.GetString(StorageKeys.VpnAfterWorkFreezeClient));
+    }
+
+    public static CommandTransportPreference LoadCommandTransportPreference(LocalStorageManager storage)
+    {
+        return AndroidSettingsContract.ParseCommandTransportPreference(
+            storage.GetString(StorageKeys.CommandTransportPreference));
     }
 }

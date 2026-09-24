@@ -39,7 +39,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private readonly Func<TimeSpan, CancellationToken, Task> _delayAsync;
     private readonly DebouncedAsyncAction _searchRefreshDebouncer;
     private readonly DashboardSettingsSaveCoordinator _settingsSaveCoordinator;
-    private readonly SerializedBackgroundWorker _dashboardRefreshWorker = new();
+    private readonly CoalescingRefreshWorker _dashboardRefreshWorker = new();
     private bool _dashboardRefreshFailed;
     private bool _permissionResumePending;
     private readonly SemaphoreSlim _iconLoadGate = new(1, 1);
@@ -242,6 +242,16 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     [ObservableProperty]
     public partial bool LoggingEnabled { get; set; } = true;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsAutoTransportSelected))]
+    [NotifyPropertyChangedFor(nameof(IsProviderTransportSelected))]
+    [NotifyPropertyChangedFor(nameof(IsActivityTransportSelected))]
+    private partial CommandTransportPreference SelectedCommandTransport { get; set; } = CommandTransportPreference.Auto;
+
+    public bool IsAutoTransportSelected => SelectedCommandTransport == CommandTransportPreference.Auto;
+    public bool IsProviderTransportSelected => SelectedCommandTransport == CommandTransportPreference.Provider;
+    public bool IsActivityTransportSelected => SelectedCommandTransport == CommandTransportPreference.Activity;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsAgnosiaThemeSelected))]
@@ -642,7 +652,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         if (!_workAppRefreshPending || IsBusy || _isOperationInProgress || IsDashboardRefreshing) return;
 
         _workAppRefreshPending = false;
-        _ = RefreshDashboardAsync(false);
+        _ = RefreshDashboardAsync(false, stateChanged: true);
     }
 
     private async Task RefreshDashboardAfterResumeAsync()
@@ -659,15 +669,21 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private Task RefreshAsync() => RefreshDashboardAsync(false);
+    private async Task RefreshAsync()
+    {
+        await _dashboardService.PrepareDashboardRefreshAsync().ConfigureAwait(false);
+        await RefreshDashboardAsync(false).ConfigureAwait(false);
+    }
 
-    private async Task RefreshDashboardAsync(bool allowDuringOperation)
+    private async Task RefreshDashboardAsync(bool allowDuringOperation, bool stateChanged = false)
     {
         if (!allowDuringOperation && (IsBusy || _isOperationInProgress))
             return;
 
         await _dashboardRefreshWorker.RunAsync(
-                () => RefreshDashboardCoreAsync(allowDuringOperation))
+                includePermissions => RefreshDashboardCoreAsync(!includePermissions),
+                stateChanged: stateChanged || allowDuringOperation,
+                includePermissions: !allowDuringOperation)
             .ConfigureAwait(false);
     }
 
@@ -868,6 +884,15 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     [RelayCommand]
     private void SelectLightTheme() => SelectedTheme = AppThemeKind.Light;
+
+    [RelayCommand]
+    private void SelectAutoTransport() => SelectedCommandTransport = CommandTransportPreference.Auto;
+
+    [RelayCommand]
+    private void SelectProviderTransport() => SelectedCommandTransport = CommandTransportPreference.Provider;
+
+    [RelayCommand]
+    private void SelectActivityTransport() => SelectedCommandTransport = CommandTransportPreference.Activity;
 
     [RelayCommand]
     private async Task StartOnboardingAsync()
@@ -1363,6 +1388,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             VpnAfterWorkFreezeClient = snapshot.Settings.VpnAfterWorkFreezeClient;
             TunguskaAutomationToken = snapshot.Settings.TunguskaAutomationToken;
             LoggingEnabled = snapshot.Settings.LoggingEnabled;
+            SelectedCommandTransport = snapshot.Settings.CommandTransport;
             SelectedTheme = snapshot.Settings.Theme;
             _settingsSaveCoordinator.SetLoadedShowAllApps(snapshot.Settings.ShowAllApps);
 

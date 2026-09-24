@@ -20,6 +20,7 @@ public static class StorageKeys
     public const string VpnAfterWorkFreezeClient = "vpn_after_work_freeze_client";
     public const string TunguskaAutomationToken = "tunguska_automation_token";
     public const string LoggingEnabled = "logging_enabled";
+    public const string CommandTransportPreference = "command_transport_preference";
     public const string AppTheme = "app_theme";
     public const string UsageStatsAccessPrompted = "usage_stats_access_prompted";
     public const string OnboardingCompleted = "onboarding_completed";

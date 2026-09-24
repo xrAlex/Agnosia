@@ -3,6 +3,7 @@ namespace Agnosia.Android.Api.Commands;
 public static class AgnosiaActions
 {
     public const string CommandResult = "agnosia.action.COMMAND_RESULT";
+    public const string ConnectCommandProvider = "agnosia.action.CONNECT_COMMAND_PROVIDER";
     public const string FinalizeProvision = "agnosia.action.FINALIZE_PROVISION";
     public const string ProfilePing = "agnosia.action.TRY_START_SERVICE";
     public const string QueryApps = "agnosia.action.QUERY_APPS";
@@ -41,6 +42,7 @@ public static class AgnosiaActions
 
     public static readonly string[] ParentToManagedCommandActions =
     [
+        ConnectCommandProvider,
         ProfilePing,
         QueryApps,
         QueryAppIcon,
@@ -80,6 +82,7 @@ public static class AgnosiaActions
 
     public static readonly string[] TargetProfileActivityActions =
     [
+        ConnectCommandProvider,
         FinalizeProvision,
         ProfilePing,
         QueryApps,

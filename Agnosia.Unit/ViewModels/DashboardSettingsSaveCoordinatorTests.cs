@@ -29,7 +29,11 @@ public sealed class DashboardSettingsSaveCoordinatorTests
     {
         var services = new TestPlatformServices();
         var statuses = new List<(bool IsError, string? Message)>();
-        var settings = AppSettingsSnapshot.Default with { LoggingEnabled = false };
+        var settings = AppSettingsSnapshot.Default with
+        {
+            LoggingEnabled = false,
+            CommandTransport = CommandTransportPreference.Provider
+        };
         var coordinator = CreateCoordinator(
             services,
             captureSettings: () => settings,
