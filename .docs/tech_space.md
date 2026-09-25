@@ -587,6 +587,13 @@ WorkLaunchUnconfirmedException отличает потерю acknowledgement/о�
 | Exclave | Quick toggle Activity. |
 | husi | Quick toggle Activity. |
 | NekoBox+ | Quick toggle Activity, поддерживаются `com.nb4a.plus` и `moe.nb4a`. |
+| v2rayNG | Explicit Tasker start broadcast для `com.v2ray.ang` и `com.v2ray.ang.fdroid`; один пункт UI, приоритет обычной версии. |
+| olcng | Explicit Tasker start broadcast для `xyz.zarazaex.olc` и `xyz.zarazaex.olc.fdroid`; один пункт UI, приоритет обычной версии. |
+| v2RayTun | Explicit Tasker start broadcast для `com.v2raytun.android`. |
+| L×Box | Explicit broadcast `com.leadaxe.lxbox.START_VPN` на `com.leadaxe.lxbox.vpn.LxBoxIntentReceiver`; приёмник отключён по умолчанию и включается в настройках автоматизации. Обычная и F-Droid сборки используют `com.leadaxe.lxbox`. |
+| Karing | Explicit broadcast `com.nebula.karing.action.CONNECT` на `com.nebula.karing.AutomationCommandReceiver`; в Karing может действовать список разрешённых отправителей. |
+
+Tasker-команда использует action `com.twofortyfouram.locale.intent.action.FIRE_SETTING`, явный `TaskerReceiver` и bundle `com.twofortyfouram.locale.intent.extra.BUNDLE` с `tasker_extra_bundle_switch=true` и `tasker_extra_bundle_guid=Default`. Для v2RayTun доступность приёмника и ключей проверена по APK 5.25.81; фактическое восстановление после VPN takeover требует проверки на устройстве.
 
 Если VPN уже активен, Agnosia не отправляет повторную команду. Для toggle-only клиентов UI показывает предупреждение, потому что такой вызов может не только включить, но и выключить VPN.
 

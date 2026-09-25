@@ -26,6 +26,7 @@
         <Compile Include="Serialization\AndroidAppLaunchJsonContext.cs"/>
         <Compile Include="Storage\AndroidSettingsContract.cs"/>
         <Compile Include="Storage\StorageKeys.cs"/>
+        <Compile Include="Vpn\VpnTaskerClientCatalog.cs"/>
     </ItemGroup>
 
     <ItemGroup>

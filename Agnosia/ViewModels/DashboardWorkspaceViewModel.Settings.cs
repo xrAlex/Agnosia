@@ -90,7 +90,12 @@ public partial class DashboardWorkspaceViewModel
             new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.Incy, "INCY"),
             new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.Exclave, "Exclave"),
             new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.Husi, "husi"),
-            new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.NekoBoxPlus, "NekoBox+")
+            new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.NekoBoxPlus, "NekoBox+"),
+            new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.V2RayNg, "v2rayNG"),
+            new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.OlcNg, "olcng"),
+            new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.V2RayTun, "v2RayTun"),
+            new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.LxBox, "L×Box"),
+            new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.Karing, "Karing")
         ];
     }
 

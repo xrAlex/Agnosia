@@ -138,6 +138,38 @@ public sealed class DashboardWorkspaceScenarioTests
         Assert.False(viewModel.IsTunguskaAutomationTokenVisible);
     }
 
+    [Theory]
+    [InlineData(VpnAutomationClientKind.V2RayNg, "v2rayNG")]
+    [InlineData(VpnAutomationClientKind.OlcNg, "olcng")]
+    [InlineData(VpnAutomationClientKind.V2RayTun, "v2RayTun")]
+    [InlineData(VpnAutomationClientKind.LxBox, "L×Box")]
+    [InlineData(VpnAutomationClientKind.Karing, "Karing")]
+    public void New_vpn_clients_can_be_selected_without_toggle_warning(
+        VpnAutomationClientKind kind,
+        string displayName)
+    {
+        var viewModel = TestWorkspaceFactory.Create(new TestPlatformServices());
+        viewModel.EnableVpnAfterWorkFreeze = true;
+
+        var option = viewModel.VpnAfterFreezeClientOptions.Single(option => option.Kind == kind);
+        Assert.Equal(displayName, option.DisplayName);
+        option.SelectCommand.Execute(null);
+
+        Assert.True(option.IsSelected);
+        Assert.False(viewModel.IsToggleOnlyVpnAfterFreezeWarningVisible);
+    }
+
+    [Fact]
+    public void Fdroid_variants_share_their_clients_ui_option()
+    {
+        var options = TestWorkspaceFactory.Create(new TestPlatformServices()).VpnAfterFreezeClientOptions;
+
+        Assert.DoesNotContain(options, option => option.Kind == VpnAutomationClientKind.V2RayNgFdroid);
+        Assert.DoesNotContain(options, option => option.Kind == VpnAutomationClientKind.OlcNgFdroid);
+        Assert.Single(options, option => option.Kind == VpnAutomationClientKind.V2RayNg);
+        Assert.Single(options, option => option.Kind == VpnAutomationClientKind.OlcNg);
+    }
+
     private static void SelectVpnAfterFreezeClient(
         DashboardWorkspaceViewModel viewModel,
         VpnAutomationClientKind kind)

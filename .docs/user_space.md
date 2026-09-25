@@ -194,7 +194,9 @@ Lockdown блокирует интернет выбранным приложен
 
 ### Поддерживаемые VPN-клиенты
 
-Поддерживаются FlClash (`com.follow.clash`), Clash Meta, Happ, Tunguska, INCY, Exclave, husi и NekoBox+.
+Поддерживаются FlClash (`com.follow.clash`), Clash Meta, Happ, Tunguska, INCY, Exclave, husi, NekoBox+, v2rayNG, olcng, v2RayTun, L×Box и Karing. Обычная версия и версия F-Droid у v2rayNG и olcng показаны одним пунктом: Agnosia сначала пробует обычную версию, затем F-Droid. L×Box из F-Droid использует тот же пакет `com.leadaxe.lxbox`, что и обычная сборка.
+
+Для L×Box включите в настройках приложения **Автоматизация → Принимать команды автоматизации**. Перед первым автоматическим запуском подключите VPN вручную и подтвердите системный запрос. Если в Karing задан список разрешённых отправителей команд, добавьте в него `com.agnosia.app`.
 
 Для Tunguska нужно дополнительно указать токен автоматизации. Без него Agnosia не сможет отправить команду запуска.
 

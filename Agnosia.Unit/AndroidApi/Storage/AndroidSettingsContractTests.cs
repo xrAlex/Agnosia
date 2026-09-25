@@ -43,6 +43,13 @@ public sealed class AndroidSettingsContractTests
     [InlineData("FlClash", VpnAutomationClientKind.FlClash)]
     [InlineData("tunguska", VpnAutomationClientKind.Tunguska)]
     [InlineData("NEKOBOXPLUS", VpnAutomationClientKind.NekoBoxPlus)]
+    [InlineData("v2rayng", VpnAutomationClientKind.V2RayNg)]
+    [InlineData("V2RayNgFdroid", VpnAutomationClientKind.V2RayNg)]
+    [InlineData("olcng", VpnAutomationClientKind.OlcNg)]
+    [InlineData("OLCNGFDROID", VpnAutomationClientKind.OlcNg)]
+    [InlineData("V2RayTun", VpnAutomationClientKind.V2RayTun)]
+    [InlineData("lxbox", VpnAutomationClientKind.LxBox)]
+    [InlineData("KARING", VpnAutomationClientKind.Karing)]
     public void ParseVpnAfterWorkFreezeClient_accepts_saved_client_names_case_insensitively(
         string savedValue,
         VpnAutomationClientKind expected)
@@ -55,6 +62,7 @@ public sealed class AndroidSettingsContractTests
     // Проверяет fallback VPN client при пустом или неизвестном persisted value.
     [Theory]
     [MemberData(nameof(MissingOrInvalidSettingsValues))]
+    [InlineData("999")]
     public void ParseVpnAfterWorkFreezeClient_falls_back_to_flclash_for_missing_or_invalid_value(
         string? savedValue)
     {

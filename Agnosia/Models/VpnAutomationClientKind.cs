@@ -9,5 +9,14 @@ public enum VpnAutomationClientKind
     Incy,
     Exclave,
     Husi,
-    NekoBoxPlus
+    NekoBoxPlus,
+    V2RayNg,
+    // Legacy saved choices are normalized to the shared client option when loaded.
+    V2RayNgFdroid,
+    OlcNg,
+    // Legacy saved choice is normalized to OlcNg when loaded.
+    OlcNgFdroid,
+    V2RayTun,
+    LxBox,
+    Karing
 }

@@ -13,9 +13,15 @@ public static class AndroidSettingsContract
 
     public static VpnAutomationClientKind ParseVpnAfterWorkFreezeClient(string? value)
     {
-        return Enum.TryParse<VpnAutomationClientKind>(value, true, out var client)
-            ? client
-            : VpnAutomationClientKind.FlClash;
+        if (!Enum.TryParse<VpnAutomationClientKind>(value, true, out var client) || !Enum.IsDefined(client))
+            return VpnAutomationClientKind.FlClash;
+
+        return client switch
+        {
+            VpnAutomationClientKind.V2RayNgFdroid => VpnAutomationClientKind.V2RayNg,
+            VpnAutomationClientKind.OlcNgFdroid => VpnAutomationClientKind.OlcNg,
+            _ => client
+        };
     }
 
     public static CommandTransportPreference ParseCommandTransportPreference(string? value)

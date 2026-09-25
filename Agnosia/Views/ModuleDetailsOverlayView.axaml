@@ -82,7 +82,7 @@
                                         <TextBlock Classes="app-dialog-setting-title"
                                                    Text="Включить модуль" />
                                         <TextBlock Classes="app-dialog-setting-caption"
-                                                   Text="Активация доступна после выполнения требований" />
+                                                   Text="Активация доступна после выдачи разрешений" />
                                     </StackPanel>
                                     <ToggleSwitch Grid.Column="1"
                                                   VerticalAlignment="Center"

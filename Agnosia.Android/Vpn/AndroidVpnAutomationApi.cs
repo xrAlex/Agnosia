@@ -1,7 +1,9 @@
 using Agnosia.Models;
+using Agnosia.Android.Api.Vpn;
 using Agnosia.Android.Storage;
 using Android.Content;
 using Android.Content.PM;
+using Android.OS;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Vpn;
@@ -50,6 +52,18 @@ public static class AndroidVpnAutomationApi
             "llc.itdev.incy.DISCONNECT",
             ReceiverClassName: "llc.itdev.incy.receiver.VpnIntentReceiver"),
         new(
+            VpnAutomationClientKind.LxBox,
+            "L×Box",
+            "com.leadaxe.lxbox",
+            "com.leadaxe.lxbox.START_VPN",
+            ReceiverClassName: "com.leadaxe.lxbox.vpn.LxBoxIntentReceiver"),
+        new(
+            VpnAutomationClientKind.Karing,
+            "Karing",
+            "com.nebula.karing",
+            "com.nebula.karing.action.CONNECT",
+            ReceiverClassName: "com.nebula.karing.AutomationCommandReceiver"),
+        new(
             VpnAutomationClientKind.Exclave,
             "Exclave",
             "com.github.dyhkwong.sagernet",
@@ -69,7 +83,17 @@ public static class AndroidVpnAutomationApi
             ["com.nb4a.plus", "moe.nb4a"],
             string.Empty,
             activityClassName: "io.nekohasekai.sagernet.QuickToggleShortcut",
-            requireExplicitActivity: true)
+            requireExplicitActivity: true),
+        ..VpnTaskerClientCatalog.Clients.Select(client => new VpnClientDefinition(
+            client.Kind,
+            client.DisplayName,
+            client.PackageNames[0],
+            VpnTaskerClientCatalog.FireSettingAction,
+            ReceiverClassName: client.ReceiverClassName,
+            UsesTaskerStart: true)
+        {
+            PackageNames = client.PackageNames
+        })
     ];
 
     public static Task<OperationResult> EnableConfiguredVpnAfterWorkFreezeAsync(Context context, string trigger)
@@ -91,9 +115,13 @@ public static class AndroidVpnAutomationApi
             return OperationResult.Success(string.Empty);
         var definition = ResolveInstalledPackage(context, ResolveClient(AndroidSettingsStore.LoadVpnAfterWorkFreezeClient(storage)));
         if (!CanStartClient(context, definition))
-            return OperationResult.Failure(IsPackageInstalled(context.PackageManager, definition.PackageName)
-                ? $"Установленный VPN-клиент {definition.DisplayName} ({definition.PackageName}) не предоставляет Agnosia доступную команду восстановления. Эта сборка клиента не поддерживает автоматизацию VPN Guard."
-                : $"VPN-клиент {definition.DisplayName} ({definition.PackageName}) не установлен. Проверьте выбранный клиент в настройках VPN Guard.");
+        {
+            if (!IsPackageInstalled(context.PackageManager, definition.PackageName))
+                return OperationResult.Failure($"VPN-клиент {definition.DisplayName} ({definition.PackageName}) не установлен. Проверьте выбранный клиент в настройках VPN Guard.");
+            if (definition.Kind == VpnAutomationClientKind.LxBox)
+                return OperationResult.Failure("L×Box не принимает команду восстановления VPN. Включите приём команд в настройках L×Box → Автоматизация и проверьте версию приложения.");
+            return OperationResult.Failure($"Установленный VPN-клиент {definition.DisplayName} ({definition.PackageName}) не предоставляет Agnosia доступную команду восстановления. Эта сборка клиента не поддерживает автоматизацию VPN Guard.");
+        }
         if (definition.Kind == VpnAutomationClientKind.Tunguska
             && string.IsNullOrWhiteSpace(storage.GetString(StorageKeys.TunguskaAutomationToken)))
             return OperationResult.Failure("Для восстановления Tunguska требуется токен автоматизации.");
@@ -203,6 +231,12 @@ public static class AndroidVpnAutomationApi
         VpnClientDefinition definition,
         LocalStorageManager storage)
     {
+        if (definition.UsesTaskerStart)
+        {
+            SendTaskerStartBroadcast(context, definition);
+            return CreateStartCommandSuccess(definition);
+        }
+
         switch (definition.Kind)
         {
             case VpnAutomationClientKind.Happ:
@@ -214,6 +248,8 @@ public static class AndroidVpnAutomationApi
             case VpnAutomationClientKind.Tunguska:
                 return StartTunguska(context, definition, storage);
             case VpnAutomationClientKind.Incy:
+            case VpnAutomationClientKind.LxBox:
+            case VpnAutomationClientKind.Karing:
                 SendStartBroadcast(context, definition);
                 return CreateStartCommandSuccess(definition);
             default:
@@ -310,6 +346,23 @@ public static class AndroidVpnAutomationApi
         Log.Info(LogTag, $"Start broadcast sent. client={definition.DisplayName}, action={definition.StartAction}.");
     }
 
+    private static void SendTaskerStartBroadcast(Context context, VpnClientDefinition definition)
+    {
+        var receiverClassName = definition.ReceiverClassName
+                                ?? throw new InvalidOperationException(
+                                    "VPN client definition does not provide a Tasker receiver class.");
+        var settings = new Bundle();
+        settings.PutBoolean(VpnTaskerClientCatalog.SwitchExtra, true);
+        settings.PutString(VpnTaskerClientCatalog.GuidExtra, VpnTaskerClientCatalog.DefaultGuid);
+
+        var intent = new Intent(VpnTaskerClientCatalog.FireSettingAction);
+        intent.SetPackage(definition.PackageName);
+        intent.SetComponent(new ComponentName(definition.PackageName, receiverClassName));
+        intent.PutExtra(VpnTaskerClientCatalog.BundleExtra, settings);
+        context.SendBroadcast(intent);
+        Log.Info(LogTag, $"Tasker start broadcast sent. client={definition.DisplayName}.");
+    }
+
     private static OperationResult StartTunguska(Context context, VpnClientDefinition definition,
         LocalStorageManager storage)
     {
@@ -344,18 +397,18 @@ public static class AndroidVpnAutomationApi
             if (definition.Kind == kind)
                 return definition;
 
-        return VpnClients[^1];
+        return VpnClients.First(definition => definition.Kind == VpnAutomationClientKind.FlClash);
     }
 
     private static VpnClientDefinition ResolveInstalledPackage(Context context, VpnClientDefinition definition)
     {
         if (definition.PackageNames.Length <= 1) return definition;
 
-        foreach (var packageName in definition.PackageNames)
-            if (IsPackageInstalled(context.PackageManager, packageName))
-                return definition with { PackageName = packageName };
-
-        return definition;
+        var packageName = VpnClientPackageSelector.Select(
+            definition.PackageNames,
+            candidate => IsPackageInstalled(context.PackageManager, candidate),
+            candidate => CanStartClient(context, definition with { PackageName = candidate }));
+        return definition with { PackageName = packageName };
     }
 
     private static bool IsPackageInstalled(PackageManager? packageManager, string packageName)
@@ -384,7 +437,8 @@ public static class AndroidVpnAutomationApi
         string? ActivityClassName = null,
         string? ReceiverClassName = null,
         bool RequireExplicitActivity = false,
-        bool IsolateActivityTask = false)
+        bool IsolateActivityTask = false,
+        bool UsesTaskerStart = false)
     {
         public string[] PackageNames { get; init; } = [PackageName];
 
