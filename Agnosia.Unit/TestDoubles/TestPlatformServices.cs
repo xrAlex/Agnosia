@@ -34,6 +34,20 @@ public sealed class TestPlatformServices :
 
     public IReadOnlyList<PermissionSnapshot> Permissions { get; set; } = [];
 
+    public IReadOnlyList<AppPermissionSnapshot> AppPermissions { get; set; } = [];
+    public Func<AppSnapshot, CancellationToken, Task<IReadOnlyList<AppPermissionSnapshot>>>? LoadAppPermissionsHandler { get; set; }
+    public Func<AppSnapshot, string, bool, CancellationToken, Task<OperationResult>>? SetAppPermissionHandler { get; set; }
+    public Func<AppSnapshot, string, CancellationToken, Task<OperationResult>>? RevokeAppPermissionHandler { get; set; }
+
+    public Task<IReadOnlyList<AppPermissionSnapshot>> LoadAppPermissionsAsync(AppSnapshot app, CancellationToken cancellationToken = default) =>
+        LoadAppPermissionsHandler?.Invoke(app, cancellationToken) ?? Task.FromResult(AppPermissions);
+
+    public Task<OperationResult> SetAppPermissionDeniedAsync(AppSnapshot app, string permission, bool denied, CancellationToken cancellationToken = default) =>
+        SetAppPermissionHandler?.Invoke(app, permission, denied, cancellationToken) ?? Task.FromResult(DefaultOperationResult);
+
+    public Task<OperationResult> RevokeAppPermissionAsync(AppSnapshot app, string permission, CancellationToken cancellationToken = default) =>
+        RevokeAppPermissionHandler?.Invoke(app, permission, cancellationToken) ?? Task.FromResult(DefaultOperationResult);
+
     public IReadOnlyList<AgnosiaModuleSnapshot> Modules { get; set; } =
         [AgnosiaModuleSnapshot.FileShuttleUnavailable];
 

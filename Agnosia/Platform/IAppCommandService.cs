@@ -25,4 +25,13 @@ public interface IAppCommandService
         CancellationToken cancellationToken = default);
 
     Task<OperationResult> RevokeRuntimePermissionsAsync(AppSnapshot app, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AppPermissionSnapshot>> LoadAppPermissionsAsync(AppSnapshot app,
+        CancellationToken cancellationToken = default);
+
+    Task<OperationResult> SetAppPermissionDeniedAsync(AppSnapshot app, string permission, bool denied,
+        CancellationToken cancellationToken = default);
+
+    Task<OperationResult> RevokeAppPermissionAsync(AppSnapshot app, string permission,
+        CancellationToken cancellationToken = default);
 }

@@ -39,9 +39,17 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
     {
         _owner = owner;
         Snapshot = snapshot;
+        Permissions = owner.CreateAppPermissions(snapshot);
     }
 
     public AppSnapshot Snapshot { get; private set; }
+
+    public AppPermissionsViewModel Permissions { get; }
+
+    partial void OnIsPermissionDetailsExpandedChanged(bool value)
+    {
+        if (value) _ = Permissions.RefreshCommand.ExecuteAsync(null);
+    }
 
     public string PackageName => Snapshot.PackageName;
 

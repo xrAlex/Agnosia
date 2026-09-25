@@ -8,6 +8,8 @@ public static class AndroidCommandContract
     public const string ExtraPackage = "package";
     public const string ExtraPackages = "packages";
     public const string ExtraPermissions = "permissions";
+    public const string ExtraClearPermissionPolicy = "clear_permission_policy";
+    public const string ExtraRevokeWithoutPolicy = "revoke_without_policy";
     public const string ExtraOpenAppDetailsSettings = "open_app_details_settings";
     public const string ExtraIsSystem = "is_system";
     public const string ExtraApk = "apk";

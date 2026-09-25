@@ -138,7 +138,7 @@ public static class AndroidPolicyApi
         }
     }
 
-    public static async Task<(bool Succeeded, string? Error)> TryDenyRuntimePermissionAsync(
+    public static Task<(bool Succeeded, string? Error)> TryDenyRuntimePermissionAsync(
         DevicePolicyManager manager,
         PackageManager? packageManager,
         ComponentName admin,
@@ -146,36 +146,46 @@ public static class AndroidPolicyApi
         string permission,
         string logTag,
         CancellationToken cancellationToken = default)
+        => TrySetRuntimePermissionPolicyAsync(manager, admin, packageName, permission,
+            PermissionGrantState.Denied, logTag, cancellationToken);
+
+    public static async Task<(bool Succeeded, string? Error)> TrySetRuntimePermissionPolicyAsync(
+        DevicePolicyManager manager,
+        ComponentName admin,
+        string packageName,
+        string permission,
+        PermissionGrantState desiredState,
+        string logTag,
+        CancellationToken cancellationToken = default)
     {
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            manager.SetPermissionGrantState(
+            if (desiredState is not (PermissionGrantState.Denied or PermissionGrantState.Default))
+                throw new ArgumentOutOfRangeException(nameof(desiredState));
+            var applied = manager.SetPermissionGrantState(
                 admin,
                 packageName,
                 permission,
-                PermissionGrantState.Denied);
+                desiredState);
+            if (!applied)
+                return (false, $"Android не разрешает менять {permission} у этого приложения. Разрешение может быть закреплено системой.");
 
             var confirmation = await WaitForRuntimePermissionRevokeConfirmationAsync(
                     manager,
-                    packageManager,
                     admin,
                     packageName,
                     permission,
+                    desiredState,
                     logTag,
                     cancellationToken)
                 .ConfigureAwait(false);
             if (confirmation.Confirmed)
             {
-                if (confirmation.PolicyState != PermissionGrantState.Denied)
-                    Log.Debug(
-                        logTag,
-                        $"Permission is already denied by package state. package={packageName}, permission={permission}, policyState={confirmation.PolicyState}.");
-
                 return (true, null);
             }
 
-            var error = $"Android не подтвердил отзыв {permission} у {packageName}.";
+            var error = $"Android не подтвердил изменение политики {permission} у {packageName}.";
             Log.Warn(
                 logTag,
                 $"Permission revoke was not confirmed. package={packageName}, permission={permission}, state={confirmation.PolicyState}.");
@@ -183,7 +193,7 @@ public static class AndroidPolicyApi
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
-            var error = $"Android не смог отозвать {permission} у {packageName}.";
+            var error = $"Android не разрешил изменить политику {permission} у {packageName}.";
             Log.Warn(
                 logTag,
                 $"Failed to deny runtime permission. package={packageName}, permission={permission}, exception={exception.GetType().FullName}: {exception}");
@@ -191,12 +201,72 @@ public static class AndroidPolicyApi
         }
     }
 
-    private static async Task<RuntimePermissionRevokeConfirmation> WaitForRuntimePermissionRevokeConfirmationAsync(
+    public static async Task<(bool Succeeded, string? Error)> TryRevokeRuntimePermissionOnceAsync(
         DevicePolicyManager manager,
-        PackageManager? packageManager,
+        PackageManager packageManager,
         ComponentName admin,
         string packageName,
         string permission,
+        string logTag,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            if (packageManager.CheckPermission(permission, packageName) != Permission.Granted)
+                return (false, "Разрешение уже не выдано. Обновите список разрешений.");
+            if (manager.GetPermissionGrantState(admin, packageName, permission) == PermissionGrantState.Denied)
+                return (false, "Разрешение уже запрещено политикой. Сначала снимите запрет.");
+
+            // After the first policy write, finish the pair even if the UI request is cancelled.
+            var denied = await TrySetRuntimePermissionPolicyAsync(manager, admin, packageName, permission,
+                PermissionGrantState.Denied, logTag, CancellationToken.None).ConfigureAwait(false);
+            var grantRemoved = denied.Succeeded && await WaitForRuntimePermissionDeniedAsync(
+                packageManager, packageName, permission).ConfigureAwait(false);
+
+            var shouldClear = denied.Succeeded
+                || manager.GetPermissionGrantState(admin, packageName, permission) == PermissionGrantState.Denied;
+            if (!shouldClear)
+                return (false, denied.Error ?? "Android не смог отозвать разрешение.");
+
+            var cleared = await TrySetRuntimePermissionPolicyAsync(manager, admin, packageName, permission,
+                PermissionGrantState.Default, logTag, CancellationToken.None).ConfigureAwait(false);
+            if (!cleared.Succeeded)
+                return (false, $"{cleared.Error} Временный запрет мог остаться; нажмите «Снять запрет».");
+
+            var remainsRevoked = await WaitForRuntimePermissionDeniedAsync(
+                packageManager, packageName, permission).ConfigureAwait(false);
+            if (!denied.Succeeded || !grantRemoved || !remainsRevoked)
+                return (false, "Android не подтвердил отзыв доступа без постоянного запрета. Обновите список разрешений.");
+            return (true, null);
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            Log.Warn(logTag,
+                $"Failed to revoke runtime permission without policy. package={packageName}, permission={permission}, exception={exception}");
+            return (false, "Android не смог завершить отзыв доступа. Обновите список разрешений; если появился статус «Запрещено», нажмите «Снять запрет».");
+        }
+    }
+
+    private static async Task<bool> WaitForRuntimePermissionDeniedAsync(
+        PackageManager packageManager, string packageName, string permission)
+    {
+        for (var attempt = 1; attempt <= RuntimePermissionRevokeConfirmationAttempts; attempt++)
+        {
+            if (packageManager.CheckPermission(permission, packageName) != Permission.Granted)
+                return true;
+            if (attempt < RuntimePermissionRevokeConfirmationAttempts)
+                await Task.Delay(RuntimePermissionRevokeConfirmationDelayMilliseconds).ConfigureAwait(false);
+        }
+        return false;
+    }
+
+    private static async Task<RuntimePermissionRevokeConfirmation> WaitForRuntimePermissionRevokeConfirmationAsync(
+        DevicePolicyManager manager,
+        ComponentName admin,
+        string packageName,
+        string permission,
+        PermissionGrantState desiredState,
         string logTag,
         CancellationToken cancellationToken)
     {
@@ -205,8 +275,7 @@ public static class AndroidPolicyApi
         {
             cancellationToken.ThrowIfCancellationRequested();
             currentState = manager.GetPermissionGrantState(admin, packageName, permission);
-            if (currentState == PermissionGrantState.Denied
-                || IsPermissionCurrentlyDenied(packageManager, packageName, permission, logTag))
+            if (currentState == desiredState)
             {
                 if (attempt > 1)
                     Log.Debug(
@@ -222,28 +291,6 @@ public static class AndroidPolicyApi
         }
 
         return new RuntimePermissionRevokeConfirmation(false, currentState);
-    }
-
-    private static bool IsPermissionCurrentlyDenied(
-        PackageManager? packageManager,
-        string packageName,
-        string permission,
-        string logTag)
-    {
-        if (packageManager is null) return false;
-
-        try
-        {
-            return packageManager.CheckPermission(permission, packageName) != Permission.Granted;
-        }
-        catch (Exception exception) when (exception is PackageManager.NameNotFoundException
-                                          || AndroidRecoverableException.IsMatch(exception))
-        {
-            Log.Debug(
-                logTag,
-                $"Could not check current permission grant. package={packageName}, permission={permission}, exception={exception.GetType().FullName}: {exception.Message}");
-            return false;
-        }
     }
 
     private readonly record struct RuntimePermissionRevokeConfirmation(

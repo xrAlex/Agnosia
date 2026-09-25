@@ -1,4 +1,6 @@
 using Agnosia.Android.Services;
+using Agnosia.Android.Permissions;
+using Android.App.Admin;
 using Log = Agnosia.Android.Api.Logging.AgnosiaLog;
 
 namespace Agnosia.Android.Activities;
@@ -86,6 +88,8 @@ public sealed partial class DummyActivity
     {
         var packageName = Intent?.GetStringExtra(AndroidCommandContract.ExtraPackage);
         var permissions = Intent?.GetStringArrayExtra(AndroidCommandContract.ExtraPermissions) ?? [];
+        var clearPolicy = Intent?.GetBooleanExtra(AndroidCommandContract.ExtraClearPermissionPolicy, false) == true;
+        var revokeWithoutPolicy = Intent?.GetBooleanExtra(AndroidCommandContract.ExtraRevokeWithoutPolicy, false) == true;
         if (!_isProfileOwner || _policyManager is null || string.IsNullOrWhiteSpace(packageName))
         {
             Log.Warn(LogTag,
@@ -100,11 +104,29 @@ public sealed partial class DummyActivity
             return;
         }
 
+        if (revokeWithoutPolicy && (clearPolicy || permissions.Length != 1 || PackageManager is null))
+        {
+            FinishWithError("Неверный запрос на отзыв разрешения.");
+            return;
+        }
+
         var failedPermissions = new List<string>();
         var admin = AgnosiaUtilities.GetAdminComponent(this, AdminReceiverType);
         using var operationLease = await HiddenAppSessionConcurrency
             .EnterOperationAsync(cancellationToken)
             .ConfigureAwait(false);
+        var currentPermissions = AndroidAppPermissionReader.Read(this, packageName, _policyManager, admin);
+        foreach (var permission in permissions)
+        {
+            var current = currentPermissions.FirstOrDefault(item => item.Name == permission);
+            if (current is not { CanChangePolicy: true }
+                || (revokeWithoutPolicy && !current.CanRevokeGrant))
+            {
+                FinishWithError(current?.RestrictionReason ??
+                    "Это разрешение сейчас нельзя отозвать. Обновите список разрешений.");
+                return;
+            }
+        }
         if (!TryMakePackageVisibleForPolicyOperation(
                 admin,
                 packageName,
@@ -127,21 +149,21 @@ public sealed partial class DummyActivity
                 if (string.IsNullOrWhiteSpace(permission)) continue;
 
                 attemptedPermissions++;
-                var denyResult = await AndroidPolicyApi.TryDenyRuntimePermissionAsync(
-                        _policyManager,
-                        PackageManager,
-                        admin,
-                        packageName,
-                        permission,
-                        LogTag,
-                        cancellationToken)
-                    .ConfigureAwait(false);
+                var denyResult = revokeWithoutPolicy
+                    ? await AndroidPolicyApi.TryRevokeRuntimePermissionOnceAsync(
+                        _policyManager, PackageManager!, admin, packageName, permission, LogTag, cancellationToken)
+                        .ConfigureAwait(false)
+                    : await AndroidPolicyApi.TrySetRuntimePermissionPolicyAsync(
+                        _policyManager, admin, packageName, permission,
+                        clearPolicy ? PermissionGrantState.Default : PermissionGrantState.Denied,
+                        LogTag, cancellationToken).ConfigureAwait(false);
                 if (!denyResult.Succeeded)
-                    failedPermissions.Add(permission);
+                    failedPermissions.Add(denyResult.Error ?? permission);
             }
         }
         finally
         {
+            ClearAppInventoryQueryCache();
             if (restoreHiddenState)
             {
                 hiddenStateRestored = RestoreHiddenStateAfterPolicyOperation(
@@ -163,11 +185,15 @@ public sealed partial class DummyActivity
 
         if (failedPermissions.Count == 0)
         {
-            FinishWithSuccessMessage($"Runtime-разрешения отозваны: {attemptedPermissions}.");
+            FinishWithSuccessMessage(revokeWithoutPolicy
+                ? "Доступ отозван. Приложение сможет снова запросить его."
+                : clearPolicy
+                    ? "Запрет снят. Приложение сможет снова запросить доступ."
+                    : $"Разрешения запрещены: {attemptedPermissions}.");
             return;
         }
 
         FinishWithError(
-            $"Не удалось отозвать runtime-разрешения: {string.Join(", ", failedPermissions.Select(FormatPermissionName))}.");
+            string.Join(Environment.NewLine, failedPermissions));
     }
 }

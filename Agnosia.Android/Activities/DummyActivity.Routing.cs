@@ -90,6 +90,9 @@ public sealed partial class DummyActivity
                 case AgnosiaActions.QueryPackageState:
                     RunCommandCenterAction(AndroidCommandKind.QueryPackageState, "Android не смог проверить состояние приложения.");
                     break;
+                case AgnosiaActions.QueryAppPermissions:
+                    RunCommandCenterAction(AndroidCommandKind.QueryAppPermissions, "Android не смог получить разрешения приложения.");
+                    break;
                 case AgnosiaActions.RequestAllFilesAccess:
                     ActionRequestAllFilesAccess();
                     break;

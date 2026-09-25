@@ -1,5 +1,8 @@
 using Agnosia.Models;
 using Agnosia.Platform;
+using Agnosia.Android.Commands.Handlers;
+using Agnosia.Android.Permissions;
+using System.Text.Json;
 using Android.Content;
 using Android.Content.PM;
 using Android.OS;
@@ -133,6 +136,42 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
     public Task<OperationResult> StartProvisioningAsync(CancellationToken cancellationToken = default)
     {
         return _provisioningCoordinator.StartProvisioningAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<AppPermissionSnapshot>> LoadAppPermissionsAsync(AppSnapshot app,
+        CancellationToken cancellationToken = default)
+    {
+        if (app.Profile != ProfileKind.Work)
+            return await Task.Run(() => AndroidAppPermissionReader.Read(global::Android.App.Application.Context,
+                app.PackageName), cancellationToken).ConfigureAwait(false);
+
+        var envelope = new AndroidCommandEnvelope(Guid.NewGuid(), AndroidCommandKind.QueryAppPermissions,
+            AndroidCommandTargetProfile.Work, AndroidCommandInteractivity.NonInteractive,
+            AndroidCommandPriority.UserBlocking, TimeSpan.FromSeconds(30),
+            JsonSerializer.Serialize(new AppPermissionsRequest(app.PackageName)));
+        var result = await ServiceRegistry.GetRequiredService<AndroidCommandCenter>()
+            .ExecuteAsync(envelope, cancellationToken).ConfigureAwait(false);
+        if (!result.Succeeded) throw new InvalidOperationException(result.Message);
+        return JsonSerializer.Deserialize<AppPermissionSnapshot[]>(result.PayloadJson ?? "null")
+            ?? throw new InvalidOperationException("Android не вернул состояния разрешений.");
+    }
+
+    public Task<OperationResult> SetAppPermissionDeniedAsync(AppSnapshot app, string permission, bool denied,
+        CancellationToken cancellationToken = default)
+    {
+        if (app.Profile != ProfileKind.Work || string.IsNullOrWhiteSpace(permission))
+            return Task.FromResult(OperationResult.Failure("Запрет доступен только в рабочем профиле."));
+        return AndroidProfileCommandGateway.RevokeRuntimePermissionsInWorkProfileAsync(
+            _commandRunner, app.PackageName, [permission], cancellationToken, clearPolicy: !denied);
+    }
+
+    public Task<OperationResult> RevokeAppPermissionAsync(AppSnapshot app, string permission,
+        CancellationToken cancellationToken = default)
+    {
+        if (app.Profile != ProfileKind.Work || string.IsNullOrWhiteSpace(permission))
+            return Task.FromResult(OperationResult.Failure("Отзыв доступен только в рабочем профиле."));
+        return AndroidProfileCommandGateway.RevokeGrantedPermissionInWorkProfileAsync(
+            _commandRunner, app.PackageName, permission, cancellationToken);
     }
 
     public Task PrepareDashboardRefreshAsync(CancellationToken cancellationToken = default)

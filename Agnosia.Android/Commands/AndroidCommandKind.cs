@@ -34,5 +34,6 @@ internal enum AndroidCommandKind
     FinalizeProvision,
     PackageInstallerCallback,
     ClearLogs,
-    ConnectCommandProvider
+    ConnectCommandProvider,
+    QueryAppPermissions
 }

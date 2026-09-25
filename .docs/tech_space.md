@@ -20,6 +20,20 @@
 
 ## Архитектура
 
+### Управление разрешениями выбранного приложения
+
+`AppPermissionsViewModel` загружает отдельный актуальный список через `IAppCommandService.LoadAppPermissionsAsync`; список инвентаря и каталог оценки риска для этой цели не используются. `AndroidAppPermissionReader` получает `PackageInfo.RequestedPermissions` с `GET_PERMISSIONS`, включая разрешения OEM и сторонних пакетов, читает `PermissionInfo` для уровня защиты, а состояние выдачи — из соответствующего `RequestedPermissionsFlags`. Неполученное состояние не подменяется на «не выдано». Названия и краткие описания вынесены в `AppPermissionDictionary`: он покрывает 372 публичные константы локального SDK 36, 30 новых констант из [справочника Android Manifest.permission](https://developer.android.com/reference/android/Manifest.permission), 95 разрешений [Health Connect](https://developer.android.com/reference/android/health/connect/HealthPermissions), 6 разрешений [Ad Services](https://developer.android.com/reference/android/adservices/common/AdServicesPermissions) и проверенные разрешения старых APK. Health Connect доступен с Android 9 через отдельное приложение. Для разрешений вне словаря UI показывает «Неизвестное разрешение», сохраняя техническое имя для поиска и диагностики. Доступность отзыва определяется Android, а не словарём. Выданные разрешения без действия отзыва получают пометку «нельзя отозвать» рядом со статусом.
+
+В рабочем профиле чтение идёт через аутентифицированную `QueryAppPermissions` (Provider с Activity fallback), проверяет владельца профиля и выполняется под `HiddenAppSessionConcurrency`. `getPermissionGrantState` дополняет обычное состояние выдачи запретом/выдачей политикой. Обычные и signature-разрешения manifest не получают кнопки изменения; специальные разрешения с `PROTECTION_FLAG_APPOP` читаются через системное отображение `PermissionToOp` и AppOps, а при недоступности данных получают неизвестный статус. Закрытые системные permission flags не читаются через reflection.
+
+`SetAppPermissionDeniedAsync` передаёт ровно одно разрешение существующим подписанным Activity-маршрутом `RevokeRuntimePermissions`, с `ExtraClearPermissionPolicy` для снятия запрета. Рабочая сторона заново проверяет, что разрешение запрошено пакетом и имеет runtime-уровень защиты. Используются только `DENIED` и `DEFAULT`, автоматической выдачи нет. Успех требует положительного результата setter и подтверждённого состояния DPM; отсутствие обычного grant само по себе не подтверждает постоянный запрет. Если Android отвергает системно закреплённое разрешение, ошибка возвращается в UI. При временном показе скрытого приложения сохраняется существующий механизм восстановления скрытого состояния. Кэш инвентаря сбрасывается после попытки изменения.
+
+Для разового отзыва `RevokeAppPermissionAsync` использует тот же подписанный маршрут с `ExtraRevokeWithoutPolicy`. Он доступен только для фактически выданного runtime-разрешения приложения с target SDK 23+, подтверждается повторной проверкой в рабочем профиле и последовательно устанавливает `DENIED`, затем `DEFAULT`. Проверяется и сброс политики, и фактическое отсутствие grant через `PackageManager.checkPermission`; при отказе Android UI перечитывает реальное состояние. После начала операции обе записи политики выполняются без отмены посередине. `DEFAULT` отдельно не отзывает уже выданный доступ, а для старых target SDK Android может оставить permission grant и лишь блокировать AppOp, поэтому им разовый отзыв не предлагается. Список сортируется в UI по уровню защиты: runtime, специальный доступ, остальные manifest, неизвестные; выданные выше остальных внутри каждой группы.
+
+Список обновляется при раскрытии раздела, возврате в Agnosia, вручную и после попытки изменения, включая неуспешную. Во время операции команды заблокированы; при ошибке перечитывания старые строки удаляются. Поиск работает по локализованной подписи и полному имени разрешения. Личный профиль доступен только для просмотра.
+
+Основание поведения: [Android DevicePolicyManager](https://developer.android.com/reference/android/app/admin/DevicePolicyManager#setPermissionGrantState(android.content.ComponentName,%20java.lang.String,%20java.lang.String,%20int)), [PackageInfo](https://developer.android.com/reference/android/content/pm/PackageInfo#requestedPermissions), [PermissionInfo](https://developer.android.com/reference/android/content/pm/PermissionInfo), [AppOpsManager](https://developer.android.com/reference/android/app/AppOpsManager).
+
 Проект разделён на три слоя. Общий Avalonia-слой не знает деталей Android API, а Android-проекты предоставляют платформенную реализацию через bridge-интерфейсы.
 
 ```text
@@ -143,7 +157,7 @@ Agnosia проверяет profile owner и применяет политики
 | Скрыть или восстановить приложение | `DevicePolicyManager.setApplicationHidden(...)` |
 | Включить системное приложение в рабочем профиле | `DevicePolicyManager.enableSystemApp(...)` |
 | Управлять межпрофильным взаимодействием | `DevicePolicyManager.setCrossProfilePackages(...)` |
-| Отозвать runtime-разрешения у рабочего приложения | `DevicePolicyManager.setPermissionGrantState(...)` |
+| Запретить отдельное runtime-разрешение / снять запрет | `DevicePolicyManager.setPermissionGrantState(DENIED / DEFAULT)` с проверкой возвращённого результата и чтением политики |
 | Применить ограничения профиля | Device policy и user restrictions через `AgnosiaUtilities` |
 
 Если профиль удалён, недоступен или больше не управляется Agnosia, состояние переводится в один из вариантов `WorkProfileRecoveryKind`. UI показывает пользователю, что нужно удалить профиль, повторить настройку или перезапустить онбординг.

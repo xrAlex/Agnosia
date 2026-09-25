@@ -6,6 +6,16 @@ namespace Agnosia.Unit.Android.Commands;
 public sealed class AndroidCommandRouterTests
 {
     [Fact]
+    public void App_permission_query_uses_work_provider_with_activity_fallback()
+    {
+        var envelope = CreateEnvelope(AndroidCommandKind.QueryAppPermissions,
+            AndroidCommandTargetProfile.Work, AndroidCommandInteractivity.NonInteractive,
+            AndroidCommandPriority.UserBlocking);
+        Assert.Equal([AndroidCommandTransportKind.Provider, AndroidCommandTransportKind.Activity],
+            AndroidCommandRouter.GetRoute(envelope, providerEnabled: true).Transports);
+    }
+
+    [Fact]
     public void GetRoute_PackageStateQuery_UsesActivityTransport()
     {
         var envelope = CreateEnvelope(

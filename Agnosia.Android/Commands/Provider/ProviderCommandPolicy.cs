@@ -8,7 +8,8 @@ internal static class ProviderCommandPolicy
         or AndroidCommandKind.QueryAllFilesAccess or AndroidCommandKind.QueryPackageInstallAccess
         or AndroidCommandKind.QueryLogs or AndroidCommandKind.QueryCrossProfilePackages
         or AndroidCommandKind.QueryPackageState or AndroidCommandKind.FreezePackage
-        or AndroidCommandKind.UnfreezePackage or AndroidCommandKind.ClearLogs;
+        or AndroidCommandKind.UnfreezePackage or AndroidCommandKind.ClearLogs
+        or AndroidCommandKind.QueryAppPermissions;
 
     public static bool IsMutation(AndroidCommandKind kind) => kind is AndroidCommandKind.FreezePackage
         or AndroidCommandKind.UnfreezePackage or AndroidCommandKind.ClearLogs;

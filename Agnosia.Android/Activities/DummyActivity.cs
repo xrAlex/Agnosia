@@ -38,6 +38,7 @@ namespace Agnosia.Android.Activities;
     AgnosiaActions.RequestPackageInstallAccess,
     AgnosiaActions.QueryAllFilesAccess,
     AgnosiaActions.QueryPackageState,
+    AgnosiaActions.QueryAppPermissions,
     AgnosiaActions.RequestAllFilesAccess,
     AgnosiaActions.InstallPackage,
     AgnosiaActions.UninstallPackage,

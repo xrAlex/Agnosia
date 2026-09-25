@@ -95,6 +95,7 @@
         <Compile Include="Commands\Handlers\ClearLogsCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\QueryPermissionsCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\QueryPackageStateCommandHandler.cs"/>
+        <Compile Include="Commands\Handlers\QueryAppPermissionsCommandHandler.cs"/>
         <Compile Include="Commands\Handlers\SetPackageHiddenCommandHandler.cs"/>
         <Compile Include="Commands\Transports\DirectLocalCommandTransport.cs"/>
         <Compile Include="Gateways\AndroidQueryCache.cs"/>

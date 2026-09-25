@@ -613,6 +613,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public void HandlePrimaryActivityResumed()
     {
+        if (IsAppControlWindowOpen && SelectedApp is { IsPermissionDetailsExpanded: true } app)
+            _ = app.Permissions.RefreshCommand.ExecuteAsync(null);
         var handledPermissionResume = false;
         var pendingResumePermissionKind = _pendingResumePermissionKind;
         if (pendingResumePermissionKind is not null)
@@ -868,7 +870,10 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     {
         SelectedApp = app;
         IsAppControlWindowOpen = true;
+        if (app.IsPermissionDetailsExpanded) _ = app.Permissions.RefreshCommand.ExecuteAsync(null);
     }
+
+    internal AppPermissionsViewModel CreateAppPermissions(AppSnapshot app) => new(_appCommandService, app);
 
     internal void CloseAppControl()
     {

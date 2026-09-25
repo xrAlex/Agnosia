@@ -377,11 +377,13 @@ public static class AndroidProfileCommandGateway
         AndroidActivityCommandGateway commandRunner,
         string packageName,
         IReadOnlyList<string> permissions,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool clearPolicy = false)
     {
         var intent = new Intent(AgnosiaActions.RevokeRuntimePermissions);
         intent.PutExtra(AndroidCommandContract.ExtraPackage, packageName);
         intent.PutExtra(AndroidCommandContract.ExtraPermissions, permissions.ToArray());
+        intent.PutExtra(AndroidCommandContract.ExtraClearPermissionPolicy, clearPolicy);
 
         var result = await commandRunner.StartActivityForResultAsync(
                 intent,
@@ -390,7 +392,24 @@ public static class AndroidProfileCommandGateway
             .ConfigureAwait(false);
         return AndroidActivityResultApi.ToVoidOperationResult(
             result,
-            $"Runtime-разрешения отозваны: {permissions.Count}.");
+              clearPolicy ? "Запрет снят. Приложение сможет снова запросить доступ." : "Разрешение запрещено.");
+    }
+
+    internal static async Task<OperationResult> RevokeGrantedPermissionInWorkProfileAsync(
+        AndroidActivityCommandGateway commandRunner,
+        string packageName,
+        string permission,
+        CancellationToken cancellationToken)
+    {
+        var intent = new Intent(AgnosiaActions.RevokeRuntimePermissions);
+        intent.PutExtra(AndroidCommandContract.ExtraPackage, packageName);
+        intent.PutExtra(AndroidCommandContract.ExtraPermissions, new[] { permission });
+        intent.PutExtra(AndroidCommandContract.ExtraRevokeWithoutPolicy, true);
+
+        var result = await commandRunner.StartActivityForResultAsync(intent, true, cancellationToken)
+            .ConfigureAwait(false);
+        return AndroidActivityResultApi.ToVoidOperationResult(result,
+            "Доступ отозван. Приложение сможет снова запросить его.");
     }
 
     internal static async Task<OperationResult> SetCrossProfileInteractionAsync(

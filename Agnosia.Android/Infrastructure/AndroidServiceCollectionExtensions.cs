@@ -38,6 +38,7 @@ internal static class AndroidServiceCollectionExtensions
         services.AddSingleton<IAndroidCommandHandler>(_ => new SetPackageHiddenCommandHandler(true));
         services.AddSingleton<IAndroidCommandHandler>(_ => new SetPackageHiddenCommandHandler(false));
         services.AddSingleton<IAndroidCommandHandler, QueryPackageStateCommandHandler>();
+        services.AddSingleton<IAndroidCommandHandler, QueryAppPermissionsCommandHandler>();
 #if AGNOSIA_ANDROID
         services.AddSingleton<AndroidCommandExecutionContextFactory>();
         services.AddSingleton<IAndroidCommandTransport, DirectLocalCommandTransport>();

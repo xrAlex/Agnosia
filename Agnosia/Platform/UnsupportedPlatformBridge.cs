@@ -4,6 +4,15 @@ namespace Agnosia.Platform;
 
 public sealed class UnsupportedPlatformBridge : IPlatformBridge
 {
+    public Task<IReadOnlyList<AppPermissionSnapshot>> LoadAppPermissionsAsync(AppSnapshot app, CancellationToken cancellationToken = default) =>
+        Task.FromException<IReadOnlyList<AppPermissionSnapshot>>(new PlatformNotSupportedException(AndroidOnlyMessage));
+
+    public Task<OperationResult> SetAppPermissionDeniedAsync(AppSnapshot app, string permission, bool denied, CancellationToken cancellationToken = default) =>
+        AndroidOnlyFailureTask;
+
+    public Task<OperationResult> RevokeAppPermissionAsync(AppSnapshot app, string permission, CancellationToken cancellationToken = default) =>
+        AndroidOnlyFailureTask;
+
     private const string AndroidOnlyMessage = "Agnosia работает только на Android.";
     private const string ProvisioningMessage = "Agnosia требует Android с поддержкой рабочего профиля.";
 

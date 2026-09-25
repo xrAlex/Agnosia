@@ -18,7 +18,8 @@ public sealed class AndroidCommandIntentMapperTests
         { nameof(AndroidCommandKind.QueryUsageStatsAccess), AgnosiaActions.QueryUsageStatsAccess },
         { nameof(AndroidCommandKind.QueryPackageInstallAccess), AgnosiaActions.QueryPackageInstallAccess },
         { nameof(AndroidCommandKind.QueryAllFilesAccess), AgnosiaActions.QueryAllFilesAccess },
-        { nameof(AndroidCommandKind.QueryPackageState), "agnosia.action.QUERY_PACKAGE_STATE" }
+        { nameof(AndroidCommandKind.QueryPackageState), "agnosia.action.QUERY_PACKAGE_STATE" },
+        { nameof(AndroidCommandKind.QueryAppPermissions), AgnosiaActions.QueryAppPermissions }
     };
 
     [Theory]
