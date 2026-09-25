@@ -1,17 +1,23 @@
+using Agnosia.Models;
+
 namespace Agnosia.Android.Commands;
 
 internal static class ProviderTransportOptions
 {
-    // Opt in with -p:AgnosiaCommandProvider=true until cross-profile grants are verified on devices.
     public static bool Enabled
     {
         get
         {
-#if AGNOSIA_COMMAND_PROVIDER
-            return true;
+#if AGNOSIA_ANDROID
+            var preference = AndroidSettingsStore.LoadCommandTransportPreference(
+                ServiceRegistry.GetRequiredService<LocalStorageManager>());
 #else
-            return false;
+            var preference = CommandTransportPreference.Auto;
 #endif
+            return IsEnabled(preference);
         }
     }
+
+    public static bool IsEnabled(CommandTransportPreference preference) =>
+        preference is CommandTransportPreference.Auto or CommandTransportPreference.Provider;
 }

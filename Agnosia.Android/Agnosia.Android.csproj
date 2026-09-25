@@ -16,10 +16,6 @@
         <DefineConstants>$(DefineConstants);AGNOSIA_ANDROID</DefineConstants>
     </PropertyGroup>
 
-    <PropertyGroup Condition="'$(AgnosiaCommandProvider)' == 'true'">
-        <DefineConstants>$(DefineConstants);AGNOSIA_COMMAND_PROVIDER</DefineConstants>
-    </PropertyGroup>
-
     <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-android' and '$(AgnosiaAndroidPackageVariant)' == 'universal'">
         <!-- Release universal APK should include 32-bit and 64-bit Android ABIs. -->
         <RuntimeIdentifiers>android-arm;android-arm64;android-x86;android-x64</RuntimeIdentifiers>

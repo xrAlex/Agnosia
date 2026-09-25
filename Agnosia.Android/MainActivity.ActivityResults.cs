@@ -9,6 +9,7 @@ public partial class MainActivity
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
     {
         base.OnActivityResult(requestCode, resultCode, data);
+        _activityResumeRefreshPolicy.RecordActivityResult(_isResumed);
 
         TaskCompletionSource<AndroidActivityResult>? completionSource;
         lock (RequestSync)
@@ -164,6 +165,7 @@ public partial class MainActivity
             Log.Debug(
                 LogTag,
                 $"Starting activity request. requestCode={request.RequestCode}, action={request.Intent.Action ?? "<none>"}, completeOnStart={request.CompleteOnStart}.");
+            _activityResumeRefreshPolicy.RecordActivityStart(request.Intent.Action);
             if (request.CompleteOnStart)
             {
                 StartActivity(request.Intent);
@@ -180,6 +182,7 @@ public partial class MainActivity
         }
         catch (Exception exception)
         {
+            _activityResumeRefreshPolicy.RecordActivityStart(null);
             lock (RequestSync)
             {
                 PendingResults.Remove(request.RequestCode);

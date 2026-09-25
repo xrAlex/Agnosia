@@ -37,6 +37,7 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
     private bool _isResumed;
     private CommandProfileAvailabilityReceiver? _commandProfileReceiver;
     private bool _pendingDrainScheduled;
+    private readonly ActivityResumeRefreshPolicy _activityResumeRefreshPolicy = new();
     private long _lastPublishedMoveAtMilliseconds;
 
     private static MainActivity? Current { get; set; }
@@ -84,8 +85,8 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         AndroidStartup.ConfigurePrimaryProfileServices(this);
         ServiceRegistry.GetRequiredService<AndroidPlatformBridge>().AttachActivity(this);
         Current = this;
-        if (ProviderTransportOptions.Enabled)
-            _commandProfileReceiver = CommandProfileAvailabilityReceiver.Register(this);
+        // Keep availability notifications active when the user changes transport without restarting.
+        _commandProfileReceiver = CommandProfileAvailabilityReceiver.Register(this);
     }
 
     private void StartBackgroundInitialization()
@@ -138,7 +139,8 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         Current = this;
         ServiceRegistry.GetRequiredService<AndroidPlatformBridge>().AttachActivity(this);
         if (ProviderTransportOptions.Enabled) _ = PrepareCommandAccessAsync();
-        ServiceRegistry.NotifyPrimaryActivityResumed();
+        if (_activityResumeRefreshPolicy.ShouldRefreshDashboardOnResume())
+            ServiceRegistry.NotifyPrimaryActivityResumed();
         DrainPendingActivityStarts();
         _ = RecoverVpnOnResumeAsync();
     }
