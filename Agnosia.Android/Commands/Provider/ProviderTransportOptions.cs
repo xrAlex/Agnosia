@@ -4,18 +4,29 @@ namespace Agnosia.Android.Commands;
 
 internal static class ProviderTransportOptions
 {
-    public static bool Enabled
+    private static int _currentPreference = -1;
+
+    public static CommandTransportPreference CurrentPreference
     {
         get
         {
+            var selected = Volatile.Read(ref _currentPreference);
+            if (selected >= 0) return (CommandTransportPreference)selected;
 #if AGNOSIA_ANDROID
-            var preference = AndroidSettingsStore.LoadCommandTransportPreference(
+            return AndroidSettingsStore.LoadCommandTransportPreference(
                 ServiceRegistry.GetRequiredService<LocalStorageManager>());
 #else
-            var preference = CommandTransportPreference.Auto;
+            return CommandTransportPreference.Auto;
 #endif
-            return IsEnabled(preference);
         }
+    }
+
+    public static void SetCurrentPreference(CommandTransportPreference preference) =>
+        Volatile.Write(ref _currentPreference, (int)preference);
+
+    public static bool Enabled
+    {
+        get => IsEnabled(CurrentPreference);
     }
 
     public static bool IsEnabled(CommandTransportPreference preference) =>

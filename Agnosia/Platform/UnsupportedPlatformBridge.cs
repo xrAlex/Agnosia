@@ -193,6 +193,10 @@ public sealed class UnsupportedPlatformBridge : IPlatformBridge
         return AndroidOnlyFailureTask;
     }
 
+    public void SetCommandTransportPreference(CommandTransportPreference preference)
+    {
+    }
+
     public Task<OperationResult> SaveSettingsAsync(AppSettingsSnapshot settings,
         CancellationToken cancellationToken = default)
     {

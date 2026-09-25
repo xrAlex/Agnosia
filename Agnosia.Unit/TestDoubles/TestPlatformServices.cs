@@ -353,6 +353,13 @@ public sealed class TestPlatformServices :
             : SaveSettingsHandler(settings, cancellationToken);
     }
 
+    public List<CommandTransportPreference> SelectedTransportPreferences { get; } = [];
+
+    public void SetCommandTransportPreference(CommandTransportPreference preference)
+    {
+        SelectedTransportPreferences.Add(preference);
+    }
+
     public Task<OperationResult> OpenDocumentsUiAsync(CancellationToken cancellationToken = default)
     {
         OpenDocumentsUiRequests++;

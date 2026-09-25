@@ -200,9 +200,11 @@ Agnosia проектируется как инструмент снижения 
 
 ## Межпрофильные команды
 
-Android разделяет личный и рабочий профили, поэтому операции в рабочем профиле выполняются только внутри фактического целевого профиля. Команды проходят через `AndroidCommandCenter`, но команда считается успешной только если она выполнилась в запрошенном Android-профиле. Локальные команды используют `DirectLocal`; все команды в рабочий профиль используют подписанный `DummyActivity`, перенесённый системным DPM intent-forwarder. Разрешение `INTERACT_ACROSS_PROFILES`, `BindServiceAsUser` и Messenger-service для команд не используются.
+Android разделяет личный и рабочий профили, поэтому операции в рабочем профиле выполняются только внутри фактического целевого профиля. Команды `AndroidCommandCenter` считаются успешными только при выполнении в запрошенном Android-профиле. Локальные команды используют `DirectLocal`. Для поддерживаемых неинтерактивных команд рабочего профиля режим `Provider` вызывает `ContentResolver.Call` с URI целевого пользователя; режим `Activity` запускает подписанный `DummyActivity` через системный DPM intent-forwarder. `Авто` сначала выбирает Provider и при безопасном сбое переходит на Activity. Ручные режимы не делают fallback. Маршрут определяется при запуске команды из очереди; изменение настройки действует сразу для последующих команд. Если режим переключён с `Авто` на ручной `Provider` во время вызова Provider, последующий Activity fallback отменяется. Разрешение `INTERACT_ACROSS_PROFILES`, `BindServiceAsUser` и Messenger-service для команд не используются.
 
-`DummyActivity` строит `AndroidCommandExecutionContext` из собственного контекста Activity/профиля и вызывает общий обработчик команд через `AndroidCommandHandlerExecutor`. Так бизнес-логика остаётся в одном источнике, а зависимость от `MainActivity` в рабочем профиле не появляется. Activity использует отдельную non-dimmed translucent theme, чтобы неизбежный переход не затемнял экран во время коротких read-команд.
+`DummyActivity` строит `AndroidCommandExecutionContext` из собственного контекста Activity/профиля и вызывает общий обработчик команд через `AndroidCommandHandlerExecutor`; Provider использует те же обработчики в рабочем профиле. Для первого предоставления постоянного URI-доступа Provider открывает `DummyActivity`, даже если выбран ручной Provider. Повторные команды с действующим доступом идут через URI. Activity использует отдельную non-dimmed translucent theme, чтобы переход не затемнял экран во время коротких команд.
+
+Синхронизация булевых настроек рабочего профиля (`SynchronizePreference`) также проходит через `AndroidCommandCenter`. Provider применяет её в рабочем профиле через URI, а Activity — через `DummyActivity`. Команда изменяет состояние, поэтому `Авто` повторяет её через Activity только при подтверждённом сбое до выполнения Provider.
 
 Каждый результат команды фиксирует запрошенный профиль, фактический профиль выполнения, транспорт, цепочку fallback и источник контекста. Несовпадение запрошенного и фактического профиля считается ошибкой команды.
 
@@ -218,7 +220,8 @@ Android command
    ▼
 AndroidCommandCenter
    ├─ DirectLocal для личного профиля
-   └─ Activity → DPM intent-forwarder → DummyActivity → AndroidCommandHandlerExecutor
+   └─ Work: Provider → content:// URI → CommandProvider → AndroidCommandHandlerExecutor
+            Activity → DPM intent-forwarder → DummyActivity → AndroidCommandHandlerExecutor
 ```
 
 Интерактивные и mutation-команды, которым нужен системный экран или Activity result, остаются Activity-потоком:
@@ -393,6 +396,7 @@ AndroidDashboardReader.LoadAppInventoryAsync()
    │    └─ PackageManager.GetInstalledApplications(...)
    └─ QueryAppsAsync(Work)
         └─ AndroidCommandCenter → handler в целевом профиле
+             ├─ Provider URI → CommandProvider
              └─ DPM intent-forwarder → signed DummyActivity
 ```
 

@@ -11,6 +11,7 @@ public sealed class ProviderRoutingTests
     [InlineData(AndroidCommandKind.QueryPermissions, true)]
     [InlineData(AndroidCommandKind.FreezePackage, true)]
     [InlineData(AndroidCommandKind.UnfreezePackage, true)]
+    [InlineData(AndroidCommandKind.SynchronizePreference, true)]
     [InlineData(AndroidCommandKind.InstallPackage, false)]
     [InlineData(AndroidCommandKind.StartFileShuttleParentToWork, false)]
     [InlineData(AndroidCommandKind.SetLockdownEnabled, false)]
@@ -51,6 +52,20 @@ public sealed class ProviderRoutingTests
 
         Assert.True(result.Succeeded);
         Assert.Equal(1, activity.Calls);
+    }
+
+    [Fact]
+    public async Task PreferenceSyncDoesNotRepeatAfterUncertainProviderOutcome()
+    {
+        var activity = new RecordingTransport(AndroidCommandTransportKind.Activity, succeeds: true);
+        var provider = new RecordingTransport(AndroidCommandTransportKind.Provider, errorCode: "outcome_unknown");
+        var center = new AndroidCommandCenter(new AndroidCommandScheduler(), [provider, activity], () => true);
+
+        var result = await center.ExecuteAsync(Envelope(AndroidCommandKind.SynchronizePreference),
+            TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(0, activity.Calls);
     }
 
     [Theory]
@@ -116,6 +131,58 @@ public sealed class ProviderRoutingTests
     }
 
     [Fact]
+    public async Task QueuedCommandUsesPreferenceSelectedBeforeDispatch()
+    {
+        var activity = new RecordingTransport(AndroidCommandTransportKind.Activity, succeeds: true);
+        var provider = new RecordingTransport(AndroidCommandTransportKind.Provider, succeeds: true);
+        var preference = CommandTransportPreference.Activity;
+        var scheduler = new AndroidCommandScheduler();
+        var center = new AndroidCommandCenter(scheduler, [provider, activity], () => true, () => preference);
+        var releaseGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gateEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var blocker = scheduler.RunAsync(Envelope(AndroidCommandKind.FreezePackage) with
+            { Priority = AndroidCommandPriority.Mutation }, async _ =>
+        {
+            gateEntered.SetResult();
+            await releaseGate.Task;
+            return true;
+        }, TestContext.Current.CancellationToken);
+        await gateEntered.Task;
+
+        var command = center.ExecuteAsync(Envelope(AndroidCommandKind.FreezePackage) with
+            { Priority = AndroidCommandPriority.Mutation }, TestContext.Current.CancellationToken);
+        preference = CommandTransportPreference.Provider;
+        releaseGate.SetResult();
+        await blocker;
+        var result = await command;
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(AndroidCommandTransportKind.Provider, result.Transport);
+        Assert.Equal(1, provider.Calls);
+        Assert.Equal(0, activity.Calls);
+    }
+
+    [Fact]
+    public async Task SwitchingAutoToProviderWhileProviderIsRunningPreventsActivityFallback()
+    {
+        var activity = new RecordingTransport(AndroidCommandTransportKind.Activity, succeeds: true);
+        var provider = new DeferredProviderTransport();
+        var preference = CommandTransportPreference.Auto;
+        var center = new AndroidCommandCenter(new AndroidCommandScheduler(), [provider, activity],
+            () => true, () => preference);
+
+        var command = center.ExecuteAsync(Envelope(AndroidCommandKind.QueryApps), TestContext.Current.CancellationToken);
+        await provider.Entered.Task;
+        preference = CommandTransportPreference.Provider;
+        provider.Fail();
+        var result = await command;
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(AndroidCommandTransportKind.Provider, result.Transport);
+        Assert.Equal(0, activity.Calls);
+    }
+
+    [Fact]
     public async Task AutoFallsBackWhenProviderReadHangs()
     {
         var activity = new RecordingTransport(AndroidCommandTransportKind.Activity, succeeds: true);
@@ -160,5 +227,23 @@ public sealed class ProviderRoutingTests
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             throw new InvalidOperationException("Unreachable.");
         }
+    }
+
+    private sealed class DeferredProviderTransport : IAndroidCommandTransport
+    {
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public AndroidCommandTransportKind Kind => AndroidCommandTransportKind.Provider;
+
+        public async Task<AndroidCommandResultEnvelope> ExecuteAsync(
+            AndroidCommandEnvelope envelope, CancellationToken cancellationToken)
+        {
+            Entered.SetResult();
+            await _release.Task.WaitAsync(cancellationToken);
+            return AndroidCommandResultEnvelope.Failure(envelope.CorrelationId, envelope.Kind, Kind,
+                "denied", "grant_missing", TimeSpan.Zero, "");
+        }
+
+        public void Fail() => _release.SetResult();
     }
 }

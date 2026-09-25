@@ -480,13 +480,20 @@ public static class AndroidProfileCommandGateway
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var intent = new Intent(AgnosiaActions.SynchronizePreference);
-        intent.PutExtra(AndroidCommandContract.ExtraPreferenceName, name);
-        intent.PutExtra(AndroidCommandContract.ExtraPreferenceBoolean, value);
         AgnosiaRuntime.Initialize(context);
-        return await ServiceRegistry.GetRequiredService<AndroidActivityCommandGateway>()
-            .RunVoidOperationAsync(intent, true, cancellationToken, "Настройка применена в рабочем профиле.")
-            .ConfigureAwait(false);
+        var envelope = new AndroidCommandEnvelope(
+            Guid.NewGuid(),
+            AndroidCommandKind.SynchronizePreference,
+            AndroidCommandTargetProfile.Work,
+            AndroidCommandInteractivity.NonInteractive,
+            AndroidCommandPriority.Mutation,
+            TimeSpan.FromSeconds(30),
+            JsonSerializer.Serialize(new { Name = name, Boolean = value }));
+        var result = await ServiceRegistry.GetRequiredService<AndroidCommandCenter>()
+            .ExecuteAsync(envelope, cancellationToken).ConfigureAwait(false);
+        return result.Succeeded
+            ? OperationResult.Success("Настройка применена в рабочем профиле.")
+            : OperationResult.Failure(result.Message);
     }
 
     private static async Task<bool> QueryWorkPermissionBooleanAsync(

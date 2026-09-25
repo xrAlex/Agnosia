@@ -22,6 +22,8 @@ internal sealed class DashboardSettingsSaveCoordinator
     private bool _loadedShowAllApps;
     private int _saveVersion;
 
+    public bool HasUncommittedChanges => _hasPendingSave || _isProcessing;
+
     public DashboardSettingsSaveCoordinator(
         ISettingsPlatformService settingsService,
         TimeSpan saveDelay,

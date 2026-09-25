@@ -9,10 +9,12 @@ internal static class ProviderCommandPolicy
         or AndroidCommandKind.QueryLogs or AndroidCommandKind.QueryCrossProfilePackages
         or AndroidCommandKind.QueryPackageState or AndroidCommandKind.FreezePackage
         or AndroidCommandKind.UnfreezePackage or AndroidCommandKind.ClearLogs
+        or AndroidCommandKind.SynchronizePreference
         or AndroidCommandKind.QueryAppPermissions;
 
     public static bool IsMutation(AndroidCommandKind kind) => kind is AndroidCommandKind.FreezePackage
-        or AndroidCommandKind.UnfreezePackage or AndroidCommandKind.ClearLogs;
+        or AndroidCommandKind.UnfreezePackage or AndroidCommandKind.ClearLogs
+        or AndroidCommandKind.SynchronizePreference;
 
     public static bool CanFallbackToActivity(AndroidCommandKind kind, string? errorCode)
     {

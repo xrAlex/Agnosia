@@ -1414,7 +1414,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
             VpnAfterWorkFreezeClient = snapshot.Settings.VpnAfterWorkFreezeClient;
             TunguskaAutomationToken = snapshot.Settings.TunguskaAutomationToken;
             LoggingEnabled = snapshot.Settings.LoggingEnabled;
-            SelectedCommandTransport = snapshot.Settings.CommandTransport;
+            if (!_settingsSaveCoordinator.HasUncommittedChanges)
+                SelectedCommandTransport = snapshot.Settings.CommandTransport;
             SelectedTheme = snapshot.Settings.Theme;
             _settingsSaveCoordinator.SetLoadedShowAllApps(snapshot.Settings.ShowAllApps);
 

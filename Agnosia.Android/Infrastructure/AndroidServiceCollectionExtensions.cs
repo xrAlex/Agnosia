@@ -18,10 +18,10 @@ internal static class AndroidServiceCollectionExtensions
             provider.GetRequiredService<AndroidCommandScheduler>(),
             provider.GetServices<IAndroidCommandTransport>(),
 #if AGNOSIA_ANDROID
-            () => ProviderTransportOptions.Enabled && !provider.GetRequiredService<CommandAccessCoordinator>().UseLegacyProfileRoute,
-            () => AndroidSettingsStore.LoadCommandTransportPreference(provider.GetRequiredService<LocalStorageManager>())));
+            () => !provider.GetRequiredService<CommandAccessCoordinator>().UseLegacyProfileRoute,
+            () => ProviderTransportOptions.CurrentPreference));
 #else
-            () => ProviderTransportOptions.Enabled));
+            () => true));
 #endif
         services.AddSingleton<AndroidCommandHandlerExecutor>();
         services.AddSingleton<IAndroidCommandHandler, ProfilePingCommandHandler>();
@@ -31,6 +31,7 @@ internal static class AndroidServiceCollectionExtensions
         services.AddSingleton<IAndroidCommandHandler, QueryCrossProfilePackagesCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, QueryLogsCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, ClearLogsCommandHandler>();
+        services.AddSingleton<IAndroidCommandHandler, SynchronizePreferenceCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler, QueryPermissionsCommandHandler>();
         services.AddSingleton<IAndroidCommandHandler>(_ => new QueryPermissionsCommandHandler(AndroidCommandKind.QueryUsageStatsAccess));
         services.AddSingleton<IAndroidCommandHandler>(_ => new QueryPermissionsCommandHandler(AndroidCommandKind.QueryPackageInstallAccess));

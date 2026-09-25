@@ -163,6 +163,14 @@ public partial class MainActivity : AvaloniaMainActivity, IAndroidActivityHost
         catch (Exception exception) { Log.Warn(LogTag, $"Provider preparation failed: {exception.GetType().Name}."); }
     }
 
+    internal static void PrepareCommandAccessForPreferenceChange()
+    {
+        if (!CanPrepareCommandAccess) return;
+        MainActivity? activity;
+        lock (RequestSync) activity = Current;
+        if (activity is not null) _ = activity.PrepareCommandAccessAsync();
+    }
+
     protected override void OnPause()
     {
         _isResumed = false;

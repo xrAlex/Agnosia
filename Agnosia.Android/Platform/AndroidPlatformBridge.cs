@@ -247,6 +247,13 @@ public sealed class AndroidPlatformBridge : IPlatformBridge
         return _appCommandCoordinator.SetLockdownInternetAccessAsync(app, blocked, cancellationToken);
     }
 
+    public void SetCommandTransportPreference(CommandTransportPreference preference)
+    {
+        ProviderTransportOptions.SetCurrentPreference(preference);
+        if (ProviderTransportOptions.Enabled)
+            MainActivity.PrepareCommandAccessForPreferenceChange();
+    }
+
     public Task<OperationResult> SaveSettingsAsync(AppSettingsSnapshot settings,
         CancellationToken cancellationToken = default)
     {

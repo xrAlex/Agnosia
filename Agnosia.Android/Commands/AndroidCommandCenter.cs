@@ -30,9 +30,7 @@ internal sealed class AndroidCommandCenter
         AndroidCommandEnvelope envelope,
         CancellationToken cancellationToken)
     {
-        var preference = _transportPreference();
-        var providerEnabled = preference == CommandTransportPreference.Auto && _providerEnabled();
-        var route = AndroidCommandRouter.GetRoute(envelope, providerEnabled, preference);
+        AndroidCommandRoute? route = null;
         using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var timeout = envelope.Timeout > TimeSpan.Zero
             ? envelope.Timeout
@@ -43,14 +41,14 @@ internal sealed class AndroidCommandCenter
         {
             return await _scheduler.RunAsync(
                     envelope,
-                    token => ExecuteWithFallbackAsync(envelope, route, token),
+                    token => ExecuteWithFallbackAsync(envelope, route = SelectRoute(envelope), token),
                     timeoutCancellation.Token)
                 .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested
                                                 && timeoutCancellation.IsCancellationRequested)
         {
-            var timeoutTransport = route.Transports.FirstOrDefault();
+            var timeoutTransport = (route ?? SelectRoute(envelope)).Transports.FirstOrDefault();
             return AndroidCommandResultEnvelope.Failure(
                 envelope.CorrelationId,
                 envelope.Kind,
@@ -60,6 +58,13 @@ internal sealed class AndroidCommandCenter
                 timeout,
                 $"timeoutMs={timeout.TotalMilliseconds:0}");
         }
+    }
+
+    private AndroidCommandRoute SelectRoute(AndroidCommandEnvelope envelope)
+    {
+        var preference = _transportPreference();
+        var providerEnabled = preference == CommandTransportPreference.Auto && _providerEnabled();
+        return AndroidCommandRouter.GetRoute(envelope, providerEnabled, preference);
     }
 
     private async Task<AndroidCommandResultEnvelope> ExecuteWithFallbackAsync(
@@ -131,7 +136,8 @@ internal sealed class AndroidCommandCenter
 
             if (index == route.Transports.Count - 1
                 || transportKind == AndroidCommandTransportKind.Provider
-                   && !ProviderCommandPolicy.CanFallbackToActivity(envelope.Kind, result.ErrorCode))
+                   && (_transportPreference() == CommandTransportPreference.Provider
+                       || !ProviderCommandPolicy.CanFallbackToActivity(envelope.Kind, result.ErrorCode)))
             {
                 diagnostics.Add($"terminalFailure={transportKind}; reason={result.ErrorCode ?? "failed"}");
                 return Complete(envelope, result, diagnostics);

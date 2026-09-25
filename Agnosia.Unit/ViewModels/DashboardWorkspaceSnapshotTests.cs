@@ -105,8 +105,31 @@ public sealed class DashboardWorkspaceSnapshotTests
         Assert.True(viewModel.IsActivityTransportSelected);
         viewModel.SelectProviderTransportCommand.Execute(null);
         Assert.True(viewModel.IsProviderTransportSelected);
+        Assert.Equal(CommandTransportPreference.Provider, services.SelectedTransportPreferences.Last());
+        Assert.Empty(services.SavedSettings);
         viewModel.SelectAutoTransportCommand.Execute(null);
         Assert.True(viewModel.IsAutoTransportSelected);
+        Assert.Equal(CommandTransportPreference.Auto, services.SelectedTransportPreferences.Last());
+    }
+
+    [Fact]
+    public async Task RefreshDoesNotRestorePersistedTransportWhileSelectionIsPendingSave()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(settings: AppSettingsSnapshot.Default with
+            {
+                CommandTransport = CommandTransportPreference.Activity
+            })
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+        await viewModel.EnsureInitializedAsync();
+
+        viewModel.SelectProviderTransportCommand.Execute(null);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.IsProviderTransportSelected);
+        Assert.Equal(CommandTransportPreference.Provider, services.SelectedTransportPreferences.Last());
     }
 
     [Fact]

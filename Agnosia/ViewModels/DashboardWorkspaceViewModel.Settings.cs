@@ -27,7 +27,11 @@ public partial class DashboardWorkspaceViewModel
 
     partial void OnShowAllAppsChanged(bool value) => QueueSettingsSave();
 
-    partial void OnSelectedCommandTransportChanged(CommandTransportPreference value) => QueueSettingsSave();
+    partial void OnSelectedCommandTransportChanged(CommandTransportPreference value)
+    {
+        _settingsService.SetCommandTransportPreference(value);
+        QueueSettingsSave();
+    }
 
     partial void OnDisableVpnBeforeWorkLaunchChanged(bool value) => QueueSettingsSave();
 
