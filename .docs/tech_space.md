@@ -1,4 +1,4 @@
-# Agnosia: техническое описание (Сгенерировано ИИ)
+# Agnosia: техническое описание
 
 ## Назначение
 
@@ -22,7 +22,7 @@
 
 ### Управление разрешениями выбранного приложения
 
-`AppPermissionsViewModel` загружает отдельный актуальный список через `IAppCommandService.LoadAppPermissionsAsync`; список инвентаря и каталог оценки риска для этой цели не используются. `AndroidAppPermissionReader` получает `PackageInfo.RequestedPermissions` с `GET_PERMISSIONS`, включая разрешения OEM и сторонних пакетов, читает `PermissionInfo` для уровня защиты, а состояние выдачи — из соответствующего `RequestedPermissionsFlags`. Неполученное состояние не подменяется на «не выдано». Названия и краткие описания вынесены в `AppPermissionDictionary`: он покрывает 372 публичные константы локального SDK 36, 30 новых констант из [справочника Android Manifest.permission](https://developer.android.com/reference/android/Manifest.permission), 95 разрешений [Health Connect](https://developer.android.com/reference/android/health/connect/HealthPermissions), 6 разрешений [Ad Services](https://developer.android.com/reference/android/adservices/common/AdServicesPermissions) и проверенные разрешения старых APK. Health Connect доступен с Android 9 через отдельное приложение. Для разрешений вне словаря UI показывает «Неизвестное разрешение», сохраняя техническое имя для поиска и диагностики. Доступность отзыва определяется Android, а не словарём. Выданные разрешения без действия отзыва получают пометку «нельзя отозвать» рядом со статусом.
+`AppPermissionsViewModel` загружает отдельный актуальный список через `IAppCommandService.LoadAppPermissionsAsync`; список инвентаря и каталог оценки риска для этой цели не используются. `AndroidAppPermissionReader` получает `PackageInfo.RequestedPermissions` с `GET_PERMISSIONS`, включая разрешения OEM и сторонних пакетов, читает `PermissionInfo` для уровня защиты, а состояние выдачи — из соответствующего `RequestedPermissionsFlags`. Неполученное состояние не подменяется на «не выдано». Названия и краткие описания вынесены в `AppPermissionDictionary`: он покрывает публичные разрешения Android из локального SDK и [справочника Manifest.permission](https://developer.android.com/reference/android/Manifest.permission), разрешения [Health Connect](https://developer.android.com/reference/android/health/connect/HealthPermissions), [Ad Services](https://developer.android.com/reference/android/adservices/common/AdServicesPermissions) и проверенные разрешения старых APK. Health Connect доступен с Android 9 через отдельное приложение. Для разрешений вне словаря UI показывает «Неизвестное разрешение», сохраняя техническое имя для поиска и диагностики. Доступность отзыва определяется Android, а не словарём. Выданные разрешения без действия отзыва получают пометку «нельзя отозвать» рядом со статусом.
 
 В рабочем профиле чтение идёт через аутентифицированную `QueryAppPermissions` (Provider с Activity fallback), проверяет владельца профиля и выполняется под `HiddenAppSessionConcurrency`. `getPermissionGrantState` дополняет обычное состояние выдачи запретом/выдачей политикой. Обычные и signature-разрешения manifest не получают кнопки изменения; специальные разрешения с `PROTECTION_FLAG_APPOP` читаются через системное отображение `PermissionToOp` и AppOps, а при недоступности данных получают неизвестный статус. Закрытые системные permission flags не читаются через reflection.
 
@@ -34,7 +34,7 @@
 
 Основание поведения: [Android DevicePolicyManager](https://developer.android.com/reference/android/app/admin/DevicePolicyManager#setPermissionGrantState(android.content.ComponentName,%20java.lang.String,%20java.lang.String,%20int)), [PackageInfo](https://developer.android.com/reference/android/content/pm/PackageInfo#requestedPermissions), [PermissionInfo](https://developer.android.com/reference/android/content/pm/PermissionInfo), [AppOpsManager](https://developer.android.com/reference/android/app/AppOpsManager).
 
-Проект разделён на три слоя. Общий Avalonia-слой не знает деталей Android API, а Android-проекты предоставляют платформенную реализацию через bridge-интерфейсы.
+Проект разделён на три прикладных слоя и отдельный тестовый проект. Общий Avalonia-слой не знает деталей Android API, а Android-проекты предоставляют платформенную реализацию через bridge-интерфейсы.
 
 ```text
 ┌────────────────────────────────────────────────────────────┐
@@ -122,10 +122,12 @@ UI собран вокруг одного рабочего пространст�
 | --- | --- | --- |
 | `OverviewSectionView` | Состояние профиля, общий статус, количество приложений и изолированных пакетов. | Обновление состояния через dashboard snapshot. |
 | `AppsSectionView` | Каталог личного и рабочего профиля, поиск, risk badge и карточки приложений. | Копировать, переместить, открыть, скрыть, удалить, ярлык, runtime-разрешения. |
-| `SettingsSectionView` | Разрешения, тема, поведение каталога и логирование. | Сохранение настроек с debounce. |
+| `ModulesSectionView` | Список File Shuttle, Lockdown, VPN Guard и Risk Engine с состояниями. | Открыть детали и включить или выключить модуль. |
+| `SettingsSectionView` | Разрешения, тема, транспорт команд, поведение каталога и логирование. | Сохранение настроек с debounce. |
 | `OnboardingOverlayView` | Первичная настройка: приветствие, рабочий профиль, разрешения, финальный шаг. | Создать профиль, запросить доступы, завершить настройку. |
 | `PermissionsOverlayView` | Детальный список системных доступов. | Открыть нужный экран Android-настроек. |
 | `AppControlOverlayView` | Действия над выбранным приложением и детали риска разрешений. | Операции из `IAppCommandService`. |
+| `ModuleDetailsOverlayView` | Описание модуля, требования и доступные действия. | Переключить модуль; для File Shuttle открыть Files, для VPN Guard выбрать клиент. |
 | `LogOverlayView` | Журнал событий и строка диагностики устройства. | Просмотр и очистка через настройки логирования. |
 | Work profile recovery overlay | Ошибка или потеря рабочего профиля. | Открыть настройки профиля или начать онбординг заново. |
 
@@ -164,7 +166,7 @@ Agnosia проверяет profile owner и применяет политики
 
 Во время провижининга Agnosia создаёт 32-байтный ключ, сохраняет его в личном профиле и передаёт в рабочий профиль через `DevicePolicyManager.ExtraProvisioningAdminExtrasBundle`. `AgnosiaDeviceAdminReceiver` в рабочем профиле сохраняет этот ключ, вызывает `setProfileEnabled`, регистрирует межпрофильные intent-фильтры и применяет ограничения. Личный профиль записывает факт провижининга через `ManagedProfileProvisionedReceiver` или финальную команду `FinalizeProvision`; если Android передал `UserHandle`, дополнительно сохраняются handle и serial рабочего пользователя.
 
-Проверка профиля не ограничивается одним флагом. `AndroidWorkProfileDiagnosticsReader` смотрит на `UserManager`, quiet mode, состояние запуска пользователя, сохранённый serial и доступность DPM cross-profile target. После этого `AndroidProfileCommandGateway` выполняет `ProfilePing` через `AndroidCommandCenter` и подписанный `DummyActivity`, который открывается через системный DPM intent-forwarder. Каждый Activity-result подписывается HMAC вместе с `correlationId`, видом команды и Android result code, а gateway при несовпадении любого поля завершает запрос fail closed. Отдельного silent service и автоматической ротации потерянного ключа нет: при отсутствии ключа профиль требует повторной настройки. Если версия APK в рабочем профиле отличается от личной, `AndroidDashboardReader` пытается обновить Agnosia в рабочем профиле через тот же package-install поток.
+Проверка профиля не ограничивается одним флагом. `AndroidWorkProfileDiagnosticsReader` смотрит на `UserManager`, quiet mode, состояние запуска пользователя, сохранённый serial и доступность DPM cross-profile target. После этого `AndroidProfileCommandGateway` выполняет `ProfilePing` через `AndroidCommandCenter`: в автоматическом режиме сначала через Provider, а при допустимом сбое через подписанный `DummyActivity`, который открывается системным DPM intent-forwarder. Activity-result подписывается HMAC вместе с `correlationId`, видом команды и Android result code, а gateway при несовпадении любого поля завершает запрос fail closed. Отдельного silent service и автоматической ротации потерянного ключа нет: при отсутствии ключа профиль требует повторной настройки. Если версия APK в рабочем профиле отличается от личной, `AndroidDashboardReader` пытается обновить Agnosia в рабочем профиле через тот же package-install поток.
 
 ### Создание через root
 
@@ -193,7 +195,7 @@ Agnosia проектируется как инструмент снижения 
 | Приложение использует чувствительные разрешения | UI показывает риск-комбинации и позволяет отозвать runtime-разрешения у рабочих приложений. |
 | Приложение проверяет активный VPN | Перед запуском рабочей копии Agnosia может временно отключить VPN и вернуть его после заморозки. |
 | Приложению не нужен интернет | Lockdown оставляет выбранный рабочий пакет внутри технического always-on VPN без forwarding, а остальные рабочие приложения выводит в direct-network allowlist. |
-| Приложение взаимодействует между профилями | Cross-profile interaction управляется отдельной политикой. |
+| Приложение взаимодействует между профилями | Agnosia задаёт allowlist для запроса согласия на cross-profile interaction; фактический доступ зависит от системного согласия и других политик Android. |
 | Команда приходит не из доверенного профиля | Межпрофильные команды подписываются HMAC и имеют ограниченный срок действия. |
 
 Вне зоны ответственности остаются серверная сторона приложения, данные, которые пользователь вводит вручную, скриншоты внутри самого приложения, сетевое поведение во время активной сессии и уязвимости Android/прошивки.
@@ -203,6 +205,10 @@ Agnosia проектируется как инструмент снижения 
 Android разделяет личный и рабочий профили, поэтому операции в рабочем профиле выполняются только внутри фактического целевого профиля. Команды `AndroidCommandCenter` считаются успешными только при выполнении в запрошенном Android-профиле. Локальные команды используют `DirectLocal`. Для поддерживаемых неинтерактивных команд рабочего профиля режим `Provider` вызывает `ContentResolver.Call` с URI целевого пользователя; режим `Activity` запускает подписанный `DummyActivity` через системный DPM intent-forwarder. `Авто` сначала выбирает Provider и при безопасном сбое переходит на Activity. Ручные режимы не делают fallback. Маршрут определяется при запуске команды из очереди; изменение настройки действует сразу для последующих команд. Если режим переключён с `Авто` на ручной `Provider` во время вызова Provider, последующий Activity fallback отменяется. Разрешение `INTERACT_ACROSS_PROFILES`, `BindServiceAsUser` и Messenger-service для команд не используются.
 
 `DummyActivity` строит `AndroidCommandExecutionContext` из собственного контекста Activity/профиля и вызывает общий обработчик команд через `AndroidCommandHandlerExecutor`; Provider использует те же обработчики в рабочем профиле. Для первого предоставления постоянного URI-доступа Provider открывает `DummyActivity`, даже если выбран ручной Provider. Повторные команды с действующим доступом идут через URI. Activity использует отдельную non-dimmed translucent theme, чтобы переход не затемнял экран во время коротких команд.
+
+`ProviderCommandPolicy` допускает чтение приложений, иконок, разрешений, журнала и состояния пакета, а также скрытие/показ пакета, очистку журнала и синхронизацию настройки. Установка и удаление APK, запуск приложения и изменение политики его разрешений остаются в Activity-маршруте. Ручной режим `Provider` не переключается на Activity для неподдерживаемой команды; интерактивные операции вне `AndroidCommandCenter` сохраняют собственный Activity-поток.
+
+`CommandProvider` не экспортирован для произвольных приложений. Первый подписанный `ProfilePing` через Activity выдаёт личной копии постоянный URI-доступ к рабочему профилю. При каждом вызове Provider проверяет UID вызывающего приложения, write-доступ к URI, родство профилей, статус profile owner и HMAC-запрос с идентификаторами пользователей, поколением профиля и сроком действия. Ответ также подписывается и сверяется с исходным запросом. Протокол ограничивает размер сообщения 256 КиБ, число иконок в одном запросе 24 и число одновременных вызовов двумя; `ProviderReplayStore` подавляет повторное выполнение запроса с тем же `correlationId` в рамках процесса.
 
 Синхронизация булевых настроек рабочего профиля (`SynchronizePreference`) также проходит через `AndroidCommandCenter`. Provider применяет её в рабочем профиле через URI, а Activity — через `DummyActivity`. Команда изменяет состояние, поэтому `Авто` повторяет её через Activity только при подтверждённом сбое до выполнения Provider.
 
@@ -224,22 +230,22 @@ AndroidCommandCenter
             Activity → DPM intent-forwarder → DummyActivity → AndroidCommandHandlerExecutor
 ```
 
-Интерактивные и mutation-команды, которым нужен системный экран или Activity result, остаются Activity-потоком:
+Установка и удаление APK, запуск приложения и изменение политики его разрешений требуют Activity-потока. Заморозка и восстановление пакета идут через командный центр и могут выполняться через Provider:
 
 ```text
 ViewModel
    │ IAppCommandService.SetFrozenAsync(app, true)
    ▼
 AndroidAppCommandCoordinator
-   │ создаёт Intent + подписывает HMAC
+   │ SetPackageHiddenInWorkProfileAsync
    ▼
-AndroidActivityCommandGateway
-   │ переносит Intent в нужный профиль
+AndroidCommandCenter
+   ├─ Provider → CommandProvider
+   └─ Activity → подписанный DummyActivity
    ▼
-DummyActivity
-   │ проверяет подпись, выполняет action
+SetPackageHiddenCommandHandler → проверка hidden-состояния
    ▼
-Result Intent → ViewModel обновляет состояние
+Результат команды → ViewModel обновляет состояние
 ```
 
 Защита команд строится на `AuthenticationUtility`:
@@ -272,7 +278,7 @@ File Shuttle - это SAF-мост для передачи файлов межд
 
 | Условие | Зачем нужно |
 | --- | --- |
-| `CrossProfileFileShuttleEnabled` | Пользователь явно включает мост в настройках Agnosia. |
+| `CrossProfileFileShuttleEnabled` | Пользователь явно включает мост на экране «Модули». |
 | `MANAGE_EXTERNAL_STORAGE` в обоих профилях | Локальный сервис каждого профиля может читать и отдавать файлы своего external storage. |
 | Включённый provider-компонент | `AgnosiaUtilities.ApplyCrossProfileFileShuttleComponentState(...)` включает `AgnosiaCrossProfileDocumentsProvider` только когда тумблер активен. |
 | Зарегистрированные cross-profile actions | `START_FILE_SHUTTLE_PARENT_TO_WORK` и `START_FILE_SHUTTLE_WORK_TO_PARENT` позволяют provider-у подключиться к агенту второго профиля. |
@@ -313,7 +319,7 @@ IPC построен без `.aidl`: используются `Android.OS.Messen
 
 Binding нужен только для получения service Messenger и сразу освобождается. Сервис завершается после 30 секунд простоя, учитывая открытые файловые дескрипторы, и уведомляет клиентов об отключении; broker освобождает свой поток. Выключение модуля закрывает broker и останавливает сервис. `OnTimeout` снимает foreground-состояние и останавливает сервис. После передачи дескриптора локальная копия освобождается с семантикой `PARCELABLE_WRITE_RETURN_VALUE`, чтобы не сообщать о завершении клиентской передачи раньше её закрытия.
 
-Запуск cross-profile bridge идёт через `PendingIntent`: `AndroidPendingIntentApi.CreateBackgroundActivityStartPendingIntent(...)` задаёт creator-side `SetPendingIntentCreatorBackgroundActivityStartMode(...)`, а `PendingIntent.Send(...)` получает sender-side `SetPendingIntentBackgroundActivityStartMode(...)`. Перед открытием Files из Agnosia bridge подключается асинхронно из видимой `MainActivity`, с отменой и тайм-аутом; системный экран открывается в UI-потоке. `DocumentsProvider` использует подготовленный client. Если Files открыт вручную без соединения, чтение каталога сообщает об ошибке; подключение следует повторить через Agnosia.
+Запуск cross-profile bridge идёт через `PendingIntent`: `AndroidPendingIntentApi.CreateBackgroundActivityStartPendingIntent(...)` задаёт creator-side `SetPendingIntentCreatorBackgroundActivityStartMode(...)`, а `PendingIntent.Send(...)` получает sender-side `SetPendingIntentBackgroundActivityStartMode(...)`. Кнопка открытия Files доступна в личном UI Agnosia: перед открытием bridge подключается асинхронно из видимой `MainActivity`, с отменой и тайм-аутом; системный экран открывается в UI-потоке. `DocumentsProvider` использует подготовленный client. Рабочая копия Agnosia не показывает UI, поэтому для Files рабочего профиля такого пути предварительного подключения нет. Если Files открыт вручную без соединения, чтение каталога сообщает об ошибке; из личного профиля подключение можно повторить через Agnosia.
 
 Границы безопасности:
 
@@ -370,15 +376,15 @@ Binding нужен только для получения service Messenger и �
 | --- | --- |
 | Копировать в рабочий профиль | Для пользовательских приложений передаётся APK и split APK в `PackageInstaller`; для системных вызывается `enableSystemApp`. |
 | Копировать в личный профиль | Запускается package operation из рабочего профиля обратно в личный. |
-| Переместить в рабочий профиль | Копирование в рабочий профиль, независимое подтверждение его состояния через подписанный Activity-result, затем удаление из личного. |
+| Переместить в рабочий профиль | Копирование в рабочий профиль, независимое подтверждение его состояния через `AndroidCommandCenter`, затем удаление из личного. |
 | Скрыть / восстановить | В рабочем профиле вызывается `setApplicationHidden`. |
-| Удалить | Пользовательские приложения удаляются через `PackageInstaller`; системные в рабочем профиле скрываются. |
-| Отозвать runtime-разрешения | Только для пользовательских приложений рабочего профиля. |
-| Межпрофильный доступ | Изменяется список пакетов, которым разрешён cross-profile interaction. |
+| Удалить | Пользовательские приложения удаляются через `PackageInstaller`. Внутренний путь для системного приложения рабочего профиля скрывает его, но кнопка удаления для системных пакетов в UI недоступна. |
+| Изменить runtime-разрешения | В подробном списке разрешений рабочего приложения можно запретить, снять запрет или разово отозвать подходящее runtime-разрешение. Это доступно и для системных рабочих приложений, если Android позволяет изменить конкретное разрешение. |
+| Межпрофильный доступ | `setCrossProfilePackages` задаёт список пакетов, которым администратор разрешает запросить согласие пользователя на cross-profile interaction. Это не выдаёт доступ к файлам или контактам второго профиля. См. [Android DevicePolicyManager](https://developer.android.com/reference/android/app/admin/DevicePolicyManager#setCrossProfilePackages(android.content.ComponentName,%20java.util.Set)). |
 
-После копирования приложения из личного профиля Agnosia пытается сразу подготовить ярлык и скрыть рабочую копию. Для скрытых рабочих приложений это важный сценарий: пользователь запускает их через ярлык, а не из списка приложений рабочего профиля.
+После копирования пользовательского приложения из личного профиля Agnosia пытается сразу подготовить ярлык и скрыть рабочую копию. Системное приложение включается в рабочем профиле без автоматического скрытия и создания ярлыка. Пользователь запускает скрытую рабочую копию через ярлык Agnosia.
 
-Пользовательские приложения копируются не через файловый менеджер, а через `PackageInstaller.Session`: Agnosia берёт `SourceDir` и `SplitSourceDirs`, пишет все части APK в install session и ждёт callback. Если Android возвращает `PendingUserAction`, `DummyActivity` открывает системный экран подтверждения и продолжает операцию после результата. Перед удалением скрытого пакета Agnosia временно снимает hidden state, иначе системный uninstall может не увидеть пакет. Признак исходного hidden-состояния передаётся через callback `PendingIntent`: отмена, ошибка старта, ошибка подтверждения и любой failure status повторно скрывают пакет, а success завершает транзакцию без rollback. Команда `MoveToWork` в UI является составной операцией: сначала clone в рабочий профиль, затем `QueryPackageState` через подписанный `DummyActivity` подтверждает `installed=true` и ожидаемое hidden-состояние (`true` для пользовательской и `false` для системной копии). Только после этого разрешён uninstall из личного профиля. Ошибка, несовпадение package/state или исключение сохраняют личную копию и обновляют dashboard; если уже разрешённое удаление не удалось, рабочая копия остаётся созданной, а статус сообщает о частичном успехе.
+Пользовательские приложения копируются не через файловый менеджер, а через `PackageInstaller.Session`: Agnosia берёт `SourceDir` и `SplitSourceDirs`, пишет все части APK в install session и ждёт callback. Если Android возвращает `PendingUserAction`, `DummyActivity` открывает системный экран подтверждения и продолжает операцию после результата. Перед удалением скрытого пакета Agnosia временно снимает hidden state, иначе системный uninstall может не увидеть пакет. Признак исходного hidden-состояния передаётся через callback `PendingIntent`: отмена, ошибка старта, ошибка подтверждения и любой failure status повторно скрывают пакет, а success завершает транзакцию без rollback. Команда `MoveToWork` в UI является составной операцией: сначала clone в рабочий профиль, затем `QueryPackageState` через `AndroidCommandCenter` подтверждает `installed=true` и ожидаемое hidden-состояние (`true` для пользовательской и `false` для системной копии). Только после этого разрешён uninstall из личного профиля. Ошибка, несовпадение package/state или исключение сохраняют личную копию и обновляют dashboard; если уже разрешённое удаление не удалось, рабочая копия остаётся созданной, а статус сообщает о частичном успехе.
 
 ## Каталог приложений
 
@@ -388,7 +394,7 @@ Dashboard применяет профиль, разрешения и модул�
 
 Запросы рабочих настроек разрешений и личная команда `CreateHiddenShortcut` доставляют подписанный ответ через explicit одноразовый mutable `PendingIntent` закрытого `ActivityCommandResultReceiver`. Это подтверждение открытия системного UI, а актуальные разрешения читаются после resume. Ответ проверяется по HMAC, сроку подписи, correlation ID, виду команды и подписанному result code. Parcelable callback исключён из HMAC; идентичность и результат команды подписаны. Callback устраняет зависимость от задержанной доставки `OnActivityResult`, пока пользователь находится в Settings или launcher; окно проверки подписи 30 секунд не увеличивается. Основание: [Android PendingIntent](https://developer.android.com/reference/android/app/PendingIntent), [Activity result lifecycle](https://developer.android.com/reference/android/app/Activity#onActivityResult(int,int,android.content.Intent)).
 
-Каталог строится из двух независимых запросов: личный профиль читается локально, рабочий профиль опрашивается через `AndroidCommandCenter` и подписанный `DummyActivity`. App list, одиночные и batch-иконки, logs, permissions и cross-profile packages выполняются общими command handlers. Оба результата приводятся к `AppSnapshot`, чтобы UI не зависел от Android-типов.
+Каталог строится из двух независимых запросов: личный профиль читается локально, рабочий профиль опрашивается через `AndroidCommandCenter`. В автоматическом режиме поддерживаемые запросы идут через Provider с допустимым Activity fallback; app list, одиночные и batch-иконки, logs, permissions и cross-profile packages выполняются общими command handlers. Оба результата приводятся к `AppSnapshot`, чтобы UI не зависел от Android-типов.
 
 ```text
 AndroidDashboardReader.LoadAppInventoryAsync()
@@ -415,7 +421,7 @@ AndroidDashboardReader.LoadAppInventoryAsync()
 
 По умолчанию системные и служебные пакеты скрываются из каталога. Переключатель `Показывать все пакеты` включает их отображение, но иконки системных приложений всё равно не подгружаются, чтобы не тратить ресурсы на низкополезные элементы.
 
-Иконки имеют два уровня оптимизации. Android-слой хранит PNG в памяти и в `CacheDir/app-icons`, ключ строится из хэша package name и version code. UI-слой дополнительно собирает видимые запросы в батчи с задержкой 60 ms и пропускает их через один gate, чтобы не запускать много параллельных profile activity-команд. Если иконка ещё не прогрета, карточка сначала отображается без неё, а повторная загрузка приходит позже из кэша.
+Иконки имеют два уровня оптимизации. Android-слой хранит PNG в памяти и в `CacheDir/app-icons`, ключ строится из хэша package name и version code. UI-слой дополнительно собирает видимые запросы в батчи с задержкой 60 ms и пропускает их через один gate, чтобы не запускать много параллельных межпрофильных команд. Если иконка ещё не прогрета, карточка сначала отображается без неё, а повторная загрузка приходит позже из кэша.
 
 ## Скрытые ярлыки
 
@@ -456,9 +462,9 @@ ProxyActivity
 
 ## Автоматическая заморозка
 
-`HiddenAppSessionMonitorService` отслеживает сессию скрытого приложения после запуска через ярлык. Логика принятия решения вынесена в `HiddenAppSessionMonitorStateMachine`, что позволяет тестировать её отдельно от Android-сервиса.
+`HiddenAppSessionMonitorService` отслеживает сессию пользовательского рабочего приложения после запуска через карточку Agnosia или её ярлык. Монитор запускается и тогда, когда пакет был видим до этого запуска: после завершения сессии он может скрыть пакет. Обычный запуск видимого приложения вне Agnosia не создаёт такую сессию. Логика принятия решения вынесена в `HiddenAppSessionMonitorStateMachine`, что позволяет тестировать её отдельно от Android-сервиса.
 
-Для пользовательского hidden-пакета запуск имеет fail-closed preflight непосредственно в рабочем профиле: `ProxyActivity` проверяет Usage Access до чтения hidden-состояния и до `setApplicationHidden(..., false)`. Если доступ отозван или его состояние нельзя подтвердить, target не раскрывается, Activity и monitor не запускаются, а пользователь получает указание включить доступ к истории использования в рабочем профиле. Системные work-приложения, которые Agnosia не скрывает и не сопровождает monitor-сессией, сохраняют прямой путь запуска.
+Для запуска пользовательского рабочего приложения через Agnosia действует fail-closed preflight непосредственно в рабочем профиле: `ProxyActivity` проверяет Usage Access до чтения hidden-состояния и до возможного `setApplicationHidden(..., false)`. Если доступ отозван или его состояние нельзя подтвердить, Agnosia не меняет видимость пакета, не запускает target Activity и monitor, а пользователь получает указание включить доступ к истории использования в рабочем профиле. Системные work-приложения, которые Agnosia не скрывает и не сопровождает monitor-сессией, сохраняют прямой путь запуска.
 
 ```text
 WaitingForTargetForeground
@@ -471,7 +477,7 @@ TargetForegroundOrDelegated
         ▼
 InactiveCandidate
         │
-        │ прошло 10 секунд без возврата target task
+        │ прошло 10 секунд без возврата целевого приложения на передний план
         ▼
 Completed → setApplicationHidden(..., true)
 ```
@@ -612,10 +618,13 @@ Android-проект остаётся тонким entry point, но содер�
 | --- | --- |
 | `MainActivity` | Запускает Avalonia UI в личном профиле. В рабочем профиле применяет политики и закрывается без основного UI. |
 | `DummyActivity` | Принимает подписанные межпрофильные команды и выполняет операции внутри целевого профиля. |
+| `CommandProvider` | Выполняет поддерживаемые неинтерактивные команды в рабочем профиле через URI после проверки вызывающей стороны и подписи. |
 | `ProxyActivity` | Запускает временно показанное рабочее приложение и стартует монитор скрытой сессии. |
+| `AgnosiaCrossProfileDocumentsProvider` и `AgnosiaFileShuttleService` | Публикуют SAF-root второго профиля и обслуживают файловые операции в его собственном хранилище. |
 | `AgnosiaDeviceAdminReceiver` | Административный receiver для profile owner-политик. |
 | `ManagedProfileProvisionedReceiver` | Обрабатывает завершение создания managed profile. |
 | `WorkAppFrozenReceiver` | Принимает подписанный immutable `PendingIntent` после подтверждённой заморозки приложения и завершает личную часть hidden-сессии. |
+| `WorkLaunchAcknowledgedReceiver` и `ActivityCommandResultReceiver` | Принимают проверяемые подтверждения запуска рабочего приложения и открытия системных экранов. |
 | `PackageInstallerCallbackReceiver` | Получает результат установки или удаления APK. |
 | `ShortcutPinReceiver` | Получает callback создания pinned shortcut. |
 | `LockFreezeStartupReceiver` | Запускает cleanup после загрузки устройства. |
@@ -636,8 +645,10 @@ Android-проект остаётся тонким entry point, но содер�
 | `android.software.managed_users` | Требуется для рабочих профилей. |
 | `com.agnosia.app.permission.CROSS_PROFILE_COMMAND` | Signature-permission для профильной команды через `DummyActivity`. |
 | `ACCESS_NETWORK_STATE` | Проверка активного VPN через `ConnectivityManager`. |
-| `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE`, `FOREGROUND_SERVICE_SYSTEM_EXEMPTED` | Foreground-сервисы монитора и transient VPN. |
+| `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC`, `FOREGROUND_SERVICE_SPECIAL_USE`, `FOREGROUND_SERVICE_SYSTEM_EXEMPTED` | Foreground-сервисы монитора, File Shuttle и VPN-сценариев. |
 | `PACKAGE_USAGE_STATS` | Наблюдение за активностью скрытого приложения. |
+| `QUERY_ALL_PACKAGES` | Каталог приложений, включая скрытые пакеты и пакеты без launcher Activity. |
+| `MANAGE_EXTERNAL_STORAGE` | Чтение файлов своего профиля для File Shuttle после отдельной выдачи доступа пользователем. |
 | `RECEIVE_BOOT_COMPLETED` | Startup cleanup после перезагрузки. |
 | `REQUEST_INSTALL_PACKAGES`, `REQUEST_DELETE_PACKAGES` | Установка и удаление APK в профильных сценариях. |
 | `POST_NOTIFICATIONS` | Уведомления foreground-сервисов на Android 13+. |
@@ -650,7 +661,7 @@ Android-проект собирается как APK с `ApplicationId` `com.agn
 
 ## Анализ рисков разрешений
 
-`AppPermissionRiskCatalog` оценивает не отдельные разрешения, а комбинации признаков. Сейчас в каталоге **27 critical-правил** и **43 dangerous-правила**.
+`AppPermissionRiskCatalog` оценивает не отдельные разрешения, а комбинации признаков. Сейчас в каталоге **25 critical-правил** и **43 dangerous-правила**.
 
 Входные данные `AppPermissionRiskInput`:
 
@@ -681,7 +692,7 @@ Android-проект собирается как APK с `ApplicationId` `com.agn
 | Уровень | Условие |
 | --- | --- |
 | `Safe` | Нет совпавших правил или grouped score ниже dangerous-порога. |
-| `Dangerous` | Есть dangerous-сигнал или score не ниже 4. |
+| `Dangerous` | Совпало хотя бы одно правило, grouped score не ниже 4 и условия уровня `Critical` не выполнены. |
 | `Critical` | Совпало critical-правило с эффективными разрешениями либо score не ниже 8 при высокой уверенности. |
 
 Примеры critical-комбинаций:
@@ -695,7 +706,7 @@ Android-проект собирается как APK с `ApplicationId` `com.agn
 | Notification Listener + Overlay + интернет | Риск социальной инженерии и чтения уведомлений. |
 | Полный доступ к файлам + persistence + интернет | Доступ к большому объёму данных и канал вывода. |
 
-В UI риск отображается на карточке приложения. Для пользовательских приложений можно раскрыть детали: manifest-разрешения, runtime-разрешения, risky permissions, matched rule IDs и разложение score.
+В UI индикатор рассчитанного риска показывается на карточках пользовательских приложений. Подробный список заявленных разрешений можно раскрыть и для системного приложения, но Risk Engine не рассчитывает для него правила и score. Для пользовательского приложения при наличии данных также показываются risky permissions, matched rule IDs и разложение score.
 
 ## Диагностика и журнал
 
@@ -721,7 +732,7 @@ Android-проект собирается как APK с `ApplicationId` `com.agn
 | DPM Activity-target рабочего профиля недоступен | Команда завершается ошибкой без локального выполнения данных рабочего профиля. |
 | APK после установки ещё не виден | `DummyActivity` ждёт доступности пакета с retry перед подготовкой ярлыка. |
 | Скрытие после установки не прошло сразу | Повторные попытки скрытия выполняются ограниченное время. |
-| Usage Access отсутствует до запуска | Запуск user work-пакета отклоняется до unhide; приложение остаётся скрытым. |
+| Usage Access отсутствует до запуска | Запуск пользовательского рабочего приложения через Agnosia отклоняется до изменения видимости; пакет сохраняет прежнее hidden-состояние. |
 | Usage Access потерян во время сессии | Приложение не скрывается по неподтверждённому таймауту; durable active-сессия сохраняется до screen-lock safety net или явной заморозки. |
 | Сервис был перезапущен | Snapshot восстанавливает active/reservation, pending-hide и outbox. Системный alarm удерживает callback между перезапусками процесса; личный профиль повторяет восстановление из durable owner. |
 | Логирование повреждено или отключено | Повреждённый JSON журнала очищается, при отключении логирования записи удаляются. |
@@ -729,15 +740,15 @@ Android-проект собирается как APK с `ApplicationId` `com.agn
 | Activity-команда стартует, пока `MainActivity` не resumed | Запрос ставится в очередь, а устаревшие фоновые icon-запросы могут быть отменены. |
 | Transient VPN не смог отключить активный VPN | Запуск рабочего приложения отменяется, чтобы не обещать скрытие VPN-состояния. |
 | Второй hidden-launch начат до завершения первого | Он наследует durable VPN restore obligation; после success становится новым owner, а устаревший callback первой сессии игнорируется. |
-| File Shuttle показывает пустой root | Проверяются `AgnosiaFileShuttleClient`, `AgnosiaDocumentsProvider`, `START_FILE_SHUTTLE_*`, `BAL_BLOCK`, timeout, `MANAGE_EXTERNAL_STORAGE` и состояние тумблера в обоих профилях. |
+| File Shuttle показывает пустой root | Проверяются `AgnosiaFileShuttleClientBroker`, `AgnosiaCrossProfileDocumentsProvider`, действия `START_FILE_SHUTTLE_*`, ошибки фонового запуска Activity (`BAL_BLOCK`), тайм-ауты, `MANAGE_EXTERNAL_STORAGE` и состояние модуля в обоих профилях. |
 
 ## Коротко о главном потоке
 
 ```text
 1. Пользователь создаёт рабочий профиль.
 2. Agnosia становится profile owner и применяет политики.
-3. Пользователь копирует приложение в рабочий профиль.
-4. Agnosia создаёт ярлык и скрывает рабочую копию.
+3. Пользователь копирует пользовательское приложение в рабочий профиль.
+4. Agnosia предлагает закрепить ярлык и скрывает рабочую копию.
 5. Пользователь запускает приложение через ярлык.
 6. Agnosia временно показывает пакет, при необходимости отключает VPN и запускает приложение.
 7. Монитор ждёт, пока пользователь покинет приложение.
