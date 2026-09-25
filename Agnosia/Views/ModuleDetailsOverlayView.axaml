@@ -160,7 +160,7 @@
                                         <StackPanel IsVisible="{Binding HasRequirements}"
                                                     Spacing="12">
                                             <TextBlock Classes="group-title"
-                                                       Text="Требования" />
+                                                       Text="Необходимые разрешения" />
 
                                             <ItemsControl ItemsSource="{Binding Requirements}">
                                                 <ItemsControl.ItemsPanel>

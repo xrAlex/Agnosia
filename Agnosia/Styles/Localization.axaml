@@ -77,8 +77,6 @@
     <system:String x:Key="String.Onboarding.StepCounter">Шаг {0} / 3</system:String>
 
     <!-- Refresh Info -->
-    <system:String x:Key="String.Refresh.Never">Снимок ещё не обновлялся</system:String>
-    <system:String x:Key="String.Refresh.At">Обновлено в {0:HH:mm:ss}</system:String>
 
     <!-- App Item -->
     <system:String x:Key="String.App.Profile.Work">Рабочий</system:String>

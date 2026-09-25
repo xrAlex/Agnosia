@@ -207,6 +207,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     public partial bool StatusIsError { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsShowAllAppsDisabled))]
     public partial bool ShowAllApps { get; set; }
 
     [ObservableProperty]
@@ -247,7 +248,12 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     public partial AppItemViewModel? SelectedApp { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsLoggingDisabled))]
     public partial bool LoggingEnabled { get; set; } = true;
+
+    public bool IsShowAllAppsDisabled => !ShowAllApps;
+
+    public bool IsLoggingDisabled => !LoggingEnabled;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsAutoTransportSelected))]
@@ -266,7 +272,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private partial AppThemeKind SelectedTheme { get; set; } = AppThemeKind.Agnosia;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(LastRefreshSummary))]
+    [NotifyPropertyChangedFor(nameof(LastRefreshTimeText))]
     private partial DateTimeOffset? LastRefreshedAt { get; set; }
 
     [ObservableProperty]
@@ -412,10 +418,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         string.Empty;
 
 
-    public string LastRefreshSummary =>
-        LastRefreshedAt is null
-            ? "Never"
-            : $"At|{LastRefreshedAt:HH:mm:ss}";
+    public string LastRefreshTimeText => LastRefreshedAt?.ToString("HH:mm:ss") ?? string.Empty;
 
     public int TotalManagedAppsCount => PersonalAppsCount + WorkAppsCount;
 
@@ -910,6 +913,18 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     [RelayCommand]
     private void SelectLightTheme() => SelectedTheme = AppThemeKind.Light;
+
+    [RelayCommand]
+    private void EnableShowAllApps() => ShowAllApps = true;
+
+    [RelayCommand]
+    private void DisableShowAllApps() => ShowAllApps = false;
+
+    [RelayCommand]
+    private void EnableLogging() => LoggingEnabled = true;
+
+    [RelayCommand]
+    private void DisableLogging() => LoggingEnabled = false;
 
     [RelayCommand]
     private void SelectAutoTransport() => SelectedCommandTransport = CommandTransportPreference.Auto;

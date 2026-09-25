@@ -366,6 +366,10 @@
         <Setter Property="MinHeight" Value="38" />
         <Setter Property="CornerRadius" Value="6" />
     </Style>
+    <Style Selector="Button.settings-choice">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
     <Style Selector="Button.segment-chip.profile-segment">
         <Setter Property="MinHeight" Value="52" />
     </Style>

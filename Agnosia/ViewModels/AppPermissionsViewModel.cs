@@ -31,10 +31,14 @@ public partial class AppPermissionsViewModel(IAppCommandService service, AppSnap
     public partial string Message { get; set; } = string.Empty;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsEmpty))]
+    [NotifyPropertyChangedFor(nameof(IsEmpty), nameof(ShowCount))]
     public partial bool HasLoaded { get; set; }
 
     public bool IsEmpty => HasLoaded && !IsBusy && !HasError && Items.Count == 0;
+
+    public bool IsWorkProfile => app.Profile == ProfileKind.Work;
+
+    public bool ShowCount => IsWorkProfile && HasLoaded;
 
     public IReadOnlyList<AppPermissionRowViewModel> VisibleItems => _visibleItems ??= FilterItems();
 
@@ -157,12 +161,14 @@ public sealed class AppPermissionRowViewModel(
     public string Label => permissionText?.Label ?? AppPermissionDictionary.UnknownLabel;
     public string? Description => permissionText?.Description;
     public bool HasDescription => !string.IsNullOrWhiteSpace(Description);
+    public bool IsWorkProfile => isWorkProfile;
     public bool CanChangePolicy => isWorkProfile && snapshot.CanChangePolicy;
     public bool CanRevoke => isWorkProfile && snapshot.Kind == AppPermissionKind.Runtime
                              && snapshot.CanChangePolicy && snapshot.CanRevokeGrant
                              && (snapshot.State is AppPermissionState.Granted or AppPermissionState.PolicyGranted);
     public string? RestrictionReason => snapshot.RestrictionReason;
     public bool HasRestriction => !string.IsNullOrWhiteSpace(RestrictionReason);
+    public bool ShowRestriction => IsWorkProfile && HasRestriction;
     public IAsyncRelayCommand<AppPermissionRowViewModel?> ChangePolicyCommand => command;
     public IAsyncRelayCommand<AppPermissionRowViewModel?> RevokeCommand => revokeCommand;
     public string ActionText => snapshot.State == AppPermissionState.PolicyDenied ? "Снять запрет" : "Запретить";

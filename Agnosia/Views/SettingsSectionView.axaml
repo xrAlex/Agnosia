@@ -12,15 +12,13 @@
     </Design.DataContext>
 
     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Classes="content-root">
+        <StackPanel Classes="content-root"
+                    HorizontalAlignment="Stretch">
             <TextBlock Classes="page-title"
                        Text="Настройки" />
 
             <StackPanel IsVisible="{Binding IsDashboardVisible}"
                         Spacing="12">
-
-                <TextBlock Classes="group-title"
-                           Text="Базовые настройки" />
 
                 <Border Classes="surface-card compact">
                     <Grid ColumnDefinitions="Auto,*,Auto"
@@ -43,13 +41,10 @@
                                 VerticalAlignment="Center"
                                 Command="{Binding OpenPermissionsCommand}">
                             <PathIcon Classes="action-icon"
-                                      Data="{StaticResource IconCheckGeometry}" />
+                                      Data="{StaticResource IconLaunchGeometry}" />
                         </Button>
                     </Grid>
                 </Border>
-
-                <TextBlock Classes="group-title"
-                           Text="Тема" />
 
                 <Border Classes="surface-card compact">
                     <Grid ColumnDefinitions="Auto,*"
@@ -72,21 +67,21 @@
                               Grid.ColumnSpan="2" Grid.Column="0"
                               ColumnDefinitions="*,*,*"
                               ColumnSpacing="10">
-                            <Button AutomationProperties.Name="Красная" Classes="segment-chip"
+                            <Button AutomationProperties.Name="Красная" Classes="segment-chip settings-choice"
                                     Classes.selected="{Binding IsAgnosiaThemeSelected}"
                                     Command="{Binding SelectAgnosiaThemeCommand}">
                                 <TextBlock Classes="button-label"
                                            Text="Красная" />
                             </Button>
                             <Button AutomationProperties.Name="Темная" Grid.Column="1"
-                                    Classes="segment-chip"
+                                    Classes="segment-chip settings-choice"
                                     Classes.selected="{Binding IsDarkThemeSelected}"
                                     Command="{Binding SelectDarkThemeCommand}">
                                 <TextBlock Classes="button-label"
                                            Text="Темная" />
                             </Button>
                             <Button AutomationProperties.Name="Светлая" Grid.Column="2"
-                                    Classes="segment-chip"
+                                    Classes="segment-chip settings-choice"
                                     Classes.selected="{Binding IsLightThemeSelected}"
                                     Command="{Binding SelectLightThemeCommand}">
                                 <TextBlock Classes="button-label"
@@ -96,31 +91,35 @@
                     </Grid>
                 </Border>
 
-                <TextBlock Classes="group-title"
-                           Text="Транспорт команд" />
-
                 <Border Classes="surface-card compact">
                     <StackPanel Spacing="12">
-                        <StackPanel Spacing="4">
-                            <TextBlock Classes="section-title compact"
-                                       Text="Команды рабочего профиля" />
-                            <TextBlock Classes="page-caption"
-                                       Text="Авто пробует Provider и при безопасном сбое переходит на Activity. Ручной выбор фиксирует транспорт командного центра." />
-                            <TextBlock Classes="page-caption"
-                                       Text="Интерактивные действия вне командного центра по-прежнему открывают Activity." />
-                        </StackPanel>
+                        <Grid ColumnDefinitions="Auto,*"
+                              ColumnSpacing="14">
+                            <Border Classes="icon-tile">
+                                <PathIcon Classes="section-icon centered"
+                                          Data="{StaticResource IconFileShuttleGeometry}" />
+                            </Border>
+                            <StackPanel Grid.Column="1"
+                                        MinWidth="0"
+                                        Spacing="4">
+                                <TextBlock Classes="section-title compact"
+                                           Text="Команды рабочего профиля" />
+                                <TextBlock Classes="page-caption"
+                                           Text="То как приложение общается с рабочим профилем. Протокол Provider или Android activity" />
+                            </StackPanel>
+                        </Grid>
                         <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
-                            <Button AutomationProperties.Name="Авто" Classes="segment-chip"
+                            <Button AutomationProperties.Name="Авто" Classes="segment-chip settings-choice"
                                     Classes.selected="{Binding IsAutoTransportSelected}"
                                     Command="{Binding SelectAutoTransportCommand}">
                                 <TextBlock Classes="button-label" Text="Авто" />
                             </Button>
-                            <Button AutomationProperties.Name="Provider" Grid.Column="1" Classes="segment-chip"
+                            <Button AutomationProperties.Name="Provider" Grid.Column="1" Classes="segment-chip settings-choice"
                                     Classes.selected="{Binding IsProviderTransportSelected}"
                                     Command="{Binding SelectProviderTransportCommand}">
                                 <TextBlock Classes="button-label" Text="Provider" />
                             </Button>
-                            <Button AutomationProperties.Name="Activity" Grid.Column="2" Classes="segment-chip"
+                            <Button AutomationProperties.Name="Activity" Grid.Column="2" Classes="segment-chip settings-choice"
                                     Classes.selected="{Binding IsActivityTransportSelected}"
                                     Command="{Binding SelectActivityTransportCommand}">
                                 <TextBlock Classes="button-label" Text="Activity" />
@@ -129,12 +128,9 @@
                     </StackPanel>
                 </Border>
 
-                <TextBlock Classes="group-title"
-                           Text="Поведение" />
-
                 <Border Classes="surface-card compact">
                     <StackPanel Spacing="12">
-                        <Grid ColumnDefinitions="Auto,*,Auto"
+                        <Grid ColumnDefinitions="Auto,*"
                               ColumnSpacing="14">
                             <Border Classes="icon-tile">
                                 <PathIcon Classes="section-icon centered"
@@ -148,12 +144,24 @@
                                 <TextBlock Classes="page-caption"
                                            Text="Отображать в библиотеке системные и служебные приложения вместе с обычными пакетами" />
                             </StackPanel>
-                            <ToggleSwitch Grid.Column="2"
-                                          VerticalAlignment="Center"
-                                          IsChecked="{Binding ShowAllApps}" />
                         </Grid>
 
-                        <Grid ColumnDefinitions="Auto,*,Auto"
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <Button AutomationProperties.Name="Показывать все пакеты: Вкл"
+                                    Classes="segment-chip settings-choice"
+                                    Classes.selected="{Binding ShowAllApps}"
+                                    Command="{Binding EnableShowAllAppsCommand}">
+                                <TextBlock Classes="button-label" Text="Вкл" />
+                            </Button>
+                            <Button AutomationProperties.Name="Показывать все пакеты: Выкл" Grid.Column="1"
+                                    Classes="segment-chip settings-choice"
+                                    Classes.selected="{Binding IsShowAllAppsDisabled}"
+                                    Command="{Binding DisableShowAllAppsCommand}">
+                                <TextBlock Classes="button-label" Text="Выкл" />
+                            </Button>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="Auto,*"
                               ColumnSpacing="14">
                             <Border Classes="icon-tile">
                                 <PathIcon Classes="section-icon centered"
@@ -163,13 +171,25 @@
                                         MinWidth="0"
                                         Spacing="4">
                                 <TextBlock Classes="section-title compact"
-                                           Text="Включить логирование" />
+                                           Text="Логирование" />
                                 <TextBlock Classes="page-caption"
                                            Text="Писать отладочные сообщения работы приложения в буфер логирования" />
                             </StackPanel>
-                            <ToggleSwitch Grid.Column="2"
-                                          VerticalAlignment="Center"
-                                          IsChecked="{Binding LoggingEnabled}" />
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <Button AutomationProperties.Name="Логирование: Вкл"
+                                    Classes="segment-chip settings-choice"
+                                    Classes.selected="{Binding LoggingEnabled}"
+                                    Command="{Binding EnableLoggingCommand}">
+                                <TextBlock Classes="button-label" Text="Вкл" />
+                            </Button>
+                            <Button AutomationProperties.Name="Логирование: Выкл" Grid.Column="1"
+                                    Classes="segment-chip settings-choice"
+                                    Classes.selected="{Binding IsLoggingDisabled}"
+                                    Command="{Binding DisableLoggingCommand}">
+                                <TextBlock Classes="button-label" Text="Выкл" />
+                            </Button>
                         </Grid>
 
                     </StackPanel>

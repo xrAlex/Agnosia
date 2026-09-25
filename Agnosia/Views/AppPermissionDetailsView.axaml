@@ -29,7 +29,7 @@
         <StackPanel Spacing="8"
                     IsVisible="{Binding IsPermissionDetailsExpanded}">
             <ItemsControl ItemsSource="{Binding PermissionRiskReasons}"
-                          IsVisible="{Binding HasPermissionRiskReasons}">
+                          IsVisible="{Binding ShowPermissionRiskReasons}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <Grid ColumnDefinitions="Auto,*"
@@ -47,12 +47,16 @@
             </ItemsControl>
 
             <StackPanel DataContext="{Binding Permissions}" x:DataType="vm:AppPermissionsViewModel" Spacing="10">
-                <TextBlock Classes="app-dialog-setting-caption" TextWrapping="Wrap" Text="{Binding Explanation}" />
-                <TextBlock Classes="app-dialog-setting-caption" Text="{Binding CountText}" IsVisible="{Binding HasLoaded}" />
+                <TextBlock Classes="app-dialog-setting-caption" TextWrapping="Wrap" Text="{Binding Explanation}"
+                           IsVisible="{Binding IsWorkProfile}" />
+                <TextBlock Classes="app-dialog-setting-caption" Text="{Binding CountText}"
+                           IsVisible="{Binding ShowCount}" />
                 <TextBox Text="{Binding SearchText}" PlaceholderText="Найти разрешение"
-                         AutomationProperties.Name="Поиск разрешений приложения" />
+                         AutomationProperties.Name="Поиск разрешений приложения"
+                         IsVisible="{Binding IsWorkProfile}" />
                 <Button Classes="compact-action" Content="Обновить статусы" Command="{Binding RefreshCommand}"
-                        HorizontalAlignment="Left" AutomationProperties.Name="Обновить статусы разрешений" />
+                        HorizontalAlignment="Left" AutomationProperties.Name="Обновить статусы разрешений"
+                        IsVisible="{Binding IsWorkProfile}" />
                 <TextBlock Classes="app-dialog-setting-caption" Text="{Binding Message}" TextWrapping="Wrap" />
                 <TextBlock Classes="app-dialog-setting-caption" IsVisible="{Binding IsEmpty}"
                            Text="Приложение не запрашивает разрешений." TextWrapping="Wrap" />
@@ -66,15 +70,16 @@
                                 <StackPanel Spacing="6">
                                     <TextBlock Classes="app-dialog-setting-title" Text="{Binding Label}" TextWrapping="Wrap" />
                                     <TextBlock Classes="app-dialog-setting-caption" Text="{Binding Name}" TextWrapping="Wrap" FontSize="11" />
-                                    <TextBlock Classes="app-dialog-setting-caption" Text="{Binding KindText}" TextWrapping="Wrap" />
+                                    <TextBlock Classes="app-dialog-setting-caption" Text="{Binding KindText}" TextWrapping="Wrap"
+                                               IsVisible="{Binding IsWorkProfile}" />
                                     <Border Background="{DynamicResource AppSurfaceBrush}" CornerRadius="6"
-                                            Padding="8,4" HorizontalAlignment="Left">
+                                            Padding="8,4" HorizontalAlignment="Left" IsVisible="{Binding IsWorkProfile}">
                                         <TextBlock Text="{Binding StatusText}" FontWeight="SemiBold" TextWrapping="Wrap" />
                                     </Border>
                                     <TextBlock Classes="app-dialog-setting-caption" Text="{Binding Description}"
                                                IsVisible="{Binding HasDescription}" TextWrapping="Wrap" />
                                     <TextBlock Classes="app-dialog-setting-caption" Text="{Binding RestrictionReason}"
-                                               IsVisible="{Binding HasRestriction}" TextWrapping="Wrap" />
+                                               IsVisible="{Binding ShowRestriction}" TextWrapping="Wrap" />
                                     <WrapPanel Orientation="Horizontal">
                                         <Button Classes="compact-action" Content="{Binding ActionText}" Margin="0,0,8,8"
                                                 AutomationProperties.Name="{Binding ActionAutomationName}"

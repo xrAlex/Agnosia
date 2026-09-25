@@ -105,6 +105,8 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     public bool HasPermissionRiskReasons => GetPermissionRiskReasons().Length > 0;
 
+    public bool ShowPermissionRiskReasons => Permissions.IsWorkProfile && HasPermissionRiskReasons;
+
     public bool IsPermissionRiskSafe => Snapshot.PermissionRiskAvailable && PermissionRiskLevel == AppPermissionRiskLevel.Safe;
 
     public bool IsPermissionRiskDangerous => Snapshot.PermissionRiskAvailable && PermissionRiskLevel == AppPermissionRiskLevel.Dangerous;
@@ -338,6 +340,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(PermissionRiskSummaryText));
             OnPropertyChanged(nameof(PermissionRiskReasons));
             OnPropertyChanged(nameof(HasPermissionRiskReasons));
+            OnPropertyChanged(nameof(ShowPermissionRiskReasons));
         }
 
         if (previous.PermissionRiskAvailable != snapshot.PermissionRiskAvailable)
@@ -361,6 +364,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(PermissionRiskSummaryText));
             OnPropertyChanged(nameof(PermissionRiskReasons));
             OnPropertyChanged(nameof(HasPermissionRiskReasons));
+            OnPropertyChanged(nameof(ShowPermissionRiskReasons));
         }
 
         if (!StringListsEqual(previous.MatchedPermissionRiskRuleIds, snapshot.MatchedPermissionRiskRuleIds)
@@ -376,6 +380,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(PermissionRiskSummaryText));
             OnPropertyChanged(nameof(PermissionRiskReasons));
             OnPropertyChanged(nameof(HasPermissionRiskReasons));
+            OnPropertyChanged(nameof(ShowPermissionRiskReasons));
         }
 
         if (!StringListsEqual(previous.ManifestPermissions, snapshot.ManifestPermissions))
