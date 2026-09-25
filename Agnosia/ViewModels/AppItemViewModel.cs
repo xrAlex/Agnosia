@@ -400,6 +400,9 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
         if (previous.IsSystem != snapshot.IsSystem)
         {
             ResetIcon();
+            OnPropertyChanged(nameof(StatusTagLabel));
+            OnPropertyChanged(nameof(HasStatusTag));
+            OnPropertyChanged(nameof(ShowSecondaryRow));
             OnPropertyChanged(nameof(CanClone));
             OnPropertyChanged(nameof(CanMoveToWork));
             OnPropertyChanged(nameof(CanUninstall));
@@ -425,6 +428,17 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
     internal void NotifyLockdownModuleStateChanged()
     {
         OnPropertyChanged(nameof(ShowInternetAccessControl));
+    }
+
+    internal void RefreshIconBindings()
+    {
+        if (_disposed || _icon is not null || _iconLoadRequested || ShouldSkipIconLoad(Snapshot)) return;
+
+        // Only realized card bindings read these properties and restart a cancelled
+        // request. Do not eagerly queue icons for every item in the catalog.
+        OnPropertyChanged(nameof(Icon));
+        OnPropertyChanged(nameof(HasIcon));
+        OnPropertyChanged(nameof(ShowMonogram));
     }
 
     public void RequestIconLoad()

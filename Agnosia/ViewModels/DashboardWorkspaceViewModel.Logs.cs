@@ -1,5 +1,6 @@
 using Agnosia.Models;
 using Avalonia.Threading;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 namespace Agnosia.ViewModels;
@@ -9,14 +10,20 @@ public partial class DashboardWorkspaceViewModel
     private int _logGeneration;
     private bool _clearingLogs;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasLogLoadError))]
+    public partial string LogLoadErrorMessage { get; set; } = string.Empty;
+
+    public bool HasLogLoadError => LogLoadErrorMessage.Length > 0;
+
     [RelayCommand]
     private async Task OpenLogsAsync()
     {
         if (!LoggingEnabled)
             return;
 
-        await ReloadPlatformLogsAsync(true);
         IsLogWindowOpen = true;
+        await ReloadPlatformLogsAsync(true);
     }
 
     [RelayCommand]
@@ -65,11 +72,24 @@ public partial class DashboardWorkspaceViewModel
             .ConfigureAwait(false);
         if (generation < 0) return;
 
-        var logs = await LoadRecentLogsOnWorkerAsync().ConfigureAwait(false);
-        await InvokeOnUiThreadActionAsync(
-                () => { if (!_clearingLogs && generation == _logGeneration) ImportPlatformLogs(logs); },
-                DispatcherPriority.Background)
-            .ConfigureAwait(false);
+        try
+        {
+            var logs = await LoadRecentLogsOnWorkerAsync().ConfigureAwait(false);
+            await InvokeOnUiThreadActionAsync(() =>
+            {
+                if (_clearingLogs || generation != _logGeneration) return;
+                LogLoadErrorMessage = string.Empty;
+                ImportPlatformLogs(logs);
+            }, DispatcherPriority.Background).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            await InvokeOnUiThreadActionAsync(() =>
+            {
+                if (_clearingLogs || generation != _logGeneration) return;
+                LogLoadErrorMessage = "Не удалось загрузить журнал. Повторите попытку, когда рабочий профиль доступен.";
+            }, DispatcherPriority.Background).ConfigureAwait(false);
+        }
     }
 
     private void ImportPlatformLogs(IEnumerable<AppLogEntry> logs)

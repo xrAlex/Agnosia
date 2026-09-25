@@ -8,6 +8,88 @@ namespace Agnosia.Unit.ViewModels;
 public sealed class DashboardWorkspaceSnapshotTests
 {
     [Fact]
+    public async Task Returning_to_apps_refreshes_lazy_icon_bindings_without_resetting_the_list()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            AppInventory = new DashboardAppInventorySnapshot([TestSnapshots.App(ProfileKind.Personal)], [])
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+        await viewModel.EnsureInitializedAsync();
+        await AsyncAssert.EventuallyAsync(() => viewModel.VisibleApps.Count == 1, "Initial inventory should load.");
+        viewModel.OpenAppsSectionCommand.Execute(null);
+        var visibleApps = viewModel.VisibleApps;
+        var card = Assert.Single(visibleApps);
+        viewModel.OpenOverviewSectionCommand.Execute(null);
+        var changed = new List<string?>();
+        card.PropertyChanged += (_, args) => changed.Add(args.PropertyName);
+
+        viewModel.OpenAppsSectionCommand.Execute(null);
+
+        Assert.Same(visibleApps, viewModel.VisibleApps);
+        Assert.Contains(nameof(card.Icon), changed);
+        Assert.Contains(nameof(card.HasIcon), changed);
+        Assert.Contains(nameof(card.ShowMonogram), changed);
+        Assert.Empty(services.AppIconLoadRequests);
+    }
+
+    [Fact]
+    public async Task Inventory_refresh_updates_cards_without_resetting_unchanged_visible_items()
+    {
+        var app = TestSnapshots.App(ProfileKind.Personal, "test.catalog", "Before");
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            AppInventory = new DashboardAppInventorySnapshot([app], [])
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+        await viewModel.EnsureInitializedAsync();
+        await AsyncAssert.EventuallyAsync(() => viewModel.VisibleApps.Count == 1, "Initial inventory should load.");
+        var visibleApps = viewModel.VisibleApps;
+        var card = Assert.Single(visibleApps);
+        var resetCount = 0;
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(viewModel.VisibleApps)) resetCount++;
+        };
+        services.AppInventory = new DashboardAppInventorySnapshot([app with { Label = "After" }], []);
+
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        await AsyncAssert.EventuallyAsync(() => card.Label == "After", "Card should receive the new snapshot.");
+
+        Assert.Same(visibleApps, viewModel.VisibleApps);
+        Assert.Equal(0, resetCount);
+    }
+
+    [Fact]
+    public async Task Inventory_refresh_publishes_changed_order_and_removes_stale_cards()
+    {
+        var first = TestSnapshots.App(ProfileKind.Personal, "test.first", "First");
+        var second = TestSnapshots.App(ProfileKind.Personal, "test.second", "Second");
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            AppInventory = new DashboardAppInventorySnapshot([first, second], [])
+        };
+        var viewModel = TestWorkspaceFactory.Create(services);
+        await viewModel.EnsureInitializedAsync();
+        await AsyncAssert.EventuallyAsync(() => viewModel.VisibleApps.Count == 2, "Initial inventory should load.");
+        var firstCard = viewModel.VisibleApps[0];
+        var secondCard = viewModel.VisibleApps[1];
+        services.AppInventory = new DashboardAppInventorySnapshot([second, first], []);
+
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        await AsyncAssert.EventuallyAsync(() => ReferenceEquals(viewModel.VisibleApps[0], secondCard), "New order should appear.");
+        Assert.Same(firstCard, viewModel.VisibleApps[1]);
+
+        services.AppInventory = new DashboardAppInventorySnapshot([second], []);
+        await viewModel.RefreshCommand.ExecuteAsync(null);
+        await AsyncAssert.EventuallyAsync(() => viewModel.VisibleApps.Count == 1, "Removed card should disappear.");
+        Assert.Same(secondCard, Assert.Single(viewModel.VisibleApps));
+    }
+
+    [Fact]
     public async Task Command_transport_selection_loads_and_switches_between_manual_and_auto()
     {
         var services = new TestPlatformServices

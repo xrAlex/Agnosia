@@ -5,6 +5,23 @@
              Height="33"
              VerticalAlignment="Center"
              IsHitTestVisible="False">
+    <UserControl.Resources>
+        <StreamGeometry x:Key="BusyPupilBladeGeometry">M50,0 C25,0 13,23 22,43 C28,57 45,62 57,54 C42,55 30,43 30,29 C30,15 39,5 50,0 Z</StreamGeometry>
+    </UserControl.Resources>
+    <UserControl.Styles>
+        <Style Selector="Grid.busy-pupil.spinning">
+            <Style.Animations>
+                <Animation Duration="0:0:0.9" IterationCount="Infinite" Easing="LinearEasing">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="RotateTransform.Angle" Value="0" />
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="RotateTransform.Angle" Value="360" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+    </UserControl.Styles>
     <Grid>
         <Path Stretch="Fill"
               Fill="{StaticResource AppChromeBrush}"
@@ -37,7 +54,7 @@
                     <TranslateTransform />
                 </Grid.RenderTransform>
 
-                <Grid>
+                <Grid x:Name="IdlePupil">
                     <Ellipse x:Name="IrisDisc"
                              Width="16"
                              Height="14"
@@ -74,6 +91,47 @@
                         </Ellipse.RenderTransform>
                     </Ellipse>
                 </Grid>
+                <!-- Translation follows the shared pupil; perspective is applied outside rotation. -->
+                <Viewbox x:Name="BusyPupilHost"
+                         Width="{Binding #IrisDisc.Width}"
+                         Height="{Binding #IrisDisc.Height}"
+                         Opacity="{Binding #IrisDisc.Opacity}"
+                         Stretch="Fill"
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center"
+                         RenderTransformOrigin="50%,50%"
+                         RenderTransform="{Binding #IrisDisc.RenderTransform}"
+                         IsVisible="False"
+                         AutomationProperties.Name="Выполняется операция">
+                    <Grid x:Name="BusyPupil"
+                          Classes="busy-pupil"
+                          Width="100"
+                          Height="100"
+                          RenderTransformOrigin="50%,50%">
+                        <Grid.RenderTransform>
+                            <RotateTransform />
+                        </Grid.RenderTransform>
+                        <Path Data="{StaticResource BusyPupilBladeGeometry}"
+                              Width="100" Height="100" Stretch="None"
+                              Fill="{StaticResource AppAccentBrush}" />
+                        <Path Data="{StaticResource BusyPupilBladeGeometry}"
+                              Width="100" Height="100" Stretch="None"
+                              Fill="{StaticResource AppAccentBrush}"
+                              RenderTransformOrigin="50%,50%" RenderTransform="rotate(72deg)" />
+                        <Path Data="{StaticResource BusyPupilBladeGeometry}"
+                              Width="100" Height="100" Stretch="None"
+                              Fill="{StaticResource AppAccentBrush}"
+                              RenderTransformOrigin="50%,50%" RenderTransform="rotate(144deg)" />
+                        <Path Data="{StaticResource BusyPupilBladeGeometry}"
+                              Width="100" Height="100" Stretch="None"
+                              Fill="{StaticResource AppAccentBrush}"
+                              RenderTransformOrigin="50%,50%" RenderTransform="rotate(216deg)" />
+                        <Path Data="{StaticResource BusyPupilBladeGeometry}"
+                              Width="100" Height="100" Stretch="None"
+                              Fill="{StaticResource AppAccentBrush}"
+                              RenderTransformOrigin="50%,50%" RenderTransform="rotate(288deg)" />
+                    </Grid>
+                </Viewbox>
             </Grid>
         </Grid>
     </Grid>

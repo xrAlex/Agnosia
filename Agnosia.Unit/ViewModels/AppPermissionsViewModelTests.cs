@@ -9,6 +9,58 @@ namespace Agnosia.Unit.ViewModels;
 public sealed class AppPermissionsViewModelTests
 {
     [Fact]
+    public async Task Clearing_search_with_a_null_text_binding_restores_all_permissions()
+    {
+        var services = new TestPlatformServices
+        {
+            AppPermissions = [Permission("android.permission.CAMERA", AppPermissionState.Granted)]
+        };
+        var vm = new AppPermissionsViewModel(services, TestSnapshots.App(ProfileKind.Work));
+        await vm.RefreshCommand.ExecuteAsync(null);
+        vm.SearchText = "unmatched";
+        Assert.True(vm.HasNoSearchResults);
+
+        vm.SearchText = null!;
+
+        Assert.Same(vm.Items, vm.VisibleItems);
+        Assert.False(vm.HasNoSearchResults);
+    }
+
+    [Fact]
+    public async Task Filtered_items_are_stable_until_search_or_permissions_change()
+    {
+        var camera = Permission("android.permission.CAMERA", AppPermissionState.Granted);
+        var services = new TestPlatformServices
+        {
+            AppPermissions = [camera, Permission("android.permission.INTERNET", AppPermissionState.Granted)]
+        };
+        var vm = new AppPermissionsViewModel(services, TestSnapshots.App(ProfileKind.Work));
+        await vm.RefreshCommand.ExecuteAsync(null);
+        vm.SearchText = " CAMERA ";
+        var filtered = vm.VisibleItems;
+        Assert.Equal(camera.Name, Assert.Single(filtered).Name);
+        Assert.False(vm.HasNoSearchResults);
+        Assert.Same(filtered, vm.VisibleItems);
+
+        IReadOnlyList<AppPermissionRowViewModel>? notifiedItems = null;
+        vm.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(vm.VisibleItems)) notifiedItems = vm.VisibleItems;
+        };
+        services.AppPermissions = [camera with { State = AppPermissionState.PolicyDenied }];
+        await vm.RefreshCommand.ExecuteAsync(null);
+        Assert.Equal(AppPermissionState.PolicyDenied, Assert.Single(vm.VisibleItems).Snapshot.State);
+        Assert.Same(vm.VisibleItems, notifiedItems);
+
+        vm.SearchText = "internet";
+        Assert.Empty(vm.VisibleItems);
+        Assert.True(vm.HasNoSearchResults);
+        Assert.Empty(notifiedItems!);
+        vm.SearchText = " ";
+        Assert.Same(vm.Items, vm.VisibleItems);
+    }
+
+    [Fact]
     public async Task Denies_only_selected_permission_and_reloads_actual_state()
     {
         var services = new TestPlatformServices();

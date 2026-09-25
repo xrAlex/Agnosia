@@ -123,7 +123,6 @@
         <Setter Property="ClipToBounds" Value="True" />
     </Style>
     <Style Selector="Border.app-control-dialog">
-        <Setter Property="MinWidth" Value="320" />
         <Setter Property="MaxWidth" Value="380" />
         <Setter Property="MaxHeight" Value="640" />
         <Setter Property="Padding" Value="14" />
@@ -131,7 +130,6 @@
         <Setter Property="VerticalAlignment" Value="Stretch" />
     </Style>
     <Style Selector="Border.module-dialog">
-        <Setter Property="MinWidth" Value="320" />
         <Setter Property="MaxWidth" Value="620" />
         <Setter Property="MaxHeight" Value="720" />
         <Setter Property="Padding" Value="16" />
@@ -275,11 +273,6 @@
         <Setter Property="BorderBrush" Value="{StaticResource AppAccentMutedBrush}" />
     </Style>
     <Style Selector="Border.permission-icon.granted PathIcon">
-        <Setter Property="Foreground" Value="{StaticResource AppAccentBrush}" />
-    </Style>
-    <Style Selector="ProgressBar.operation-progress">
-        <Setter Property="Height" Value="3" />
-        <Setter Property="Background" Value="{StaticResource AppBorderSoftBrush}" />
         <Setter Property="Foreground" Value="{StaticResource AppAccentBrush}" />
     </Style>
     <Style Selector="ItemsControl.log-list">

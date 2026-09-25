@@ -53,7 +53,6 @@
                          AutomationProperties.Name="Поиск разрешений приложения" />
                 <Button Classes="compact-action" Content="Обновить статусы" Command="{Binding RefreshCommand}"
                         HorizontalAlignment="Left" AutomationProperties.Name="Обновить статусы разрешений" />
-                <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" Height="3" />
                 <TextBlock Classes="app-dialog-setting-caption" Text="{Binding Message}" TextWrapping="Wrap" />
                 <TextBlock Classes="app-dialog-setting-caption" IsVisible="{Binding IsEmpty}"
                            Text="Приложение не запрашивает разрешений." TextWrapping="Wrap" />
@@ -76,16 +75,16 @@
                                                IsVisible="{Binding HasDescription}" TextWrapping="Wrap" />
                                     <TextBlock Classes="app-dialog-setting-caption" Text="{Binding RestrictionReason}"
                                                IsVisible="{Binding HasRestriction}" TextWrapping="Wrap" />
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <Button Classes="compact-action" Content="{Binding ActionText}"
+                                    <WrapPanel Orientation="Horizontal">
+                                        <Button Classes="compact-action" Content="{Binding ActionText}" Margin="0,0,8,8"
                                                 AutomationProperties.Name="{Binding ActionAutomationName}"
                                                 IsVisible="{Binding CanChangePolicy}"
                                                 Command="{Binding ChangePolicyCommand}" CommandParameter="{Binding}" />
-                                        <Button Classes="compact-action" Content="Отозвать"
+                                        <Button Classes="compact-action" Content="Отозвать" Margin="0,0,0,8"
                                                 AutomationProperties.Name="{Binding RevokeAutomationName}"
                                                 IsVisible="{Binding CanRevoke}"
                                                 Command="{Binding RevokeCommand}" CommandParameter="{Binding}" />
-                                    </StackPanel>
+                                    </WrapPanel>
                                 </StackPanel>
                             </Border>
                         </DataTemplate>

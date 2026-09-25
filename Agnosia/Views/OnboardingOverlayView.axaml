@@ -25,16 +25,11 @@
                                        IsVisible="{Binding IsOnboardingVisible}" />
         </Grid>
 
-        <ProgressBar Grid.Row="0"
-                     Classes="operation-progress"
-                     VerticalAlignment="Top"
-                     IsHitTestVisible="False"
-                     IsVisible="{Binding IsOperationActive}"
-                     IsIndeterminate="True" />
-
         <ScrollViewer Grid.Row="0"
                       HorizontalScrollBarVisibility="Disabled">
             <StackPanel Classes="content-root">
+                <controls:WatcherEye HorizontalAlignment="Left"
+                                     IsBusy="{Binding IsActivityIndicatorActive}" />
                 <StackPanel IsVisible="{Binding IsOnboardingWelcomeStep}"
                             Spacing="16">
                     <Border Padding="8,10,8,8"

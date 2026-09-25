@@ -34,6 +34,9 @@
                            Text="Журнал событий" />
                 <TextBlock Classes="header-status"
                            Text="{Binding LogSummary}" />
+                <TextBlock Classes="header-status error"
+                           IsVisible="{Binding HasLogLoadError}"
+                           Text="{Binding LogLoadErrorMessage}" />
             </StackPanel>
 
             <WrapPanel Grid.Row="1"

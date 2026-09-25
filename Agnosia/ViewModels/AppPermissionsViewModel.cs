@@ -7,6 +7,8 @@ namespace Agnosia.ViewModels;
 
 public partial class AppPermissionsViewModel(IAppCommandService service, AppSnapshot app) : ObservableObject
 {
+    private IReadOnlyList<AppPermissionRowViewModel>? _visibleItems;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEmpty))]
     [NotifyPropertyChangedFor(nameof(VisibleItems), nameof(HasNoSearchResults), nameof(CountText))]
@@ -34,10 +36,20 @@ public partial class AppPermissionsViewModel(IAppCommandService service, AppSnap
 
     public bool IsEmpty => HasLoaded && !IsBusy && !HasError && Items.Count == 0;
 
-    public IReadOnlyList<AppPermissionRowViewModel> VisibleItems => string.IsNullOrWhiteSpace(SearchText)
-        ? Items
-        : Items.Where(item => item.Label.Contains(SearchText.Trim(), StringComparison.CurrentCultureIgnoreCase)
-            || item.Name.Contains(SearchText.Trim(), StringComparison.OrdinalIgnoreCase)).ToArray();
+    public IReadOnlyList<AppPermissionRowViewModel> VisibleItems => _visibleItems ??= FilterItems();
+
+    partial void OnItemsChanged(IReadOnlyList<AppPermissionRowViewModel> value) => _visibleItems = null;
+
+    partial void OnSearchTextChanged(string value) => _visibleItems = null;
+
+    private IReadOnlyList<AppPermissionRowViewModel> FilterItems()
+    {
+        var query = SearchText?.Trim() ?? string.Empty;
+        return query.Length == 0
+            ? Items
+            : Items.Where(item => item.Label.Contains(query, StringComparison.CurrentCultureIgnoreCase)
+                || item.Name.Contains(query, StringComparison.OrdinalIgnoreCase)).ToArray();
+    }
 
     public bool HasNoSearchResults => Items.Count > 0 && VisibleItems.Count == 0;
 

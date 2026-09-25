@@ -1,13 +1,21 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="using:Agnosia.Controls"
+             xmlns:converters="using:Avalonia.Data.Converters"
              xmlns:vm="using:Agnosia.ViewModels"
              x:Class="Agnosia.Views.AppHeaderView"
              x:DataType="vm:DashboardWorkspaceViewModel">
     <Grid Margin="18,10,18,0"
           ColumnDefinitions="Auto,*,Auto"
           ColumnSpacing="10">
-        <controls:WatcherEye Padding="1" />
+        <controls:WatcherEye Padding="1">
+            <controls:WatcherEye.IsBusy>
+                <MultiBinding Converter="{x:Static converters:BoolConverters.Or}">
+                    <Binding Path="IsActivityIndicatorActive" />
+                    <Binding Path="RefreshCommand.IsRunning" />
+                </MultiBinding>
+            </controls:WatcherEye.IsBusy>
+        </controls:WatcherEye>
 
         <StackPanel Grid.Column="1"
                     MinWidth="0"
@@ -21,8 +29,12 @@
                            FontWeight="SemiBold"
                            Text="Agnosia" />
             </Button>
+            <!-- Reserve both status lines so changing messages never resize the header. -->
             <TextBlock Classes="header-status"
+                       Height="36"
+                       LineHeight="18"
                        Classes.error="{Binding StatusIsError}"
+                       ToolTip.Tip="{Binding StatusMessage, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.Dashboard.Status.'}"
                        Text="{Binding StatusMessage, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.Dashboard.Status.'}" />
         </StackPanel>
 

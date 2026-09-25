@@ -29,7 +29,7 @@ public partial class DashboardWorkspaceViewModel
     {
         if (!IsDashboardVisible
             || HasLoadedInventory
-            || _inventoryLoadInProgress
+            || IsInventoryLoadInProgress
             || _lastProfileSnapshot is null)
             return;
 
@@ -43,7 +43,7 @@ public partial class DashboardWorkspaceViewModel
         CancelInventoryLoad(false);
         inventoryCancellation = new CancellationTokenSource();
         _inventoryLoadCancellation = inventoryCancellation;
-        _inventoryLoadInProgress = true;
+        IsInventoryLoadInProgress = true;
         return ++_inventoryLoadGeneration;
     }
 
@@ -56,7 +56,7 @@ public partial class DashboardWorkspaceViewModel
         }
 
         ++_inventoryLoadGeneration;
-        _inventoryLoadInProgress = false;
+        IsInventoryLoadInProgress = false;
         if (updateProgressState) IsInventoryLoading = false;
     }
 
@@ -105,7 +105,7 @@ public partial class DashboardWorkspaceViewModel
             {
                 if (!ReferenceEquals(_inventoryLoadCancellation, inventoryCancellation)) return;
                 _inventoryLoadCancellation = null;
-                _inventoryLoadInProgress = false;
+                IsInventoryLoadInProgress = false;
                 IsInventoryLoading = false;
             }, DispatcherPriority.Background);
             inventoryCancellation.Dispose();

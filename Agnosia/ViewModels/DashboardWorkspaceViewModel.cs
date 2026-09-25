@@ -69,8 +69,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private bool _workAppRefreshPending;
     private bool _isPreparingOnboardingPermissions;
     private PermissionKind? _pendingResumePermissionKind;
-    private bool _inventoryLoadInProgress;
     private int _busyScopeCount;
+    private int _activeAppPermissionOperations;
     private int _inventoryLoadGeneration;
     private CancellationTokenSource? _inventoryLoadCancellation;
     private CancellationTokenSource? _onboardingMonitorCancellation;
@@ -115,6 +115,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(OverallStatusText))]
     [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
     [NotifyPropertyChangedFor(nameof(IsOperationActive))]
+    [NotifyPropertyChangedFor(nameof(IsActivityIndicatorActive))]
     [NotifyCanExecuteChangedFor(nameof(StartProvisioningCommand))]
     [NotifyCanExecuteChangedFor(nameof(StartOfflineProvisioningCommand))]
     [NotifyCanExecuteChangedFor(nameof(StartDirectProvisioningCommand))]
@@ -186,7 +187,12 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private partial bool IsInventoryLoading { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsActivityIndicatorActive))]
+    private partial bool IsInventoryLoadInProgress { get; set; }
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsOperationActive))]
+    [NotifyPropertyChangedFor(nameof(IsActivityIndicatorActive))]
     [NotifyPropertyChangedFor(nameof(OverviewHeadline))]
     [NotifyPropertyChangedFor(nameof(OverallStatusText))]
     [NotifyPropertyChangedFor(nameof(OverallStatusCaption))]
@@ -501,12 +507,16 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     public bool IsOperationActive => IsBusy || _isOperationInProgress || IsDashboardRefreshing;
 
+    public bool IsActivityIndicatorActive =>
+        IsOperationActive || IsInventoryLoadInProgress || Volatile.Read(ref _activeAppPermissionOperations) > 0;
+
     partial void OnSelectedSectionChanged(DashboardSection value)
     {
         if (value == DashboardSection.Apps)
         {
             _settingsSaveCoordinator.TryStartPendingCatalogRefresh();
             StartInventoryLoadIfNeeded();
+            foreach (var app in _visibleApps) app.RefreshIconBindings();
             return;
         }
 
@@ -873,7 +883,18 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         if (app.IsPermissionDetailsExpanded) _ = app.Permissions.RefreshCommand.ExecuteAsync(null);
     }
 
-    internal AppPermissionsViewModel CreateAppPermissions(AppSnapshot app) => new(_appCommandService, app);
+    internal AppPermissionsViewModel CreateAppPermissions(AppSnapshot app)
+    {
+        var permissions = new AppPermissionsViewModel(_appCommandService, app);
+        // Track the operation lifetime even if its dialog is closed or another app is selected.
+        permissions.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName != nameof(AppPermissionsViewModel.IsBusy)) return;
+            Interlocked.Add(ref _activeAppPermissionOperations, permissions.IsBusy ? 1 : -1);
+            OnPropertyChanged(nameof(IsActivityIndicatorActive));
+        };
+        return permissions;
+    }
 
     internal void CloseAppControl()
     {
@@ -1470,6 +1491,10 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
     private void SetVisibleApps(AppItemViewModel[] visibleApps)
     {
+        // Existing cards publish their own property changes. Replacing an identical
+        // sequence needlessly resets the item containers and scroll state.
+        if (_visibleApps.AsSpan().SequenceEqual(visibleApps)) return;
+
         CancelStaleVisibleIconLoads(visibleApps);
         _visibleApps = visibleApps;
         OnPropertyChanged(nameof(VisibleApps));
@@ -1713,6 +1738,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     private void NotifyOperationStatusChanged()
     {
         OnPropertyChanged(nameof(IsOperationActive));
+        OnPropertyChanged(nameof(IsActivityIndicatorActive));
         OnPropertyChanged(nameof(OverviewHeadline));
         OnPropertyChanged(nameof(OverallStatusText));
         OnPropertyChanged(nameof(OverallStatusCaption));

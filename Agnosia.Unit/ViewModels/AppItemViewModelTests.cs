@@ -9,6 +9,26 @@ namespace Agnosia.Unit.ViewModels;
 public sealed class AppItemViewModelTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void System_status_change_notifies_the_card_badge(bool wasSystem)
+    {
+        var snapshot = TestSnapshots.App(ProfileKind.Personal, isSystem: wasSystem);
+        var app = CreateApp(snapshot);
+        var changed = new List<string?>();
+        app.PropertyChanged += (_, args) => changed.Add(args.PropertyName);
+
+        app.ApplySnapshot(snapshot with { IsSystem = !wasSystem });
+
+        Assert.Equal(wasSystem ? string.Empty : "System", app.StatusTagLabel);
+        Assert.Equal(!wasSystem, app.HasStatusTag);
+        Assert.Equal(!wasSystem, app.ShowSecondaryRow);
+        Assert.Contains(nameof(AppItemViewModel.StatusTagLabel), changed);
+        Assert.Contains(nameof(AppItemViewModel.HasStatusTag), changed);
+        Assert.Contains(nameof(AppItemViewModel.ShowSecondaryRow), changed);
+    }
+
+    [Theory]
     [InlineData(AppPermissionRiskLevel.Safe)]
     [InlineData(AppPermissionRiskLevel.Dangerous)]
     [InlineData(AppPermissionRiskLevel.Critical)]

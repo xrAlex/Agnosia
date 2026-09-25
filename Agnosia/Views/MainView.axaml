@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:controls="using:Agnosia.Controls"
+             xmlns:converters="using:Avalonia.Data.Converters"
              xmlns:vm="using:Agnosia.ViewModels"
              xmlns:views="using:Agnosia.Views"
              mc:Ignorable="d"
@@ -19,7 +20,14 @@
               ClipToBounds="True">
             <controls:PlexusBackground LineBrush="{StaticResource AppPlexusLineBrush}"
                                        NodeBrush="{StaticResource AppPlexusNodeBrush}"
-                                       GlowBrush="{StaticResource AppPlexusGlowBrush}" />
+                                       GlowBrush="{StaticResource AppPlexusGlowBrush}">
+                <controls:PlexusBackground.IsVisible>
+                    <MultiBinding Converter="{x:Static converters:BoolConverters.And}">
+                        <Binding Path="!IsLogWindowOpen" />
+                        <Binding Path="!IsOnboardingVisible" />
+                    </MultiBinding>
+                </controls:PlexusBackground.IsVisible>
+            </controls:PlexusBackground>
         </Grid>
 
         <views:AppHeaderView Grid.Row="0" />
@@ -32,15 +40,6 @@
         </Grid>
 
         <views:BottomNavigationView Grid.Row="2" />
-
-        <ProgressBar Grid.Row="0"
-                     Grid.RowSpan="3"
-                     Classes="operation-progress"
-                     HorizontalAlignment="Stretch"
-                     VerticalAlignment="Top"
-                     IsHitTestVisible="False"
-                     IsVisible="{Binding IsOperationActive}"
-                     IsIndeterminate="True" />
 
         <views:LogOverlayView Grid.Row="0" Grid.RowSpan="3" />
 
@@ -62,6 +61,8 @@
                     Padding="22"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center">
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto">
                 <Grid RowDefinitions="Auto,Auto"
                       RowSpacing="14">
                     <Button AutomationProperties.Name="Закрыть" Classes="icon-button"
@@ -114,6 +115,7 @@
                         </Button>
                     </StackPanel>
                 </Grid>
+                </ScrollViewer>
             </Border>
         </Grid>
     </Grid>

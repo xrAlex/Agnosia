@@ -39,6 +39,16 @@ public partial class WatcherEye : UserControl
     private bool _isAttachedToPointerEvents;
     private double _targetPupilX;
     private double _targetPupilY;
+    private bool _isInitialized;
+
+    public static readonly StyledProperty<bool> IsBusyProperty =
+        AvaloniaProperty.Register<WatcherEye, bool>(nameof(IsBusy));
+
+    public bool IsBusy
+    {
+        get => GetValue(IsBusyProperty);
+        set => SetValue(IsBusyProperty, value);
+    }
 
     public WatcherEye()
     {
@@ -85,6 +95,36 @@ public partial class WatcherEye : UserControl
 
         AttachedToVisualTree += (_, _) => AttachPointerSource();
         DetachedFromVisualTree += (_, _) => DetachPointerSource();
+        _isInitialized = true;
+        UpdateBusyState();
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (_isInitialized && change.Property == IsBusyProperty) UpdateBusyState();
+    }
+
+    private void UpdateBusyState()
+    {
+        IdlePupil.IsVisible = !IsBusy;
+        BusyPupilHost.IsVisible = IsBusy;
+        BusyPupil.Classes.Set("spinning", IsBusy && _isAttachedToPointerEvents && UiAnimationState.IsActive);
+    }
+
+    private void OnAnimationStateChanged()
+    {
+        UpdateBusyState();
+        if (UiAnimationState.IsActive)
+        {
+            ScheduleLookAtUser(immediate: true);
+            return;
+        }
+
+        _pupilMotionTimer.Stop();
+        _pointerIdleTimer.Stop();
+        _returnToUserTimer.Stop();
+        _isTrackingPointer = false;
     }
 
     private void AttachPointerSource()
@@ -99,7 +139,9 @@ public partial class WatcherEye : UserControl
         _pointerSource.AddHandler(PointerCaptureLostEvent, OnPointerCaptureLost, PointerRoutingStrategies, true);
         _pointerSource.AddHandler(PointerExitedEvent, OnPointerExited, PointerRoutingStrategies, true);
         WatcherPointerTracker.PointerChanged += OnPlatformPointerChanged;
+        UiAnimationState.Changed += OnAnimationStateChanged;
         _isAttachedToPointerEvents = true;
+        UpdateBusyState();
     }
 
     private void DetachPointerSource()
@@ -107,6 +149,7 @@ public partial class WatcherEye : UserControl
         if (_isAttachedToPointerEvents && _pointerSource is not null)
         {
             WatcherPointerTracker.PointerChanged -= OnPlatformPointerChanged;
+            UiAnimationState.Changed -= OnAnimationStateChanged;
             _pointerSource.RemoveHandler(PointerPressedEvent, OnPointerPressed);
             _pointerSource.RemoveHandler(PointerMovedEvent, OnPointerMoved);
             _pointerSource.RemoveHandler(PointerReleasedEvent, OnPointerReleased);
@@ -120,6 +163,7 @@ public partial class WatcherEye : UserControl
         _pointerIdleTimer.Stop();
         _returnToUserTimer.Stop();
         _isTrackingPointer = false;
+        BusyPupil.Classes.Set("spinning", false);
     }
 
     private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
@@ -185,6 +229,8 @@ public partial class WatcherEye : UserControl
 
     private void BeginOrMoveTracking(Point target)
     {
+        if (!IsEffectivelyVisible || !UiAnimationState.IsActive) return;
+
         _returnToUserTimer.Stop();
         _isTrackingPointer = true;
         LookAt(target);
