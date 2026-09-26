@@ -105,7 +105,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
     public bool HasPermissionRiskReasons => GetPermissionRiskReasons().Length > 0;
 
-    public bool ShowPermissionRiskReasons => Permissions.IsWorkProfile && HasPermissionRiskReasons;
+    public bool ShowPermissionRiskReasons => HasPermissionRiskReasons;
 
     public bool IsPermissionRiskSafe => Snapshot.PermissionRiskAvailable && PermissionRiskLevel == AppPermissionRiskLevel.Safe;
 

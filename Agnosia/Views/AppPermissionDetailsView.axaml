@@ -54,9 +54,12 @@
                 <TextBox Text="{Binding SearchText}" PlaceholderText="Найти разрешение"
                          AutomationProperties.Name="Поиск разрешений приложения"
                          IsVisible="{Binding IsWorkProfile}" />
-                <Button Classes="compact-action" Content="Обновить статусы" Command="{Binding RefreshCommand}"
+                <Button Classes="icon-button" Command="{Binding RefreshCommand}"
                         HorizontalAlignment="Left" AutomationProperties.Name="Обновить статусы разрешений"
-                        IsVisible="{Binding IsWorkProfile}" />
+                        ToolTip.Tip="Обновить статусы разрешений"
+                        IsVisible="{Binding IsWorkProfile}">
+                    <PathIcon Classes="action-icon" Data="{StaticResource IconRefreshGeometry}" />
+                </Button>
                 <TextBlock Classes="app-dialog-setting-caption" Text="{Binding Message}" TextWrapping="Wrap" />
                 <TextBlock Classes="app-dialog-setting-caption" IsVisible="{Binding IsEmpty}"
                            Text="Приложение не запрашивает разрешений." TextWrapping="Wrap" />

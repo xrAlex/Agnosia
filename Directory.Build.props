@@ -10,6 +10,5 @@
 
     <PropertyGroup Condition="$([System.String]::Copy('$(MSBuildProjectName)').Contains('Android'))">
         <ApplicationDisplayVersion>$(AppVersion)</ApplicationDisplayVersion>
-        <BaseIntermediateOutputPath>$(LocalAppData)\Agnosia\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
     </PropertyGroup>
 </Project>

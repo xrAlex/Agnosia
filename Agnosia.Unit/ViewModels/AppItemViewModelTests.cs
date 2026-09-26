@@ -240,6 +240,21 @@ public sealed class AppItemViewModelTests
         Assert.Contains("может использовать микрофон", app.PermissionRiskReasons);
     }
 
+    [Theory]
+    [InlineData(ProfileKind.Personal)]
+    [InlineData(ProfileKind.Work)]
+    public void Dangerous_permission_explanations_are_visible_in_app_details(ProfileKind profile)
+    {
+        var app = CreateApp(TestSnapshots.App(
+            profile,
+            permissionRiskLevel: AppPermissionRiskLevel.Dangerous,
+            riskyPermissions: ["android.permission.CAMERA"]));
+
+        Assert.True(app.HasPermissionRiskReasons);
+        Assert.True(app.ShowPermissionRiskReasons);
+        Assert.Contains("может использовать камеру", app.PermissionRiskReasons);
+    }
+
     [Fact]
     public void Permission_risk_indicator_is_hidden_when_risk_engine_is_unavailable()
     {

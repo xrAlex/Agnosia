@@ -24,9 +24,7 @@
                 <ContentControl.DataTemplates>
                     <DataTemplate x:DataType="vm:AppItemViewModel">
                         <Border Classes="surface-card app-control-dialog">
-                            <ScrollViewer HorizontalScrollBarVisibility="Disabled"
-                                          VerticalScrollBarVisibility="Auto">
-                                <StackPanel Spacing="12">
+                            <Grid RowDefinitions="Auto,Auto,*" RowSpacing="12">
                                     <Grid ColumnDefinitions="Auto,*,Auto,Auto"
                                           ColumnSpacing="12">
                                         <Border Classes="app-icon-frame dialog">
@@ -85,7 +83,12 @@
                                         </Button>
                                     </Grid>
 
-                                    <Border Classes="divider" />
+                                    <Border Grid.Row="1" Classes="divider" />
+
+                                    <ScrollViewer Grid.Row="2"
+                                                  HorizontalScrollBarVisibility="Disabled"
+                                                  VerticalScrollBarVisibility="Auto">
+                                        <StackPanel Spacing="12">
 
                                     <StackPanel Spacing="8">
                                         <Button AutomationProperties.Name="{Binding CloneLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}" Classes="compact-action app-dialog-action"
@@ -210,8 +213,9 @@
                                     </StackPanel>
 
                                     <views:AppPermissionDetailsView />
-                                </StackPanel>
-                            </ScrollViewer>
+                                        </StackPanel>
+                                    </ScrollViewer>
+                            </Grid>
                         </Border>
                     </DataTemplate>
                 </ContentControl.DataTemplates>
