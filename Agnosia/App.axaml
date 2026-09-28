@@ -6,6 +6,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceInclude Source="avares://Agnosia/Styles/ThemeResources.axaml" />
+                <ResourceInclude Source="avares://Agnosia/Styles/LayoutResources.axaml" />
                 <ResourceInclude Source="avares://Agnosia/Styles/Localization.axaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>

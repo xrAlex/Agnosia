@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Agnosia.ViewModels"
+             xmlns:views="using:Agnosia.Views"
              mc:Ignorable="d"
              x:Class="Agnosia.Views.ModulesSectionView"
              x:DataType="vm:DashboardWorkspaceViewModel">
@@ -28,27 +29,18 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:AgnosiaModuleViewModel">
-                            <Button AutomationProperties.Name="{Binding Title}" Classes="app-card-button"
+                            <Button Classes="app-card-button"
                                     Command="{Binding OpenCommand}">
+                                <AutomationProperties.Name>
+                                    <MultiBinding StringFormat="{}{0}: {1}">
+                                        <Binding Path="Title" />
+                                        <Binding Path="StatusText" />
+                                    </MultiBinding>
+                                </AutomationProperties.Name>
                                 <Border Classes="surface-card compact list-card">
                                     <Grid ColumnDefinitions="Auto,*,Auto"
                                           ColumnSpacing="14">
-                                        <Border Classes="icon-tile">
-                                            <Grid>
-                                                <PathIcon Classes="section-icon centered"
-                                                          Data="{StaticResource IconFileShuttleGeometry}"
-                                                          IsVisible="{Binding IsFileShuttle}" />
-                                                <PathIcon Classes="section-icon centered"
-                                                          Data="{StaticResource IconLockdownGeometry}"
-                                                          IsVisible="{Binding IsLockdown}" />
-                                                <PathIcon Classes="section-icon centered"
-                                                          Data="{StaticResource IconVpnGuardGeometry}"
-                                                          IsVisible="{Binding IsVpnGuard}" />
-                                                <PathIcon Classes="section-icon centered"
-                                                          Data="{StaticResource IconRiskEngineGeometry}"
-                                                          IsVisible="{Binding IsRiskEngine}" />
-                                            </Grid>
-                                        </Border>
+                                        <views:ModuleIconView />
 
                                         <StackPanel Grid.Column="1"
                                                     MinWidth="0"
@@ -69,6 +61,8 @@
 
                                         <ToggleSwitch Grid.Column="2"
                                                       VerticalAlignment="Center"
+                                                      Focusable="False"
+                                                      AutomationProperties.AccessibilityView="Raw"
                                                       IsHitTestVisible="False"
                                                       IsChecked="{Binding IsEnabled, Mode=OneWay}" />
                                     </Grid>

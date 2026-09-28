@@ -21,6 +21,7 @@
     <SolidColorBrush x:Key="AppRiskSafeBrush" Color="#38D37A" />
     <SolidColorBrush x:Key="AppRiskDangerousBrush" Color="#F7C948" />
     <SolidColorBrush x:Key="AppRiskCriticalBrush" Color="#FF253A" />
+    <SolidColorBrush x:Key="AppRiskBadgeTextBrush" Color="#08090B" />
     <SolidColorBrush x:Key="AppButtonSecondaryBrush" Color="#1B1F25" />
     <SolidColorBrush x:Key="AppButtonSecondaryHoverBrush" Color="#252B34" />
     <SolidColorBrush x:Key="AppInputBrush" Color="#11141A" />

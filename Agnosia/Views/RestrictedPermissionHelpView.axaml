@@ -6,10 +6,12 @@
              IsVisible="{Binding IsVisible}">
     <StackPanel Spacing="8">
         <ToggleButton Classes="app-dialog-section-toggle"
-                      HorizontalAlignment="Left"
                       AutomationProperties.Name="Не удаётся разрешить?"
                       IsChecked="{Binding IsExpanded, Mode=TwoWay}">
-            <TextBlock Classes="button-label" Text="Не удаётся разрешить?" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <TextBlock Classes="app-dialog-setting-title" VerticalAlignment="Center" Text="Не удаётся разрешить?" />
+                <PathIcon Grid.Column="1" Classes="disclosure-chevron" Classes.expanded="{Binding IsExpanded}" />
+            </Grid>
         </ToggleButton>
         <StackPanel Spacing="8" IsVisible="{Binding IsExpanded}">
             <TextBlock Classes="page-caption"

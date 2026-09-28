@@ -147,7 +147,7 @@ public sealed class DashboardWorkspaceRecoveryTests
         viewModel.HandlePrimaryActivityResumed();
 
         await AsyncAssert.EventuallyAsync(
-            () => !viewModel.StatusIsError && viewModel.OnboardingPermissionSummary == "GrantedCount|4|4",
+            () => !viewModel.StatusIsError && viewModel.OnboardingPermissionSummary == "GrantedCount|3|3",
             "A subsequent resume should retry a failed permission refresh.");
     }
 
@@ -175,7 +175,7 @@ public sealed class DashboardWorkspaceRecoveryTests
         await request;
 
         await AsyncAssert.EventuallyAsync(
-            () => viewModel.OnboardingPermissionSummary == "GrantedCount|4|4",
+            () => viewModel.OnboardingPermissionSummary == "GrantedCount|3|3",
             "The permission result must complete before resume refresh reads the granted state.");
         Assert.Equal(loads + 1, services.PermissionLoadCount);
     }
@@ -203,7 +203,7 @@ public sealed class DashboardWorkspaceRecoveryTests
         Assert.True(viewModel.StatusIsError);
         Assert.True(viewModel.WorkProfileAvailable);
         Assert.True(viewModel.IsWorkProfileSelected);
-        Assert.Equal("GrantedCount|4|4", viewModel.OnboardingPermissionSummary);
+        Assert.Equal("GrantedCount|3|3", viewModel.OnboardingPermissionSummary);
     }
 
     [Fact]
@@ -229,7 +229,7 @@ public sealed class DashboardWorkspaceRecoveryTests
                   && !viewModel.IsDashboardRefreshing
                   && !viewModel.StatusIsError,
             "Resume should recover the dashboard after a transient refresh failure.");
-        Assert.Equal("GrantedCount|4|4", viewModel.OnboardingPermissionSummary);
+        Assert.Equal("GrantedCount|3|3", viewModel.OnboardingPermissionSummary);
         Assert.True(viewModel.WorkProfileAvailable);
     }
 }

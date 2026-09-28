@@ -81,7 +81,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     public ReadOnlyObservableCollection<PermissionItemViewModel> PermissionItems { get; }
 
     public IReadOnlyList<PermissionItemViewModel> OnboardingPermissionItems =>
-        _permissionItems.Where(item => IsAppPermission(item.Kind)).ToArray();
+        _settingsPermissionItems.ToArray();
 
     public ReadOnlyObservableCollection<AgnosiaModuleViewModel> Modules { get; }
 
@@ -1870,7 +1870,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
         {
             var item = new PermissionItemViewModel(this, snapshot);
             _permissionItems.Add(item);
-            if (IsAppPermission(snapshot.Kind)) _settingsPermissionItems.Add(item);
+            if (IsAppPermission(snapshot.Kind) && snapshot.Kind != PermissionKind.WorkProfile)
+                _settingsPermissionItems.Add(item);
         }
 
         OnPropertyChanged(nameof(PermissionSummary));

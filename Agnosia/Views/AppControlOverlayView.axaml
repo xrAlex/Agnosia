@@ -14,33 +14,21 @@
     </Design.DataContext>
 
     <Border Background="{StaticResource AppOverlayScrimBrush}">
-        <Grid x:Name="DialogHost" Margin="12">
+        <Grid x:Name="DialogHost" Classes="overlay-root">
             <ContentControl Content="{Binding SelectedApp}"
                             MaxHeight="{Binding #DialogHost.Bounds.Height}"
+                            MaxWidth="380"
                             HorizontalContentAlignment="Stretch"
                             VerticalContentAlignment="Stretch"
-                            HorizontalAlignment="Center"
+                            HorizontalAlignment="Stretch"
                             VerticalAlignment="Center">
                 <ContentControl.DataTemplates>
                     <DataTemplate x:DataType="vm:AppItemViewModel">
                         <Border Classes="surface-card app-control-dialog">
                             <Grid RowDefinitions="Auto,Auto,*" RowSpacing="12">
                                     <Grid ColumnDefinitions="Auto,*,Auto,Auto"
-                                          ColumnSpacing="12">
-                                        <Border Classes="app-icon-frame dialog">
-                                            <Grid>
-                                                <Image Classes="app-icon dialog"
-                                                       Source="{Binding Icon}"
-                                                       IsVisible="{Binding HasIcon}" />
-                                                <Border Background="{StaticResource AppAccentBrush}"
-                                                        IsVisible="{Binding ShowMonogram}">
-                                                    <TextBlock HorizontalAlignment="Center"
-                                                               VerticalAlignment="Center"
-                                                               Classes="app-monogram dialog"
-                                                               Text="{Binding Monogram}" />
-                                                </Border>
-                                            </Grid>
-                                        </Border>
+                                          ColumnSpacing="10">
+                                        <views:AppIconView Classes="dialog" />
 
                                         <StackPanel Grid.Column="1"
                                                     MinWidth="0"
@@ -65,7 +53,7 @@
                                         </StackPanel>
 
                                         <Button AutomationProperties.Name="{Binding LaunchLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}" Grid.Column="2"
-                                                Classes="icon-button app-dialog-close"
+                                                Classes="icon-button"
                                                 ToolTip.Tip="{Binding LaunchLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}"
                                                 Command="{Binding LaunchCommand}"
                                                 IsVisible="{Binding ShowLaunch}"
@@ -75,7 +63,7 @@
                                         </Button>
 
                                         <Button AutomationProperties.Name="Закрыть" Grid.Column="3"
-                                                Classes="icon-button app-dialog-close"
+                                                Classes="icon-button"
                                                 ToolTip.Tip="Закрыть"
                                                 Command="{Binding CloseControlsCommand}">
                                             <PathIcon Classes="action-icon"
@@ -174,6 +162,7 @@
                                             </StackPanel>
                                             <ToggleSwitch Grid.Column="1"
                                                           VerticalAlignment="Center"
+                                                          AutomationProperties.Name="{Binding AgnosiaIsolationLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}"
                                                           IsChecked="{Binding IsAgnosiaManaged, Mode=OneWay}"
                                                           IsEnabled="{Binding CanFreeze}"
                                                           Command="{Binding ToggleFrozenCommand}" />
@@ -190,6 +179,7 @@
                                             </StackPanel>
                                             <ToggleSwitch Grid.Column="1"
                                                           VerticalAlignment="Center"
+                                                          AutomationProperties.Name="{Binding InteractionLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}"
                                                           IsChecked="{Binding InteractionAllowed, Mode=OneWay}"
                                                           Command="{Binding ToggleInteractionAccessCommand}" />
                                         </Grid>
@@ -206,6 +196,7 @@
                                             </StackPanel>
                                             <ToggleSwitch Grid.Column="1"
                                                           VerticalAlignment="Center"
+                                                          AutomationProperties.Name="{Binding InternetAccessLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}"
                                                           IsChecked="{Binding IsInternetBlocked, Mode=OneWay}"
                                                           IsEnabled="{Binding CanToggleInternetAccess}"
                                                           Command="{Binding ToggleInternetAccessCommand}" />

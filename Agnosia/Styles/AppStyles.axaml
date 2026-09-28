@@ -1,11 +1,11 @@
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:automation="using:Avalonia.Automation">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Style Selector="Window">
         <Setter Property="Background" Value="{StaticResource AppBackgroundBrush}" />
         <Setter Property="Foreground" Value="{StaticResource AppTextPrimaryBrush}" />
     </Style>
     <Style Selector="UserControl">
-        <Setter Property="Background" Value="{StaticResource AppBackgroundBrush}" />
+        <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{StaticResource AppTextPrimaryBrush}" />
     </Style>
     <Style Selector="UserControl.overlay-view">
@@ -13,9 +13,9 @@
     </Style>
     <StyleInclude Source="avares://Agnosia/Styles/AppTextStyles.axaml" />
     <Style Selector="ToggleButton.app-dialog-section-toggle">
-        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="MinHeight" Value="{StaticResource AppTouchTargetSize}" />
         <Setter Property="Margin" Value="0" />
-        <Setter Property="Padding" Value="0" />
+        <Setter Property="Padding" Value="4,8" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
@@ -33,6 +33,22 @@
     <Style Selector="ToggleButton.app-dialog-section-toggle:pressed">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="ToggleButton.app-dialog-section-toggle:checked /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="PathIcon.disclosure-chevron">
+        <Setter Property="Width" Value="16" />
+        <Setter Property="Height" Value="16" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{StaticResource AppTextSecondaryBrush}" />
+        <Setter Property="Data" Value="{StaticResource IconChevronDownGeometry}" />
+    </Style>
+    <Style Selector="PathIcon.disclosure-chevron.expanded">
+        <Setter Property="RenderTransform">
+            <RotateTransform Angle="180" />
+        </Setter>
     </Style>
     <Style Selector="PathIcon.section-icon">
         <Setter Property="Width" Value="20" />
@@ -67,47 +83,37 @@
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="Stretch" Value="Uniform" />
     </Style>
-    <Style Selector="Image.app-icon.dialog">
-        <Setter Property="Width" Value="44" />
-        <Setter Property="Height" Value="44" />
-    </Style>
     <Style Selector="Border.surface-card">
-        <Setter Property="CornerRadius" Value="8" />
-        <Setter Property="Padding" Value="16" />
+        <Setter Property="CornerRadius" Value="{StaticResource AppCardRadius}" />
+        <Setter Property="Padding" Value="{StaticResource AppCardPadding}" />
         <Setter Property="Background" Value="{StaticResource AppSurfaceBrush}" />
         <Setter Property="BorderBrush" Value="{StaticResource AppBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="StackPanel.content-root">
-        <Setter Property="MaxWidth" Value="900" />
-        <Setter Property="Margin" Value="18,12,18,16" />
-        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="MaxWidth" Value="{StaticResource AppContentMaxWidth}" />
+        <Setter Property="Margin" Value="{StaticResource AppPageMargin}" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="Spacing" Value="12" />
     </Style>
     <Style Selector="Grid.content-root">
-        <Setter Property="MaxWidth" Value="900" />
-        <Setter Property="Margin" Value="18,12,18,16" />
-        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="MaxWidth" Value="{StaticResource AppContentMaxWidth}" />
+        <Setter Property="Margin" Value="{StaticResource AppPageMargin}" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
     </Style>
     <Style Selector="UniformGrid.tile-grid">
         <Setter Property="Columns" Value="2" />
-    </Style>
-    <Style Selector="Border.surface-card:pointerover">
-        <Setter Property="Background" Value="{StaticResource AppSurfaceAltBrush}" />
-        <Setter Property="BorderBrush" Value="{StaticResource AppAccentBrush}" />
     </Style>
     <Style Selector="Border.surface-card.hero">
         <Setter Property="Background" Value="{StaticResource AppChromeBrush}" />
     </Style>
     <Style Selector="Border.surface-card.compact">
-        <Setter Property="Padding" Value="14" />
+        <Setter Property="Padding" Value="{StaticResource AppCompactCardPadding}" />
     </Style>
-    <Style Selector="Border.tutorial-step-icon">
-        <Setter Property="Background" Value="{StaticResource AppAccentMutedBrush}" />
-        <Setter Property="BorderBrush" Value="{StaticResource AppAccentMutedBrush}" />
-    </Style>
-    <Style Selector="Border.tutorial-step-icon PathIcon">
-        <Setter Property="Foreground" Value="{StaticResource AppAccentBrush}" />
+    <Style Selector="Border.surface-card.inset">
+        <Setter Property="Background" Value="{StaticResource AppSurfaceAltBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource AppBorderSoftBrush}" />
+        <Setter Property="Padding" Value="12" />
     </Style>
     <Style Selector="Border.overlay-panel">
         <Setter Property="MaxWidth" Value="860" />
@@ -116,6 +122,7 @@
         <Setter Property="VerticalAlignment" Value="Stretch" />
     </Style>
     <Style Selector="Border.log-panel">
+        <Setter Property="MaxWidth" Value="{StaticResource AppContentMaxWidth}" />
         <Setter Property="Margin" Value="18,0,18,0" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -137,7 +144,7 @@
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <Style Selector="Grid.overlay-root">
-        <Setter Property="Margin" Value="18" />
+        <Setter Property="Margin" Value="{StaticResource AppOverlayMargin}" />
     </Style>
     <Style Selector="Border.icon-tile">
         <Setter Property="Width" Value="42" />
@@ -160,10 +167,6 @@
         <Setter Property="BorderBrush" Value="{StaticResource AppBorderSoftBrush}" />
         <Setter Property="BorderThickness" Value="1" />
     </Style>
-    <Style Selector="Border.app-icon-frame.dialog">
-        <Setter Property="Width" Value="54" />
-        <Setter Property="Height" Value="54" />
-    </Style>
     <Style Selector="Border.permission-risk-badge">
         <Setter Property="Width" Value="24" />
         <Setter Property="Height" Value="24" />
@@ -183,22 +186,6 @@
     </Style>
     <Style Selector="Border.list-card">
         <Setter Property="Margin" Value="0,0,0,10" />
-    </Style>
-    <Style Selector="Border.list-card:pointerover">
-        <Setter Property="Background" Value="{StaticResource AppSurfaceBrush}" />
-        <Setter Property="BorderBrush" Value="{StaticResource AppBorderBrush}" />
-    </Style>
-    <Style Selector="Border.surface-card.list-card:pointerover">
-        <Setter Property="Background" Value="{StaticResource AppSurfaceBrush}" />
-        <Setter Property="BorderBrush" Value="{StaticResource AppBorderBrush}" />
-    </Style>
-    <Style Selector="Button.app-card-button:pointerover Border.surface-card.list-card">
-        <Setter Property="Background" Value="{StaticResource AppSurfaceBrush}" />
-        <Setter Property="BorderBrush" Value="{StaticResource AppBorderBrush}" />
-    </Style>
-    <Style Selector="Button.app-card-button:pressed Border.surface-card.list-card">
-        <Setter Property="Background" Value="{StaticResource AppSurfaceBrush}" />
-        <Setter Property="BorderBrush" Value="{StaticResource AppBorderBrush}" />
     </Style>
     <Style Selector="Border.divider">
         <Setter Property="Height" Value="1" />
@@ -228,13 +215,13 @@
         <Setter Property="Background" Value="{StaticResource AppBorderBrush}" />
     </Style>
     <Style Selector="Border.module-status-indicator.enabled">
-        <Setter Property="Background" Value="{StaticResource AppBorderBrush}" />
+        <Setter Property="Background" Value="{StaticResource AppAccentBrush}" />
     </Style>
     <Style Selector="Border.module-status-dot">
         <Setter Property="Width" Value="8" />
         <Setter Property="Height" Value="8" />
         <Setter Property="CornerRadius" Value="4" />
-        <Setter Property="Background" Value="{StaticResource AppTextPrimaryBrush}" />
+        <Setter Property="Background" Value="{StaticResource AppOnAccentBrush}" />
         <Setter Property="HorizontalAlignment" Value="Center" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
@@ -297,9 +284,9 @@
         <Setter Property="Foreground" Value="{StaticResource AppTextPrimaryBrush}" />
         <Setter Property="BorderBrush" Value="{StaticResource AppBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="CornerRadius" Value="{StaticResource AppControlRadius}" />
         <Setter Property="Padding" Value="16,9" />
-        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="MinHeight" Value="{StaticResource AppTouchTargetSize}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -363,12 +350,14 @@
     </Style>
     <Style Selector="Button.segment-chip">
         <Setter Property="Padding" Value="12,8" />
-        <Setter Property="MinHeight" Value="38" />
-        <Setter Property="CornerRadius" Value="6" />
     </Style>
     <Style Selector="Button.settings-choice">
+        <Setter Property="Padding" Value="8,8" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.settings-choice TextBlock.button-label">
+        <Setter Property="TextAlignment" Value="Center" />
     </Style>
     <Style Selector="Button.segment-chip.profile-segment">
         <Setter Property="MinHeight" Value="52" />
@@ -379,9 +368,8 @@
         <Setter Property="Foreground" Value="{StaticResource AppAccentBrush}" />
     </Style>
     <Style Selector="Button.icon-button">
-        <Setter Property="Width" Value="42" />
-        <Setter Property="Height" Value="42" />
-        <Setter Property="MinHeight" Value="42" />
+        <Setter Property="Width" Value="{StaticResource AppTouchTargetSize}" />
+        <Setter Property="Height" Value="{StaticResource AppTouchTargetSize}" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -389,17 +377,10 @@
     </Style>
     <Style Selector="Button.compact-action">
         <Setter Property="Padding" Value="14,8" />
-        <Setter Property="MinHeight" Value="38" />
-        <Setter Property="CornerRadius" Value="6" />
     </Style>
     <Style Selector="Button.app-dialog-action">
         <Setter Property="Padding" Value="10,8" />
-        <Setter Property="MinHeight" Value="48" />
-    </Style>
-    <Style Selector="Button.app-dialog-close">
-        <Setter Property="Width" Value="38" />
-        <Setter Property="Height" Value="38" />
-        <Setter Property="MinHeight" Value="38" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
     </Style>
     <Style Selector="Button.app-title-button">
         <Setter Property="Background" Value="Transparent" />
@@ -434,51 +415,28 @@
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
+    <Style Selector="Button.app-card-button:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.app-card-button:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource AppTextPrimaryBrush}" />
+    </Style>
     <Style Selector="TextBox">
         <Setter Property="Background" Value="{StaticResource AppInputBrush}" />
         <Setter Property="Foreground" Value="{StaticResource AppTextPrimaryBrush}" />
         <Setter Property="BorderBrush" Value="{StaticResource AppBorderSoftBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="CornerRadius" Value="{StaticResource AppControlRadius}" />
         <Setter Property="Padding" Value="12,10" />
         <Setter Property="SelectionBrush" Value="{StaticResource AppAccentBrush}" />
-        <Setter Property="MinHeight" Value="42" />
-    </Style>
-    <Style Selector="ListBox.apps-list">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Padding" Value="0" />
-        <Setter Property="Margin" Value="0" />
+        <Setter Property="MinHeight" Value="{StaticResource AppTouchTargetSize}" />
     </Style>
     <Style Selector="ItemsControl.apps-list">
         <Setter Property="Margin" Value="0" />
     </Style>
-    <Style Selector="ListBox.apps-list ListBoxItem">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="Transparent" />
-        <Setter Property="Padding" Value="0" />
-        <Setter Property="Margin" Value="0" />
-        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-        <Setter Property="Transitions">
-            <Transitions />
-        </Setter>
-    </Style>
-    <Style Selector="ListBox.apps-list ListBoxItem:pointerover">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="Transparent" />
-    </Style>
-    <Style Selector="ListBox.apps-list ListBoxItem:selected">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="Transparent" />
-    </Style>
-    <Style Selector="ListBox.apps-list ListBoxItem:selected:pointerover">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="Transparent" />
-    </Style>
     <Style Selector="ToggleSwitch">
-        <Setter Property="OffContent" Value="Выкл." />
-        <Setter Property="OnContent" Value="Вкл." />
+        <Setter Property="OffContent" Value="{x:Null}" />
+        <Setter Property="OnContent" Value="{x:Null}" />
+        <Setter Property="MinHeight" Value="{StaticResource AppTouchTargetSize}" />
         <Setter Property="Foreground" Value="{StaticResource AppTextPrimaryBrush}" />
-        <Setter Property="automation:AutomationProperties.AccessibilityView" Value="Raw" />
     </Style>
 </Styles>

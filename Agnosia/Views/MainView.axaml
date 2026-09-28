@@ -53,13 +53,12 @@
 
         <Grid Grid.Row="0"
               Grid.RowSpan="3"
-              Background="#99000000"
+              Background="{StaticResource AppOverlayScrimBrush}"
               IsVisible="{Binding IsWorkProfileRecoveryVisible}">
             <Border Classes="surface-card"
                     MaxWidth="560"
-                    Margin="18"
-                    Padding="22"
-                    HorizontalAlignment="Center"
+                    Margin="{StaticResource AppOverlayMargin}"
+                    HorizontalAlignment="Stretch"
                     VerticalAlignment="Center">
                 <ScrollViewer HorizontalScrollBarVisibility="Disabled"
                               VerticalScrollBarVisibility="Auto">

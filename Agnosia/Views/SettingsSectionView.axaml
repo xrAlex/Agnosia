@@ -3,7 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Agnosia.ViewModels"
-             xmlns:viewModels="clr-namespace:Agnosia.ViewModels"
+             xmlns:controls="using:Agnosia.Controls"
              mc:Ignorable="d"
              x:Class="Agnosia.Views.SettingsSectionView"
              x:DataType="vm:DashboardWorkspaceViewModel">
@@ -21,21 +21,12 @@
                         Spacing="12">
 
                 <Border Classes="surface-card compact">
-                    <Grid ColumnDefinitions="Auto,*,Auto"
+                    <Grid ColumnDefinitions="*,Auto"
                           ColumnSpacing="14">
-                        <Border Classes="icon-tile">
-                            <PathIcon Classes="section-icon centered"
-                                      Data="{StaticResource IconCheckGeometry}" />
-                        </Border>
-                        <StackPanel Grid.Column="1"
-                                    MinWidth="0"
-                                    Spacing="4">
-                            <TextBlock Classes="section-title compact"
-                                       Text="Разрешения" />
-                            <TextBlock Classes="page-caption"
-                                       Text="Выдача разрешений для корректной работы приложения" />
-                        </StackPanel>
-                        <Button AutomationProperties.Name="Открыть разрешения" Grid.Column="2"
+                        <controls:SectionHeader Icon="{StaticResource IconCheckGeometry}"
+                                                Title="Разрешения"
+                                                Description="Выдача разрешений для корректной работы приложения" />
+                        <Button AutomationProperties.Name="Открыть разрешения" Grid.Column="1"
                                 Classes="icon-button"
                                 ToolTip.Tip="Открыть разрешения"
                                 VerticalAlignment="Center"
@@ -47,24 +38,12 @@
                 </Border>
 
                 <Border Classes="surface-card compact">
-                    <Grid ColumnDefinitions="Auto,*"
-                          RowDefinitions="Auto,Auto"
-                          ColumnSpacing="14"
+                    <Grid RowDefinitions="Auto,Auto"
                           RowSpacing="12">
-                        <Border Classes="icon-tile">
-                            <PathIcon Classes="section-icon centered"
-                                      Data="{StaticResource IconSettingsGeometry}" />
-                        </Border>
-                        <StackPanel Grid.Row="0" Grid.Column="1"
-                                    MinWidth="0"
-                                    Spacing="4">
-                            <TextBlock Classes="section-title compact"
-                                       Text="Оформление" />
-                            <TextBlock Classes="page-caption"
-                                       Text="Выберите палитру интерфейса" />
-                        </StackPanel>
+                        <controls:SectionHeader Icon="{StaticResource IconSettingsGeometry}"
+                                                Title="Оформление"
+                                                Description="Выберите палитру интерфейса" />
                         <Grid Grid.Row="1"
-                              Grid.ColumnSpan="2" Grid.Column="0"
                               ColumnDefinitions="*,*,*"
                               ColumnSpacing="10">
                             <Button AutomationProperties.Name="Красная" Classes="segment-chip settings-choice"
@@ -93,21 +72,9 @@
 
                 <Border Classes="surface-card compact">
                     <StackPanel Spacing="12">
-                        <Grid ColumnDefinitions="Auto,*"
-                              ColumnSpacing="14">
-                            <Border Classes="icon-tile">
-                                <PathIcon Classes="section-icon centered"
-                                          Data="{StaticResource IconFileShuttleGeometry}" />
-                            </Border>
-                            <StackPanel Grid.Column="1"
-                                        MinWidth="0"
-                                        Spacing="4">
-                                <TextBlock Classes="section-title compact"
-                                           Text="Команды рабочего профиля" />
-                                <TextBlock Classes="page-caption"
-                                           Text="То как приложение общается с рабочим профилем. Протокол Provider или Android activity" />
-                            </StackPanel>
-                        </Grid>
+                        <controls:SectionHeader Icon="{StaticResource IconFileShuttleGeometry}"
+                                                Title="Команды рабочего профиля"
+                                                Description="Способ связи с рабочим профилем" />
                         <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
                             <Button AutomationProperties.Name="Авто" Classes="segment-chip settings-choice"
                                     Classes.selected="{Binding IsAutoTransportSelected}"
@@ -130,21 +97,9 @@
 
                 <Border Classes="surface-card compact">
                     <StackPanel Spacing="12">
-                        <Grid ColumnDefinitions="Auto,*"
-                              ColumnSpacing="14">
-                            <Border Classes="icon-tile">
-                                <PathIcon Classes="section-icon centered"
-                                          Data="{StaticResource IconAppsGeometry}" />
-                            </Border>
-                            <StackPanel Grid.Column="1"
-                                        MinWidth="0"
-                                        Spacing="4">
-                                <TextBlock Classes="section-title compact"
-                                           Text="Показывать все пакеты" />
-                                <TextBlock Classes="page-caption"
-                                           Text="Отображать в библиотеке системные и служебные приложения вместе с обычными пакетами" />
-                            </StackPanel>
-                        </Grid>
+                        <controls:SectionHeader Icon="{StaticResource IconAppsGeometry}"
+                                                Title="Показывать все пакеты"
+                                                Description="Отображать в библиотеке системные и служебные приложения вместе с обычными пакетами" />
 
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
                             <Button AutomationProperties.Name="Показывать все пакеты: Вкл"
@@ -161,21 +116,10 @@
                             </Button>
                         </Grid>
 
-                        <Grid ColumnDefinitions="Auto,*"
-                              ColumnSpacing="14">
-                            <Border Classes="icon-tile">
-                                <PathIcon Classes="section-icon centered"
-                                          Data="{StaticResource IconLogGeometry}" />
-                            </Border>
-                            <StackPanel Grid.Column="1"
-                                        MinWidth="0"
-                                        Spacing="4">
-                                <TextBlock Classes="section-title compact"
-                                           Text="Логирование" />
-                                <TextBlock Classes="page-caption"
-                                           Text="Писать отладочные сообщения работы приложения в буфер логирования" />
-                            </StackPanel>
-                        </Grid>
+                        <Border Classes="divider" />
+                        <controls:SectionHeader Icon="{StaticResource IconLogGeometry}"
+                                                Title="Логирование"
+                                                Description="Сохранять диагностические сообщения в журнале событий" />
 
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
                             <Button AutomationProperties.Name="Логирование: Вкл"

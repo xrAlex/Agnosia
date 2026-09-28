@@ -1,0 +1,11 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <x:Double x:Key="AppTouchTargetSize">48</x:Double>
+    <x:Double x:Key="AppContentMaxWidth">900</x:Double>
+    <Thickness x:Key="AppPageMargin">18,12,18,16</Thickness>
+    <Thickness x:Key="AppOverlayMargin">18</Thickness>
+    <Thickness x:Key="AppCardPadding">16</Thickness>
+    <Thickness x:Key="AppCompactCardPadding">14</Thickness>
+    <CornerRadius x:Key="AppCardRadius">8</CornerRadius>
+    <CornerRadius x:Key="AppControlRadius">6</CornerRadius>
+</ResourceDictionary>

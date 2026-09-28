@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Agnosia.ViewModels"
              xmlns:views="using:Agnosia.Views"
+             xmlns:controls="using:Agnosia.Controls"
              mc:Ignorable="d"
              x:Class="Agnosia.Views.ModuleDetailsOverlayView"
              x:DataType="vm:DashboardWorkspaceViewModel"
@@ -14,9 +15,13 @@
     </Design.DataContext>
 
     <Border Background="{StaticResource AppOverlayScrimBrush}">
-        <Grid Classes="overlay-root">
+        <Grid x:Name="DialogHost" Classes="overlay-root">
             <ContentControl Content="{Binding SelectedModule}"
-                            HorizontalAlignment="Center"
+                            MaxHeight="{Binding #DialogHost.Bounds.Height}"
+                            MaxWidth="620"
+                            HorizontalContentAlignment="Stretch"
+                            VerticalContentAlignment="Stretch"
+                            HorizontalAlignment="Stretch"
                             VerticalAlignment="Center">
                 <ContentControl.DataTemplates>
                     <DataTemplate x:DataType="vm:AgnosiaModuleViewModel">
@@ -27,22 +32,7 @@
                                       ColumnDefinitions="Auto,*,Auto"
                                       ColumnSpacing="12"
                                       RowSpacing="8">
-                                    <Border Classes="icon-tile large">
-                                        <Grid>
-                                            <PathIcon Classes="section-icon centered"
-                                                      Data="{StaticResource IconFileShuttleGeometry}"
-                                                      IsVisible="{Binding IsFileShuttle}" />
-                                            <PathIcon Classes="section-icon centered"
-                                                      Data="{StaticResource IconLockdownGeometry}"
-                                                      IsVisible="{Binding IsLockdown}" />
-                                            <PathIcon Classes="section-icon centered"
-                                                      Data="{StaticResource IconVpnGuardGeometry}"
-                                                      IsVisible="{Binding IsVpnGuard}" />
-                                            <PathIcon Classes="section-icon centered"
-                                                      Data="{StaticResource IconRiskEngineGeometry}"
-                                                      IsVisible="{Binding IsRiskEngine}" />
-                                        </Grid>
-                                    </Border>
+                                    <views:ModuleIconView Classes="large" />
 
                                     <StackPanel Grid.Column="1"
                                                 MinWidth="0"
@@ -68,10 +58,6 @@
                                                   Data="{StaticResource IconCloseGeometry}" />
                                     </Button>
 
-                                    <TextBlock Grid.Row="1"
-                                               Grid.ColumnSpan="3"
-                                               Classes="page-caption"
-                                               Text="{Binding FullDescription}" />
                                 </Grid>
 
                                 <Grid Grid.Row="1"
@@ -85,6 +71,7 @@
                                                    Text="Активация доступна после выдачи разрешений" />
                                     </StackPanel>
                                     <ToggleSwitch Grid.Column="1"
+                                                  AutomationProperties.Name="Включить модуль"
                                                   VerticalAlignment="Center"
                                                   IsChecked="{Binding IsEnabled, Mode=OneWay}"
                                                   IsEnabled="{Binding CanToggle}"
@@ -95,6 +82,7 @@
                                               HorizontalScrollBarVisibility="Disabled"
                                               VerticalScrollBarVisibility="Auto">
                                     <StackPanel Spacing="12">
+                                        <TextBlock Classes="page-caption" Text="{Binding FullDescription}" />
                                         <Border Classes="divider" />
 
                                         <StackPanel IsVisible="{Binding IsVpnGuard}"
@@ -102,24 +90,12 @@
                                             <TextBlock Classes="group-title"
                                                        Text="Настройки VPN Guard" />
 
-                                            <Grid ColumnDefinitions="Auto,*"
-                                                  ColumnSpacing="12">
-                                                <Border Classes="icon-tile">
-                                                    <PathIcon Classes="section-icon centered"
-                                                              Data="{StaticResource IconVpnOffGeometry}" />
-                                                </Border>
-                                                <StackPanel Grid.Column="1"
-                                                            MinWidth="0"
-                                                            Spacing="4">
-                                                    <TextBlock Classes="section-title compact"
-                                                               Text="VPN клиент" />
-                                                    <TextBlock Classes="page-caption"
-                                                               Text="Команда запуска отправится выбранному клиенту" />
-                                                </StackPanel>
-                                            </Grid>
+                                            <controls:SectionHeader Icon="{StaticResource IconVpnOffGeometry}"
+                                                                    Title="VPN-клиент"
+                                                                    Description="Команда запуска отправится выбранному клиенту" />
 
                                             <ItemsControl ItemsSource="{Binding VpnAfterFreezeClientOptions}"
-                                                          HorizontalAlignment="Center">
+                                                          HorizontalAlignment="Stretch">
                                                 <ItemsControl.ItemsPanel>
                                                     <ItemsPanelTemplate>
                                                         <UniformGrid Columns="2" />
@@ -127,9 +103,9 @@
                                                 </ItemsControl.ItemsPanel>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="vm:VpnAutomationClientOptionViewModel">
-                                                        <Button AutomationProperties.Name="{Binding DisplayName}" MinWidth="100"
+                                                        <Button AutomationProperties.Name="{Binding DisplayName}"
                                                                 Margin="5"
-                                                                Classes="segment-chip"
+                                                                Classes="segment-chip settings-choice"
                                                                 Classes.selected="{Binding IsSelected}"
                                                                 Command="{Binding SelectCommand}">
                                                             <TextBlock Classes="button-label"

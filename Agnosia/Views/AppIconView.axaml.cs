@@ -2,9 +2,9 @@ using Avalonia.Controls;
 
 namespace Agnosia.Views;
 
-public partial class AppsSectionView : UserControl
+public partial class AppIconView : UserControl
 {
-    public AppsSectionView()
+    public AppIconView()
     {
         InitializeComponent();
     }

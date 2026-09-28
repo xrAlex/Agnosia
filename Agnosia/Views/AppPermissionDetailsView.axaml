@@ -14,15 +14,11 @@
             <Grid ColumnDefinitions="*,Auto"
                   ColumnSpacing="8">
                 <TextBlock Classes="app-dialog-setting-title"
-                           Padding="3"
                            VerticalAlignment="Center"
                            Text="Разрешения приложения" />
                 <PathIcon Grid.Column="1"
-                          Width="16"
-                          Height="16"
-                          VerticalAlignment="Center"
-                          Foreground="{StaticResource AppTextSecondaryBrush}"
-                          Data="{StaticResource IconChevronDownGeometry}" />
+                          Classes="disclosure-chevron"
+                          Classes.expanded="{Binding IsPermissionDetailsExpanded}" />
             </Grid>
         </ToggleButton>
 
@@ -50,30 +46,32 @@
                 <ItemsControl ItemsSource="{Binding VisibleItems}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:AppPermissionRowViewModel">
-                            <Border BorderBrush="{DynamicResource AppBorderBrush}" Background="{DynamicResource AppSurfaceAltBrush}" BorderThickness="1"
-                                    CornerRadius="10" Padding="12" Margin="0,0,0,10">
+                            <Border Classes="surface-card inset list-card">
                                 <StackPanel Spacing="6">
                                     <TextBlock Classes="app-dialog-setting-title" Text="{Binding Label}" TextWrapping="Wrap" />
-                                    <TextBlock Classes="app-dialog-setting-caption" Text="{Binding Name}" TextWrapping="Wrap" FontSize="11" />
+                                    <TextBlock Classes="technical-name" Text="{Binding Name}" />
                                     <TextBlock Classes="app-dialog-setting-caption" Text="{Binding KindText}" TextWrapping="Wrap"
                                                IsVisible="{Binding IsWorkProfile}" />
-                                    <Border Background="{DynamicResource AppSurfaceBrush}" CornerRadius="6"
-                                            Padding="8,4" HorizontalAlignment="Left" IsVisible="{Binding IsWorkProfile}">
-                                        <TextBlock Text="{Binding StatusText}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                    <Border Classes="tag-chip dense" HorizontalAlignment="Left" IsVisible="{Binding IsWorkProfile}">
+                                        <TextBlock Classes="tag-label" Text="{Binding StatusText}" />
                                     </Border>
                                     <TextBlock Classes="app-dialog-setting-caption" Text="{Binding Description}"
                                                IsVisible="{Binding HasDescription}" TextWrapping="Wrap" />
                                     <TextBlock Classes="app-dialog-setting-caption" Text="{Binding RestrictionReason}"
                                                IsVisible="{Binding ShowRestriction}" TextWrapping="Wrap" />
                                     <WrapPanel Orientation="Horizontal">
-                                        <Button Classes="compact-action" Content="{Binding ActionText}" Margin="0,0,8,8"
+                                        <Button Classes="compact-action" Margin="0,0,8,8"
                                                 AutomationProperties.Name="{Binding ActionAutomationName}"
                                                 IsVisible="{Binding CanChangePolicy}"
-                                                Command="{Binding ChangePolicyCommand}" CommandParameter="{Binding}" />
-                                        <Button Classes="compact-action" Content="Отозвать" Margin="0,0,0,8"
+                                                Command="{Binding ChangePolicyCommand}" CommandParameter="{Binding}">
+                                            <TextBlock Classes="button-label" Text="{Binding ActionText}" />
+                                        </Button>
+                                        <Button Classes="compact-action" Margin="0,0,0,8"
                                                 AutomationProperties.Name="{Binding RevokeAutomationName}"
                                                 IsVisible="{Binding CanRevoke}"
-                                                Command="{Binding RevokeCommand}" CommandParameter="{Binding}" />
+                                                Command="{Binding RevokeCommand}" CommandParameter="{Binding}">
+                                            <TextBlock Classes="button-label" Text="Отозвать" />
+                                        </Button>
                                     </WrapPanel>
                                 </StackPanel>
                             </Border>

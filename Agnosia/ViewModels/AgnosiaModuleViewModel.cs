@@ -80,7 +80,8 @@ public sealed partial class AgnosiaModuleViewModel : ObservableObject
 
         _requirements.Clear();
         foreach (var requirement in snapshot.Requirements)
-            _requirements.Add(new AgnosiaModuleRequirementViewModel(_owner, requirement));
+            if (requirement.PermissionKind != PermissionKind.WorkProfile)
+                _requirements.Add(new AgnosiaModuleRequirementViewModel(_owner, requirement));
 
         OnPropertyChanged(string.Empty);
         ToggleEnabledCommand.NotifyCanExecuteChanged();

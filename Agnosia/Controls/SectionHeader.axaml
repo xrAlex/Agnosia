@@ -1,0 +1,16 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:Agnosia.Controls"
+             x:Class="Agnosia.Controls.SectionHeader"
+             x:DataType="controls:SectionHeader"
+             x:Name="Root">
+    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+        <Border Classes="icon-tile">
+            <PathIcon Classes="section-icon centered" Data="{Binding #Root.Icon}" />
+        </Border>
+        <StackPanel Grid.Column="1" MinWidth="0" Spacing="4">
+            <TextBlock Classes="section-title compact" Text="{Binding #Root.Title}" />
+            <TextBlock Classes="page-caption" Text="{Binding #Root.Description}" />
+        </StackPanel>
+    </Grid>
+</UserControl>

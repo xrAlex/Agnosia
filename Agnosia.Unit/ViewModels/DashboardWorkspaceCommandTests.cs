@@ -295,7 +295,7 @@ public sealed class DashboardWorkspaceCommandTests
         Assert.Equal(1, services.PermissionLoadCount);
         Assert.False(viewModel.StatusIsError);
         Assert.Equal("PermissionOpened", viewModel.StatusMessage);
-        Assert.Contains(viewModel.PermissionItems, item => item.Kind == PermissionKind.WorkProfile && item.IsGranted);
+        Assert.DoesNotContain(viewModel.PermissionItems, item => item.Kind == PermissionKind.WorkProfile);
     }
 
     // Проверяет, что устаревшая отмененная загрузка permissions не роняет команду открытия overlay.
@@ -516,7 +516,7 @@ public sealed class DashboardWorkspaceCommandTests
         Assert.Equal("CompletionRejected", viewModel.StatusMessage);
     }
 
-    // Проверяет, что модульные permissions не попадают в настройки и onboarding.
+    // Проверяет, что рабочий профиль и модульные permissions не попадают в настройки и onboarding.
     [Fact]
     public async Task Settings_and_onboarding_permissions_exclude_module_permissions()
     {
@@ -543,7 +543,6 @@ public sealed class DashboardWorkspaceCommandTests
             viewModel.PermissionItems.Select(item => item.Kind));
         Assert.Equal(
             [
-                PermissionKind.WorkProfile,
                 PermissionKind.UsageStats,
                 PermissionKind.Notifications,
                 PermissionKind.PackageInstall
@@ -558,7 +557,8 @@ public sealed class DashboardWorkspaceCommandTests
         Assert.DoesNotContain(viewModel.OnboardingPermissionItems, item => item.Kind == PermissionKind.VpnControl);
         Assert.DoesNotContain(viewModel.OnboardingPermissionItems, item => item.Kind == PermissionKind.Overlay);
         Assert.True(viewModel.AreOnboardingPermissionsGranted);
-        Assert.Equal("GrantedCount|4|4", viewModel.OnboardingPermissionSummary);
+        Assert.Equal("GrantedCount|3|3", viewModel.OnboardingPermissionSummary);
+        Assert.Equal("GrantedCount|3|3", viewModel.PermissionSummary);
     }
 
     private static AppItemViewModel CreatePersonalApp(DashboardWorkspaceViewModel owner)

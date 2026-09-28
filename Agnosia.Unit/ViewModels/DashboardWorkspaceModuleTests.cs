@@ -132,7 +132,8 @@ public sealed class DashboardWorkspaceModuleTests
         var services = new TestPlatformServices
         {
             DashboardProfile = TestSnapshots.Dashboard(),
-            Modules = [TestSnapshots.FileShuttleModule()]
+            Modules = [TestSnapshots.FileShuttleModule(requirements:
+                [TestSnapshots.ModuleRequirement(PermissionKind.WorkProfile, true)])]
         };
         var viewModel = TestWorkspaceFactory.Create(services);
 
@@ -140,14 +141,17 @@ public sealed class DashboardWorkspaceModuleTests
         var module = viewModel.Modules.Single();
 
         Assert.False(module.HasRequirements);
+        Assert.Empty(module.Requirements);
 
         module.ApplySnapshot(TestSnapshots.FileShuttleModule(
             requirements:
             [
+                TestSnapshots.ModuleRequirement(PermissionKind.WorkProfile, true),
                 TestSnapshots.ModuleRequirement(PermissionKind.PersonalAllFiles, false)
             ]));
 
         Assert.True(module.HasRequirements);
+        Assert.Equal(PermissionKind.PersonalAllFiles, Assert.Single(module.Requirements).PermissionKind);
     }
 
     [Fact]

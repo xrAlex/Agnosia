@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Agnosia.ViewModels"
+             xmlns:views="using:Agnosia.Views"
              mc:Ignorable="d"
              x:Class="Agnosia.Views.AppsSectionView"
              x:DataType="vm:DashboardWorkspaceViewModel">
@@ -62,6 +63,7 @@
                 </Border>
 
                 <TextBox PlaceholderText="Поиск по названию или имени пакета"
+                         AutomationProperties.Name="Поиск приложений"
                          Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
 
                 <Border Classes="surface-card compact"
@@ -87,10 +89,10 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:AppItemViewModel">
-                    <Border HorizontalAlignment="Stretch"
-                            Classes="surface-card compact list-card"
-                            Tapped="OnAppCardTapped"
-                            Transitions="{x:Null}">
+                    <Button Classes="app-card-button"
+                            AutomationProperties.Name="{Binding Label}"
+                            Command="{Binding OpenControlsCommand}">
+                    <Border Classes="surface-card compact list-card">
                         <Grid RowDefinitions="Auto,Auto"
                               ColumnDefinitions="*,Auto"
                               RowSpacing="10"
@@ -98,20 +100,7 @@
                             <Grid Grid.Column="0"
                                   ColumnDefinitions="Auto,*"
                                   ColumnSpacing="10">
-                                <Border Classes="app-icon-frame">
-                                    <Grid>
-                                        <Image Classes="app-icon"
-                                               Source="{Binding Icon}"
-                                               IsVisible="{Binding HasIcon}" />
-                                        <Border Background="{StaticResource AppAccentBrush}"
-                                                IsVisible="{Binding ShowMonogram}">
-                                            <TextBlock HorizontalAlignment="Center"
-                                                       VerticalAlignment="Center"
-                                                       Classes="app-monogram"
-                                                       Text="{Binding Monogram}" />
-                                        </Border>
-                                    </Grid>
-                                </Border>
+                                <views:AppIconView />
 
                                 <StackPanel Grid.Column="1"
                                             MinWidth="0"
@@ -152,6 +141,7 @@
                             </WrapPanel>
                         </Grid>
                     </Border>
+                    </Button>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
             </ItemsControl>

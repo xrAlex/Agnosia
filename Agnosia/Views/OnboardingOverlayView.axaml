@@ -46,111 +46,39 @@
                     </Border>
 
                     <Border Classes="surface-card compact">
-                        <Grid ColumnDefinitions="Auto,*"
-                              ColumnSpacing="14">
-                            <Border Classes="icon-tile tutorial-step-icon">
-                                <PathIcon Classes="section-icon centered"
-                                          Data="{StaticResource IconWorkGeometry}" />
-                            </Border>
-                            <StackPanel Grid.Column="1"
-                                        MinWidth="0"
-                                        Spacing="5">
-                                <TextBlock Classes="group-title feature-title"
-                                           Text="Изоляция в рабочем профиле" />
-                                <TextBlock Classes="page-caption"
-                                           Text="Переносите приложения в отдельный Android-профиль, чтобы их данные и окружение были отделены от личного профиля." />
-                            </StackPanel>
-                        </Grid>
+                        <controls:SectionHeader Icon="{StaticResource IconWorkGeometry}"
+                                                Title="Изоляция в рабочем профиле"
+                                                Description="Переносите приложения в отдельный Android-профиль, чтобы их данные и окружение были отделены от личного профиля." />
                     </Border>
 
                     <Border Classes="surface-card compact">
-                        <Grid ColumnDefinitions="Auto,*"
-                              ColumnSpacing="14">
-                            <Border Classes="icon-tile tutorial-step-icon">
-                                <PathIcon Classes="section-icon centered"
-                                          Data="{StaticResource IconCheckGeometry}" />
-                            </Border>
-                            <StackPanel Grid.Column="1"
-                                        MinWidth="0"
-                                        Spacing="5">
-                                <TextBlock Classes="group-title feature-title"
-                                           Text="Контролируемый запуск" />
-                                <TextBlock Classes="page-caption"
-                                           Text="Открывайте изолированные приложения только когда они нужны. После использования Agnosia может снова их остановить." />
-                            </StackPanel>
-                        </Grid>
+                        <controls:SectionHeader Icon="{StaticResource IconCheckGeometry}"
+                                                Title="Контролируемый запуск"
+                                                Description="Открывайте изолированные приложения только когда они нужны. После использования Agnosia может снова их остановить." />
                     </Border>
 
                     <Border Classes="surface-card compact">
-                        <Grid ColumnDefinitions="Auto,*"
-                              ColumnSpacing="14">
-                            <Border Classes="icon-tile tutorial-step-icon">
-                                <PathIcon Classes="section-icon centered"
-                                          Data="{StaticResource IconAppsGeometry}" />
-                            </Border>
-                            <StackPanel Grid.Column="1"
-                                        MinWidth="0"
-                                        Spacing="5">
-                                <TextBlock Classes="group-title feature-title"
-                                           Text="Меньше лишних следов" />
-                                <TextBlock Classes="page-caption"
-                                           Text="Настройки Agnosia помогают ограничивать фоновые действия приложений и скрывать нежелательные признаки вашего окружения." />
-                            </StackPanel>
-                        </Grid>
+                        <controls:SectionHeader Icon="{StaticResource IconAppsGeometry}"
+                                                Title="Меньше лишних следов"
+                                                Description="Настройки Agnosia помогают ограничивать фоновые действия приложений и скрывать нежелательные признаки вашего окружения." />
                     </Border>
 
                     <Border Classes="surface-card compact">
-                        <Grid ColumnDefinitions="Auto,*"
-                              ColumnSpacing="14">
-                            <Border Classes="icon-tile tutorial-step-icon">
-                                <PathIcon Classes="section-icon centered"
-                                          Data="{StaticResource IconSettingsGeometry}" />
-                            </Border>
-                            <StackPanel Grid.Column="1"
-                                        MinWidth="0"
-                                        Spacing="5">
-                                <TextBlock Classes="group-title feature-title"
-                                           Text="Отключение VPN перед запуском" />
-                                <TextBlock Classes="page-caption"
-                                           Text="Agnosia может временно отключать VPN перед открытием рабочего приложения, чтобы оно не увидело адрес VPN-сервера." />
-                            </StackPanel>
-                        </Grid>
+                        <controls:SectionHeader Icon="{StaticResource IconSettingsGeometry}"
+                                                Title="Отключение VPN перед запуском"
+                                                Description="Agnosia может временно отключать VPN перед открытием рабочего приложения, чтобы оно не увидело адрес VPN-сервера." />
                     </Border>
 
                     <Border Classes="surface-card compact">
-                        <Grid ColumnDefinitions="Auto,*"
-                              ColumnSpacing="14">
-                            <Border Classes="icon-tile tutorial-step-icon">
-                                <PathIcon Classes="section-icon centered"
-                                          Data="{StaticResource IconLockdownGeometry}" />
-                            </Border>
-                            <StackPanel Grid.Column="1"
-                                        MinWidth="0"
-                                        Spacing="5">
-                                <TextBlock Classes="group-title feature-title"
-                                           Text="Устрой им Lockdown" />
-                                <TextBlock Classes="page-caption"
-                                           Text="Модуль Lockdown позволяет заблокировать интернет выбранным приложениям в рабочем профиле." />
-                            </StackPanel>
-                        </Grid>
+                        <controls:SectionHeader Icon="{StaticResource IconLockdownGeometry}"
+                                                Title="Устрой им Lockdown"
+                                                Description="Модуль Lockdown позволяет заблокировать интернет выбранным приложениям в рабочем профиле." />
                     </Border>
 
                     <Border Classes="surface-card compact">
-                        <Grid ColumnDefinitions="Auto,*"
-                              ColumnSpacing="14">
-                            <Border Classes="icon-tile tutorial-step-icon">
-                                <PathIcon Classes="section-icon centered"
-                                          Data="{StaticResource IconAlertGeometry}" />
-                            </Border>
-                            <StackPanel Grid.Column="1"
-                                        MinWidth="0"
-                                        Spacing="5">
-                                <TextBlock Classes="group-title feature-title"
-                                           Text="Проверка опасности приложений" />
-                                <TextBlock Classes="page-caption"
-                                           Text="Agnosia анализирует разрешения приложений и показывает, какие из них могут собирать слишком много данных." />
-                            </StackPanel>
-                        </Grid>
+                        <controls:SectionHeader Icon="{StaticResource IconAlertGeometry}"
+                                                Title="Проверка опасности приложений"
+                                                Description="Agnosia анализирует разрешения приложений и показывает, какие из них могут собирать слишком много данных." />
                     </Border>
 
                 </StackPanel>
@@ -190,57 +118,21 @@
                     </Border>
 
                     <Border Classes="surface-card compact">
-                        <Grid ColumnDefinitions="Auto,*"
-                              ColumnSpacing="14">
-                            <Border Classes="icon-tile tutorial-step-icon">
-                                <PathIcon Classes="section-icon centered"
-                                          Data="{StaticResource IconWorkGeometry}" />
-                            </Border>
-                            <StackPanel Grid.Column="1"
-                                        MinWidth="0"
-                                        Spacing="5">
-                                <TextBlock Classes="group-title feature-title"
-                                           Text="Android создаст отдельное пространство" />
-                                <TextBlock Classes="page-caption"
-                                           Text="В нём будут свои приложения, настройки и данные." />
-                            </StackPanel>
-                        </Grid>
+                        <controls:SectionHeader Icon="{StaticResource IconWorkGeometry}"
+                                                Title="Android создаст отдельное пространство"
+                                                Description="В нём будут свои приложения, настройки и данные." />
                     </Border>
 
                     <Border Classes="surface-card compact">
-                        <Grid ColumnDefinitions="Auto,*"
-                              ColumnSpacing="14">
-                            <Border Classes="icon-tile tutorial-step-icon">
-                                <PathIcon Classes="section-icon centered"
-                                          Data="{StaticResource IconAppsGeometry}" />
-                            </Border>
-                            <StackPanel Grid.Column="1"
-                                        MinWidth="0"
-                                        Spacing="5">
-                                <TextBlock Classes="group-title feature-title"
-                                           Text="Agnosia станет администратором профиля" />
-                                <TextBlock Classes="page-caption"
-                                           Text="Android выдаст Agnosia права управления рабочим профилем и приложениями внутри него." />
-                            </StackPanel>
-                        </Grid>
+                        <controls:SectionHeader Icon="{StaticResource IconAppsGeometry}"
+                                                Title="Agnosia станет администратором профиля"
+                                                Description="Android выдаст Agnosia права управления рабочим профилем и приложениями внутри него." />
                     </Border>
 
                     <Border Classes="surface-card compact">
-                        <Grid ColumnDefinitions="Auto,*"
-                              ColumnSpacing="14">
-                            <Border Classes="icon-tile tutorial-step-icon">
-                                <PathIcon Classes="section-icon centered"
-                                          Data="{StaticResource IconCheckGeometry}" />
-                            </Border>
-                            <StackPanel Grid.Column="1"
-                                        MinWidth="0"
-                                        Spacing="5">
-                                <TextBlock Classes="group-title feature-title"
-                                           Text="Вернитесь в Agnosia после настройки" />
-                                <TextBlock Classes="page-caption"
-                                           Text="Когда Android закончит создание профиля, откройте Agnosia снова. Мы проверим профиль и перейдём к разрешениям." />
-                            </StackPanel>
-                        </Grid>
+                        <controls:SectionHeader Icon="{StaticResource IconCheckGeometry}"
+                                                Title="Вернитесь в Agnosia после настройки"
+                                                Description="Когда Android закончит создание профиля, откройте Agnosia снова. Мы проверим профиль и перейдём к разрешениям." />
                     </Border>
 
                 </StackPanel>
@@ -275,57 +167,21 @@
                     </Border>
 
                     <Border Classes="surface-card compact">
-                        <Grid ColumnDefinitions="Auto,*"
-                              ColumnSpacing="14">
-                            <Border Classes="icon-tile tutorial-step-icon">
-                                <PathIcon Classes="section-icon centered"
-                                          Data="{StaticResource IconAppsGeometry}" />
-                            </Border>
-                            <StackPanel Grid.Column="1"
-                                        MinWidth="0"
-                                        Spacing="5">
-                                <TextBlock Classes="group-title feature-title"
-                                           Text="Выберите приложение из личного профиля" />
-                                <TextBlock Classes="page-caption"
-                                           Text="Откройте карточку приложения и выберите Копировать в рабочий или Переместить в рабочий." />
-                            </StackPanel>
-                        </Grid>
+                        <controls:SectionHeader Icon="{StaticResource IconAppsGeometry}"
+                                                Title="Выберите приложение из личного профиля"
+                                                Description="Откройте карточку приложения и выберите Копировать в рабочий или Переместить в рабочий." />
                     </Border>
 
                     <Border Classes="surface-card compact">
-                        <Grid ColumnDefinitions="Auto,*"
-                              ColumnSpacing="14">
-                            <Border Classes="icon-tile tutorial-step-icon">
-                                <PathIcon Classes="section-icon centered"
-                                          Data="{StaticResource IconLaunchGeometry}" />
-                            </Border>
-                            <StackPanel Grid.Column="1"
-                                        MinWidth="0"
-                                        Spacing="5">
-                                <TextBlock Classes="group-title feature-title"
-                                           Text="Создавайте ярлыки для безопасного запуска" />
-                                <TextBlock Classes="page-caption"
-                                           Text="Ярлык временно откроет рабочее приложение. После использования Agnosia сможет снова его остановить." />
-                            </StackPanel>
-                        </Grid>
+                        <controls:SectionHeader Icon="{StaticResource IconLaunchGeometry}"
+                                                Title="Создавайте ярлыки для безопасного запуска"
+                                                Description="Ярлык временно откроет рабочее приложение. После использования Agnosia сможет снова его остановить." />
                     </Border>
 
                     <Border Classes="surface-card compact">
-                        <Grid ColumnDefinitions="Auto,*"
-                              ColumnSpacing="14">
-                            <Border Classes="icon-tile tutorial-step-icon">
-                                <PathIcon Classes="section-icon centered"
-                                          Data="{StaticResource IconSettingsGeometry}" />
-                            </Border>
-                            <StackPanel Grid.Column="1"
-                                        MinWidth="0"
-                                        Spacing="5">
-                                <TextBlock Classes="group-title feature-title"
-                                           Text="Настройки можно изменить позже" />
-                                <TextBlock Classes="page-caption"
-                                           Text="VPN-сценарий, журнал событий и межпрофильный обмен доступны в настройках и карточках приложений." />
-                            </StackPanel>
-                        </Grid>
+                        <controls:SectionHeader Icon="{StaticResource IconSettingsGeometry}"
+                                                Title="Настройки можно изменить позже"
+                                                Description="VPN-сценарий, журнал событий и межпрофильный обмен доступны в настройках и карточках приложений." />
                     </Border>
 
                 </StackPanel>
@@ -361,8 +217,7 @@
                 <Button AutomationProperties.Name="Далее" Classes="primary"
                         Grid.Column="2"
                         Width="172"
-                        Height="44"
-                        MinHeight="44"
+
                         HorizontalAlignment="Right"
                         IsVisible="{Binding IsOnboardingWelcomeStep}"
                         Command="{Binding StartOnboardingCommand}">
@@ -381,28 +236,26 @@
                     <Button AutomationProperties.Name="Создать офлайн"
                             Grid.Column="0"
                             HorizontalAlignment="Stretch"
-                            Height="44"
-                            MinHeight="44"
+
                             Padding="8,4"
                             Command="{Binding StartOfflineProvisioningCommand}"
                             IsEnabled="{Binding CanStartProvisioning}">
                         <TextBlock Classes="button-label"
                                    FontSize="13"
-                                   TextWrapping="NoWrap"
+
                                    TextAlignment="Center"
                                    Text="Создать офлайн" />
                     </Button>
                     <Button AutomationProperties.Name="Создать профиль" Classes="primary"
                             Grid.Column="1"
                             HorizontalAlignment="Stretch"
-                            Height="44"
-                            MinHeight="44"
+
                             Padding="8,4"
                             Command="{Binding StartProvisioningCommand}"
                             IsEnabled="{Binding CanStartProvisioning}">
                         <TextBlock Classes="button-label"
                                    FontSize="13"
-                                   TextWrapping="NoWrap"
+
                                    TextAlignment="Center"
                                    Text="Создать профиль" />
                     </Button>
@@ -410,8 +263,7 @@
                             Grid.Row="1"
                             Grid.ColumnSpan="2"
                             HorizontalAlignment="Stretch"
-                            Height="44"
-                            MinHeight="44"
+
                             Padding="8,4"
                             Command="{Binding StartDirectProvisioningCommand}"
                             IsEnabled="{Binding CanStartProvisioning}">
@@ -425,8 +277,7 @@
                 <Button AutomationProperties.Name="Далее" Classes="primary"
                         Grid.Column="2"
                         Width="116"
-                        Height="44"
-                        MinHeight="44"
+
                         HorizontalAlignment="Right"
                         IsVisible="{Binding IsOnboardingPermissionsStep}"
                         Command="{Binding FinishOnboardingCommand}">
@@ -436,11 +287,9 @@
                 </Button>
 
                 <Button AutomationProperties.Name="Открыть приложения" Classes="primary"
-                        Grid.Column="2"
-                        Width="116"
-                        Height="44"
-                        MinHeight="44"
-                        HorizontalAlignment="Right"
+                        Grid.ColumnSpan="3"
+
+                        HorizontalAlignment="Stretch"
                         IsVisible="{Binding IsOnboardingFinalStep}"
                         Command="{Binding FinishOnboardingCommand}">
                     <TextBlock Classes="button-label"

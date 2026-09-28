@@ -6,7 +6,7 @@
     <system:String x:Key="String.Dashboard.Status.Updating">Обновляем список приложений и состояние профилей...</system:String>
     <system:String x:Key="String.Dashboard.Status.UpdatingWorkProfile">Обновляю Agnosia в рабочем профиле...</system:String>
     <system:String x:Key="String.Dashboard.Status.WorkProfileUpdated">Agnosia в рабочем профиле обновлена.</system:String>
-    <system:String x:Key="String.Dashboard.Status.LoadingApps">Загружаем каталог приложений в фоне...</system:String>
+    <system:String x:Key="String.Dashboard.Status.LoadingApps">Загружаем каталог приложений...</system:String>
     <system:String x:Key="String.Dashboard.Status.Updated">Список приложений обновлен.</system:String>
     <system:String x:Key="String.Dashboard.Status.LoadAppsFailed">Не удалось загрузить каталог приложений.</system:String>
     <system:String x:Key="String.Dashboard.Status.NotSupported">Эта сборка предназначена для Android-устройств с поддержкой рабочего профиля.</system:String>

@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Agnosia.ViewModels"
+             x:Class="Agnosia.Views.AppIconView"
+             x:DataType="vm:AppItemViewModel">
+    <UserControl.Styles>
+        <Style Selector="UserControl.dialog Border.app-icon-frame">
+            <Setter Property="Width" Value="54" />
+            <Setter Property="Height" Value="54" />
+        </Style>
+        <Style Selector="UserControl.dialog Image.app-icon">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
+        </Style>
+        <Style Selector="UserControl.dialog TextBlock.app-monogram">
+            <Setter Property="FontSize" Value="22" />
+        </Style>
+    </UserControl.Styles>
+    <Border Classes="app-icon-frame">
+        <Grid>
+            <Image Classes="app-icon" Source="{Binding Icon}" IsVisible="{Binding HasIcon}" />
+            <Border Background="{StaticResource AppAccentBrush}" IsVisible="{Binding ShowMonogram}">
+                <TextBlock Classes="app-monogram"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Text="{Binding Monogram}" />
+            </Border>
+        </Grid>
+    </Border>
+</UserControl>
