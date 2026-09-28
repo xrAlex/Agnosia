@@ -13,10 +13,7 @@ public static class AndroidAppInventoryApi
 {
     private const string LogTag = "AndroidAppInventory";
     private const int RequestedPermissionGrantedFlag = 2;
-    private const string CameraOp = "android:camera";
-    private const string FineLocationOp = "android:fine_location";
-    private const string CoarseLocationOp = "android:coarse_location";
-    private const string MicrophoneOp = "android:record_audio";
+    private const int AppOpModeForeground = 4;
     private const string ManageExternalStorageOp = "android:manage_external_storage";
     private const string RequestInstallPackagesOp = "android:request_install_packages";
     private const string ScheduleExactAlarmOp = "android:schedule_exact_alarm";
@@ -267,7 +264,7 @@ public static class AndroidAppInventoryApi
                     specialAccess,
                     out var identity,
                     out var risk)
-                ? new PackageInventoryMetadata(identity, risk, true) : null,
+                ? new PackageInventoryMetadata(identity, risk, true, DateTimeOffset.UtcNow) : null,
             () => TryGetPackageIdentity(packageManager, packageName, out var identity) ? identity : null);
         if (isRiskEngineEnabled && !metadata.RiskAvailable || metadata.Identity is null)
             Log.Warn(LogTag,
@@ -287,7 +284,8 @@ public static class AndroidAppInventoryApi
             metadata.RiskAvailable,
             loadIcon: options.IncludeInlineIcons && metadata.Identity is not null,
             includeApkPaths: true,
-            isIsolationEnabled: isHidden || packagesAwaitingHide.Contains(packageName));
+            isIsolationEnabled: isHidden || packagesAwaitingHide.Contains(packageName),
+            permissionRiskEvaluatedAtUtc: metadata.RiskEvaluatedAtUtc);
     }
 
     private static AppServiceModel CreateModel(
@@ -304,7 +302,8 @@ public static class AndroidAppInventoryApi
         bool permissionRiskAvailable,
         bool loadIcon,
         bool includeApkPaths,
-        bool isIsolationEnabled)
+        bool isIsolationEnabled,
+        DateTimeOffset? permissionRiskEvaluatedAtUtc = null)
     {
         return new AppServiceModel
         {
@@ -330,6 +329,9 @@ public static class AndroidAppInventoryApi
             PermissionRiskScoreBreakdown = permissionRisk.ScoreBreakdown,
             ManifestPermissions = permissionRisk.ManifestPermissions.ToArray(),
             RuntimePermissions = permissionRisk.RuntimePermissions.ToArray(),
+            PermissionRiskFindings = permissionRisk.Findings.ToArray(),
+            PermissionRiskUnavailableChecks = permissionRisk.UnavailableChecks.ToArray(),
+            PermissionRiskEvaluatedAtUtc = permissionRiskEvaluatedAtUtc,
             IconPng = loadIcon
                 ? AndroidAppIconResolver.TryLoadCachedAppIconPng(
                     context,
@@ -437,8 +439,8 @@ public static class AndroidAppInventoryApi
                     packageName,
                     AndroidSystemApi.GetInstalledApplicationFlags()
                     | PackageInfoFlags.Permissions
-                    | PackageInfoFlags.Services)
-                ?? packageManager.GetPackageInfo(packageName, PackageInfoFlags.Permissions | PackageInfoFlags.Services);
+                    | PackageInfoFlags.Services | PackageInfoFlags.Receivers)
+                ?? packageManager.GetPackageInfo(packageName, PackageInfoFlags.Permissions | PackageInfoFlags.Services | PackageInfoFlags.Receivers);
             if (packageInfo is null)
             {
                 Log.Warn(LogTag, $"Package inventory details unavailable. package={packageName}, reason=PackageInfoNull.");
@@ -449,6 +451,7 @@ public static class AndroidAppInventoryApi
 
             identity = new PackageIdentity(packageInfo.LongVersionCode);
             var appInfo = packageInfo.ApplicationInfo;
+            var permissionOps = ReadPermissionAppOpModes(context, appInfo, packageInfo.RequestedPermissions);
             permissionRisk = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
                 packageInfo.RequestedPermissions,
                 (int)Build.VERSION.SdkInt,
@@ -461,14 +464,21 @@ public static class AndroidAppInventoryApi
                 specialAccess.HasNotificationListener(packageName),
                 IsAppOpAllowed(context, appInfo, SystemAlertWindowOp),
                 IsAppOpAllowed(context, appInfo, UsageStatsOp),
-                IsAppOpAllowedOrUnknown(context, appInfo, CameraOp),
-                IsAppOpAllowedOrUnknown(context, appInfo, MicrophoneOp),
-                IsAppOpAllowedOrUnknown(context, appInfo, FineLocationOp),
-                IsAppOpAllowedOrUnknown(context, appInfo, CoarseLocationOp),
+                IsAllowedMode(permissionOps.GetValueOrDefault("android.permission.CAMERA")),
+                IsAllowedMode(permissionOps.GetValueOrDefault("android.permission.RECORD_AUDIO")),
+                IsAllowedMode(permissionOps.GetValueOrDefault("android.permission.ACCESS_FINE_LOCATION")),
+                IsAllowedMode(permissionOps.GetValueOrDefault("android.permission.ACCESS_COARSE_LOCATION")),
+                ObservedSignals: specialAccess.GetObservedRoles(packageName),
                 HasManageExternalStorageAccess: HasManageExternalStorageAccess(context, appInfo),
                 CanRequestPackageInstalls: CanRequestPackageInstalls(context, packageManager, appInfo),
                 CanScheduleExactAlarms: CanScheduleExactAlarms(context, appInfo),
-                IsIgnoringBatteryOptimizations: IsIgnoringBatteryOptimizations(context, packageName)));
+                IsIgnoringBatteryOptimizations: IsIgnoringBatteryOptimizations(context, packageName),
+                ForegroundOnlyPermissions: permissionOps.Where(pair => (int?)pair.Value == AppOpModeForeground).Select(pair => pair.Key),
+                UnavailableAppOpPermissions: permissionOps.Where(pair => pair.Value is null).Select(pair => pair.Key),
+                IsInputMethodEnabled: specialAccess.InputMethodPackages?.Contains(packageName),
+                IsAutofillServiceEnabled: specialAccess.AutofillPackages?.Contains(packageName),
+                IsDeviceAdminEnabled: specialAccess.DeviceAdminPackages?.Contains(packageName),
+                BlockedAppOpPermissions: permissionOps.Where(pair => pair.Value is AppOpsManagerMode.Ignored or AppOpsManagerMode.Errored).Select(pair => pair.Key)));
             return true;
         }
         catch (Exception exception) when (exception is PackageManager.NameNotFoundException
@@ -518,13 +528,13 @@ public static class AndroidAppInventoryApi
 
     private static string[] GetServicePermissions(PackageInfo packageInfo)
     {
-        if (packageInfo.Services is not { Count: > 0 } services) return [];
-
-        var result = new List<string>(services.Count);
+        var result = new List<string>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var service in services)
+        var componentPermissions = (packageInfo.Services ?? []).Select(service => service.Permission)
+            .Concat((packageInfo.Receivers ?? []).Select(receiver => receiver.Permission)
+                .Where(permission => permission == "android.permission.BIND_DEVICE_ADMIN"));
+        foreach (var permission in componentPermissions)
         {
-            var permission = service.Permission;
             if (string.IsNullOrWhiteSpace(permission) || !seen.Add(permission)) continue;
 
             result.Add(permission);
@@ -579,10 +589,35 @@ public static class AndroidAppInventoryApi
     {
         return new SpecialAccessSnapshot(
             ReadSecureComponentPackages(context, Settings.Secure.EnabledAccessibilityServices),
-            ReadSecureComponentPackages(context, "enabled_notification_listeners"));
+            ReadSecureComponentPackages(context, "enabled_notification_listeners"),
+            ReadSecureComponentPackages(context, "default_input_method"),
+            ReadSecureComponentPackages(context, "autofill_service"),
+            ReadActiveAdminPackages(context),
+            ReadDefaultPackage(() => Telephony.Sms.GetDefaultSmsPackage(context)),
+            ReadDefaultPackage(() => (context.GetSystemService(Context.TelecomService) as global::Android.Telecom.TelecomManager)?.DefaultDialerPackage),
+            ReadSecureComponentPackages(context, "assistant"));
     }
 
-    private static HashSet<string> ReadSecureComponentPackages(Context context, string settingName)
+    private static string? ReadDefaultPackage(Func<string?> read)
+    {
+        try { return read(); }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception)) { return null; }
+    }
+
+    private static HashSet<string>? ReadActiveAdminPackages(Context context)
+    {
+        try
+        {
+            if (context.GetSystemService(Context.DevicePolicyService) is not DevicePolicyManager manager) return null;
+            return manager.ActiveAdmins?.Select(component => component.PackageName).ToHashSet(StringComparer.Ordinal) ?? [];
+        }
+        catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+        {
+            return null;
+        }
+    }
+
+    private static HashSet<string>? ReadSecureComponentPackages(Context context, string settingName)
     {
         try
         {
@@ -590,7 +625,7 @@ public static class AndroidAppInventoryApi
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
-            return new HashSet<string>(StringComparer.Ordinal);
+            return null;
         }
     }
 
@@ -614,12 +649,12 @@ public static class AndroidAppInventoryApi
         return packages;
     }
 
-    private static bool IsAppOpAllowed(Context context, ApplicationInfo? appInfo, string op)
+    private static bool? IsAppOpAllowed(Context context, ApplicationInfo? appInfo, string op)
     {
-        return IsAppOpAllowedOrUnknown(context, appInfo, op) == true;
+        return IsAppOpAllowedOrUnknown(context, appInfo, op);
     }
 
-    private static bool HasManageExternalStorageAccess(Context context, ApplicationInfo? appInfo)
+    private static bool? HasManageExternalStorageAccess(Context context, ApplicationInfo? appInfo)
     {
         var packageName = appInfo?.PackageName;
         if (packageName is null || packageName != context.PackageName)
@@ -635,11 +670,11 @@ public static class AndroidAppInventoryApi
             Log.Debug(
                 LogTag,
                 $"All-files access check failed. package={packageName}, error={exception.GetType().Name}.");
-            return false;
+            return null;
         }
     }
 
-    private static bool CanRequestPackageInstalls(
+    private static bool? CanRequestPackageInstalls(
         Context context,
         PackageManager packageManager,
         ApplicationInfo? appInfo)
@@ -657,47 +692,76 @@ public static class AndroidAppInventoryApi
             Log.Debug(
                 LogTag,
                 $"Package install access check failed. package={packageName}, error={exception.GetType().Name}.");
-            return false;
+            return null;
         }
     }
 
-    private static bool CanScheduleExactAlarms(Context context, ApplicationInfo? appInfo)
+    private static bool? CanScheduleExactAlarms(Context context, ApplicationInfo? appInfo)
     {
         var packageName = appInfo?.PackageName;
         if (packageName is null || packageName != context.PackageName)
             return IsAppOpAllowed(context, appInfo, ScheduleExactAlarmOp);
         try
         {
-            return context.GetSystemService(Context.AlarmService) is AlarmManager alarmManager
-                   && alarmManager.CanScheduleExactAlarms();
+            return (context.GetSystemService(Context.AlarmService) as AlarmManager)?.CanScheduleExactAlarms();
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
             Log.Debug(
                 LogTag,
                 $"Exact alarm access check failed. package={packageName}, error={exception.GetType().Name}.");
-            return false;
+            return null;
         }
     }
 
-    private static bool IsIgnoringBatteryOptimizations(Context context, string packageName)
+    private static bool? IsIgnoringBatteryOptimizations(Context context, string packageName)
     {
-        if (string.IsNullOrWhiteSpace(packageName)) return false;
+        if (string.IsNullOrWhiteSpace(packageName)) return null;
 
         try
         {
-            return AndroidSystemApi.GetPowerManager(context)?.IsIgnoringBatteryOptimizations(packageName) == true;
+            return AndroidSystemApi.GetPowerManager(context)?.IsIgnoringBatteryOptimizations(packageName);
         }
         catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
         {
             Log.Debug(
                 LogTag,
                 $"Battery optimization check failed. package={packageName}, error={exception.GetType().Name}.");
-            return false;
+            return null;
         }
     }
 
     private static bool? IsAppOpAllowedOrUnknown(Context context, ApplicationInfo? appInfo, string op)
+        => IsAllowedMode(ReadAppOpMode(context, appInfo, op));
+
+    private static Dictionary<string, AppOpsManagerMode?> ReadPermissionAppOpModes(
+        Context context, ApplicationInfo? appInfo, IEnumerable<string>? permissions)
+    {
+        var result = new Dictionary<string, AppOpsManagerMode?>(StringComparer.Ordinal);
+        foreach (var permission in permissions ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(permission)) continue;
+            try
+            {
+                if (AppOpsManager.PermissionToOp(permission) is { } op)
+                    result[permission] = ReadAppOpMode(context, appInfo, op);
+            }
+            catch (Exception exception) when (AndroidRecoverableException.IsMatch(exception))
+            {
+                result[permission] = null;
+            }
+        }
+        return result;
+    }
+
+    private static bool? IsAllowedMode(AppOpsManagerMode? mode) => mode switch
+    {
+        AppOpsManagerMode.Allowed => true,
+        AppOpsManagerMode.Ignored or AppOpsManagerMode.Errored => false,
+        _ => null
+    };
+
+    private static AppOpsManagerMode? ReadAppOpMode(Context context, ApplicationInfo? appInfo, string op)
     {
         if (appInfo is null)
         {
@@ -719,13 +783,12 @@ public static class AndroidAppInventoryApi
                 return null;
             }
 
-            var mode = appOpsManager.CheckOpNoThrow(op, appInfo.Uid, packageName);
-            return mode switch
-            {
-                AppOpsManagerMode.Allowed => true,
-                AppOpsManagerMode.Ignored or AppOpsManagerMode.Errored => false,
-                _ => null
-            };
+            // The translated check collapses MODE_FOREGROUND into an allow/deny answer.
+            if (OperatingSystem.IsAndroidVersionAtLeast(36))
+                return appOpsManager.CheckOpRawNoThrow(op, appInfo.Uid, packageName, null);
+#pragma warning disable CS0618 // Raw API for supported Android 12–15 devices.
+            return appOpsManager.UnsafeCheckOpRawNoThrow(op, appInfo.Uid, packageName);
+#pragma warning restore CS0618
         }
         catch (Exception exception) when (exception is Java.Lang.SecurityException
                                           || AndroidRecoverableException.IsMatch(exception))
@@ -798,21 +861,34 @@ public static class AndroidAppInventoryApi
     }
 
     private sealed record SpecialAccessSnapshot(
-        HashSet<string> AccessibilityServicePackages,
-        HashSet<string> NotificationListenerPackages)
+        HashSet<string>? AccessibilityServicePackages,
+        HashSet<string>? NotificationListenerPackages,
+        HashSet<string>? InputMethodPackages = null,
+        HashSet<string>? AutofillPackages = null,
+        HashSet<string>? DeviceAdminPackages = null,
+        string? DefaultSmsPackage = null,
+        string? DefaultDialerPackage = null,
+        HashSet<string>? AssistantPackages = null)
     {
         public static SpecialAccessSnapshot Empty { get; } = new(
             new HashSet<string>(StringComparer.Ordinal),
             new HashSet<string>(StringComparer.Ordinal));
 
-        public bool HasAccessibilityService(string packageName)
+        public bool? HasAccessibilityService(string packageName)
         {
-            return AccessibilityServicePackages.Contains(packageName);
+            return AccessibilityServicePackages?.Contains(packageName);
         }
 
-        public bool HasNotificationListener(string packageName)
+        public bool? HasNotificationListener(string packageName)
         {
-            return NotificationListenerPackages.Contains(packageName);
+            return NotificationListenerPackages?.Contains(packageName);
+        }
+
+        public IEnumerable<string> GetObservedRoles(string packageName)
+        {
+            if (DefaultSmsPackage == packageName) yield return "android.observed.DefaultSmsRole";
+            if (DefaultDialerPackage == packageName) yield return "android.observed.DefaultDialerRole";
+            if (AssistantPackages?.Contains(packageName) == true) yield return "android.observed.AssistantRole";
         }
     }
 }

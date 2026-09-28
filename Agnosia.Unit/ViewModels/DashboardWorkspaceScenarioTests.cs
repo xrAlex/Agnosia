@@ -8,6 +8,23 @@ namespace Agnosia.Unit.ViewModels;
 
 public sealed class DashboardWorkspaceScenarioTests
 {
+    [Fact]
+    public async Task Permission_change_refreshes_risk_without_reopening_details()
+    {
+        var snapshot = TestSnapshots.App(ProfileKind.Work, permissionRiskLevel: AppPermissionRiskLevel.Critical);
+        var services = new TestPlatformServices
+        {
+            AppPermissions = [new("android.permission.CAMERA", "Камера", null, AppPermissionKind.Runtime, AppPermissionState.Granted, true, null)],
+            AppInventory = new([], [snapshot with { PermissionRiskLevel = AppPermissionRiskLevel.Safe }])
+        };
+        var owner = TestWorkspaceFactory.Create(services);
+        var app = TestWorkspaceFactory.CreateApp(owner, snapshot);
+        await app.Permissions.RefreshCommand.ExecuteAsync(null);
+        await app.Permissions.ChangePolicyCommand.ExecuteAsync(app.Permissions.Items[0]);
+        Assert.Equal(AppPermissionRiskLevel.Safe, app.PermissionRiskLevel);
+        Assert.Equal(1, services.AppInventoryLoadCount);
+    }
+
     // Проверяет копирование личного приложения в рабочий профиль и refresh состояния.
     [Fact]
     public async Task CloneCommand_copies_personal_app_to_work_profile_and_refreshes_dashboard()

@@ -452,7 +452,10 @@ internal sealed class AndroidDashboardReader(AndroidActivityCommandGateway comma
                 app.RuntimePermissions,
                 app.PermissionRiskAvailable,
                 app.IsInternetBlocked,
-                app.IsIsolationEnabled);
+                app.IsIsolationEnabled,
+                app.PermissionRiskFindings,
+                app.PermissionRiskEvaluatedAtUtc,
+                app.PermissionRiskUnavailableChecks);
         }
 
         return mappedApps;

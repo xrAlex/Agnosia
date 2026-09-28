@@ -5,7 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace Agnosia.ViewModels;
 
-public partial class AppPermissionsViewModel(IAppCommandService service, AppSnapshot app) : ObservableObject
+public partial class AppPermissionsViewModel(IAppCommandService service, AppSnapshot app, Func<Task>? onPermissionsChanged = null) : ObservableObject
 {
     private IReadOnlyList<AppPermissionRowViewModel>? _visibleItems;
 
@@ -115,8 +115,12 @@ public partial class AppPermissionsViewModel(IAppCommandService service, AppSnap
         finally
         {
             // Re-read even after failure: Android may have applied part of the operation.
-            await ReadAsync();
-            IsBusy = false;
+            try
+            {
+                await ReadAsync();
+                if (onPermissionsChanged is not null) await onPermissionsChanged();
+            }
+            finally { IsBusy = false; }
         }
     }
 

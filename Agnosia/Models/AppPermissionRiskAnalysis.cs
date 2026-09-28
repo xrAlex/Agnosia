@@ -24,7 +24,6 @@ public sealed record AppPermissionRiskScoreBreakdown(
             + ExfiltrationScore
             + ControlSurfaceScore
             + StealthScore
-            + ConfidenceScore
             - LegitimacyPenalty);
 
     public static AppPermissionRiskScoreBreakdown Empty { get; } = new(0, 0, 0, 0, 0, 0, 0);
@@ -83,6 +82,10 @@ public sealed record AppPermissionRiskAnalysis
         ManifestPermissions = manifestPermissions;
         RuntimePermissions = runtimePermissions;
     }
+
+    public IReadOnlyList<AppPermissionRiskFinding> Findings { get; init; } = [];
+
+    public IReadOnlyList<string> UnavailableChecks { get; init; } = [];
 
     public AppPermissionRiskLevel Level { get; init; }
 

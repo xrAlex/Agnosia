@@ -23,7 +23,7 @@ public static partial class AppPermissionRiskCatalog
     {
         return Rule(
             id,
-            id,
+            GetCapabilityGroup(id),
             level,
             requiredPermissions,
             minDeviceSdkVersion,
@@ -95,6 +95,38 @@ public static partial class AppPermissionRiskCatalog
         int Score,
         Func<AnalysisContext, bool>? ExtraCondition)
     {
+        public AppPermissionRiskFinding CreateFinding(AnalysisContext context, int ruleScore)
+        {
+            var evidence = new List<AppPermissionRiskEvidence>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            void Add(string id, AppPermissionRiskEvidenceState state)
+            {
+                if (seen.Add(id)) evidence.Add(new(id, state));
+            }
+
+            foreach (var permission in RequiredPermissions)
+                Add(permission, context.GetEvidenceState(permission));
+            foreach (var prefix in RequiredPermissionPrefixes)
+                foreach (var permission in context.GetPermissionsByPrefix(prefix))
+                    if (context.HasEffectivePermission(permission))
+                        Add(permission, context.GetEvidenceState(permission));
+            if (ForegroundServiceType is not null)
+                Add("android.foregroundServiceType." + ForegroundServiceType, AppPermissionRiskEvidenceState.Declared);
+            foreach (var signal in RequiredObservedSignals)
+                Add(signal, context.GetObservedEvidenceState(signal));
+            // A channel belongs to this finding only when the rule requires it.
+            // Explicit channels are already included through RequiredPermissions.
+            if (RequireExfiltrationChannel)
+                foreach (var permission in context.GetDeclaredExfiltrationPermissions())
+                    Add(permission, context.GetEvidenceState(permission));
+
+            var exfiltrationScore = context.GetExfiltrationScore(RequireExfiltrationChannel ? null : RequiredPermissions);
+            var level = Level == AppPermissionRiskLevel.Critical ||
+                        ruleScore + exfiltrationScore >= BaseDangerousScoreThreshold
+                ? Level : AppPermissionRiskLevel.Safe;
+            return new AppPermissionRiskFinding(Id, level, evidence);
+        }
+
         public bool IsMatch(AnalysisContext context)
         {
             return MatchesSdk(context)
@@ -111,12 +143,8 @@ public static partial class AppPermissionRiskCatalog
         {
             return IsMatch(context)
                    && RequiredPermissions.All(context.HasEffectivePermission)
+                   && !RequiredPermissions.Any(context.IsForegroundOnly)
                    && RequiredPermissionPrefixes.All(context.HasEffectivePermissionPrefix);
-        }
-
-        public int GetScore(AnalysisContext context)
-        {
-            return GetScoreBreakdown(context).Total;
         }
 
         public AppPermissionRiskScoreBreakdown GetScoreBreakdown(AnalysisContext context)
@@ -153,7 +181,7 @@ public static partial class AppPermissionRiskCatalog
 
             return new AppPermissionRiskScoreBreakdown(
                 score,
-                context.GetPersistenceScore(RequiredPermissions),
+                context.GetPersistenceScore(RequiredPermissions, ForegroundServiceType),
                 0,
                 controlSurfaceScore,
                 context.GetStealthScore(RequiredPermissions),
@@ -182,12 +210,13 @@ public static partial class AppPermissionRiskCatalog
 
         private bool HasNoExcludedPermissions(AnalysisContext context)
         {
-            return !ExcludedPermissions.Any(context.HasPermission);
+            return !ExcludedPermissions.Any(context.HasEffectivePermission);
         }
 
         private bool HasRequiredPermissionPrefixes(AnalysisContext context)
         {
-            return RequiredPermissionPrefixes.All(context.HasPermissionPrefix);
+            return RequiredPermissionPrefixes.All(RequireEffectivePermissionsForMatch
+                ? context.HasEffectivePermissionPrefix : context.HasPermissionPrefix);
         }
 
         private bool HasRequiredObservedSignals(AnalysisContext context)
@@ -206,4 +235,20 @@ public static partial class AppPermissionRiskCatalog
             return !RequireExfiltrationChannel || context.HasExfiltrationChannel;
         }
     }
+
+    private static string GetCapabilityGroup(string id) => id switch
+    {
+        var s when s.StartsWith("CR-MIC-", StringComparison.Ordinal) => "microphone",
+        var s when s.StartsWith("CR-CAM-", StringComparison.Ordinal) => "camera",
+        "CR-SCR-01" or "SU-SCR-FGS-01" => "screen",
+        var s when s.Contains("SMS-", StringComparison.Ordinal) => "sms",
+        var s when s.Contains("CALL-LOG", StringComparison.Ordinal) => "call-log",
+        var s when s.StartsWith("CR-PROF-", StringComparison.Ordinal) => "usage",
+        "SU-PROF-USAGE-01" => "usage",
+        var s when s.StartsWith("CR-FILE-ALL-", StringComparison.Ordinal) => "all-files",
+        "SU-FILE-ALL-01" => "all-files",
+        var s when s.StartsWith("CR-UI-", StringComparison.Ordinal) => "interface-control",
+        "SU-UI-ACC-01" or "SU-UI-OVERLAY-01" or "SU-NOTIF-01" or "SU-NOTIF-OVERLAY-01" => "interface-control",
+        _ => id
+    };
 }

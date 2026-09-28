@@ -1,0 +1,98 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Agnosia.ViewModels"
+             x:Class="Agnosia.Views.AppRiskFindingsView"
+             x:DataType="vm:AppItemViewModel"
+             IsVisible="{Binding ShowRiskSection}">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Default">
+                    <SolidColorBrush x:Key="RiskReportDangerousBrush" Color="#F7C948" />
+                    <SolidColorBrush x:Key="RiskReportCriticalBrush" Color="#FF6B79" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="RiskReportDangerousBrush" Color="#8A5900" />
+                    <SolidColorBrush x:Key="RiskReportCriticalBrush" Color="#BB2335" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+    <UserControl.Styles>
+        <Style Selector="ToggleButton.app-dialog-section-toggle:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="PathIcon.risk-chevron.expanded">
+            <Setter Property="RenderTransform">
+                <RotateTransform Angle="180" />
+            </Setter>
+        </Style>
+        <Style Selector="TextBlock.risk-level">
+            <Setter Property="Foreground" Value="{DynamicResource RiskReportDangerousBrush}" />
+        </Style>
+        <Style Selector="TextBlock.risk-level.critical">
+            <Setter Property="Foreground" Value="{DynamicResource RiskReportCriticalBrush}" />
+        </Style>
+        <Style Selector="TextBlock.risk-level.low">
+            <Setter Property="Foreground" Value="{DynamicResource AppTextSecondaryBrush}" />
+        </Style>
+    </UserControl.Styles>
+    <StackPanel Spacing="8">
+        <Border Classes="divider" />
+        <ToggleButton AutomationProperties.Name="Отчет Risk Engine" Classes="app-dialog-section-toggle"
+                      IsChecked="{Binding IsRiskReportExpanded}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <TextBlock Classes="app-dialog-setting-title" Padding="3"
+                           VerticalAlignment="Center" TextWrapping="Wrap" Text="Отчет Risk Engine" />
+                <PathIcon Grid.Column="1" Width="16" Height="16" VerticalAlignment="Center"
+                          Classes="risk-chevron" Classes.expanded="{Binding IsRiskReportExpanded}"
+                          Foreground="{DynamicResource AppTextSecondaryBrush}"
+                          Data="{StaticResource IconChevronDownGeometry}" />
+            </Grid>
+        </ToggleButton>
+        <Border IsVisible="{Binding IsRiskReportExpanded}" Background="{DynamicResource AppSurfaceBrush}"
+            BorderBrush="{DynamicResource AppBorderSoftBrush}" BorderThickness="1"
+            CornerRadius="10" Padding="16" VerticalAlignment="Top">
+        <StackPanel Spacing="16">
+            <StackPanel Spacing="4" IsVisible="{Binding RiskReport.HasDetailsHeader}">
+                <TextBlock Text="{Binding RiskReport.LevelText}" IsVisible="{Binding RiskReport.HasLevel}"
+                           Classes="risk-level" Classes.critical="{Binding RiskReport.IsCritical}"
+                           Classes.low="{Binding RiskReport.IsLow}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding RiskReport.CheckedAtText}" IsVisible="{Binding RiskReport.HasCheckedAt}"
+                           FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource AppTextSecondaryBrush}" />
+            </StackPanel>
+            <TextBlock Text="{Binding RiskReport.StatusText}" IsVisible="{Binding RiskReport.HasStatus}"
+                       FontSize="13" TextWrapping="Wrap" Foreground="{DynamicResource AppTextSecondaryBrush}" />
+            <TextBlock Text="{Binding RiskReport.Summary}" IsVisible="{Binding RiskReport.HasSummary}"
+                       FontSize="14" TextWrapping="Wrap" Foreground="{DynamicResource AppTextPrimaryBrush}" />
+            <ItemsControl ItemsSource="{Binding RiskReport.Sections}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><StackPanel Spacing="16" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:AppRiskReportSectionViewModel">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                            <ItemsControl ItemsSource="{Binding Paragraphs}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <TextBlock Text="{Binding .}" FontSize="14" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource AppTextSecondaryBrush}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{Binding RiskReport.ProtectionText}" IsVisible="{Binding RiskReport.HasProtection}"
+                       FontSize="13" TextWrapping="Wrap" Foreground="{DynamicResource AppTextSecondaryBrush}" />
+        </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

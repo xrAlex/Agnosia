@@ -23,4 +23,25 @@ public sealed record AppSnapshot(
     IReadOnlyList<string>? RuntimePermissions = null,
     bool PermissionRiskAvailable = true,
     bool IsInternetBlocked = false,
-    bool IsIsolationEnabled = false);
+    bool IsIsolationEnabled = false,
+    IReadOnlyList<AppPermissionRiskFinding>? PermissionRiskFindings = null,
+    DateTimeOffset? PermissionRiskEvaluatedAtUtc = null,
+    IReadOnlyList<string>? PermissionRiskUnavailableChecks = null)
+{
+    public AppSnapshot WithPermissionRiskFrom(AppSnapshot source) => this with
+    {
+        PermissionRiskAvailable = source.PermissionRiskAvailable,
+        PermissionRiskLevel = source.PermissionRiskLevel,
+        RiskyPermissions = source.RiskyPermissions,
+        MatchedPermissionRiskRuleIds = source.MatchedPermissionRiskRuleIds,
+        PermissionRiskScore = source.PermissionRiskScore,
+        PermissionRiskRawScore = source.PermissionRiskRawScore,
+        PermissionRiskConfidence = source.PermissionRiskConfidence,
+        PermissionRiskScoreBreakdown = source.PermissionRiskScoreBreakdown,
+        PermissionRiskFindings = source.PermissionRiskFindings,
+        PermissionRiskEvaluatedAtUtc = source.PermissionRiskEvaluatedAtUtc,
+        PermissionRiskUnavailableChecks = source.PermissionRiskUnavailableChecks,
+        ManifestPermissions = source.ManifestPermissions,
+        RuntimePermissions = source.RuntimePermissions
+    };
+}

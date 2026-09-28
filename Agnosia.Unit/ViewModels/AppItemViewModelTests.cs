@@ -8,6 +8,76 @@ namespace Agnosia.Unit.ViewModels;
 
 public sealed class AppItemViewModelTests
 {
+    [Fact]
+    public void Older_inventory_does_not_overwrite_a_more_recent_risk_evaluation()
+    {
+        var current = TestSnapshots.App(ProfileKind.Personal) with { PermissionRiskEvaluatedAtUtc = DateTimeOffset.UtcNow };
+        var app = CreateApp(current);
+        app.ApplySnapshot(current with
+        {
+            IsHidden = true,
+            PermissionRiskLevel = AppPermissionRiskLevel.Critical,
+            PermissionRiskEvaluatedAtUtc = current.PermissionRiskEvaluatedAtUtc!.Value.AddMinutes(-1)
+        });
+        Assert.Equal(AppPermissionRiskLevel.Safe, app.PermissionRiskLevel);
+        Assert.Equal(current.PermissionRiskEvaluatedAtUtc, app.Snapshot.PermissionRiskEvaluatedAtUtc);
+        Assert.True(app.IsHidden);
+    }
+    [Fact]
+    public void Incomplete_checks_remain_internal_without_claiming_safety()
+    {
+        var snapshot = TestSnapshots.App(ProfileKind.Personal);
+        var app = CreateApp(snapshot);
+        var changes = new List<string?>();
+        app.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+        app.ApplySnapshot(snapshot with { PermissionRiskUnavailableChecks = ["android.permission.SYSTEM_ALERT_WINDOW"] });
+        Assert.NotEmpty(app.Snapshot.PermissionRiskUnavailableChecks!);
+        Assert.Empty(app.RiskReport.StatusText);
+        Assert.Contains(nameof(app.RiskReport), changes);
+        Assert.Equal("Проверка не выявила опасных возможностей.", app.RiskReport.Summary);
+    }
+    [Fact]
+    public void Low_score_findings_remain_visible_in_details()
+    {
+        var app = CreateApp(TestSnapshots.App(ProfileKind.Personal) with
+        {
+            PermissionRiskFindings = [new("SU-MEDIA-PARTIAL-01", AppPermissionRiskLevel.Safe,
+                [new("android.permission.READ_MEDIA_VISUAL_USER_SELECTED", AppPermissionRiskEvidenceState.Granted)])]
+        });
+        Assert.Single(app.RiskReport.Sections);
+        Assert.Empty(app.RiskReport.Summary);
+    }
+
+    [Fact]
+    public void Findings_follow_snapshot_and_show_captured_time()
+    {
+        var snapshot = TestSnapshots.App(ProfileKind.Personal);
+        var app = CreateApp(snapshot);
+        var changed = new List<string?>();
+        app.PropertyChanged += (_, args) => changed.Add(args.PropertyName);
+        app.ApplySnapshot(snapshot with
+        {
+            PermissionRiskLevel = AppPermissionRiskLevel.Critical,
+            PermissionRiskFindings = [new("CR-LOC-BG-01", AppPermissionRiskLevel.Critical,
+                [new("android.permission.ACCESS_BACKGROUND_LOCATION", AppPermissionRiskEvidenceState.Granted),
+                    new("android.permission.INTERNET", AppPermissionRiskEvidenceState.Declared)])],
+            PermissionRiskEvaluatedAtUtc = new DateTimeOffset(2026, 9, 26, 11, 32, 0, TimeSpan.Zero)
+        });
+
+        Assert.Single(app.RiskReport.Sections);
+        Assert.Equal("Местоположение", app.RiskReport.Sections[0].Title);
+        Assert.NotEmpty(app.RiskReport.CheckedAtText);
+        Assert.Contains(nameof(AppItemViewModel.RiskReport), changed);
+    }
+
+    [Fact]
+    public void System_app_does_not_show_risk_section()
+    {
+        var app = CreateApp(TestSnapshots.App(ProfileKind.Personal, isSystem: true));
+
+        Assert.False(app.ShowRiskSection);
+        Assert.False(app.ShowRiskSection);
+    }
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -44,6 +114,8 @@ public sealed class AppItemViewModelTests
         Assert.False(app.IsPermissionRiskDangerous);
         Assert.False(app.IsPermissionRiskCritical);
         Assert.Equal("Оценка разрешений недоступна", app.PermissionRiskSummaryText);
+        Assert.Empty(app.RiskReport.Sections);
+        Assert.Equal("Оценка пока недоступна", app.RiskReport.StatusText);
         Assert.Equal("Оценка разрешений недоступна", app.PermissionRiskTooltip);
         Assert.Contains(nameof(AppItemViewModel.IsPermissionRiskSafe), changed);
         Assert.Contains(nameof(AppItemViewModel.IsPermissionRiskDangerous), changed);
@@ -67,6 +139,8 @@ public sealed class AppItemViewModelTests
         Assert.False(app.IsPermissionRiskCritical);
         Assert.False(app.ShowPermissionRiskIndicator);
         Assert.False(app.HasRiskyPermissions);
+        Assert.Empty(app.RiskReport.Sections);
+        Assert.Equal("Проверка не выявила опасных возможностей.", app.RiskReport.Summary);
         Assert.Empty(app.RiskyPermissionsText);
         Assert.Equal("Разрешения: OK", app.PermissionRiskTooltip);
         Assert.Equal("Open", app.LaunchLabel);

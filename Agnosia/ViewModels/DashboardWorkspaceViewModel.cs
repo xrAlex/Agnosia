@@ -429,6 +429,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     public bool IsRiskSummaryVisible => RiskEngineModule?.IsEnabled == true;
 
     internal bool IsLockdownModuleEnabled => LockdownModule?.IsEnabled == true;
+    internal bool IsRiskEngineModuleEnabled => RiskEngineModule?.IsEnabled != false;
 
     public int RiskyAppsCount => CriticalRiskAppsCount;
 
@@ -883,12 +884,23 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     {
         SelectedApp = app;
         IsAppControlWindowOpen = true;
+        _ = app.RefreshRiskAsync();
         if (app.IsPermissionDetailsExpanded) _ = app.Permissions.RefreshCommand.ExecuteAsync(null);
     }
 
-    internal AppPermissionsViewModel CreateAppPermissions(AppSnapshot app)
+    internal async Task RefreshAppRiskAsync(AppItemViewModel app)
     {
-        var permissions = new AppPermissionsViewModel(_appCommandService, app);
+        var profile = _lastProfileSnapshot ?? await _dashboardService.LoadDashboardProfileAsync();
+        var inventory = await Task.Run(() => _dashboardService.LoadAppInventoryAsync(profile));
+        var fresh = inventory.PersonalApps.Concat(inventory.WorkApps)
+            .FirstOrDefault(item => item.Profile == app.Profile && item.PackageName == app.PackageName);
+        if (fresh is null) throw new InvalidOperationException("Оценка приложения недоступна.");
+        await InvokeOnUiThreadActionAsync(() => app.ApplySnapshot(app.Snapshot.WithPermissionRiskFrom(fresh)));
+    }
+
+    internal AppPermissionsViewModel CreateAppPermissions(AppItemViewModel app)
+    {
+        var permissions = new AppPermissionsViewModel(_appCommandService, app.Snapshot, app.RefreshRiskAsync);
         // Track the operation lifetime even if its dialog is closed or another app is selected.
         permissions.PropertyChanged += (_, args) =>
         {
@@ -1792,6 +1804,7 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
     {
         var selectedKind = SelectedModule?.Kind;
         var wasLockdownModuleEnabled = IsLockdownModuleEnabled;
+        var wasRiskEngineModuleEnabled = IsRiskEngineModuleEnabled;
         var retainedKinds = new HashSet<AgnosiaModuleKind>();
 
         _moduleItems.Clear();
@@ -1824,6 +1837,8 @@ public partial class DashboardWorkspaceViewModel : ObservableObject
 
         OnPropertyChanged(nameof(HasModules));
         if (wasLockdownModuleEnabled != IsLockdownModuleEnabled) NotifyLockdownModuleStateChanged();
+        if (wasRiskEngineModuleEnabled != IsRiskEngineModuleEnabled)
+            foreach (var app in _appItemCache.Values) app.NotifyRiskEngineModuleStateChanged();
         NotifyOverviewMetricsChanged();
     }
 

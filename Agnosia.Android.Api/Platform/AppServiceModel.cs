@@ -46,4 +46,10 @@ public sealed class AppServiceModel
     public string[] ManifestPermissions { get; init; } = [];
 
     public string[] RuntimePermissions { get; init; } = [];
+
+    public AppPermissionRiskFinding[] PermissionRiskFindings { get; init; } = [];
+
+    public string[] PermissionRiskUnavailableChecks { get; init; } = [];
+
+    public DateTimeOffset? PermissionRiskEvaluatedAtUtc { get; init; }
 }

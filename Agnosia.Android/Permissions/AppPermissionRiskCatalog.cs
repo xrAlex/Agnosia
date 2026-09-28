@@ -5,7 +5,13 @@ namespace Agnosia.Android.Permissions;
 public static partial class AppPermissionRiskCatalog
 {
     private const int BaseDangerousScoreThreshold = 4;
-    private const int CriticalScoreThreshold = 8;
+
+    private readonly record struct MatchedRule(
+        PermissionCombinationRule Rule,
+        AppPermissionRiskScoreBreakdown ScoreBreakdown);
+
+    internal static IReadOnlyList<string> AllRuleIds =>
+        CriticalRules.Concat(DangerousRules).Select(rule => rule.Id).ToArray();
 
     public static AppPermissionRiskLevel Classify(IEnumerable<string>? requestedPermissions)
     {
@@ -29,59 +35,36 @@ public static partial class AppPermissionRiskCatalog
         var context = AnalysisContext.Create(input);
         if (!context.HasAnySignal) return AppPermissionRiskAnalysis.Safe;
 
-        var matchedRules = new List<PermissionCombinationRule>(CriticalRules.Length + DangerousRules.Length);
+        var matchedRules = new List<MatchedRule>(8);
         var hasCriticalMatch = false;
         foreach (var rule in CriticalRules)
         {
             if (!rule.IsCriticalMatch(context)) continue;
 
-            matchedRules.Add(rule);
+            matchedRules.Add(new(rule, rule.GetScoreBreakdown(context)));
             hasCriticalMatch = true;
         }
 
         foreach (var rule in DangerousRules)
         {
-            if (rule.IsMatch(context)) matchedRules.Add(rule);
+            if (rule.IsMatch(context)) matchedRules.Add(new(rule, rule.GetScoreBreakdown(context)));
         }
+
+        if (matchedRules.Count == 0) return CreateSafeAnalysis(context);
 
         var rawScore = CalculateRawScore(context, matchedRules);
         var scoreBreakdown = CalculateGroupedScoreBreakdown(context, matchedRules);
         var score = scoreBreakdown.Total;
-
-        if (hasCriticalMatch)
-            return CreateAnalysis(
-                AppPermissionRiskLevel.Critical,
-                context,
-                matchedRules,
-                score,
-                rawScore,
-                scoreBreakdown);
-
-        if (matchedRules.Count == 0 || score < context.DangerousScoreThreshold)
-            return CreateSafeAnalysis(context);
-
-        if (score >= CriticalScoreThreshold && context.HasHighConfidenceSignals)
-            return CreateAnalysis(
-                AppPermissionRiskLevel.Critical,
-                context,
-                matchedRules,
-                score,
-                rawScore,
-                scoreBreakdown);
-
-        return CreateAnalysis(
-            AppPermissionRiskLevel.Dangerous,
-            context,
-            matchedRules,
-            score,
-            rawScore,
-            scoreBreakdown);
+        var level = hasCriticalMatch ? AppPermissionRiskLevel.Critical
+            : score >= context.DangerousScoreThreshold ? AppPermissionRiskLevel.Dangerous
+            : AppPermissionRiskLevel.Safe;
+        return CreateAnalysis(level, context, matchedRules, score, rawScore, scoreBreakdown);
     }
 
     private static AppPermissionRiskAnalysis CreateAnalysis(
         AppPermissionRiskLevel level,
         AnalysisContext context,
-        IReadOnlyList<PermissionCombinationRule> matchedRules,
+        IReadOnlyList<MatchedRule> matchedRules,
         int score,
         int rawScore,
         AppPermissionRiskScoreBreakdown scoreBreakdown)
@@ -92,18 +75,22 @@ public static partial class AppPermissionRiskCatalog
             GetMatchedRuleIds(matchedRules),
             score,
             rawScore,
-            context.GetConfidence(),
+            context.GetConfidence(matchedRules),
             scoreBreakdown,
             context.GetManifestPermissions(),
-            context.GetRuntimePermissions());
+            context.GetRuntimePermissions())
+        {
+            Findings = matchedRules.Select(match => match.Rule.CreateFinding(context, match.ScoreBreakdown.Total)).ToArray(),
+            UnavailableChecks = context.GetUnavailableChecks()
+        };
     }
 
-    private static string[] GetMatchedRuleIds(IReadOnlyList<PermissionCombinationRule> matchedRules)
+    private static string[] GetMatchedRuleIds(IReadOnlyList<MatchedRule> matchedRules)
     {
         var ruleIds = new string[matchedRules.Count];
         for (var index = 0; index < matchedRules.Count; index++)
         {
-            ruleIds[index] = matchedRules[index].Id;
+            ruleIds[index] = matchedRules[index].Rule.Id;
         }
 
         return ruleIds;
@@ -120,6 +107,9 @@ public static partial class AppPermissionRiskCatalog
             AppPermissionRiskConfidence.None,
             AppPermissionRiskScoreBreakdown.Empty,
             context.GetManifestPermissions(),
-            context.GetRuntimePermissions());
+            context.GetRuntimePermissions())
+        {
+            UnavailableChecks = context.GetUnavailableChecks()
+        };
     }
 }

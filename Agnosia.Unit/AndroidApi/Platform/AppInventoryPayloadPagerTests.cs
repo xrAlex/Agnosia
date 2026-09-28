@@ -1,10 +1,32 @@
 using Agnosia.Android.Api.Platform;
+using Agnosia.Models;
+using Agnosia.Android.Api.Serialization;
+using System.Text.Json;
 using Xunit;
 
 namespace Agnosia.Unit.AndroidApi.Platform;
 
 public sealed class AppInventoryPayloadPagerTests
 {
+    [Fact]
+    public void Inventory_json_preserves_findings_and_evaluation_time()
+    {
+        var timestamp = new DateTimeOffset(2026, 9, 26, 11, 32, 0, TimeSpan.Zero);
+        var model = new AppServiceModel
+        {
+            PackageName = "org.example.risk",
+            Label = "Risk",
+            PermissionRiskFindings = [new("CR-LOC-BG-01", AppPermissionRiskLevel.Critical,
+                [new("android.permission.INTERNET", AppPermissionRiskEvidenceState.Declared)])],
+            PermissionRiskEvaluatedAtUtc = timestamp,
+            PermissionRiskUnavailableChecks = ["android.observed.MediaProjection"]
+        };
+        var json = JsonSerializer.Serialize(new List<AppServiceModel> { model }, AndroidApiJsonContext.Default.ListAppServiceModel);
+        var result = JsonSerializer.Deserialize(json, AndroidApiJsonContext.Default.ListAppServiceModel)![0];
+        Assert.Equal(timestamp, result.PermissionRiskEvaluatedAtUtc);
+        Assert.Single(result.PermissionRiskFindings);
+        Assert.Equal(model.PermissionRiskUnavailableChecks, result.PermissionRiskUnavailableChecks);
+    }
     // Проверяет, что helper дробит inventory на страницы с монотонным nextOffset.
     [Fact]
     public void CreatePage_returns_all_items_without_duplicates_across_pages()

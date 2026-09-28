@@ -3,7 +3,8 @@ using Agnosia.Models;
 namespace Agnosia.Android.Packages;
 
 internal sealed record PackageInventoryMetadata(
-    PackageIdentity? Identity, AppPermissionRiskAnalysis Risk, bool RiskAvailable)
+    PackageIdentity? Identity, AppPermissionRiskAnalysis Risk, bool RiskAvailable,
+    DateTimeOffset? RiskEvaluatedAtUtc = null)
 {
     public static PackageInventoryMetadata Read(bool analyzeRisk,
         Func<PackageInventoryMetadata?> readRisk, Func<PackageIdentity?> readIdentity)

@@ -28,24 +28,6 @@
 
         <StackPanel Spacing="8"
                     IsVisible="{Binding IsPermissionDetailsExpanded}">
-            <ItemsControl ItemsSource="{Binding PermissionRiskReasons}"
-                          IsVisible="{Binding ShowPermissionRiskReasons}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Grid ColumnDefinitions="Auto,*"
-                              ColumnSpacing="8"
-                              Margin="0,0,0,4">
-                            <TextBlock Classes="app-dialog-setting-caption"
-                                       Text="-" />
-                            <TextBlock Grid.Column="1"
-                                       Classes="app-dialog-setting-caption"
-                                       TextWrapping="Wrap"
-                                       Text="{Binding}" />
-                        </Grid>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-
             <StackPanel DataContext="{Binding Permissions}" x:DataType="vm:AppPermissionsViewModel" Spacing="10">
                 <TextBlock Classes="app-dialog-setting-caption" TextWrapping="Wrap" Text="{Binding Explanation}"
                            IsVisible="{Binding IsWorkProfile}" />

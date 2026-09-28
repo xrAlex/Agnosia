@@ -8,6 +8,25 @@ namespace Agnosia.Unit.ViewModels;
 public sealed class DashboardWorkspaceModuleTests
 {
     [Fact]
+    public async Task Disabled_risk_module_hides_previously_captured_findings_in_details()
+    {
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            Modules = [TestSnapshots.RiskEngineModule(isEnabled: false, state: AgnosiaModuleState.Disabled)]
+        };
+        var owner = TestWorkspaceFactory.Create(services);
+        await owner.EnsureInitializedAsync();
+        var app = TestWorkspaceFactory.CreateApp(owner, TestSnapshots.App(ProfileKind.Work) with
+        {
+            PermissionRiskLevel = AppPermissionRiskLevel.Critical,
+            PermissionRiskFindings = [new("CR-LOC-BG-01", AppPermissionRiskLevel.Critical, [])]
+        });
+        Assert.False(app.ShowRiskSection);
+        Assert.Empty(app.RiskReport.Sections);
+        Assert.Empty(app.RiskReport.StatusText);
+    }
+    [Fact]
     public async Task Modules_section_is_available_after_dashboard_setup()
     {
         var services = new TestPlatformServices

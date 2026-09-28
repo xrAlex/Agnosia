@@ -31,20 +31,52 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
     private string? _manifestPermissionsText;
     private string? _runtimePermissionsText;
     private string[]? _permissionRiskReasons;
+    private AppRiskReportViewModel? _riskReport;
+    private readonly SemaphoreSlim _riskRefreshLock = new(1, 1);
+
+    [ObservableProperty]
+    public partial bool IsRiskRefreshing { get; set; }
+
+    [ObservableProperty]
+    public partial bool RiskRefreshFailed { get; set; }
 
     [ObservableProperty]
     public partial bool IsPermissionDetailsExpanded { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsRiskReportExpanded { get; set; }
 
     public AppItemViewModel(DashboardWorkspaceViewModel owner, AppSnapshot snapshot)
     {
         _owner = owner;
         Snapshot = snapshot;
-        Permissions = owner.CreateAppPermissions(snapshot);
+        Permissions = owner.CreateAppPermissions(this);
     }
 
     public AppSnapshot Snapshot { get; private set; }
 
     public AppPermissionsViewModel Permissions { get; }
+
+    internal async Task RefreshRiskAsync()
+    {
+        if (Snapshot.IsSystem) return;
+        await _riskRefreshLock.WaitAsync();
+        try
+        {
+            IsRiskRefreshing = true;
+            RiskRefreshFailed = false;
+            await _owner.RefreshAppRiskAsync(this);
+        }
+        catch (Exception)
+        {
+            RiskRefreshFailed = true;
+        }
+        finally
+        {
+            IsRiskRefreshing = false;
+            _riskRefreshLock.Release();
+        }
+    }
 
     partial void OnIsPermissionDetailsExpandedChanged(bool value)
     {
@@ -64,6 +96,21 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
     public bool IsInternetBlocked => Snapshot.IsInternetBlocked;
 
     public AppPermissionRiskLevel PermissionRiskLevel => Snapshot.PermissionRiskLevel;
+
+    public AppRiskReportViewModel RiskReport => _riskReport ??= AppRiskReportBuilder.Build(
+        Snapshot, _owner.IsRiskEngineModuleEnabled, IsRiskRefreshing, RiskRefreshFailed);
+
+    partial void OnIsRiskRefreshingChanged(bool value) => InvalidateRiskReport();
+
+    partial void OnRiskRefreshFailedChanged(bool value) => InvalidateRiskReport();
+
+    private void InvalidateRiskReport()
+    {
+        _riskReport = null;
+        OnPropertyChanged(nameof(RiskReport));
+    }
+
+    public bool ShowRiskSection => !Snapshot.IsSystem && _owner.IsRiskEngineModuleEnabled;
 
     public IReadOnlyList<string> RiskyPermissions => Snapshot.RiskyPermissions ?? EmptyRiskyPermissions;
 
@@ -293,7 +340,22 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
             throw new InvalidOperationException("App item identity cannot be changed.");
 
         var previous = Snapshot;
+        if (previous.PermissionRiskAvailable && snapshot.PermissionRiskAvailable &&
+            previous.PermissionRiskEvaluatedAtUtc is { } currentTime &&
+            snapshot.PermissionRiskEvaluatedAtUtc is { } incomingTime && incomingTime < currentTime)
+            snapshot = snapshot.WithPermissionRiskFrom(previous);
         Snapshot = snapshot;
+
+        if (!ReferenceEquals(previous.PermissionRiskFindings, snapshot.PermissionRiskFindings)
+            || previous.PermissionRiskEvaluatedAtUtc != snapshot.PermissionRiskEvaluatedAtUtc
+            || previous.PermissionRiskLevel != snapshot.PermissionRiskLevel
+            || previous.PermissionRiskAvailable != snapshot.PermissionRiskAvailable
+            || !StringListsEqual(previous.PermissionRiskUnavailableChecks, snapshot.PermissionRiskUnavailableChecks)
+            || previous.IsSystem != snapshot.IsSystem)
+        {
+            InvalidateRiskReport();
+            OnPropertyChanged(nameof(ShowRiskSection));
+        }
 
         if (!ByteArraysEqual(previous.IconPng, snapshot.IconPng)) ResetIcon();
 
@@ -324,6 +386,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
 
         if (previous.IsInternetBlocked != snapshot.IsInternetBlocked)
         {
+            InvalidateRiskReport();
             OnPropertyChanged(nameof(IsInternetBlocked));
             OnPropertyChanged(nameof(InternetAccessLabel));
         }
@@ -433,6 +496,12 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
     internal void NotifyLockdownModuleStateChanged()
     {
         OnPropertyChanged(nameof(ShowInternetAccessControl));
+    }
+
+    internal void NotifyRiskEngineModuleStateChanged()
+    {
+        OnPropertyChanged(nameof(ShowRiskSection));
+        InvalidateRiskReport();
     }
 
     internal void RefreshIconBindings()
