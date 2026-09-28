@@ -556,7 +556,7 @@ internal sealed class AndroidAppCommandCoordinator(
         return Task.Run(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return AndroidVpnApi.IsVpnActive(context);
+            return PersonalVpnPresence.IsActive(context);
         }, cancellationToken);
     }
 

@@ -111,7 +111,7 @@ public static class AndroidVpnAutomationApi
     public static OperationResult CheckRestoreBeforeTakeover(Context context)
     {
         var storage = ServiceRegistry.GetRequiredService<LocalStorageManager>();
-        if (!storage.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch) || !AndroidVpnApi.IsVpnActive(context))
+        if (!storage.GetBoolean(StorageKeys.DisableVpnBeforeWorkLaunch) || !PersonalVpnPresence.IsActive(context))
             return OperationResult.Success(string.Empty);
         var definition = ResolveInstalledPackage(context, ResolveClient(AndroidSettingsStore.LoadVpnAfterWorkFreezeClient(storage)));
         if (!CanStartClient(context, definition))
@@ -167,7 +167,7 @@ public static class AndroidVpnAutomationApi
             return OperationResult.Success(string.Empty);
         }
 
-        if (AndroidVpnApi.IsVpnActive(context) && !ShouldIgnoreSingleVisibleLockdownVpn(context, trigger))
+        if (PersonalVpnPresence.IsActive(context))
         {
             Log.Debug(LogTag, $"VPN is already active; skipping enable-after-freeze command. trigger={trigger}.");
             return OperationResult.Success(string.Empty);
@@ -184,7 +184,7 @@ public static class AndroidVpnAutomationApi
             var timer = System.Diagnostics.Stopwatch.StartNew();
             while (timer.Elapsed < TimeSpan.FromSeconds(10))
             {
-                if (AndroidVpnApi.IsVpnActive(context) && !ShouldIgnoreSingleVisibleLockdownVpn(context, trigger))
+                if (PersonalVpnPresence.IsActive(context))
                 {
                     Log.Info(LogTag, $"External VPN detected after restore command. client={definition.DisplayName}, trigger={trigger}.");
                     return OperationResult.Success("VPN обнаружен после команды восстановления.");
@@ -205,25 +205,6 @@ public static class AndroidVpnAutomationApi
             Log.Warn(LogTag, $"{message} error={exception.Message}");
             return OperationResult.Failure(message);
         }
-    }
-
-    private static bool ShouldIgnoreSingleVisibleLockdownVpn(Context context, string trigger)
-    {
-        if (!LockdownSettingsStore.IsEnabled()) return false;
-
-        var visibleVpnCount = AndroidVpnApi.GetVisibleVpnNetworkHandles(context).Count;
-        if (visibleVpnCount == 1)
-        {
-            Log.Debug(
-                LogTag,
-                $"Ignoring single visible VPN while Lockdown is enabled. trigger={trigger}, visibleVpnCount={visibleVpnCount}.");
-            return true;
-        }
-
-        Log.Debug(
-            LogTag,
-            $"Lockdown is enabled, but visible VPN count does not match the single-Lockdown restore case. trigger={trigger}, visibleVpnCount={visibleVpnCount}.");
-        return false;
     }
 
     private static OperationResult StartClient(

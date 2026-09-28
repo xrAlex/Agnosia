@@ -455,7 +455,7 @@ public sealed class ProxyActivity : Activity
         }
 
         Log.Info(LogTag, $"VPN Guard is enabled for shortcut launch. package={_request?.PackageName ?? "<none>"}.");
-        if (!AndroidVpnApi.IsVpnActive(this))
+        if (!PersonalVpnPresence.IsActive(this))
         {
             Log.Info(LogTag, "Shortcut launch: no active VPN detected.");
             return WorkLaunchVpnTakeoverResult.NotRequired(OperationResult.Success(string.Empty));
@@ -472,7 +472,7 @@ public sealed class ProxyActivity : Activity
                     OperationResult.Failure("Android не выдал Agnosia временное управление VPN."));
         }
 
-        if (!AndroidVpnApi.IsVpnActive(this))
+        if (!PersonalVpnPresence.IsActive(this))
         {
             OverlayVpnService.ShowOverlay(this);
             Log.Debug(LogTag, "Shortcut launch: active VPN was cleared while preparing VPN control.");

@@ -35,9 +35,8 @@ public static class AndroidAppInventoryApi
             context, packageManager, policyManager, admin, knownPackageNames, cancellationToken);
         var models = new List<AppServiceModel>(apps.Count);
         var installedPackageNames = new HashSet<string>(StringComparer.Ordinal);
-        var internetBlockedPackages = LockdownSettingsStore
-            .LoadBlockedPackages()
-            .ToHashSet(StringComparer.Ordinal);
+        var internetBlockedPackages = LockdownInternetAccessPolicy.ResolveActiveBlockedPackages(
+            LockdownSettingsStore.IsEnabled(), LockdownSettingsStore.LoadBlockedPackages());
         var specialAccess = isRiskEngineEnabled ? ReadSpecialAccessSnapshot(context) : SpecialAccessSnapshot.Empty;
         var packagesAwaitingHide = HiddenAppSessionMonitorService.GetPackagesAwaitingHide();
         foreach (var app in apps)

@@ -1,6 +1,7 @@
 using Agnosia.Models;
 using Agnosia.Unit.TestDoubles;
 using Agnosia.Unit.TestSupport;
+using Agnosia.ViewModels;
 using Xunit;
 
 namespace Agnosia.Unit.ViewModels;
@@ -312,6 +313,38 @@ public sealed class DashboardWorkspaceModuleTests
         await viewModel.Modules.Single().ToggleEnabledCommand.ExecuteAsync(null);
 
         Assert.True(app.ShowInternetAccessControl);
+    }
+
+    [Fact]
+    public async Task Disabling_lockdown_removes_stale_protection_from_open_risk_report()
+    {
+        var workApp = TestSnapshots.App(ProfileKind.Work, isInternetBlocked: true);
+        var services = new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            AppInventory = new DashboardAppInventorySnapshot([], [workApp]),
+            Modules = [TestSnapshots.LockdownModule(true, AgnosiaModuleState.Enabled), TestSnapshots.RiskEngineModule()]
+        };
+        services.SetModuleEnabledHandler = (_, enabled, _) =>
+        {
+            services.Modules = [TestSnapshots.LockdownModule(enabled,
+                enabled ? AgnosiaModuleState.Enabled : AgnosiaModuleState.Disabled), TestSnapshots.RiskEngineModule()];
+            return Task.FromResult(OperationResult.Success("Lockdown updated"));
+        };
+        var owner = TestWorkspaceFactory.Create(services);
+        await owner.EnsureInitializedAsync();
+        owner.SelectWorkCommand.Execute(null);
+        var app = Assert.Single(owner.VisibleApps);
+        Assert.NotEmpty(app.RiskReport.ProtectionText);
+        var changes = new List<string?>();
+        app.PropertyChanged += (_, args) => changes.Add(args.PropertyName);
+
+        await owner.Modules.Single(module => module.Kind == AgnosiaModuleKind.Lockdown)
+            .ToggleEnabledCommand.ExecuteAsync(null);
+
+        Assert.False(owner.IsLockdownModuleEnabled);
+        Assert.Empty(app.RiskReport.ProtectionText);
+        Assert.Contains(nameof(AppItemViewModel.RiskReport), changes);
     }
 
 

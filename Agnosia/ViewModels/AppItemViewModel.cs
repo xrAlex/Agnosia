@@ -98,7 +98,8 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
     public AppPermissionRiskLevel PermissionRiskLevel => Snapshot.PermissionRiskLevel;
 
     public AppRiskReportViewModel RiskReport => _riskReport ??= AppRiskReportBuilder.Build(
-        Snapshot, _owner.IsRiskEngineModuleEnabled, IsRiskRefreshing, RiskRefreshFailed);
+        _owner.IsLockdownModuleEnabled ? Snapshot : Snapshot with { IsInternetBlocked = false },
+        _owner.IsRiskEngineModuleEnabled, IsRiskRefreshing, RiskRefreshFailed);
 
     partial void OnIsRiskRefreshingChanged(bool value) => InvalidateRiskReport();
 
@@ -496,6 +497,7 @@ public partial class AppItemViewModel : ObservableObject, IDisposable
     internal void NotifyLockdownModuleStateChanged()
     {
         OnPropertyChanged(nameof(ShowInternetAccessControl));
+        InvalidateRiskReport();
     }
 
     internal void NotifyRiskEngineModuleStateChanged()

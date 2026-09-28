@@ -10,10 +10,16 @@ namespace Agnosia.Unit.ViewModels;
 public sealed class AppRiskReportStateTests
 {
     [Fact]
-    public void App_item_invalidates_report_for_snapshot_refresh_status_and_protection()
+    public async Task App_item_invalidates_report_for_snapshot_refresh_status_and_protection()
     {
         var snapshot = Snapshot(Finding("SU-MIC-01", "RECORD_AUDIO"));
-        var app = TestWorkspaceFactory.CreateApp(TestWorkspaceFactory.Create(), snapshot);
+        var owner = TestWorkspaceFactory.Create(new TestPlatformServices
+        {
+            DashboardProfile = TestSnapshots.Dashboard(),
+            Modules = [TestSnapshots.LockdownModule(true, AgnosiaModuleState.Enabled)]
+        });
+        await owner.EnsureInitializedAsync();
+        var app = TestWorkspaceFactory.CreateApp(owner, snapshot);
         var initial = app.RiskReport;
         var changes = new List<string?>();
         app.PropertyChanged += (_, e) => changes.Add(e.PropertyName);

@@ -42,6 +42,7 @@
         <Compile Include="Activities\PackageCopyPreflight.cs"/>
         <Compile Include="Packages\PackageIdentity.cs"/>
         <Compile Include="Packages\PackageInventoryMetadata.cs"/>
+        <Compile Include="Packages\LockdownInternetAccessPolicy.cs"/>
         <Compile Include="Packages\PackageInventoryQuery.cs"/>
         <Compile Include="Storage\PendingBooleanSettingsSync.cs"/>
         <Compile Include="Files\AgnosiaFileShuttleContract.cs"/>
@@ -120,6 +121,7 @@
         <Compile Include="Vpn\VpnRestoreOwnershipJsonContext.cs"/>
         <Compile Include="Vpn\VpnRestoreOwnershipState.cs"/>
         <Compile Include="Vpn\WorkLaunchVpnTransaction.cs"/>
+        <Compile Include="Vpn\VpnPresencePolicy.cs"/>
     </ItemGroup>
 
     <ItemGroup>

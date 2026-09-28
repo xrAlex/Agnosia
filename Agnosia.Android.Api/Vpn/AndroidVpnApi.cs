@@ -17,6 +17,25 @@ public static class AndroidVpnApi
         return IsVpnActive(context, new HashSet<long>());
     }
 
+    public static bool IsVpnActiveOnDefaultNetwork(Context context)
+    {
+        if (AndroidSystemApi.GetConnectivityManager(context) is not { } connectivityManager) return false;
+
+        try
+        {
+            return HasExternalVpnTransport(
+                connectivityManager,
+                connectivityManager.ActiveNetwork,
+                context.ApplicationInfo?.Uid ?? -1,
+                new HashSet<long>());
+        }
+        catch (Exception exception)
+        {
+            Log.Warn(LogTag, $"Failed to determine default network VPN state: {exception.Message}");
+            return false;
+        }
+    }
+
     public static bool IsVpnActive(Context context, IReadOnlySet<long> ignoredVpnNetworkHandles)
     {
         if (AndroidSystemApi.GetConnectivityManager(context) is not { } connectivityManager) return false;
