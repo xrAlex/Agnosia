@@ -30,4 +30,5 @@ public sealed record AppPermissionRiskInput(
     bool? IsInputMethodEnabled = null,
     bool? IsAutofillServiceEnabled = null,
     bool? IsDeviceAdminEnabled = null,
-    IEnumerable<string>? BlockedAppOpPermissions = null);
+    IEnumerable<string>? BlockedAppOpPermissions = null,
+    bool? HasLegacyExternalStorageAccess = null);

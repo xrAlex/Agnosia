@@ -20,6 +20,7 @@ public sealed class AppRiskFindingIsolationTests
     {
         var permissions = Permissions.Concat(Channels).Select(Permission)
             .Append("com.google.android.gms.permission.AD_ID")
+            .Append("com.android.voicemail.permission.ADD_VOICEMAIL")
             .Where(p => variant != "offline" || p != Permission("INTERNET"))
             .Where(p => variant != "limited" || !new[]
             {
@@ -35,14 +36,15 @@ public sealed class AppRiskFindingIsolationTests
             HasUsageStatsAccess: true, IsVpnControlEnabled: true, IsAssistantScreenContentEnabled: true,
             IsMediaProjectionActive: true, HasManageExternalStorageAccess: true, CanRequestPackageInstalls: true,
             IsIgnoringBatteryOptimizations: true, IsLocalNetworkRestrictionEnabled: true,
-            IsInputMethodEnabled: true, IsAutofillServiceEnabled: true, IsDeviceAdminEnabled: true);
+            IsInputMethodEnabled: true, IsAutofillServiceEnabled: true, IsDeviceAdminEnabled: true,
+            HasLegacyExternalStorageAccess: true);
     }
 
     // Deliberately broad application fixtures expose cross-contamination between findings.
     private static readonly string[] Permissions =
     [
         "ACCESS_BACKGROUND_LOCATION", "ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "ACCESS_MEDIA_LOCATION",
-        "ANSWER_PHONE_CALLS", "BIND_ACCESSIBILITY_SERVICE", "BIND_NOTIFICATION_LISTENER_SERVICE", "BIND_VPN_SERVICE",
+        "ANSWER_PHONE_CALLS", "ACCEPT_HANDOVER", "BIND_ACCESSIBILITY_SERVICE", "BIND_NOTIFICATION_LISTENER_SERVICE", "BIND_VPN_SERVICE",
         "BIND_INPUT_METHOD", "BIND_AUTOFILL_SERVICE", "BIND_DEVICE_ADMIN", "BLUETOOTH_SCAN", "RECEIVE_BOOT_COMPLETED",
         "CAMERA", "FOREGROUND_SERVICE", "FOREGROUND_SERVICE_CAMERA", "FOREGROUND_SERVICE_LOCATION",
         "FOREGROUND_SERVICE_MEDIA_PROJECTION", "FOREGROUND_SERVICE_MICROPHONE", "GET_ACCOUNTS",
@@ -104,7 +106,7 @@ public sealed class AppRiskFindingIsolationTests
         if (ruleId.StartsWith("CR-FILE-ALL-", StringComparison.Ordinal) || ruleId == "SU-FILE-ALL-01")
             result.Add("MANAGE_EXTERNAL_STORAGE");
         if (ruleId == "SU-FILE-WRITE-LEGACY-01") result.Add("WRITE_EXTERNAL_STORAGE");
-        if (ruleId == "SU-BLUETOOTH-EXFIL-01") result.Add("BLUETOOTH_CONNECT");
+        if (ruleId is "SU-BLUETOOTH-EXFIL-01" or "SU-BLUETOOTH-CONNECT-01") result.Add("BLUETOOTH_CONNECT");
         if (ruleId == "SU-LAN-17-01") result.Add("ACCESS_LOCAL_NETWORK");
         return result;
     }

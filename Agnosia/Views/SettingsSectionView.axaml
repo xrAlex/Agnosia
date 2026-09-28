@@ -73,8 +73,8 @@
                 <Border Classes="surface-card compact">
                     <StackPanel Spacing="12">
                         <controls:SectionHeader Icon="{StaticResource IconFileShuttleGeometry}"
-                                                Title="Команды рабочего профиля"
-                                                Description="Способ связи с рабочим профилем" />
+                                                Title="Транспорт команд"
+                                                Description="Протокол общения с рабочим профилем" />
                         <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
                             <Button AutomationProperties.Name="Авто" Classes="segment-chip settings-choice"
                                     Classes.selected="{Binding IsAutoTransportSelected}"
@@ -115,8 +115,11 @@
                                 <TextBlock Classes="button-label" Text="Выкл" />
                             </Button>
                         </Grid>
+                    </StackPanel>
+                </Border>
 
-                        <Border Classes="divider" />
+                <Border Classes="surface-card compact">
+                    <StackPanel Spacing="12">
                         <controls:SectionHeader Icon="{StaticResource IconLogGeometry}"
                                                 Title="Логирование"
                                                 Description="Сохранять диагностические сообщения в журнале событий" />

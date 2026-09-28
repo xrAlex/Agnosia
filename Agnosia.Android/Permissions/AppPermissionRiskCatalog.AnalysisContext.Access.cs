@@ -21,10 +21,26 @@ public static partial class AppPermissionRiskCatalog
 
             if (IsBlockedByAppOp(permission) || GetGrantStatus(permission) == PermissionGrantStatus.Denied) return false;
 
+            if (permission == ReadExternalStorage)
+                return HasGrantedPermission(permission) &&
+                       (DeviceSdkVersion <= Android12LApi || TargetSdkVersion is > 0 and < Android13Api);
+
+            if (permission == WriteExternalStorage)
+                return HasGrantedPermission(permission) && HasLegacyExternalStorageAccess == true
+                       && TargetSdkVersion is > 0 and <= LegacyExternalStorageMaxTargetSdk;
+
             if (permission == AccessBackgroundLocation)
                 return HasGrantedPermission(permission) &&
                        (HasEffectivePermission(AccessFineLocation) && !IsForegroundOnly(AccessFineLocation)
                         || HasEffectivePermission(AccessCoarseLocation) && !IsForegroundOnly(AccessCoarseLocation));
+
+            if (permission == BodySensorsBackground)
+                return HasGrantedPermission(permission) && !IsForegroundOnly(permission)
+                       && HasEffectivePermission(BodySensors) && !IsForegroundOnly(BodySensors);
+
+            if (permission == HealthBackground)
+                return HasGrantedPermission(permission) && !IsForegroundOnly(permission)
+                       && HasBackgroundHealthDataAccess;
 
             if (IsRuntimeSensitivePermission(permission))
                 return GetGrantStatus(permission) == PermissionGrantStatus.Granted;
@@ -59,6 +75,8 @@ public static partial class AppPermissionRiskCatalog
                        or AccessMediaLocation
                        or AccessLocalNetwork
                        or AnswerPhoneCalls
+                       or AcceptHandover
+                       or AddVoicemail
                        or BluetoothConnect
                        or BluetoothScan
                        or Camera

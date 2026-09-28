@@ -15,6 +15,9 @@ public static partial class AppPermissionRiskCatalog
                 IsRuntimeSensitivePermission(p) && GetGrantStatus(p) == PermissionGrantStatus.Unknown
                 || TryGetSpecialAccessState(p, out var state) && state is null).ToHashSet(StringComparer.Ordinal);
             foreach (var permission in UnavailableAppOpPermissions.Where(HasGrantedPermission)) unavailable.Add(permission);
+            if (HasPermission(WriteExternalStorage) && HasGrantedPermission(WriteExternalStorage)
+                && TargetSdkVersion is > 0 and <= LegacyExternalStorageMaxTargetSdk
+                && HasLegacyExternalStorageAccess is null) unavailable.Add(WriteExternalStorage);
             // On Android 12–13, Health Connect grants live in the companion provider.
             // Package permission flags cannot establish that provider's access state.
             if (DeviceSdkVersion < Android14Api)

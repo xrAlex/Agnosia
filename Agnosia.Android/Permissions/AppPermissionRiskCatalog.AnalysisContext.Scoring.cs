@@ -44,8 +44,7 @@ public static partial class AppPermissionRiskCatalog
             if (HasEffectivePermission(BluetoothConnect)) permissions.Add(BluetoothConnect);
             if (HasEffectivePermission(Nfc)) permissions.Add(Nfc);
             if (HasEffectivePermission(SendSms)) permissions.Add(SendSms);
-            if (DeviceSdkVersion <= Android12LApi && TargetSdkVersion is > 0 and <= LegacyExternalStorageMaxTargetSdk
-                && HasEffectivePermission(WriteExternalStorage)) permissions.Add(WriteExternalStorage);
+            if (HasEffectivePermission(WriteExternalStorage)) permissions.Add(WriteExternalStorage);
             if (HasEffectivePermission(ManageExternalStorage)) permissions.Add(ManageExternalStorage);
             return permissions;
         }

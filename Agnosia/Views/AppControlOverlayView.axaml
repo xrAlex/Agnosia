@@ -32,24 +32,12 @@
 
                                         <StackPanel Grid.Column="1"
                                                     MinWidth="0"
-                                                    Spacing="3"
+                                                    Spacing="2"
                                                     VerticalAlignment="Center">
                                             <TextBlock Classes="app-control-title"
                                                        Text="{Binding Label}" />
                                             <TextBlock Classes="package-name"
                                                        Text="{Binding PackageName}" />
-                                            <WrapPanel>
-                                                <Border Classes="tag-chip dense">
-                                                    <TextBlock Classes="tag-label"
-                                                               Text="{Binding ProfileLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Profile.'}" />
-                                                </Border>
-                                                <Border Classes="tag-chip dense"
-                                                        Margin="8,0,0,0"
-                                                        IsVisible="{Binding HasStatusTag}">
-                                                    <TextBlock Classes="tag-label"
-                                                               Text="{Binding StatusTagLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Status.'}" />
-                                                </Border>
-                                            </WrapPanel>
                                         </StackPanel>
 
                                         <Button AutomationProperties.Name="{Binding LaunchLabel, Converter={StaticResource LocalizationConverter}, ConverterParameter='String.App.Action.'}" Grid.Column="2"

@@ -19,6 +19,8 @@ public static partial class AppPermissionRiskCatalog
     private const string AccessLocalNetwork = "android.permission.ACCESS_LOCAL_NETWORK";
     private const string AccessMediaLocation = "android.permission.ACCESS_MEDIA_LOCATION";
     private const string AnswerPhoneCalls = "android.permission.ANSWER_PHONE_CALLS";
+    private const string AcceptHandover = "android.permission.ACCEPT_HANDOVER";
+    private const string AddVoicemail = "com.android.voicemail.permission.ADD_VOICEMAIL";
     private const string BindAccessibilityService = "android.permission.BIND_ACCESSIBILITY_SERVICE";
     private const string BindNotificationListenerService = "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE";
     private const string BindVpnService = "android.permission.BIND_VPN_SERVICE";
@@ -131,6 +133,17 @@ public static partial class AppPermissionRiskCatalog
     
     private static readonly PermissionCombinationRule[] DangerousRules =
     [
+        Rule("SU-GRAPH-ACCOUNTS-02", "accounts", AppPermissionRiskLevel.Dangerous, [GetAccounts], score: 2, requireEffectivePermissionsForMatch: true),
+        Rule("SU-CALL-STATE-01", "phone-state", AppPermissionRiskLevel.Dangerous, [ReadPhoneState], score: 2, requireEffectivePermissionsForMatch: true),
+        Rule("SU-CALL-ANSWER-01", "call-answer", AppPermissionRiskLevel.Dangerous, [AnswerPhoneCalls], score: 2, requireEffectivePermissionsForMatch: true),
+        Rule("SU-CALL-HANDOVER-01", "call-answer", AppPermissionRiskLevel.Dangerous, [AcceptHandover], score: 2, requireEffectivePermissionsForMatch: true),
+        Rule("SU-CALL-VOICEMAIL-ADD-01", "voicemail", AppPermissionRiskLevel.Dangerous, [AddVoicemail], score: 3, requireEffectivePermissionsForMatch: true),
+        Rule("SU-BLUETOOTH-SCAN-01", "nearby-devices", AppPermissionRiskLevel.Dangerous, [BluetoothScan], score: 2, requireEffectivePermissionsForMatch: true),
+        Rule("SU-BLUETOOTH-CONNECT-01", "nearby-devices", AppPermissionRiskLevel.Dangerous, [BluetoothConnect], score: 2, requireEffectivePermissionsForMatch: true),
+        Rule("SU-NEARBY-WIFI-01", "nearby-devices", AppPermissionRiskLevel.Dangerous, [NearbyWifiDevices], score: 2, minDeviceSdkVersion: Android13Api, requireEffectivePermissionsForMatch: true),
+        Rule("SU-APK-INSTALL-02", "package-inventory", AppPermissionRiskLevel.Dangerous, [RequestInstallPackages], score: 3, requireEffectivePermissionsForMatch: true),
+        Rule("SU-HEALTH-BG-01", "health-read", AppPermissionRiskLevel.Dangerous, [HealthBackground], minDeviceSdkVersion: Android14Api, requiredPermissionPrefixes: [HealthReadPrefix], score: 5, requireEffectivePermissionsForMatch: true),
+        Rule("SU-HEALTH-SENSORS-BG-01", "body-sensors", AppPermissionRiskLevel.Dangerous, [BodySensors, BodySensorsBackground], minDeviceSdkVersion: Android13Api, extraCondition: c => c.DeviceSdkVersion < Android16Api || c.TargetSdkVersion < Android16Api, score: 5, requireEffectivePermissionsForMatch: true),
         Rule("SU-SMS-ROLE-01", "selected-roles", AppPermissionRiskLevel.Dangerous, [], score: 1, requiredObservedSignals: [ObservedDefaultSmsRole]),
         Rule("SU-CALL-ROLE-01", "selected-roles", AppPermissionRiskLevel.Dangerous, [], score: 1, requiredObservedSignals: [ObservedDefaultDialerRole]),
         Rule("SU-ASSIST-ROLE-01", "selected-roles", AppPermissionRiskLevel.Dangerous, [], score: 1, requiredObservedSignals: [ObservedAssistantRole]),
@@ -175,9 +188,9 @@ public static partial class AppPermissionRiskCatalog
         Rule("SU-CAM-PERSIST-02", "camera", AppPermissionRiskLevel.Dangerous, [Camera, IgnoreBatteryOptimizations], score: 3, requireEffectivePermissionsForMatch: true),
         Rule("SU-CAM-FGS-14-01", "camera", AppPermissionRiskLevel.Dangerous, [Camera, ForegroundServiceCamera, Internet], score: 3, minDeviceSdkVersion: Android14Api, foregroundServiceType: FgsCamera, requireEffectivePermissionsForMatch: true),
         Rule("SU-CALL-ID-01", AppPermissionRiskLevel.Dangerous, [ReadPhoneNumbers], score: 4, requireEffectivePermissionsForMatch: true),
-        Rule("SU-CALL-STATE-PROF-01", AppPermissionRiskLevel.Dangerous, [ReadPhoneState, QueryAllPackages], score: 4, requireEffectivePermissionsForMatch: true),
+        Rule("SU-CALL-STATE-PROF-01", "phone-state", AppPermissionRiskLevel.Dangerous, [ReadPhoneState, QueryAllPackages], score: 4, requireEffectivePermissionsForMatch: true),
         Rule("SU-GRAPH-CONTACTS-01", AppPermissionRiskLevel.Dangerous, [ReadContacts], score: 3, requireEffectivePermissionsForMatch: true),
-        Rule("SU-GRAPH-ACCOUNTS-01", AppPermissionRiskLevel.Dangerous, [ReadContacts, GetAccounts, ReadPhoneNumbers], score: 4, requireEffectivePermissionsForMatch: true),
+        Rule("SU-GRAPH-ACCOUNTS-01", "accounts", AppPermissionRiskLevel.Dangerous, [ReadContacts, GetAccounts, ReadPhoneNumbers], score: 4, requireEffectivePermissionsForMatch: true),
         Rule("SU-NOTIF-01", AppPermissionRiskLevel.Dangerous, [BindNotificationListenerService], score: 4, requireEffectivePermissionsForMatch: true),
         Rule("SU-VPN-01", AppPermissionRiskLevel.Dangerous, [BindVpnService], score: 4, requiredObservedSignals: [ObservedVpnControl], requireEffectivePermissionsForMatch: true),
         Rule("SU-UI-ACC-01", AppPermissionRiskLevel.Dangerous, [BindAccessibilityService], score: 5, requireEffectivePermissionsForMatch: true),
@@ -185,17 +198,18 @@ public static partial class AppPermissionRiskCatalog
         Rule("SU-PROF-USAGE-01", AppPermissionRiskLevel.Dangerous, [PackageUsageStats], score: 5, requireEffectivePermissionsForMatch: true),
         Rule("SU-PROF-INVENTORY-01", "package-inventory", AppPermissionRiskLevel.Dangerous, [QueryAllPackages], score: 5, requireEffectivePermissionsForMatch: true),
         Rule("SU-FILE-ALL-01", AppPermissionRiskLevel.Dangerous, [ManageExternalStorage], score: 5, requireEffectivePermissionsForMatch: true),
-        Rule("SU-MEDIA-LEGACY-01", AppPermissionRiskLevel.Dangerous, [ReadExternalStorage], score: 3, maxDeviceSdkVersion: Android12LApi, requireEffectivePermissionsForMatch: true),
-        Rule("SU-FILE-WRITE-LEGACY-01", AppPermissionRiskLevel.Dangerous, [WriteExternalStorage], score: 3, maxDeviceSdkVersion: Android12LApi, maxTargetSdkVersion: LegacyExternalStorageMaxTargetSdk, requireEffectivePermissionsForMatch: true),
+        Rule("SU-MEDIA-LEGACY-01", "media", AppPermissionRiskLevel.Dangerous, [ReadExternalStorage], score: 3, requireEffectivePermissionsForMatch: true),
+        Rule("SU-FILE-WRITE-LEGACY-01", AppPermissionRiskLevel.Dangerous, [WriteExternalStorage], score: 3, maxTargetSdkVersion: LegacyExternalStorageMaxTargetSdk, requireEffectivePermissionsForMatch: true),
         Rule("SU-MEDIA-IMG-01", "media", AppPermissionRiskLevel.Dangerous, [ReadMediaImages], score: 3, minDeviceSdkVersion: Android13Api, requireEffectivePermissionsForMatch: true),
         Rule("SU-MEDIA-VID-01", "media", AppPermissionRiskLevel.Dangerous, [ReadMediaVideo], score: 3, minDeviceSdkVersion: Android13Api, requireEffectivePermissionsForMatch: true),
         Rule("SU-MEDIA-AUD-01", "media", AppPermissionRiskLevel.Dangerous, [ReadMediaAudio], score: 3, minDeviceSdkVersion: Android13Api, requireEffectivePermissionsForMatch: true),
         Rule("SU-MEDIA-PARTIAL-01", "media", AppPermissionRiskLevel.Dangerous, [ReadMediaVisualUserSelected], score: 1, minDeviceSdkVersion: Android14Api, excludedPermissions: [ReadMediaImages, ReadMediaVideo], requireEffectivePermissionsForMatch: true),
-        Rule("SU-MEDIA-LOC-LEGACY-01", "media", AppPermissionRiskLevel.Dangerous, [ReadExternalStorage, AccessMediaLocation], score: 4, maxDeviceSdkVersion: Android12LApi, requireEffectivePermissionsForMatch: true),
+        Rule("SU-MEDIA-LOC-PARTIAL-01", "media", AppPermissionRiskLevel.Dangerous, [ReadMediaVisualUserSelected, AccessMediaLocation], score: 2, minDeviceSdkVersion: Android14Api, excludedPermissions: [ReadMediaImages, ReadMediaVideo], requireEffectivePermissionsForMatch: true),
+        Rule("SU-MEDIA-LOC-LEGACY-01", "media", AppPermissionRiskLevel.Dangerous, [ReadExternalStorage, AccessMediaLocation], score: 4, requireEffectivePermissionsForMatch: true),
         Rule("SU-MEDIA-LOC-IMG-01", "media", AppPermissionRiskLevel.Dangerous, [ReadMediaImages, AccessMediaLocation], score: 4, minDeviceSdkVersion: Android13Api, requireEffectivePermissionsForMatch: true),
         Rule("SU-MEDIA-LOC-VID-01", "media", AppPermissionRiskLevel.Dangerous, [ReadMediaVideo, AccessMediaLocation], score: 4, minDeviceSdkVersion: Android13Api, requireEffectivePermissionsForMatch: true),
-        Rule("SU-NEARBY-BLUETOOTH-01", AppPermissionRiskLevel.Dangerous, [NearbyWifiDevices, BluetoothScan], score: 3, minDeviceSdkVersion: Android13Api, requireEffectivePermissionsForMatch: true),
-        Rule("SU-BLUETOOTH-EXFIL-01", AppPermissionRiskLevel.Dangerous, [BluetoothConnect, BluetoothScan], score: 3, minDeviceSdkVersion: Android12Api, requireEffectivePermissionsForMatch: true),
+        Rule("SU-NEARBY-BLUETOOTH-01", "nearby-devices", AppPermissionRiskLevel.Dangerous, [NearbyWifiDevices, BluetoothScan], score: 3, minDeviceSdkVersion: Android13Api, requireEffectivePermissionsForMatch: true),
+        Rule("SU-BLUETOOTH-EXFIL-01", "nearby-devices", AppPermissionRiskLevel.Dangerous, [BluetoothConnect, BluetoothScan], score: 3, minDeviceSdkVersion: Android12Api, requireEffectivePermissionsForMatch: true),
         Rule("SU-PROX-RANGING-01", AppPermissionRiskLevel.Dangerous, [Ranging], score: 4, minDeviceSdkVersion: Android16Api, requireEffectivePermissionsForMatch: true),
         Rule("SU-LAN-16-01", AppPermissionRiskLevel.Dangerous, [NearbyWifiDevices], score: 3, minDeviceSdkVersion: Android16Api, maxDeviceSdkVersion: Android16Api, minTargetSdkVersion: Android16Api, requireEffectivePermissionsForMatch: true, extraCondition: c => c.IsLocalNetworkRestrictionEnabled == true),
         Rule("SU-LAN-17-01", AppPermissionRiskLevel.Dangerous, [AccessLocalNetwork], score: 2, minDeviceSdkVersion: Android17Api, minTargetSdkVersion: Android17Api, requireEffectivePermissionsForMatch: true),

@@ -73,8 +73,7 @@ public static class AppRiskReportBuilder
             }
             foreach (var id in _sources.Keys) _access[id] = Evaluate(Meanings[id]);
             RequireUnderlyingAccess("location-background", "location-fine", "location-coarse");
-            RequireUnderlyingAccess("health-background", "health-read");
-            RequireUnderlyingAccess("health-history", "health-read");
+            RequireHealthDataAccess();
             RequireUnderlyingAccess("body-background", "body-sensors");
             var visible = Meanings.Keys.Where(_sources.ContainsKey)
                 .Where(id => id != "location-coarse" || !Available("location-fine") || !Available(id))
@@ -153,6 +152,9 @@ public static class AppRiskReportBuilder
 
         private string Action(string id)
         {
+            if (id == "health-background" && _access[id] == Access.Available
+                && GetHealthDataStates().Any(state => state != Access.Available))
+                return "читать часть записей о здоровье, когда приложение не открыто на экране";
             if (id == "selected-media" && Available("files-all"))
                 return "читать выбранные вами фотографии и видео";
             if (id == "media-location")
@@ -170,6 +172,25 @@ public static class AppRiskReportBuilder
             if (_access.ContainsKey(condition) && !underlying.Any(id => _access.TryGetValue(id, out var state) && state == Access.Available))
                 _access[condition] = Access.Requested;
         }
+
+        private void RequireHealthDataAccess()
+        {
+            if (_access.ContainsKey("health-background") && !GetHealthDataStates().Contains(Access.Available))
+                _access["health-background"] = Access.Requested;
+            // History changes the date range; it does not require background access.
+            if (_access.TryGetValue("health-history", out var history))
+                _access["health-history"] = (Access)Math.Min((int)history,
+                    (int)_access.GetValueOrDefault("health-read", Access.Requested));
+        }
+
+        private IEnumerable<Access> GetHealthDataStates() =>
+            _sources.TryGetValue("health-read", out var sources)
+                ? sources.SelectMany(f => f.Evidence).Select(e => e.SignalId)
+                    .Where(s => s.StartsWith("android.permission.health.READ_", StringComparison.Ordinal)
+                        && s is not "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
+                            and not "android.permission.health.READ_HEALTH_DATA_HISTORY")
+                    .Distinct(StringComparer.Ordinal).Select(s => EvaluateSignal(s))
+                : [];
 
         private Access Evaluate(Meaning meaning)
         {
@@ -287,7 +308,7 @@ public static class AppRiskReportBuilder
             Topic.Recording => ids.Contains("microphone") && ids.Contains("camera") ? "Микрофон и камера"
                 : ids.Contains("microphone") ? "Микрофон" : "Камера",
             Topic.Screen => "Экран и уведомления", Topic.Files => FileTitle(ids),
-            Topic.Health => "Здоровье и активность", Topic.Usage => "Использование приложений",
+            Topic.Health => "Здоровье и активность", Topic.Usage => "Данные о приложениях",
             Topic.Ads => "Реклама", Topic.Nearby => "Устройства поблизости", _ => "Управление телефоном"
         };
 

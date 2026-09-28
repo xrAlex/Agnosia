@@ -530,7 +530,8 @@ public sealed class AppPermissionRiskCatalogTests
             ],
             DeviceSdkVersion: 32,
             TargetSdkVersion: 29,
-            GrantedPermissions: ["android.permission.WRITE_EXTERNAL_STORAGE"]));
+            GrantedPermissions: ["android.permission.WRITE_EXTERNAL_STORAGE"],
+            HasLegacyExternalStorageAccess: true));
         var modernTargetResult = AppPermissionRiskCatalog.Analyze(new AppPermissionRiskInput(
             [
                 "android.permission.WRITE_EXTERNAL_STORAGE",

@@ -49,7 +49,7 @@ public sealed class AppRiskReportCoverageTests
             Assert.DoesNotContain(forbidden, text);
     }
 
-    // Independent expectations include every distinct action/condition of all 98 rules.
+    // Independent expectations include every distinct action/condition of every rule.
     internal static IReadOnlyDictionary<string, string[]> ExpectedWords { get; } = CreateExpectations();
 
     private static Dictionary<string, string[]> CreateExpectations()
@@ -82,7 +82,18 @@ public sealed class AppRiskReportCoverageTests
         Add("SU-SMS-READ-01", "сохранённые");
         Add("SU-SMS-RECEIVE-01", "новые");
         Add("SU-SMS-SEND-01", "отправлять", "расходам");
-        Add("SU-SMS-MMS-01", "получать", "читать", "SMS");
+        Add("SU-SMS-MMS-01", "получать", "читать", "MMS");
+        Add("SU-CALL-ANSWER-01", "отвечать", "звонки");
+        Add("SU-CALL-HANDOVER-01", "продолжать звонки", "другом приложении");
+        Add("SU-CALL-VOICEMAIL-ADD-01", "добавлять сообщения", "голосовую почту");
+        Add("SU-CALL-STATE-01", "мобильной сети", "идёт ли звонок");
+        Add("SU-GRAPH-ACCOUNTS-02", "аккаунтах");
+        Add("SU-BLUETOOTH-SCAN-01", "обнаруживать", "Bluetooth");
+        Add("SU-BLUETOOTH-CONNECT-01", "обмениваться", "Bluetooth");
+        Add("SU-NEARBY-WIFI-01", "Wi-Fi", "взаимодействовать");
+        Add("SU-APK-INSTALL-02", "предлагать установку");
+        Add("SU-HEALTH-BG-01", "здоровье", "не открыто");
+        Add("SU-HEALTH-SENSORS-BG-01", "датчиков здоровья", "не открыто");
         Add("SU-SMS-WAP-01", "служебные сообщения");
         Add("SU-SMS-ROLE-01", "основным для SMS");
         Add("CR-CALL-LOG-WRITE-01", "читать журнал", "изменять и удалять", "номер телефона", "интернет");
@@ -123,13 +134,14 @@ public sealed class AppRiskReportCoverageTests
         Add("CR-FILE-ALL-PERSIST-02", "читать и изменять", "батареи", "интернет");
         Add("CR-FILE-ALL-MEDIA-LOC-01", "читать и изменять", "место съёмки", "интернет");
         Add("SU-FILE-ALL-01", "читать и изменять");
-        Add("SU-MEDIA-LEGACY-01", "читать файлы");
+        Add("SU-MEDIA-LEGACY-01", "фотографии", "видео", "аудиофайлы", "общем хранилище");
         Add("SU-FILE-WRITE-LEGACY-01", "сохранять и изменять");
         Add("SU-MEDIA-IMG-01", "просматривать фотографии");
         Add("SU-MEDIA-VID-01", "просматривать видеозаписи");
         Add("SU-MEDIA-AUD-01", "читать аудиофайлы");
         Add("SU-MEDIA-PARTIAL-01", "выбранные вами фотографии и видео");
-        Add("SU-MEDIA-LOC-LEGACY-01", "читать файлы", "место съёмки");
+        Add("SU-MEDIA-LOC-LEGACY-01", "общем хранилище", "место съёмки");
+        Add("SU-MEDIA-LOC-PARTIAL-01", "выбранные вами", "место съёмки");
         Add("SU-MEDIA-LOC-IMG-01", "просматривать фотографии", "место съёмки");
         Add("SU-MEDIA-LOC-VID-01", "просматривать видеозаписи", "место съёмки");
         Add("SU-GRAPH-CONTACTS-01", "читать контакты");

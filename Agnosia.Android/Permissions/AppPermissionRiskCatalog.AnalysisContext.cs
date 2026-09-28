@@ -33,11 +33,16 @@ public static partial class AppPermissionRiskCatalog
         private bool? IsInputMethodEnabled { get; init; }
         private bool? IsAutofillServiceEnabled { get; init; }
         private bool? IsDeviceAdminEnabled { get; init; }
+        private bool? HasLegacyExternalStorageAccess { get; init; }
 
         public bool IsForegroundOnly(string permission) => ForegroundOnlyPermissions.Contains(permission);
 
         public bool HasHealthDataAccess => GetPermissionsByPrefix(HealthReadPrefix)
             .Any(p => p is not HealthBackground and not HealthHistory && HasEffectivePermission(p));
+
+        public bool HasBackgroundHealthDataAccess => GetPermissionsByPrefix(HealthReadPrefix)
+            .Any(p => p is not HealthBackground and not HealthHistory
+                      && HasEffectivePermission(p) && !IsForegroundOnly(p));
 
         public bool? IsAccessibilityServiceEnabled { get; }
 

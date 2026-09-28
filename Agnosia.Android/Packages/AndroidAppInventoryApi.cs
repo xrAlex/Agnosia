@@ -15,6 +15,7 @@ public static class AndroidAppInventoryApi
     private const int RequestedPermissionGrantedFlag = 2;
     private const int AppOpModeForeground = 4;
     private const string ManageExternalStorageOp = "android:manage_external_storage";
+    private const string LegacyStorageOp = "android:legacy_storage";
     private const string RequestInstallPackagesOp = "android:request_install_packages";
     private const string ScheduleExactAlarmOp = "android:schedule_exact_alarm";
     private const string UsageStatsOp = "android:get_usage_stats";
@@ -477,7 +478,10 @@ public static class AndroidAppInventoryApi
                 IsInputMethodEnabled: specialAccess.InputMethodPackages?.Contains(packageName),
                 IsAutofillServiceEnabled: specialAccess.AutofillPackages?.Contains(packageName),
                 IsDeviceAdminEnabled: specialAccess.DeviceAdminPackages?.Contains(packageName),
-                BlockedAppOpPermissions: permissionOps.Where(pair => pair.Value is AppOpsManagerMode.Ignored or AppOpsManagerMode.Errored).Select(pair => pair.Key)));
+                BlockedAppOpPermissions: permissionOps.Where(pair => pair.Value is AppOpsManagerMode.Ignored or AppOpsManagerMode.Errored).Select(pair => pair.Key),
+                HasLegacyExternalStorageAccess: appInfo is not null && (int)appInfo.TargetSdkVersion <= 29
+                    && packageInfo.RequestedPermissions?.Contains("android.permission.WRITE_EXTERNAL_STORAGE") == true
+                        ? IsAppOpAllowed(context, appInfo, LegacyStorageOp) : null));
             return true;
         }
         catch (Exception exception) when (exception is PackageManager.NameNotFoundException

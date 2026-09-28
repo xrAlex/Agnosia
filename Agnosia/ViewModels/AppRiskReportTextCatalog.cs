@@ -28,17 +28,19 @@ internal static class AppRiskReportTextCatalog
             new("phone-number", Topic.Calls, "узнавать ваш номер телефона", ["READ_PHONE_NUMBERS"], TransferObject: "номер телефона"),
             new("call-place", Topic.Calls, "совершать телефонные звонки", ["CALL_PHONE"], "Звонки могут приводить к расходам на связь."),
             new("call-answer", Topic.Calls, "отвечать на входящие звонки", ["ANSWER_PHONE_CALLS"]),
+            new("call-handover", Topic.Calls, "продолжать звонки, начатые в другом приложении", ["ACCEPT_HANDOVER"]),
+            new("voicemail-add", Topic.Calls, "добавлять сообщения в голосовую почту устройства", ["com.android.voicemail.permission.ADD_VOICEMAIL"]),
             new("call-state", Topic.Calls, "узнавать, подключён ли телефон к мобильной сети и идёт ли звонок", ["READ_PHONE_STATE"]),
             new("call-role", Topic.Calls, "обрабатывать телефонные звонки", ["android.observed.DefaultDialerRole"], ConfirmedText: "Приложение выбрано основным для телефонных звонков."),
             new("sms-read", Topic.Messages, "читать сохранённые SMS", ["READ_SMS"], TransferObject: "содержимое SMS"),
             new("sms-receive", Topic.Messages, "получать новые SMS", ["RECEIVE_SMS"], TransferObject: "содержимое новых SMS"),
             new("sms-send", Topic.Messages, "отправлять SMS", ["SEND_SMS"], "Отправка SMS может приводить к расходам на связь."),
-            new("mms", Topic.Messages, "получать и читать SMS сообщения", ["RECEIVE_MMS"]),
+            new("mms", Topic.Messages, "получать и читать MMS", ["RECEIVE_MMS"]),
             new("wap", Topic.Messages, "получать служебные сообщения от мобильного оператора", ["RECEIVE_WAP_PUSH"]),
             new("sms-role", Topic.Messages, "обрабатывать SMS", ["android.observed.DefaultSmsRole"], ConfirmedText: "Приложение выбрано основным для SMS."),
             new("contacts-read", Topic.Contacts, "читать контакты, включая имена и номера телефонов", ["READ_CONTACTS"]),
             new("contacts-write", Topic.Contacts, "изменять и удалять контакты", ["WRITE_CONTACTS"]),
-            new("accounts", Topic.Contacts, "узнавать об аккаунтах на телефоне", ["GET_ACCOUNTS"]),
+            new("accounts", Topic.Contacts, "узнавать о доступных ему аккаунтах на телефоне", ["GET_ACCOUNTS"]),
             new("calendar-read", Topic.Calendar, "читать события календаря", ["READ_CALENDAR"]),
             new("calendar-write", Topic.Calendar, "создавать, изменять и удалять события календаря", ["WRITE_CALENDAR"]),
             new("microphone", Topic.Recording, "использовать микрофон", ["RECORD_AUDIO"], TransferObject: "записи с микрофона"),
@@ -52,8 +54,8 @@ internal static class AppRiskReportTextCatalog
             new("keyboard", Topic.Screen, "обрабатывать текст, который вы вводите через его клавиатуру", ["BIND_INPUT_METHOD"]),
             new("autofill", Topic.Screen, "читать данные в полях, которые оно помогает заполнять автоматически", ["BIND_AUTOFILL_SERVICE"]),
             new("files-all", Topic.Files, "читать и изменять файлы на телефоне", ["MANAGE_EXTERNAL_STORAGE"], TransferObject: "содержимое файлов"),
-            new("files-legacy", Topic.Files, "читать файлы на телефоне", ["READ_EXTERNAL_STORAGE"]),
-            new("files-write", Topic.Files, "сохранять и изменять файлы на телефоне", ["WRITE_EXTERNAL_STORAGE"]),
+            new("files-legacy", Topic.Files, "читать фотографии, видео и аудиофайлы в общем хранилище", ["READ_EXTERNAL_STORAGE"]),
+            new("files-write", Topic.Files, "сохранять и изменять файлы в общем хранилище", ["WRITE_EXTERNAL_STORAGE"]),
             new("photos", Topic.Files, "просматривать фотографии на телефоне", ["READ_MEDIA_IMAGES"]),
             new("videos", Topic.Files, "просматривать видеозаписи на телефоне", ["READ_MEDIA_VIDEO"]),
             new("audio", Topic.Files, "читать аудиофайлы на телефоне", ["READ_MEDIA_AUDIO"]),
@@ -112,6 +114,10 @@ internal static class AppRiskReportTextCatalog
         Add(["SU-CALL-ID-01"], ["phone-number"]);
         Add(["SU-CALL-PLACE-01"], ["call-place"]);
         Add(["SU-CALL-MIC-01"], ["call-answer", "microphone"]);
+        Add(["SU-CALL-ANSWER-01"], ["call-answer"]);
+        Add(["SU-CALL-HANDOVER-01"], ["call-handover"]);
+        Add(["SU-CALL-VOICEMAIL-ADD-01"], ["voicemail-add"]);
+        Add(["SU-CALL-STATE-01"], ["call-state"]);
         Add(["SU-CALL-STATE-PROF-01"], ["call-state", "inventory"]);
         Add(["SU-CALL-ROLE-01"], ["call-role"]);
         Add(["CR-SMS-SEND-01"], ["sms-receive", "sms-send"], true);
@@ -126,6 +132,7 @@ internal static class AppRiskReportTextCatalog
         Add(["SU-GRAPH-CONTACTS-01"], ["contacts-read"]);
         Add(["SU-GRAPH-WRITE-01"], ["contacts-write"]);
         Add(["SU-GRAPH-ACCOUNTS-01"], ["contacts-read", "accounts", "phone-number"]);
+        Add(["SU-GRAPH-ACCOUNTS-02"], ["accounts"]);
         Add(["SU-CALENDAR-READ-01"], ["calendar-read"]);
         Add(["SU-CALENDAR-WRITE-01"], ["calendar-write"]);
         Add(["CR-HEALTH-BG-01"], ["health-read", "health-background"], true);
@@ -134,6 +141,8 @@ internal static class AppRiskReportTextCatalog
         Add(["SU-HEALTH-WRITE-01"], ["health-write"]);
         Add(["SU-HEALTH-HISTORY-01"], ["health-read", "health-history"]);
         Add(["SU-HEALTH-SENSORS-01"], ["body-sensors"]);
+        Add(["SU-HEALTH-BG-01"], ["health-read", "health-background"]);
+        Add(["SU-HEALTH-SENSORS-BG-01"], ["body-sensors", "body-background"]);
         Add(["SU-HEALTH-ACTIVITY-01"], ["activity"]);
         Add(["CR-UI-ACC-01"], ["accessibility"], true);
         Add(["CR-UI-ACC-OVERLAY-01"], ["accessibility", "overlay"], true);
@@ -161,6 +170,7 @@ internal static class AppRiskReportTextCatalog
         Add(["SU-MEDIA-VID-01"], ["videos"]);
         Add(["SU-MEDIA-AUD-01"], ["audio"]);
         Add(["SU-MEDIA-PARTIAL-01"], ["selected-media"]);
+        Add(["SU-MEDIA-LOC-PARTIAL-01"], ["selected-media", "media-location"]);
         Add(["SU-MEDIA-LOC-LEGACY-01"], ["files-legacy", "media-location"]);
         Add(["SU-MEDIA-LOC-IMG-01"], ["photos", "media-location"]);
         Add(["SU-MEDIA-LOC-VID-01"], ["videos", "media-location"]);
@@ -169,11 +179,15 @@ internal static class AppRiskReportTextCatalog
         Add(["SU-NEARBY-BLUETOOTH-01"], ["nearby-wifi", "bluetooth-scan"]);
         Add(["SU-BLUETOOTH-EXFIL-01"], ["bluetooth-scan", "bluetooth-connect"]);
         Add(["SU-BLUETOOTH-ADVERTISE-01"], ["bluetooth-advertise"]);
+        Add(["SU-BLUETOOTH-SCAN-01"], ["bluetooth-scan"]);
+        Add(["SU-BLUETOOTH-CONNECT-01"], ["bluetooth-connect"]);
+        Add(["SU-NEARBY-WIFI-01"], ["nearby-wifi"]);
         Add(["SU-PROX-UWB-01"], ["uwb"]);
         Add(["SU-PROX-RANGING-01"], ["ranging"]);
         Add(["SU-LAN-16-01"], ["lan-16"]);
         Add(["SU-LAN-17-01"], ["lan-17"]);
         Add(["SU-APK-INSTALL-01"], ["install", "inventory"]);
+        Add(["SU-APK-INSTALL-02"], ["install"]);
         Add(["SU-UI-ADMIN-01"], ["admin"]);
         Add(["SU-VPN-01"], ["vpn"]);
         Add(["SU-ASSIST-ROLE-01"], ["assistant-role"]);

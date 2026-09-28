@@ -27,6 +27,7 @@ public static partial class AppPermissionRiskCatalog
             IsInputMethodEnabled = input.IsInputMethodEnabled;
             IsAutofillServiceEnabled = input.IsAutofillServiceEnabled;
             IsDeviceAdminEnabled = input.IsDeviceAdminEnabled;
+            HasLegacyExternalStorageAccess = input.HasLegacyExternalStorageAccess;
 
             var requestedPermissions = NormalizeDistinct(input.RequestedPermissions);
             var servicePermissions = NormalizeDistinct(input.ServicePermissions);
