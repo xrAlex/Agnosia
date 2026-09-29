@@ -18,5 +18,6 @@ public enum VpnAutomationClientKind
     OlcNgFdroid,
     V2RayTun,
     LxBox,
-    Karing
+    Karing,
+    FlClashX
 }

@@ -34,9 +34,12 @@
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
-    <Style Selector="ToggleButton.app-dialog-section-toggle:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Style Selector="ToggleButton.app-dialog-section-toggle:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.app-dialog-section-toggle:pressed /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.app-dialog-section-toggle:checked /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="ToggleButton.app-dialog-section-toggle TextBlock.app-dialog-setting-title">
+        <Setter Property="Foreground" Value="{DynamicResource AppTextPrimaryBrush}" />
     </Style>
     <Style Selector="PathIcon.disclosure-chevron">
         <Setter Property="Width" Value="16" />
@@ -296,6 +299,11 @@
     </Style>
     <Style Selector="Button:pressed">
         <Setter Property="Background" Value="{StaticResource AppSurfaceAltBrush}" />
+    </Style>
+    <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button:pressed /template/ ContentPresenter#PART_ContentPresenter, Button:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{ReflectionBinding Background, RelativeSource={RelativeSource TemplatedParent}}" />
+        <Setter Property="BorderBrush" Value="{ReflectionBinding BorderBrush, RelativeSource={RelativeSource TemplatedParent}}" />
+        <Setter Property="Foreground" Value="{ReflectionBinding Foreground, RelativeSource={RelativeSource TemplatedParent}}" />
     </Style>
     <Style Selector="Button:disabled">
         <Setter Property="Opacity" Value="0.55" />

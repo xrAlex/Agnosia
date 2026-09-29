@@ -84,6 +84,7 @@ public partial class DashboardWorkspaceViewModel
         return
         [
             new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.FlClash, "FlClash"),
+            new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.FlClashX, "FlClashX"),
             new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.ClashMeta, "Clash Meta"),
             new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.Happ, "Happ"),
             new VpnAutomationClientOptionViewModel(this, VpnAutomationClientKind.Tunguska, "Tunguska"),

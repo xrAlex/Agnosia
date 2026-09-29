@@ -11,7 +11,7 @@
         <vm:DashboardWorkspaceViewModel />
     </Design.DataContext>
 
-    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <controls:FadingScrollViewer HorizontalScrollBarVisibility="Disabled">
         <StackPanel Classes="content-root">
             <Border Classes="surface-card hero"
                     IsVisible="{Binding IsUnsupportedVisible}">
@@ -153,5 +153,5 @@
                 </controls:MasonryPanel>
             </StackPanel>
         </StackPanel>
-    </ScrollViewer>
+    </controls:FadingScrollViewer>
 </UserControl>

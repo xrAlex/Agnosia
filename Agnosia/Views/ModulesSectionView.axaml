@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:Agnosia.Controls"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Agnosia.ViewModels"
@@ -11,7 +12,7 @@
         <vm:DashboardWorkspaceViewModel />
     </Design.DataContext>
 
-    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <controls:FadingScrollViewer HorizontalScrollBarVisibility="Disabled">
         <StackPanel Classes="content-root">
             <TextBlock Classes="page-title"
                        Text="Модули" />
@@ -73,5 +74,5 @@
                 </ItemsControl>
             </StackPanel>
         </StackPanel>
-    </ScrollViewer>
+    </controls:FadingScrollViewer>
 </UserControl>

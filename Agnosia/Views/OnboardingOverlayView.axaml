@@ -27,7 +27,7 @@
 
         <views:AppHeaderView Grid.Row="0" />
 
-        <ScrollViewer Grid.Row="1"
+        <controls:FadingScrollViewer Grid.Row="1"
                       HorizontalScrollBarVisibility="Disabled">
             <StackPanel Classes="content-root">
                 <StackPanel IsVisible="{Binding IsOnboardingWelcomeStep}"
@@ -184,7 +184,7 @@
 
                 </StackPanel>
             </StackPanel>
-        </ScrollViewer>
+        </controls:FadingScrollViewer>
 
         <Border Grid.Row="2"
                 Background="{StaticResource AppChromeBrush}"

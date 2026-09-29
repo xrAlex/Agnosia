@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:Agnosia.Controls"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Agnosia.ViewModels"
@@ -54,10 +55,10 @@
                         </WrapPanel>
                     </Grid>
 
-                    <ScrollViewer Grid.Row="1"
+                    <controls:FadingScrollViewer Grid.Row="1"
                                   HorizontalScrollBarVisibility="Disabled">
                         <views:PermissionListView Items="{Binding PermissionItems}" />
-                    </ScrollViewer>
+                    </controls:FadingScrollViewer>
 
                     <TextBlock Grid.Row="2"
                                Classes="page-caption"

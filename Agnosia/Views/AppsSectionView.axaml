@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:Agnosia.Controls"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Agnosia.ViewModels"
@@ -75,7 +76,7 @@
             </StackPanel>
         </StackPanel>
 
-        <ScrollViewer Grid.Row="1"
+        <controls:FadingScrollViewer Grid.Row="1"
                       IsVisible="{Binding IsDashboardVisible}"
                       BringIntoViewOnFocusChange="False"
                       HorizontalScrollBarVisibility="Disabled"
@@ -145,6 +146,6 @@
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
             </ItemsControl>
-        </ScrollViewer>
+        </controls:FadingScrollViewer>
     </Grid>
 </UserControl>

@@ -60,7 +60,7 @@
                     Margin="{StaticResource AppOverlayMargin}"
                     HorizontalAlignment="Stretch"
                     VerticalAlignment="Center">
-                <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                <controls:FadingScrollViewer HorizontalScrollBarVisibility="Disabled"
                               VerticalScrollBarVisibility="Auto">
                 <Grid RowDefinitions="Auto,Auto"
                       RowSpacing="14">
@@ -114,7 +114,7 @@
                         </Button>
                     </StackPanel>
                 </Grid>
-                </ScrollViewer>
+                </controls:FadingScrollViewer>
             </Border>
         </Grid>
     </Grid>

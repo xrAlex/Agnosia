@@ -45,6 +45,14 @@ public static class AndroidVpnAutomationApi
             RequireExplicitActivity: true,
             IsolateActivityTask: true),
         new(
+            VpnAutomationClientKind.FlClashX,
+            "FlClashX",
+            "com.follow.clashx",
+            "com.follow.clashx.action.START",
+            ActivityClassName: "com.follow.clashx.TempActivity",
+            RequireExplicitActivity: true,
+            IsolateActivityTask: true),
+        new(
             VpnAutomationClientKind.Incy,
             "INCY",
             "llc.itdev.incy",

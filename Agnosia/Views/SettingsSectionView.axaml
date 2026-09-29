@@ -11,7 +11,7 @@
         <vm:DashboardWorkspaceViewModel />
     </Design.DataContext>
 
-    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <controls:FadingScrollViewer HorizontalScrollBarVisibility="Disabled">
         <StackPanel Classes="content-root"
                     HorizontalAlignment="Stretch">
             <TextBlock Classes="page-title"
@@ -146,5 +146,5 @@
                            Text="{Binding AppVersion, StringFormat='Версия {0}'}" />
             </StackPanel>
         </StackPanel>
-    </ScrollViewer>
+    </controls:FadingScrollViewer>
 </UserControl>

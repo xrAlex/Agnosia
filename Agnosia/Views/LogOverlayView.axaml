@@ -81,7 +81,7 @@
 
         <Border Grid.Row="1"
                 Classes="surface-card log-panel">
-            <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+            <controls:FadingScrollViewer HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Auto">
                 <ItemsControl Classes="log-list"
                               ItemsSource="{Binding LogLines}">
@@ -99,7 +99,7 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-            </ScrollViewer>
+            </controls:FadingScrollViewer>
         </Border>
 
         <Grid Grid.Row="2"
